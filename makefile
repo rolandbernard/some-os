@@ -4,7 +4,7 @@ BUILD := debug
 # ==
 
 # == Targets
-TARGETS := kernel bootloader
+TARGETS := kernel
 # ==
 
 # == Directories
