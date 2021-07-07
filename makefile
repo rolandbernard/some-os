@@ -33,10 +33,11 @@ BINARYS        := $(patsubst %, $(BINARY_DIR)/%, $(TARGETS))
 CC       ?= clang
 LINK     ?= ld
 OBJDUMP  ?= objdump
+#==
 
-QEMU_BIN       = qemu-system-x86_64
-QEMU_ARGS      = -smp 4 -m 128M -display none
-QEMU_DEVICES   = -serial stdio
+# == Qemu
+QEMU           = qemu-system-x86_64
+QEMU_ARGS      = -smp 4 -m 128M -display none -serial stdio
 # ==
 
 # == Flags
@@ -78,11 +79,7 @@ $(BINARYS): $(BINARY_DIR)/%: $(OBJECTS) $$(OBJECTS.$$*) $(SOURCE_DIR)/$$*/$(ARCH
 	@$(ECHO) "Building $@"
 	$(LINK) $(LDFLAGS) -o $@  $(OBJECTS) $(OBJECTS.$*) -T$(SOURCE_DIR)/$*/$(ARCH)/link.ld
 
-$(OBJECT_DIR)/%.c.o: $(SOURCE_DIR)/%.c $(MAKEFILE_LIST) | $$(dir $$@)
-	@$(ECHO) "Building $@"
-	$(CC) $(CCFLAGS) -c -o $@ $<
-
-$(OBJECT_DIR)/%.S.o: $(SOURCE_DIR)/%.S $(MAKEFILE_LIST) | $$(dir $$@)
+$(OBJECT_DIR)/%.o: $(SOURCE_DIR)/% $(MAKEFILE_LIST) | $$(dir $$@)
 	@$(ECHO) "Building $@"
 	$(CC) $(CCFLAGS) -c -o $@ $<
 
@@ -93,7 +90,7 @@ $(OBJECT_DIR)/%.S.o: $(SOURCE_DIR)/%.S $(MAKEFILE_LIST) | $$(dir $$@)
 # Running
 
 qemu: $(BINARY_DIR)/kernel
-	$(QEMU_BIN) $(QEMU_ARGS) $(QEMU_DEVICES) -kernel $(BINARY_DIR)/kernel
+	$(QEMU) $(QEMU_ARGS) -kernel $(BINARY_DIR)/kernel
 
 # Cleanup
 

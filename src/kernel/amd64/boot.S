@@ -12,15 +12,13 @@
 
 #define XEN_ELFNOTE_PHYS32_ENTRY 18
 
-.code64
-
 ELFNOTE(Xen, XEN_ELFNOTE_PHYS32_ENTRY, .long _start)
 
-.section .text
+.section .text.boot
+
 .global kernelMain
 .global _start
 
-.section .text.boot
 _start:
     call kernelMain
 
