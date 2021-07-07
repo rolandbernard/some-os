@@ -36,8 +36,11 @@ OBJDUMP  ?= objdump
 #==
 
 # == Qemu
-QEMU           = qemu-system-x86_64
-QEMU_ARGS      = -smp 4 -m 128M -display none -serial stdio
+QEMU      := qemu-system-x86_64
+
+QEMU_ARGS := -smp 1 -m 128M
+QEMU_ARGS += -monitor telnet:127.0.0.1:55555,server,nowait
+QEMU_ARGS += -display none -serial stdio
 # ==
 
 # == Flags

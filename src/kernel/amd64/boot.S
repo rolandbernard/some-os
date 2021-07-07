@@ -21,4 +21,7 @@ ELFNOTE(Xen, XEN_ELFNOTE_PHYS32_ENTRY, .long _start)
 
 _start:
     call kernelMain
+1:
+    hlt
+    jmp 1b
 

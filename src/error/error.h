@@ -2,8 +2,7 @@
 #define _ERROR_H_
 
 typedef enum {
-    NONE = 0,
-    UNKNOWN,
+    SUCCESS = 0,
 
     UNSUPPORTED,
     INIT_FAILED,
