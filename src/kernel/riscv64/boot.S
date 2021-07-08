@@ -3,7 +3,7 @@
 .section .data
 
 .section .text.boot
-.global kernelMain
+.global runtimeInit
 .global _start
 
 _start:
@@ -23,7 +23,7 @@ _start:
     # Enter the kernel in M mode
     li t0, 0b11 << 11
     csrw mstatus, t0
-    la t0, kernelMain
+    la t0, runtimeInit
     csrw mepc, t0
     la ra, 1f 
     mret
