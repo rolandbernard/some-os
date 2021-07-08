@@ -1,7 +1,7 @@
 
 # == Build type
 BUILD := debug
-ARCH  := amd64
+ARCH  := riscv64
 # ==
 
 # == Targets
@@ -30,16 +30,15 @@ BINARYS        := $(patsubst %, $(BINARY_DIR)/%, $(TARGETS))
 # ==
 
 # == Tools
-CC       ?= clang
-LINK     ?= ld
-OBJDUMP  ?= objdump
+CC       := clang -target $(ARCH)
+LINK     := ld.lld
 #==
 
 # == Qemu
-QEMU      := qemu-system-x86_64
+QEMU      := qemu-system-riscv64
 
-QEMU_ARGS := -smp 1 -m 128M
-QEMU_ARGS += -monitor telnet:127.0.0.1:55555,server,nowait
+QEMU_ARGS := -M virt -smp 4 -m 128M
+QEMU_ARGS += -cpu rv64 -bios none
 QEMU_ARGS += -display none -serial stdio
 # ==
 
@@ -51,7 +50,7 @@ LDFLAGS.debug   += -O0 -g
 CCFLAGS.release += -O3
 LDFLAGS.release += -O3
 
-CCFLAGS += $(CCFLAGS.$(BUILD)) $(WARNINGS) -MMD -MP -I$(SOURCE_DIR) -nostdlib 
+CCFLAGS += $(CCFLAGS.$(BUILD)) $(WARNINGS) -MMD -MP -I$(SOURCE_DIR) -nostdlib -mno-relax -fpic
 LDFLAGS += $(LDFLAGS.$(BUILD)) -static
 # ==
 

@@ -5,10 +5,11 @@
 #include <stdint.h>
 
 #include "error/error.h"
+#include "devices/serial/serial.h"
 
 typedef struct {
+    volatile uint8_t* const base_address;
     bool initialized;
-    uint8_t* base_address;
 } Uart16550;
 
 Error initUart16550(Uart16550* uart);
@@ -16,5 +17,7 @@ Error initUart16550(Uart16550* uart);
 Error writeUart16550(Uart16550* uart, char value);
 
 Error readUart16550(Uart16550* uart, char* value);
+
+Serial serialUart16550(Uart16550* uart);
 
 #endif

@@ -5,9 +5,7 @@ typedef enum {
     SUCCESS = 0,
 
     UNSUPPORTED,
-    INIT_FAILED,
-    UNEXPECTED_STATE,
-    NO_RESPONSE,
+    NOT_INITIALIZED,
 } Error;
 
 #endif
