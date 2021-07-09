@@ -3,6 +3,6 @@
 
 #include "error/error.h"
 
-Error logKernelMessage(const char* msg);
+Error logKernelMessage(const char* fmt, ...);
 
 #endif

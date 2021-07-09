@@ -161,7 +161,7 @@ int vsnprintf(char* buf, size_t size, const char* fmt, va_list args) {
             fmt++;
             Flags flags = 0;
             int width = 0;
-            int precision = 0;
+            int precision = -1;
             Length length = LENGTH_INT;
             for (;;) {
                 if (*fmt == '#') {
@@ -179,10 +179,27 @@ int vsnprintf(char* buf, size_t size, const char* fmt, va_list args) {
                 }
                 fmt++;
             }
-            width = readInt(&fmt);
+            if (*fmt == '*') {
+                fmt++;
+                width = va_arg(args, int);
+            } else {
+                width = readInt(&fmt);
+            }
+            if (width < 0) {
+                width = -width;
+                flags |= FLAG_LEFT;
+            }
             if (*fmt == '.') {
                 fmt++;
-                precision = readInt(&fmt);
+                if (*fmt == '*') {
+                    fmt++;
+                    precision = va_arg(args, int);
+                } else {
+                    precision = readInt(&fmt);
+                }
+                if (precision < 0) {
+                    precision = 0;
+                }
             }
             if (*fmt == 'h') {
                 fmt++;

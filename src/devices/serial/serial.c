@@ -5,6 +5,8 @@
 
 #include "devices/serial/serial.h"
 
+#include "util/text.h"
+
 static Error writeStringToSerial(Serial serial, const char* str) {
     while (*str != 0) {
         Error res = serial.write(serial.data, *str);
@@ -17,14 +19,7 @@ static Error writeStringToSerial(Serial serial, const char* str) {
 }
 
 Error writeToSerial(Serial serial, const char* fmt, ...) {
-    va_list args;
-    va_start(args, fmt);
-    size_t size = vsnprintf(NULL, 0, fmt, args);
-    va_end(args);
-    va_start(args, fmt);
-    char string[size + 1];
-    vsnprintf(string, size + 1, fmt, args);
-    va_end(args);
+    FORMAT_STRING(string, fmt);
     return writeStringToSerial(serial, string);
 }
 
