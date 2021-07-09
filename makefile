@@ -6,6 +6,7 @@ ARCH  := riscv64
 
 # == Targets
 TARGETS := kernel
+ARCHS   := riscv64
 # ==
 
 # == Directories
@@ -16,15 +17,19 @@ BINARY_DIR := $(BUILD_DIR)/$(BUILD)/bin
 # ==
 
 # == Files
+$(foreach ARC, $(ARCHS), \
+	$(eval SOURCES.$(ARC) := \
+		$(shell find $(SOURCE_DIR) -type f -path '*/$(ARC)/*.[cS]' 2> /dev/null)) \
+	$(eval OBJECTS.$(ARC) := $(patsubst $(SOURCE_DIR)/%, $(OBJECT_DIR)/%.o, $(SOURCES.$(ARC)))))
+ARCH_OBJECTS   := $(filter-out $(OBJECTS.$(ARCH)), $(foreach ARC, $(ARCHS), $(OBJECTS.$(ARC))))
 $(foreach TARGET, $(TARGETS), \
 	$(eval SOURCES.$(TARGET) := \
-		$(shell find $(SOURCE_DIR)/$(TARGET)/$(ARCH) -type f -name '*.[cS]' 2> /dev/null) \
-		$(shell find $(SOURCE_DIR)/$(TARGET) -maxdepth 1 -type f -name '*.[cS]' 2> /dev/null)) \
-	$(eval OBJECTS.$(TARGET) := $(patsubst $(SOURCE_DIR)/%, $(OBJECT_DIR)/%.o, $(SOURCES.$(TARGET)))))
+		$(shell find $(SOURCE_DIR)/$(TARGET) -type f -name '*.[cS]' 2> /dev/null)) \
+	$(eval OBJECTS.$(TARGET) := $(filter-out $(ARCH_OBJECTS), $(patsubst $(SOURCE_DIR)/%, $(OBJECT_DIR)/%.o, $(SOURCES.$(TARGET))))))
 SOURCES        := $(shell find $(SOURCE_DIR) -type f -name '*.[cS]')
 ALL_OBJECTS    := $(patsubst $(SOURCE_DIR)/%, $(OBJECT_DIR)/%.o, $(SOURCES))
 TARGET_OBJECTS := $(foreach TARGET, $(TARGETS), $(OBJECTS.$(TARGET)))
-OBJECTS        := $(filter-out $(TARGET_OBJECTS), $(ALL_OBJECTS))
+OBJECTS        := $(filter-out $(ARCH_OBJECTS) $(TARGET_OBJECTS), $(ALL_OBJECTS))
 DEPENDENCIES   := $(ALL_OBJECTS:.o=.d)
 BINARYS        := $(patsubst %, $(BINARY_DIR)/%, $(TARGETS))
 # ==
@@ -78,9 +83,9 @@ endif
 build: $(BINARYS)
 	@$(ECHO) "Build successful."
 
-$(BINARYS): $(BINARY_DIR)/%: $(OBJECTS) $$(OBJECTS.$$*) $(SOURCE_DIR)/$$*/$(ARCH)/link.ld | $$(dir $$@)
+$(BINARYS): $(BINARY_DIR)/%: $$(OBJECTS) $$(OBJECTS.$$*) $(SOURCE_DIR)/$$*/$(ARCH)/link.ld | $$(dir $$@)
 	@$(ECHO) "Building $@"
-	$(LINK) $(LDFLAGS) -o $@  $(OBJECTS) $(OBJECTS.$*) -T$(SOURCE_DIR)/$*/$(ARCH)/link.ld
+	$(LINK) $(LDFLAGS) -o $@ $(OBJECTS) $(OBJECTS.$*) -T$(SOURCE_DIR)/$*/$(ARCH)/link.ld
 
 $(OBJECT_DIR)/%.o: $(SOURCE_DIR)/% $(MAKEFILE_LIST) | $$(dir $$@)
 	@$(ECHO) "Building $@"
