@@ -3,6 +3,8 @@
 
 #include "devices/serial/serial.h"
 
+Error initBaselineDevices();
+
 Error initDevices();
 
 Serial getDefaultSerialDevice();

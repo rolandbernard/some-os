@@ -13,6 +13,6 @@ typedef struct {
     SerialReadFunction read;
 } Serial;
 
-Error writeToSerial(Serial serial, const char* string);
+Error writeToSerial(Serial serial, const char* fmt, ...);
 
 #endif

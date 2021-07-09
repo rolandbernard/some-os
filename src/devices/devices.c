@@ -8,8 +8,11 @@ static Uart16550 serial_mmio = {
     .initialized = false,
 };
 
+Error initBaselineDevices() {
+    return initUart16550(&serial_mmio);
+}
+
 Error initDevices() {
-    initUart16550(&serial_mmio);
     return SUCCESS;
 }
 

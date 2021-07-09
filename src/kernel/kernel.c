@@ -1,14 +1,19 @@
 
 #include <stddef.h>
+#include <stdio.h>
 
 #include "devices/devices.h"
-#include "devices/serial/serial.h"
+#include "error/log.h"
 
 void kernelMain() {
+    // Neccesary for other devices
+    initBaselineDevices();
+
+    logKernelMessage("[+] Kernel started");
     initDevices();
+    logKernelMessage("[+] Kernel initialized");
 
     // Just some testing code
-    Serial serial = getDefaultSerialDevice();
-    writeToSerial(serial, "Hello world!\n");
+    logKernelMessage("Hello world!");
 }
 
