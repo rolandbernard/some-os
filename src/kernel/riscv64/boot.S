@@ -21,10 +21,15 @@ _start:
     la sp, __stack_top
 .option pop
 
+    # Initialize trap data
+    jal trapInit
+
     # Disable address translation
     csrw satp, zero
     # Give S and U mode access to memory
     csrw pmpcfg0, 0xF
+    li t0, -1
+    csrw pmpaddr0, t0
 
     # Enter the kernel in S mode
     li t0, 0b11 << 11
