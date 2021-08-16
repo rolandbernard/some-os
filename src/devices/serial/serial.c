@@ -9,13 +9,10 @@
 
 static Error writeStringToSerial(Serial serial, const char* str) {
     while (*str != 0) {
-        Error res = serial.write(serial.data, *str);
-        if (res != SUCCESS) {
-            return res;
-        }
+        CHECKED(serial.write(serial.data, *str));
         str++;
     }
-    return SUCCESS;
+    return simpleError(SUCCESS);
 }
 
 Error writeToSerial(Serial serial, const char* fmt, ...) {

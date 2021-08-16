@@ -6,13 +6,23 @@
 #include "error/log.h"
 
 void kernelMain() {
+    Error status;
+
     // Neccesary for other devices
-    initBaselineDevices();
+    status = initBaselineDevices();
+    if (isError(status)) {
+        logKernelMessage("[+] Failed to initialize baseline devices: %s", getErrorMessage(status));
+    } else {
+        logKernelMessage("[+] Kernel started");
+    }
 
     // Initialize the kernel
-    logKernelMessage("[+] Kernel started");
-    initDevices();
-    logKernelMessage("[+] Kernel initialized");
+    status = initDevices();
+    if (isError(status)) {
+        logKernelMessage("[+] Failed to initialize devices: %s", getErrorMessage(status));
+    } else {
+        logKernelMessage("[+] Kernel initialized");
+    }
 
     // TODO: replace with starting init process
     // Just some testing code

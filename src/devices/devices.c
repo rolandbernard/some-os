@@ -9,11 +9,12 @@ static Uart16550 serial_mmio = {
 };
 
 Error initBaselineDevices() {
-    return initUart16550(&serial_mmio);
+    CHECKED(initUart16550(&serial_mmio));
+    return simpleError(SUCCESS);
 }
 
 Error initDevices() {
-    return SUCCESS;
+    return simpleError(SUCCESS);
 }
 
 Serial getDefaultSerialDevice() {
