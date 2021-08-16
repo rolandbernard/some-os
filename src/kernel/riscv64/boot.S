@@ -4,14 +4,15 @@
 
 .section .text.boot
 .global runtimeInit
+.global trapInit
 .global _start
+
+.global initBaselineDevices
 
 _start:
     # Go into infinite loop with all but one hart
     csrr t0, mhartid
     bnez t0, 1f
-    # Disable address translation
-    csrw satp, zero
 
     # Set global and stack pointer
 .option push
@@ -20,9 +21,16 @@ _start:
     la sp, __stack_top
 .option pop
 
-    # Enter the kernel in M mode
+    # Disable address translation
+    csrw satp, zero
+    # Give S and U mode access to memory
+    csrw pmpcfg0, 0xF
+
+    # Enter the kernel in S mode
     li t0, 0b11 << 11
-    csrw mstatus, t0
+    csrrc zero, mstatus, t0
+    li t0, 0b01 << 11
+    csrrs zero, mstatus, t0
     la t0, runtimeInit
     csrw mepc, t0
     la ra, 1f 
