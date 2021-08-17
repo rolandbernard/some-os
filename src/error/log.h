@@ -3,6 +3,8 @@
 
 #include "error/error.h"
 
+Error initLogSystem();
+
 Error logKernelMessage(const char* fmt, ...);
 
 #endif

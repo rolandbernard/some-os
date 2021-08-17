@@ -3,7 +3,11 @@
 #include <stdbool.h>
 
 #include "error/log.h"
+#include "error/panic.h"
 #include "devices/devices.h"
+#include "process/process.h"
+#include "interrupt/syscall.h"
+#include "schedule/schedule.h"
 
 const char* getCauseString(bool interrupt, int code) {
     if (interrupt) {
@@ -40,9 +44,23 @@ const char* getCauseString(bool interrupt, int code) {
     }
 }
 
-void kernelTrap(uint64_t cause, uint64_t pc, uint64_t val, uint64_t scratch) {
-    bool interrupt = cause >> 63;
-    int code = cause & 0xff;
-    logKernelMessage("[+] Unhandled trap: %016x %016x %016x %s", pc, val, scratch, getCauseString(interrupt, code));
+void machineTrap(void* cause, void* pc, void* val, void* scratch) {
+    bool interrupt = (intptr_t)cause >> (sizeof(intptr_t) * 8 - 1);
+    int code = (intptr_t)cause & 0xff;
+    logKernelMessage("[!] Unhandled machine trap: %p %p %p %s", pc, val, scratch, getCauseString(interrupt, code));
+    panic();
+}
+
+void kernelTrap(void* cause, void* pc, void* val, Process* process) {
+    bool interrupt = (intptr_t)cause >> (sizeof(intptr_t) * 8 - 1);
+    int code = (intptr_t)cause & 0xff;
+    if (!interrupt && code == 8) {
+        process->pc = pc + 4;
+        process->state = READY;
+        runSyscall(process);
+        enqueueProcess(process);
+    }
+    logKernelMessage("[!] Unhandled trap: %p %p %p %s", pc, val, process, getCauseString(interrupt, code));
+    panic();
 }
 

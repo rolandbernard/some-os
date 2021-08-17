@@ -1,13 +1,8 @@
 
 .option norvc
-.section .data
 
 .section .text.boot
-.global runtimeInit
-.global trapInit
 .global _start
-
-.global initBaselineDevices
 
 _start:
     # Go into infinite loop with all but one hart
