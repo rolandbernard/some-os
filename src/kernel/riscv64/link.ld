@@ -1,8 +1,8 @@
 
-ENTRY( _start )
+ENTRY(_start)
 
 MEMORY {
-    ram  (wxa) : ORIGIN = 0x80000000, LENGTH = 128M
+    ram (wxa) : ORIGIN = 0x80000000, LENGTH = 128M
 }
 
 PHDRS {
@@ -42,7 +42,10 @@ SECTIONS {
         PROVIDE(__bss_end = .);
     } >ram AT>ram :bss
 
-    PROVIDE(__stack_top  = ORIGIN(ram) + LENGTH(ram));
-}
+    PROVIDE(__stack_top    = ORIGIN(ram) + LENGTH(ram));
+    PROVIDE(__stack_bottom = __stack_top - 0x80000);
 
+    PROVIDE(__heap_start = __bss_end);
+    PROVIDE(__heap_end   = __stack_bottom);
+}
 
