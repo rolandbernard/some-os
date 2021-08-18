@@ -11,6 +11,7 @@
 #include "interrupt/syscall.h"
 
 Error logKernelMessage(const char* fmt, ...) {
+    // Logging happens to the default serial device
     Serial serial = getDefaultSerialDevice();
     FORMAT_STRING(string, fmt);
     return writeToSerial(serial, "%s\n", string);

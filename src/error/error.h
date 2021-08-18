@@ -18,14 +18,19 @@ typedef struct {
     const char* details;
 } Error;
 
+// Create error struct without a message
 Error simpleError(ErrorKind kind);
 
+// Create error struct with a message
 Error someError(ErrorKind kind, const char* details);
 
+// Return true if the argument is an error
 bool isError(Error error);
 
+// Get the message for the given error kind
 const char* getErrorKindMessage(ErrorKind error);
 
+// Get the message for the given error
 const char* getErrorMessage(Error error);
 
 #endif

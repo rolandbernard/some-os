@@ -6,9 +6,12 @@
 .global enterKernelMode
 .global waitForInterrupt
 
+# Simple function to wait for interrupt
 waitForInterrupt:
     wfi
+    ret
 
+# Initialize 
 trapInit:
     la t0, kernelTrapVector
     csrw stvec, t0
@@ -20,6 +23,7 @@ trapInit:
     ret
 
 .align 4
+# Called for machine traps, call out to C code
 machineTrapVector:
     csrr a0, mcause
     csrr a1, mepc
@@ -33,12 +37,14 @@ machineTrapVector:
     jal machineTrap
     mret
 
+# Enter as user at a1 and save registers at a0
 enterUserMode:
     # 0b00 << 11 MPP (Previous Protection Mode) is 0 (U mode)
     li t0, 0b11 << 11
     csrrc x0, sstatus, t0
     j kernelTrapReturn
 
+# Enter as superior at a1 and save registers at a0
 enterKernelMode:
     # 0b01 << 11 MPP (Previous Protection Mode) is 1 (S mode)
     li t0, 0b11 << 11
@@ -47,6 +53,7 @@ enterKernelMode:
     csrrs zero, sstatus, t0
     j kernelTrapReturn
 
+# Return from trap intp a1 and save registers at a0
 kernelTrapReturn:
     csrw sepc, a1
     csrw sscratch, a0
@@ -84,6 +91,7 @@ kernelTrapReturn:
     sret
 
 .align 4
+# Called on supervisor tarps, call out to C code
 kernelTrapVector:
     csrrw x1, sscratch, x1 # Swap scratch (register save location) with x1
     beqz x1, 1f

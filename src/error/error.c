@@ -30,6 +30,7 @@ const char* getErrorKindMessage(ErrorKind error) {
 }
 
 const char* getErrorMessage(Error error) {
+    // Return the error message in the error is present, otherwise the message for the kind
     if (error.details != NULL) {
         return error.details;
     } else {

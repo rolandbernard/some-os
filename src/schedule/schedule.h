@@ -3,6 +3,7 @@
 
 #include "process/process.h"
 
+// Enqueue the given process
 void enqueueProcess(Process* process);
 
 #endif

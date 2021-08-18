@@ -3,6 +3,7 @@
 
 #include "error/error.h"
 
+// Initialize all the kernel systems
 Error initAllSystems();
 
 #endif

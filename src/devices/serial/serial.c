@@ -6,7 +6,7 @@
 
 #include "util/text.h"
 
-static Error writeStringToSerial(Serial serial, const char* str) {
+Error writeStringToSerial(Serial serial, const char* str) {
     while (*str != 0) {
         CHECKED(serial.write(serial.data, *str));
         str++;
@@ -25,13 +25,14 @@ Error readLineFromSerial(Serial serial, char* string, size_t length, bool echo) 
         do {
             status = serial.read(serial.data, string);
         } while (status.kind == NO_DATA);
-        if (status.kind != SUCCESS) {
+        if (isError(status)) {
             *string = 0;
             return status;
         }
         if (echo) {
             CHECKED(serial.write(serial.data, *string))
         }
+        // There is no default \n and \r expantion
         if (*string == '\r') {
             break;
         }

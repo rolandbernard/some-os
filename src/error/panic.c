@@ -5,6 +5,7 @@
 void panic() {
     logKernelMessage("[!] Kernel panic!");
     for (;;) {
+        // Infinite loop after panic
         waitForInterrupt();
     }
 }

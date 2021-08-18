@@ -26,6 +26,7 @@ Error initUart16550(Uart16550* uart) {
 
 Error writeUart16550(Uart16550* uart, char value) {
     if (uart->initialized) {
+        // Write directly to MMIO
         uart->base_address[0] = value;
         return simpleError(SUCCESS);
     } else {
@@ -36,9 +37,10 @@ Error writeUart16550(Uart16550* uart, char value) {
 Error readUart16550(Uart16550* uart, char* value) {
     if (uart->initialized) {
         if ((uart->base_address[5] & 0x1) == 0) {
-            // Data Ready == 0
+            // Data Ready == 0 => No data is available
             return simpleError(NO_DATA);
         } else {
+            // Data is available
             *value = uart->base_address[0];
             return simpleError(SUCCESS);
         }

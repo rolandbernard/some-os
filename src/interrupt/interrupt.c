@@ -55,6 +55,7 @@ void kernelTrap(void* cause, void* pc, void* val, Process* process) {
     bool interrupt = (intptr_t)cause >> (sizeof(intptr_t) * 8 - 1);
     int code = (intptr_t)cause & 0xff;
     if (!interrupt && code == 8) {
+        // Environment call from U-mode
         process->pc = pc + 4;
         process->state = READY;
         runSyscall(process);

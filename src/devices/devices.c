@@ -9,6 +9,7 @@ static Uart16550 serial_mmio = {
 };
 
 Error initBaselineDevices() {
+    // Initialize the uart device to enable logging
     CHECKED(initUart16550(&serial_mmio));
     return simpleError(SUCCESS);
 }

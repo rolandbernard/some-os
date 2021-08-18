@@ -16,8 +16,13 @@ typedef struct {
     SerialReadFunction read;
 } Serial;
 
+// Write null-terminated string to the given serial device
+Error writeStringToSerial(Serial serial, const char* str);
+
+// Write format string to the serial device
 Error writeToSerial(Serial serial, const char* fmt, ...);
 
+// Read a line from the serial device
 Error readLineFromSerial(Serial serial, char* string, size_t length, bool echo);
 
 #endif
