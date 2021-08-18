@@ -1,8 +1,10 @@
 
 build/
+mnt/
 tmp/
 .vim
 compile_flags.txt
+example.img
 
 # Prerequisites
 *.d
