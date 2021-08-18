@@ -1,6 +1,5 @@
 
 #include <stdarg.h>
-#include <stddef.h>
 #include <stdio.h>
 
 #include "devices/serial/serial.h"
@@ -18,5 +17,30 @@ static Error writeStringToSerial(Serial serial, const char* str) {
 Error writeToSerial(Serial serial, const char* fmt, ...) {
     FORMAT_STRING(string, fmt);
     return writeStringToSerial(serial, string);
+}
+
+Error readLineFromSerial(Serial serial, char* string, size_t length, bool echo) {
+    while (length > 1) {
+        Error status;
+        do {
+            status = serial.read(serial.data, string);
+        } while (status.kind == NO_DATA);
+        if (status.kind != SUCCESS) {
+            *string = 0;
+            return status;
+        }
+        if (echo) {
+            CHECKED(serial.write(serial.data, *string))
+        }
+        if (*string == '\r') {
+            break;
+        }
+        string++;
+        length--;
+    }
+    if (length > 0) {
+        *string = 0;
+    }
+    return simpleError(SUCCESS);
 }
 

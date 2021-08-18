@@ -21,13 +21,13 @@ Error initUart16550(Uart16550* uart) {
 
         uart->initialized = true;
     }
-    return someError(SUCCESS, "Uart16550 initialized");
+    return simpleError(SUCCESS);
 }
 
 Error writeUart16550(Uart16550* uart, char value) {
     if (uart->initialized) {
         uart->base_address[0] = value;
-        return someError(SUCCESS, "Written to Uart16550");
+        return simpleError(SUCCESS);
     } else {
         return someError(NOT_INITIALIZED, "Uart16550 is not initialized");
     }
@@ -35,7 +35,13 @@ Error writeUart16550(Uart16550* uart, char value) {
 
 Error readUart16550(Uart16550* uart, char* value) {
     if (uart->initialized) {
-        return someError(UNSUPPORTED, "Uart16550 reading not yet supported");
+        if ((uart->base_address[5] & 0x1) == 0) {
+            // Data Ready == 0
+            return simpleError(NO_DATA);
+        } else {
+            *value = uart->base_address[0];
+            return simpleError(SUCCESS);
+        }
     } else {
         return someError(NOT_INITIALIZED, "Uart16550 is not initialized");
     }

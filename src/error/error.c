@@ -22,6 +22,7 @@ bool isError(Error error) {
 const char* getErrorKindMessage(ErrorKind error) {
     switch (error) {
         case SUCCESS: return "Success";
+        case NO_DATA: return "No data";
         case UNSUPPORTED: return "Unsupported";
         case NOT_INITIALIZED: return "Not initialized";
         default: return "Unknown";

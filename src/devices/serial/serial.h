@@ -1,6 +1,9 @@
 #ifndef _SERIAL_H_
 #define _SERIAL_H_
 
+#include <stddef.h>
+#include <stdbool.h>
+
 #include "error/error.h"
 
 typedef Error (*SerialWriteFunction)(void* data, char value);
@@ -14,5 +17,7 @@ typedef struct {
 } Serial;
 
 Error writeToSerial(Serial serial, const char* fmt, ...);
+
+Error readLineFromSerial(Serial serial, char* string, size_t length, bool echo);
 
 #endif

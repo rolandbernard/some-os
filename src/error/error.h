@@ -8,6 +8,7 @@
 typedef enum {
     SUCCESS = 0,
 
+    NO_DATA,
     UNSUPPORTED,
     NOT_INITIALIZED,
 } ErrorKind;
