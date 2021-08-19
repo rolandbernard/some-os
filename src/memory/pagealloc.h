@@ -15,12 +15,12 @@ typedef struct {
 } FreePages;
 
 // Initialize the memory for page allocation.
-FreePages initializeFreePages();
+void initPageAllocator();
 
 // Allocate a new page. If no pages are left, return NULL.
-void* allocateNewPage(FreePages* free_pages);
+void* allocPage();
 
 // Free an allocated page. Freeing an allocated page is undefined behavior.
-void freePage(FreePages* free_pages, void* page);
+void freePage(void* page);
 
 #endif
