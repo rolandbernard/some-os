@@ -1,0 +1,26 @@
+#ifndef _PAGEALLOC_H_
+#define _PAGEALLOC_H_
+
+#include <stddef.h>
+
+#define PAGE_SIZE 4096
+
+typedef struct FreePage_s {
+    size_t size; // Number of free pages after this one
+    struct FreePage_s* next;
+} FreePage;
+
+typedef struct {
+    FreePage* first;
+} FreePages;
+
+// Initialize the memory for page allocation.
+FreePages initializeFreePages();
+
+// Allocate a new page. If no pages are left, return NULL.
+void* allocateNewPage(FreePages* free_pages);
+
+// Free an allocated page. Freeing an allocated page is undefined behavior.
+void freePage(FreePages* free_pages, void* page);
+
+#endif
