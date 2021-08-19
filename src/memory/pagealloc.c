@@ -19,36 +19,60 @@ void initPageAllocator() {
 }
 
 void* allocPage() {
-    if (free_pages.first != NULL) {
-        if (free_pages.first->size > 1) {
-            void* page = free_pages.first;
-            FreePage* moved = page + PAGE_SIZE;
-            moved->size = free_pages.first->size;
-            moved->next = free_pages.first->next;
-            free_pages.first = moved;
-            return page;
-        } else {
-            FreePage* page = free_pages.first;
-            free_pages.first = page->next;
-            return page;
-        }
-    } else {
-        return NULL;
-    }
+    return allocPages(1).ptr;
 }
 
 void freePage(void* ptr) {
-    if (ptr != NULL) {
-        if (ptr + PAGE_SIZE == free_pages.first) {
-            FreePage* page = ptr;
-            page->size = 1 + free_pages.first->size;
+    PageAllocation alloc = {
+        .ptr = ptr,
+        .size = 1,
+    };
+    freePages(alloc);
+}
+
+PageAllocation allocPages(size_t max_pages) {
+    if (free_pages.first != NULL && max_pages != 0) {
+        if (free_pages.first->size > max_pages) {
+            void* page = free_pages.first;
+            FreePage* moved = page + PAGE_SIZE * max_pages;
+            moved->size = free_pages.first->size - max_pages;
+            moved->next = free_pages.first->next;
+            free_pages.first = moved;
+            PageAllocation ret = {
+                .ptr = page,
+                .size = max_pages,
+            };
+            return ret;
+        } else {
+            FreePage* page = free_pages.first;
+            free_pages.first = page->next;
+            PageAllocation ret = {
+                .ptr = page,
+                .size = page->size,
+            };
+            return ret;
+        }
+    } else {
+        PageAllocation ret = {
+            .ptr = NULL,
+            .size = 0,
+        };
+        return ret;
+    }
+}
+
+void freePages(PageAllocation alloc) {
+    if (alloc.ptr != NULL && alloc.size != 0) {
+        if (alloc.ptr + PAGE_SIZE * alloc.size == free_pages.first) {
+            FreePage* page = alloc.ptr;
+            page->size = alloc.size + free_pages.first->size;
             page->next = free_pages.first->next;
             free_pages.first = page;
-        } else if (((void*)free_pages.first) + PAGE_SIZE * free_pages.first->size == ptr) {
-            free_pages.first->size += 1;
+        } else if (((void*)free_pages.first) + PAGE_SIZE * free_pages.first->size == alloc.ptr) {
+            free_pages.first->size += alloc.size;
         } else {
-            FreePage* page = ptr;
-            page->size = 1;
+            FreePage* page = alloc.ptr;
+            page->size = alloc.size;
             page->next = free_pages.first;
             free_pages.first = page;
         }
