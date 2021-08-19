@@ -15,7 +15,7 @@ void registerSyscall(int kind, SyscallFunction function) {
 }
 
 void runSyscall(Process* process) {
-    intptr_t kind = (intptr_t)process->regs[9];
+    uintptr_t kind = (uintptr_t)process->regs[9];
     if (kind < TABLE_SIZE && syscall_table[kind] != NULL) {
         process->regs[9] = syscall_table[kind](process, &(process->regs[10]));
     }

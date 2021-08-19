@@ -45,15 +45,15 @@ const char* getCauseString(bool interrupt, int code) {
 }
 
 void machineTrap(void* cause, void* pc, void* val, void* scratch) {
-    bool interrupt = (intptr_t)cause >> (sizeof(intptr_t) * 8 - 1);
-    int code = (intptr_t)cause & 0xff;
+    bool interrupt = (uintptr_t)cause >> (sizeof(uintptr_t) * 8 - 1);
+    int code = (uintptr_t)cause & 0xff;
     logKernelMessage("[!] Unhandled machine trap: %p %p %p %s", pc, val, scratch, getCauseString(interrupt, code));
     panic();
 }
 
 void kernelTrap(void* cause, void* pc, void* val, Process* process) {
-    bool interrupt = (intptr_t)cause >> (sizeof(intptr_t) * 8 - 1);
-    int code = (intptr_t)cause & 0xff;
+    bool interrupt = (uintptr_t)cause >> (sizeof(uintptr_t) * 8 - 1);
+    int code = (uintptr_t)cause & 0xff;
     if (!interrupt && code == 8) {
         // Environment call from U-mode
         process->pc = pc + 4;

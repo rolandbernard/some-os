@@ -20,8 +20,8 @@ typedef enum {
 
 typedef struct {
     MemmapType type;
-    intptr_t base;
-    intptr_t size;
+    uintptr_t base;
+    uintptr_t size;
 } MemmapEntry;
 
 extern const MemmapEntry virt_memmap[];
