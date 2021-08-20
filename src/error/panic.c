@@ -3,7 +3,7 @@
 #include "interrupt/trap.h"
 
 void panic() {
-    logKernelMessage("[!] Kernel panic!");
+    KERNEL_LOG("[!] Kernel panic!");
     for (;;) {
         // Infinite loop after panic
         waitForInterrupt();

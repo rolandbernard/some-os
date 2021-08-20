@@ -47,7 +47,7 @@ const char* getCauseString(bool interrupt, int code) {
 void machineTrap(void* cause, void* pc, void* val, void* scratch) {
     bool interrupt = (uintptr_t)cause >> (sizeof(uintptr_t) * 8 - 1);
     int code = (uintptr_t)cause & 0xff;
-    logKernelMessage("[!] Unhandled machine trap: %p %p %p %s", pc, val, scratch, getCauseString(interrupt, code));
+    KERNEL_LOG("[!] Unhandled machine trap: %p %p %p %s", pc, val, scratch, getCauseString(interrupt, code));
     panic();
 }
 
@@ -61,7 +61,7 @@ void kernelTrap(void* cause, void* pc, void* val, Process* process) {
         runSyscall(process);
         enqueueProcess(process);
     }
-    logKernelMessage("[!] Unhandled trap: %p %p %p %s", pc, val, process, getCauseString(interrupt, code));
+    KERNEL_LOG("[!] Unhandled trap: %p %p %p %s", pc, val, process, getCauseString(interrupt, code));
     panic();
 }
 

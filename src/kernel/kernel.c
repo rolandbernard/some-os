@@ -8,6 +8,7 @@
 #include "schedule/schedule.h"
 #include "interrupt/syscall.h"
 #include "kernel/init.h"
+#include "util/assert.h"
 
 void userMain() {
     // TODO: replace with starting init process
@@ -27,25 +28,25 @@ void kernelMain() {
     // Initialize baseline devices
     status = initBaselineDevices();
     if (isError(status)) {
-        logKernelMessage("[+] Failed to initialize baseline devices: %s", getErrorMessage(status));
+        KERNEL_LOG("[+] Failed to initialize baseline devices: %s", getErrorMessage(status));
     } else {
-        logKernelMessage("[+] Kernel started");
+        KERNEL_LOG("[+] Kernel started");
     }
 
     // Initialize kernel systems
     status = initAllSystems();
     if (isError(status)) {
-        logKernelMessage("[+] Failed to initialize kernel: %s", getErrorMessage(status));
+        KERNEL_LOG("[+] Failed to initialize kernel: %s", getErrorMessage(status));
     } else {
-        logKernelMessage("[+] Kernel initialized");
+        KERNEL_LOG("[+] Kernel initialized");
     }
 
     // Initialize devices
     status = initDevices();
     if (isError(status)) {
-        logKernelMessage("[+] Failed to initialize devices: %s", getErrorMessage(status));
+        KERNEL_LOG("[+] Failed to initialize devices: %s", getErrorMessage(status));
     } else {
-        logKernelMessage("[+] Devices initialized");
+        KERNEL_LOG("[+] Devices initialized");
     }
 
     initProcess(&user_process, user_stack, NULL, userMain);
