@@ -79,3 +79,16 @@ void freePages(PageAllocation alloc) {
     }
 }
 
+void* callocPage() {
+    return callocPages(1).ptr;
+}
+
+PageAllocation callocPages(size_t max_pages) {
+    PageAllocation alloc = allocPages(max_pages);
+    uint64_t* addr = alloc.ptr;
+    for (size_t i = 0; i < alloc.size * PAGE_SIZE / 8; i++) {
+        addr[i] = 0;
+    }
+    return alloc;
+}
+

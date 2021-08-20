@@ -34,4 +34,10 @@ PageAllocation allocPages(size_t max_pages);
 // Free a continuously allocated pages.
 void freePages(PageAllocation allocation);
 
+// Allocate a new page and fill the page with zeros.
+void* callocPage();
+
+// Allocate a set of continuous pages and fill the page with zeros.
+PageAllocation callocPages(size_t max_pages);
+
 #endif
