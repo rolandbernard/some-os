@@ -8,7 +8,6 @@
 #include "schedule/schedule.h"
 #include "interrupt/syscall.h"
 #include "kernel/init.h"
-#include "util/assert.h"
 
 void userMain() {
     // TODO: replace with starting init process
