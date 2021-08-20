@@ -13,7 +13,7 @@
 void userMain() {
     // TODO: replace with starting init process
     // Just some testing code
-    for (int i = 1; i <= 10; i++) {
+    for (int i = 1; i <= 5; i++) {
         syscall(0, "Hello world!");
     }
     syscall(1);

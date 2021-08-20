@@ -1,5 +1,6 @@
 
 #include <stdint.h>
+#include <string.h>
 
 #include "memory/pagealloc.h"
 
@@ -85,10 +86,7 @@ void* callocPage() {
 
 PageAllocation callocPages(size_t max_pages) {
     PageAllocation alloc = allocPages(max_pages);
-    uint64_t* addr = alloc.ptr;
-    for (size_t i = 0; i < alloc.size * PAGE_SIZE / 8; i++) {
-        addr[i] = 0;
-    }
+    memset(alloc.ptr, 0, alloc.size * PAGE_SIZE);
     return alloc;
 }
 
