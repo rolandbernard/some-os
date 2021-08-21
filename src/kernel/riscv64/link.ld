@@ -13,17 +13,14 @@ PHDRS {
 
 SECTIONS {
     .text : {
+        PROVIDE(__text_start = .);
         *(.text.boot)
         *(.text.*)
+        PROVIDE(__text_end = .);
     } >ram AT>ram :text
-
-    .eh_frame : {
-        *(.rodata .rodata.*)
-    } >ram AT>ram :text
-
-    PROVIDE(__global_pointer = .);
 
     .rodata : {
+        PROVIDE(__data_start = .);
         *(.rodata .rodata.*)
     } >ram AT>ram :text
 
@@ -31,6 +28,7 @@ SECTIONS {
         . = ALIGN(4K);
         *(.sdata .sdata*)
         *(.data .data.*)
+        PROVIDE(__data_end = .);
     } >ram AT>ram :data
 
     .bss ALIGN(8): {
@@ -41,6 +39,8 @@ SECTIONS {
         . = ALIGN(8);
         PROVIDE(__bss_end = .);
     } >ram AT>ram :bss
+
+    PROVIDE(__global_pointer = __data_start);
 
     PROVIDE(__stack_top    = ORIGIN(ram) + LENGTH(ram));
     PROVIDE(__stack_bottom = __stack_top - 0x80000);
