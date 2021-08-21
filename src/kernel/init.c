@@ -7,8 +7,8 @@
 #include "memory/virtmem.h"
 
 Error initAllSystems() {
-    /* CHECKED(initPageAllocator()); */
-    /* CHECKED(initKernelVirtualMemory()); */
+    CHECKED(initPageAllocator());
+    CHECKED(initKernelVirtualMemory());
     // kalloc is available from here on.
     CHECKED(initLogSystem());
     CHECKED(initProcessSystem());

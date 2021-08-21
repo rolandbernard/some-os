@@ -39,7 +39,7 @@ typedef union {
 
 #define PAGE_TABLE_SIZE 512
 
-typedef union {
+typedef struct {
     PageTableEntry entries[PAGE_TABLE_SIZE];
 } PageTable;
 

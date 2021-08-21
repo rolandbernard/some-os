@@ -5,14 +5,14 @@
 
 #include "memory/pagealloc.h"
 
-extern uintptr_t __heap_start;
-extern uintptr_t __heap_end;
+extern void __heap_start;
+extern void __heap_end;
 
 static FreePages free_pages;
 
 Error initPageAllocator() {
-    uintptr_t start = (__heap_start + PAGE_SIZE - 1) & -PAGE_SIZE;
-    uintptr_t end = __heap_start & -PAGE_SIZE;
+    uintptr_t start = ((uintptr_t)&__heap_start + PAGE_SIZE - 1) & -PAGE_SIZE;
+    uintptr_t end = (uintptr_t)&__heap_end & -PAGE_SIZE;
     assert(end >= start);
     size_t count = (end - start) / PAGE_SIZE;
     if (count > 0) {
@@ -31,7 +31,6 @@ void* allocPage() {
 }
 
 PageAllocation allocPages(size_t max_pages) {
-    assert(free_pages.first == NULL || free_pages.first->size != 0);
     if (free_pages.first != NULL && max_pages != 0) {
         if (free_pages.first->size > max_pages) {
             void* page = free_pages.first;
@@ -60,7 +59,6 @@ PageAllocation allocPages(size_t max_pages) {
         };
         return ret;
     }
-    assert(free_pages.first == NULL || free_pages.first->size != 0);
 }
 
 void deallocPage(void* ptr) {
@@ -72,9 +70,8 @@ void deallocPage(void* ptr) {
 }
 
 void deallocPages(PageAllocation alloc) {
-    assert(free_pages.first == NULL || free_pages.first->size != 0);
     if (alloc.ptr != NULL && alloc.size != 0) {
-        assert(alloc.ptr >= (void*)__heap_start && alloc.ptr <= (void*)__heap_end);
+        assert(alloc.ptr >= &__heap_start && alloc.ptr <= &__heap_end);
         if (alloc.ptr + PAGE_SIZE * alloc.size == free_pages.first) {
             FreePage* page = alloc.ptr;
             page->size = alloc.size + free_pages.first->size;
@@ -89,7 +86,6 @@ void deallocPages(PageAllocation alloc) {
             free_pages.first = page;
         }
     }
-    assert(free_pages.first == NULL || free_pages.first->size != 0);
 }
 
 void* zallocPage() {

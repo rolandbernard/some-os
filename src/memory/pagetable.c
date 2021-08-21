@@ -7,7 +7,9 @@
 
 PageTable* createPageTable() {
     static_assert(PAGE_SIZE == sizeof(PageTable));
-    return zallocPage();
+    PageTable* ret = zallocPage();
+    assert(ret != NULL); // TODO: handle memory pressure
+    return ret;
 }
 
 void freePageTable(PageTable* table) {
@@ -30,7 +32,7 @@ void mapPage(PageTable* root, uintptr_t vaddr, uintptr_t paddr, int bits, int le
         if (!entry->v) {
             PageTable* page = createPageTable();
             entry->entry = 0;
-            entry->paddr = ((intptr_t)page) >> 12;
+            entry->paddr = ((uintptr_t)page) >> 12;
             entry->v = true;
         }
         // This must not be a leaf node
