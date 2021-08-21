@@ -3,6 +3,8 @@
 
 #include <stddef.h>
 
+#include "error/error.h"
+
 #define PAGE_SIZE (1 << 12)
 
 typedef struct FreePage_s {
@@ -20,7 +22,7 @@ typedef struct {
 } PageAllocation;
 
 // Initialize the memory for page allocation.
-void initPageAllocator();
+Error initPageAllocator();
 
 // Allocate a new page. If no pages are left, return NULL.
 void* allocPage();

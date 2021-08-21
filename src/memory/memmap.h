@@ -4,7 +4,6 @@
 #include <stdint.h>
 
 typedef enum {
-    END,
     VIRT_DEBUG,
     VIRT_MROM,
     VIRT_TEST,
@@ -19,13 +18,10 @@ typedef enum {
 } MemmapType;
 
 typedef struct {
-    MemmapType type;
     uintptr_t base;
     uintptr_t size;
 } MemmapEntry;
 
-extern const MemmapEntry virt_memmap[];
-
-const MemmapEntry* findMemmapFor(MemmapType type);
+extern const MemmapEntry memory_map[];
 
 #endif

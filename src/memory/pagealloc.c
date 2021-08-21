@@ -10,7 +10,7 @@ extern uintptr_t __heap_end;
 
 static FreePages free_pages;
 
-void initPageAllocator() {
+Error initPageAllocator() {
     uintptr_t start = (__heap_start + PAGE_SIZE - 1) & -PAGE_SIZE;
     uintptr_t end = __heap_start & -PAGE_SIZE;
     assert(end >= start);
@@ -23,6 +23,7 @@ void initPageAllocator() {
     } else {
         free_pages.first = NULL;
     }
+    return simpleError(SUCCESS);
 }
 
 void* allocPage() {

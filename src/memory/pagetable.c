@@ -1,8 +1,9 @@
 
 #include <assert.h>
 
-#include "memory/pagealloc.h"
 #include "memory/pagetable.h"
+
+#include "memory/pagealloc.h"
 
 PageTable* createPageTable() {
     static_assert(PAGE_SIZE == sizeof(PageTable));

@@ -20,12 +20,12 @@ SECTIONS {
     } >ram AT>ram :text
 
     .rodata : {
+        . = ALIGN(4K); /* Align to page boundaries */
         PROVIDE(__data_start = .);
         *(.rodata .rodata.*)
     } >ram AT>ram :text
 
     .data : {
-        . = ALIGN(4K);
         *(.sdata .sdata*)
         *(.data .data.*)
         PROVIDE(__data_end = .);
@@ -43,7 +43,7 @@ SECTIONS {
     PROVIDE(__global_pointer = __data_start);
 
     PROVIDE(__stack_top    = ORIGIN(ram) + LENGTH(ram));
-    PROVIDE(__stack_bottom = __stack_top - 0x80000);
+    PROVIDE(__stack_bottom = __stack_top - 0x10000);
 
     PROVIDE(__heap_start = __bss_end);
     PROVIDE(__heap_end   = __stack_bottom);

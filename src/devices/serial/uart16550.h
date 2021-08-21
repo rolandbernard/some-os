@@ -8,7 +8,7 @@
 #include "devices/serial/serial.h"
 
 typedef struct {
-    volatile uint8_t* const base_address;
+    volatile uint8_t* base_address;
     bool initialized;
 } Uart16550;
 
