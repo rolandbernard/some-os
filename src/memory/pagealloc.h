@@ -3,7 +3,7 @@
 
 #include <stddef.h>
 
-#define PAGE_SIZE 4096
+#define PAGE_SIZE (1 << 12)
 
 typedef struct FreePage_s {
     size_t size; // Number of free pages after this one
