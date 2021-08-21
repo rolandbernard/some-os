@@ -3,15 +3,13 @@
 
 #include "error/error.h"
 #include "util/text.h"
+#include "util/macro.h"
 
 // Initialize the log system
 Error initLogSystem();
 
 // Log the given message
 Error logKernelMessage(const char* fmt, ...);
-
-#define STRING(X) #X
-#define STRINGX(X) STRING(X)
 
 #ifdef DEBUG
 #define KERNEL_LOG(FMT, ...) { \

@@ -6,4 +6,6 @@
 // Simply alias to the util implementation for now
 #define assert(COND) ASSERT(COND)
 
+#define static_assert(COND, ...) STATIC_ASSERT(COND, __VA_ARGS__)
+
 #endif
