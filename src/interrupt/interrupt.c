@@ -51,9 +51,9 @@ void machineTrap(void* cause, void* pc, void* val, void* scratch) {
     panic();
 }
 
-void kernelTrap(void* cause, void* pc, void* val, Process* process) {
-    bool interrupt = (uintptr_t)cause >> (sizeof(uintptr_t) * 8 - 1);
-    int code = (uintptr_t)cause & 0xff;
+void kernelTrap(uintptr_t cause, uintptr_t pc, uintptr_t val, Process* process) {
+    bool interrupt = cause >> (sizeof(uintptr_t) * 8 - 1);
+    int code = cause & 0xff;
     if (!interrupt && code == 8) {
         // Environment call from U-mode
         process->pc = pc + 4;

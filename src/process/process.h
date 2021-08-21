@@ -12,10 +12,10 @@ typedef enum {
 } ProcessState;
 
 typedef struct {
-    void* regs[31];
-    void* pc;
-    void* stack_top;
-    void* globals;
+    uintptr_t regs[31];
+    uintptr_t pc;
+    uintptr_t stack_top;
+    uintptr_t globals;
     ProcessState state;
 } Process;
 
@@ -23,7 +23,7 @@ typedef struct {
 Error initProcessSystem();
 
 // Initialize a process for the given stack_top, globals and start pc
-void initProcess(Process* process, void* stack_top, void* globals, void* start);
+void initProcess(Process* process, uintptr_t stack_top, uintptr_t globals, uintptr_t start);
 
 // Enter process into user mode
 void enterProcessAsUser(Process* process);

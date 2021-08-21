@@ -7,8 +7,8 @@
 #include "interrupt/trap.h"
 #include "interrupt/syscall.h"
 
-void initProcess(Process* process, void* stack_top, void* globals, void* start) {
-    process->regs[0] = (void*)panic;
+void initProcess(Process* process, uintptr_t stack_top, uintptr_t globals, uintptr_t start) {
+    process->regs[0] = (uintptr_t)panic;
     process->regs[1] = stack_top;
     process->regs[2] = globals;
     process->pc = start;
@@ -27,9 +27,9 @@ void enterProcessAsKernel(Process* process) {
     enterKernelMode(process, process->pc);
 }
 
-void* exitSyscall(Process* process, SyscallArgs args) {
+uintptr_t exitSyscall(Process* process, SyscallArgs args) {
     process->state = TERMINATED;
-    return NULL;
+    return 0;
 }
 
 Error initProcessSystem() {

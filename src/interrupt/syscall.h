@@ -6,8 +6,8 @@
 // Simple wrapper around ecall
 void* syscall(int kind, ...);
 
-typedef void* SyscallArgs[7];
-typedef void* (*SyscallFunction)(Process* process, SyscallArgs args);
+typedef uintptr_t SyscallArgs[7];
+typedef uintptr_t (*SyscallFunction)(Process* process, SyscallArgs args);
 
 // Register a syscall at the given kind
 void registerSyscall(int kind, SyscallFunction function);

@@ -10,9 +10,9 @@ void trapInit();
 void waitForInterrupt();
 
 // Enter process at pc into user mode
-void enterUserMode(Process* process, void* pc);
+void enterUserMode(Process* process, uintptr_t pc);
 
 // Enter process at pc into supervisor mode
-void enterKernelMode(Process* process, void* pc);
+void enterKernelMode(Process* process, uintptr_t pc);
 
 #endif

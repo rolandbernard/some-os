@@ -48,7 +48,7 @@ void kernelMain() {
         KERNEL_LOG("[+] Devices initialized");
     }
 
-    initProcess(&user_process, user_stack, NULL, userMain);
+    initProcess(&user_process, (uintptr_t)user_stack, 0, (uintptr_t)userMain);
     enqueueProcess(&user_process);
 }
 
