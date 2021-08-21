@@ -69,4 +69,7 @@ void mapPageRangeAtLevel(PageTable* root, uintptr_t from_vaddr, uintptr_t to_vad
 // Remove all maps between from and to.
 void unmapPageRange(PageTable* root, uintptr_t from, uintptr_t to);
 
+// Use the given page table to map from virtual to physical address. Returns 0 if unmapped.
+uintptr_t virtToPhys(PageTable* root, uintptr_t vaddr);
+
 #endif

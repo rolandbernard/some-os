@@ -89,6 +89,32 @@ void unmapPage(PageTable* root, uintptr_t vaddr) {
     }
 }
 
+uintptr_t virtToPhys(PageTable* root, uintptr_t vaddr) {
+    uintptr_t vpn[3] = {
+        (vaddr >> 12) & 0x1ff,
+        (vaddr >> 21) & 0x1ff,
+        (vaddr >> 30) & 0x1ff,
+    };
+    PageTable* table = root;
+    for (int i = 2; i >= 0; i--) {
+        PageTableEntry* entry = &table->entries[vpn[i]];
+        if (entry->v) {
+            if ((entry->bits & 0b1110) == 0) {
+                assert(i != 0); // Level 0 can not contain branches
+                table = (PageTable*)(entry->paddr << 12);
+            } else {
+                uintptr_t mask = ((PAGE_SIZE << (9 * i)) - 1);
+                uintptr_t offset = vaddr & mask;
+                return ((entry->paddr << 12) & ~mask) | offset;
+            }
+        } else {
+            // The address is unmapped
+            return 0;
+        }
+    }
+    return 0;
+}
+
 void unmapAllPages(PageTable* root) {
     for (int i = 0; i < PAGE_TABLE_SIZE; i++) {
         PageTableEntry* entry_lv2 = &root->entries[i];
