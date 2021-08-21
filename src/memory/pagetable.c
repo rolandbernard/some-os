@@ -147,7 +147,7 @@ static void tryMapingRangeAtLevel(PageTable* root, uintptr_t from_vaddr, uintptr
             uintptr_t size = (PAGE_SIZE << (9 * level));
             uintptr_t start = (from_vaddr + size - 1) & -size;
             uintptr_t end = to_vaddr & -size;
-            if ((end - start) > size) {
+            if (start < end && (end - start) > size) {
                 tryMapingRangeAtLevel(root, from_vaddr, start, paddr, bits, level - 1);
                 mapPageRangeAtLevel(root, start, end, paddr + (start - from_vaddr), bits, level);
                 tryMapingRangeAtLevel(root, end, to_vaddr, paddr + (end - from_vaddr), bits, level - 1);
@@ -166,8 +166,8 @@ void mapPageRange(PageTable* root, uintptr_t from_vaddr, uintptr_t to_vaddr, uin
 
 void mapPageRangeAtLevel(PageTable* root, uintptr_t from_vaddr, uintptr_t to_vaddr, uintptr_t paddr, int bits, int level) {
     uintptr_t size = (PAGE_SIZE << (9 * level));
-    for (uintptr_t i = from_vaddr; i < to_vaddr; i += size, paddr += size) {
-        mapPage(root, i, paddr, bits, level);
+    for (uintptr_t i = 0; i < to_vaddr - from_vaddr; i += size, paddr += size) {
+        mapPage(root, from_vaddr + i, paddr, bits, level);
     }
 }
 
