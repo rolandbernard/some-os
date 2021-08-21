@@ -29,14 +29,6 @@ void* allocPage() {
     return allocPages(1).ptr;
 }
 
-void freePage(void* ptr) {
-    PageAllocation alloc = {
-        .ptr = ptr,
-        .size = 1,
-    };
-    freePages(alloc);
-}
-
 PageAllocation allocPages(size_t max_pages) {
     assert(free_pages.first == NULL || free_pages.first->size != 0);
     if (free_pages.first != NULL && max_pages != 0) {
@@ -70,7 +62,15 @@ PageAllocation allocPages(size_t max_pages) {
     assert(free_pages.first == NULL || free_pages.first->size != 0);
 }
 
-void freePages(PageAllocation alloc) {
+void deallocPage(void* ptr) {
+    PageAllocation alloc = {
+        .ptr = ptr,
+        .size = 1,
+    };
+    deallocPages(alloc);
+}
+
+void deallocPages(PageAllocation alloc) {
     assert(free_pages.first == NULL || free_pages.first->size != 0);
     if (alloc.ptr != NULL && alloc.size != 0) {
         assert(alloc.ptr >= (void*)__heap_start && alloc.ptr <= (void*)__heap_end);
@@ -91,11 +91,11 @@ void freePages(PageAllocation alloc) {
     assert(free_pages.first == NULL || free_pages.first->size != 0);
 }
 
-void* callocPage() {
-    return callocPages(1).ptr;
+void* zallocPage() {
+    return zallocPages(1).ptr;
 }
 
-PageAllocation callocPages(size_t max_pages) {
+PageAllocation zallocPages(size_t max_pages) {
     PageAllocation alloc = allocPages(max_pages);
     memset(alloc.ptr, 0, alloc.size * PAGE_SIZE);
     return alloc;

@@ -25,19 +25,19 @@ void initPageAllocator();
 // Allocate a new page. If no pages are left, return NULL.
 void* allocPage();
 
-// Free an allocated page. Freeing an not allocated page is undefined behavior.
-void freePage(void* page);
-
 // Allocate a set of continuous pages. Allocate up to max_pages.
 PageAllocation allocPages(size_t max_pages);
 
+// Free an allocated page. Freeing an not allocated page is undefined behavior.
+void deallocPage(void* page);
+
 // Free a continuously allocated pages.
-void freePages(PageAllocation allocation);
+void deallocPages(PageAllocation allocation);
 
 // Allocate a new page and fill the page with zeros.
-void* callocPage();
+void* zallocPage();
 
 // Allocate a set of continuous pages and fill the page with zeros.
-PageAllocation callocPages(size_t max_pages);
+PageAllocation zallocPages(size_t max_pages);
 
 #endif
