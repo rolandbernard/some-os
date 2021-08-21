@@ -26,4 +26,6 @@ typedef struct {
 
 extern const MemmapEntry virt_memmap[];
 
+const MemmapEntry* findMemmapFor(MemmapType type);
+
 #endif

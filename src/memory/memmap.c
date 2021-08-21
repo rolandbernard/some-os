@@ -1,4 +1,6 @@
 
+#include <stddef.h>
+
 #include "memory/memmap.h"
 
 const MemmapEntry virt_memmap[] = {
@@ -15,4 +17,15 @@ const MemmapEntry virt_memmap[] = {
     { VIRT_PCIE_ECAM, 0x30000000, 0x10000000 },
     { END,                   0x0,        0x0 },
 };
+
+const MemmapEntry* findMemmapFor(MemmapType type) {
+    const MemmapEntry* entry = virt_memmap;
+    while (entry != NULL && entry->type != END) {
+        if (entry->type == type) {
+            return entry;
+        }
+        entry++;
+    }
+    return NULL;
+}
 
