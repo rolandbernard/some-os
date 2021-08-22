@@ -42,8 +42,8 @@ LINK     := ld.lld
 # == Qemu
 QEMU      := qemu-system-riscv64
 
-QEMU_ARGS := -M virt -smp 4 -m 128M
-QEMU_ARGS += -cpu rv64 -bios none
+QEMU_ARGS := -M virt -smp 4 -m 128M -s
+QEMU_ARGS += -cpu rv64 -bios none -snapshot
 QEMU_ARGS += -display none -serial stdio
 # ==
 
