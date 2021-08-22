@@ -3,8 +3,11 @@
 
 #include "error/error.h"
 #include "memory/pagetable.h"
+#include "util/spinlock.h"
 
 extern PageTable* kernel_page_table;
+
+extern SpinLock kernel_page_table_lock;
 
 Error initKernelVirtualMemory();
 
