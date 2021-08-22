@@ -15,26 +15,26 @@ SECTIONS {
     .text : {
         PROVIDE(__text_start = .);
         *(.text.boot)
-        *(.text.*)
+        *(.text .text*)
         PROVIDE(__text_end = .);
     } >ram AT>ram :text
 
     .rodata : {
         . = ALIGN(4K); /* Align to page boundaries */
         PROVIDE(__data_start = .);
-        *(.rodata .rodata.*)
+        *(.rodata .rodata*)
     } >ram AT>ram :text
 
     .data : {
         *(.sdata .sdata*)
-        *(.data .data.*)
+        *(.data .data*)
         PROVIDE(__data_end = .);
     } >ram AT>ram :data
 
     .bss ALIGN(8): {
         PROVIDE(__bss_start = .);
-        *(.sbss .sbss.*)
-        *(.bss .bss.*)
+        *(.sbss .sbss*)
+        *(.bss .bss*)
         . += 8;
         . = ALIGN(8);
         PROVIDE(__bss_end = .);
