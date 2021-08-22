@@ -2,9 +2,9 @@
 .option norvc
 
 .section .text
-.global syscall
+.global lockSpinLock
+.global unlockSpinLock
 
-# Lock simple spinlock with fences
 lockSpinLock:
     li t0, 1
 1:
@@ -13,7 +13,6 @@ lockSpinLock:
     bnez t0, 1b
     ret
 
-# Unlock simple spinlock with fences
 unlockSpinLock:
     fence
     amoswap.w zero, zero, (a0)
