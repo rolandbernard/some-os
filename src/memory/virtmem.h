@@ -4,8 +4,10 @@
 #include "error/error.h"
 #include "memory/pagetable.h"
 
-extern PageTable kernel_page_table;
+extern PageTable* kernel_page_table;
 
 Error initKernelVirtualMemory();
+
+void setVirtualMemory(int asid, PageTable* page_table, bool fence);
 
 #endif

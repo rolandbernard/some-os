@@ -53,7 +53,7 @@ enterKernelMode:
     csrrs zero, sstatus, t0
     j kernelTrapReturn
 
-# Return from trap intp a1 and save registers at a0
+# Return from trap into a1 and save registers at a0
 kernelTrapReturn:
     csrw sepc, a1
     csrw sscratch, a0

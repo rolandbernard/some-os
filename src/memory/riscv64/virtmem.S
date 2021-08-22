@@ -2,20 +2,18 @@
 .option norvc
 
 .section .text
-.global syscall
+.global setVirtualMemory
 
-# Lock simple spinlock with fences
-lockSpinLock:
-    li t0, 1
+# fn (int asid, PageTable* page_table, bool fence);
+setVirtualMemory:
+    li t0, 8 << 60
+    sll t1, a0, 44
+    srl t2, a1, 12
+    or t0, t0, t1
+    or t0, t0, t2
+    csrw satp, t0
+    beqz a2, 1f
+    sfence.vma zero, a0
 1:
-    amoswap.w t0, t0, (a0)
-    fence
-    bnez t0, 1b
-    ret
-
-# Unlock simple spinlock with fences
-unlockSpinLock:
-    fence
-    amoswap.w zero, zero, (a0)
     ret
 

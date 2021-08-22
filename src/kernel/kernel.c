@@ -12,6 +12,7 @@
 void userMain() {
     // TODO: replace with starting init process
     // Just some testing code
+    // Throws a Instruction page fault now, because user is not allowed to access kernel memory.
     for (int i = 1; i <= 5; i++) {
         syscall(0, "Hello world!");
     }
