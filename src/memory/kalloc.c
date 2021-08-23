@@ -38,8 +38,8 @@ static void insertFreeMemory(FreeMemory* memory) {
             *current = (*current)->next;
         } else if (current_ptr + (*current)->size == memory_ptr) {
             (*current)->size += memory->size;
-            *current = (*current)->next;
             memory = *current;
+            *current = (*current)->next;
         } else {
             current = &(*current)->next;
         }
@@ -172,9 +172,9 @@ void* krealloc(void* ptr, size_t size) {
                 start = (AllocatedMemory*)*before;
             }
             memmove(start->bytes, ptr, mem->size - sizeof(AllocatedMemory));
-            if (before != NULL && *after == (*before)->next) {
+            if (before != NULL && after == &(*before)->next) {
                 *before = (*after)->next;
-            } else if (after != NULL && *before == (*after)->next) {
+            } else if (after != NULL && before == &(*after)->next) {
                 *after = (*before)->next;
             } else {
                 if (before != NULL) {
