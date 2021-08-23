@@ -11,8 +11,8 @@
 #include "util/spinlock.h"
 
 #define KALLOC_MEM_START 0x90000000
-#define KALLOC_MIN_FREE_MEM 16
 #define KALLOC_MEM_ALIGN 8
+#define KALLOC_MIN_FREE_MEM sizeof(FreeMemory)
 
 typedef struct FreeMemory_s {
     size_t size; // Number of free bytes
@@ -91,13 +91,13 @@ void* kalloc(size_t size) {
             if ((*memory)->size < length + KALLOC_MIN_FREE_MEM) {
                 *memory = (*memory)->next;
             } else {
-                mem->size = length;
-                FreeMemory* next = (FreeMemory*)(((uintptr_t)*memory) + length);
-                next->size = (*memory)->size - length;
+                FreeMemory* next = (FreeMemory*)((uintptr_t)*memory + length);
                 next->next = (*memory)->next;
+                next->size = (*memory)->size - length;
                 *memory = next;
+                mem->size = length;
             }
-            ret = &mem->bytes;
+            ret = mem->bytes;
         }
         unlockSpinLock(&kalloc_lock);
         return ret;
@@ -154,61 +154,54 @@ void* krealloc(void* ptr, size_t size) {
     } else if (ptr == NULL) {
         return kalloc(size);
     } else {
-        lockSpinLock(&kalloc_lock);
         size_t size_with_header = (size + sizeof(AllocatedMemory) + KALLOC_MEM_ALIGN - 1) & -KALLOC_MEM_ALIGN;
+        lockSpinLock(&kalloc_lock);
         AllocatedMemory* mem = (AllocatedMemory*)(ptr - sizeof(AllocatedMemory));
         FreeMemory** before = findFreeMemoryBefore(mem);
         FreeMemory** after = findFreeMemoryAfter(mem);
         size_t length = mem->size;
-        if (length < size_with_header) {
-            if (before != NULL) {
-                length += (*before)->size;
-            }
+        if (before != NULL) {
+            length += (*before)->size;
         }
-        if (length < size_with_header) {
-            if (after != NULL) {
-                length += (*after)->size;
-            }
+        if (after != NULL) {
+            length += (*after)->size;
         }
-        if (length < size_with_header) {
+        if (length >= size_with_header) {
             AllocatedMemory* start = mem;
-            length = mem->size;
-            if (length < size_with_header) {
+            if (before != NULL) {
+                start = (AllocatedMemory*)*before;
+            }
+            memmove(start->bytes, ptr, mem->size - sizeof(AllocatedMemory));
+            if (before != NULL && *after == (*before)->next) {
+                *before = (*after)->next;
+            } else if (after != NULL && *before == (*after)->next) {
+                *after = (*before)->next;
+            } else {
                 if (before != NULL) {
-                    if (length + (*before)->size < size_with_header + KALLOC_MIN_FREE_MEM) {
-                        start = (AllocatedMemory*)*before;
-                        length += (*before)->size;
-                        *before = (*before)->next;
-                    } else {
-                        start = (AllocatedMemory*)(*before + (size_with_header - length));
-                        length = size_with_header;
-                        (*before)->size -= (size_with_header - length);
-                    }
+                    *before = (*before)->next;
                 }
-            }
-            if (length < size_with_header) {
                 if (after != NULL) {
-                    if (length + (*after)->size < size_with_header + KALLOC_MIN_FREE_MEM) {
-                        length += (*after)->size;
-                        *after = (*after)->next;
-                    } else {
-                        length = size_with_header;
-                        FreeMemory* next = (FreeMemory*)(((uintptr_t)*after) + (size_with_header - length));
-                        next->size = (*after)->size - (size_with_header - length);
-                        next->next = (*after)->next;
-                        *after = next;
-                    }
+                    *after = (*after)->next;
                 }
             }
-            start->size = length;
-            return &start->bytes;
+            if (length < size_with_header + KALLOC_MIN_FREE_MEM) {
+                start->size = length;
+            } else {
+                FreeMemory* next = (FreeMemory*)((uintptr_t)start + size_with_header);
+                next->next = first_free;
+                next->size = length - size_with_header;
+                first_free = next;
+                start->size = size_with_header;
+            }
+            unlockSpinLock(&kalloc_lock);
+            return start->bytes;
         } else {
+            unlockSpinLock(&kalloc_lock);
             void* ret = kalloc(size);
             memmove(ret, ptr, mem->size - sizeof(AllocatedMemory));
             dealloc(ptr);
             return ret;
         }
-        unlockSpinLock(&kalloc_lock);
     }
 }
 
