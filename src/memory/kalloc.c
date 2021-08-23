@@ -171,7 +171,6 @@ void* krealloc(void* ptr, size_t size) {
             if (before != NULL) {
                 start = (AllocatedMemory*)*before;
             }
-            memmove(start->bytes, ptr, mem->size - sizeof(AllocatedMemory));
             if (before != NULL && after == &(*before)->next) {
                 *before = (*after)->next;
             } else if (after != NULL && before == &(*after)->next) {
@@ -184,6 +183,7 @@ void* krealloc(void* ptr, size_t size) {
                     *after = (*after)->next;
                 }
             }
+            memmove(start->bytes, ptr, mem->size - sizeof(AllocatedMemory));
             if (length < size_with_header + KALLOC_MIN_FREE_MEM) {
                 start->size = length;
             } else {
