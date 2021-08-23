@@ -27,7 +27,9 @@ Error initPageAllocator() {
 }
 
 void* allocPage() {
-    return allocPages(1).ptr;
+    void* ret = allocPages(1).ptr;
+    assert(ret != NULL); // TODO: handle memory pressure
+    return ret;
 }
 
 PageAllocation allocPages(size_t max_pages) {

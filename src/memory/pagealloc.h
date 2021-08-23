@@ -24,7 +24,7 @@ typedef struct {
 // Initialize the memory for page allocation.
 Error initPageAllocator();
 
-// Allocate a new page. If no pages are left, return NULL.
+// Allocate a new page.
 void* allocPage();
 
 // Allocate a set of continuous pages. Allocate up to max_pages.

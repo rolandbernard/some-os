@@ -7,9 +7,7 @@
 
 PageTable* createPageTable() {
     static_assert(PAGE_SIZE == sizeof(PageTable));
-    PageTable* ret = zallocPage();
-    assert(ret != NULL); // TODO: handle memory pressure
-    return ret;
+    return zallocPage();
 }
 
 void freePageTable(PageTable* table) {
