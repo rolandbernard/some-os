@@ -95,10 +95,10 @@ void* kalloc(size_t size) {
             memory = findFreeMemoryAtEnd();
             if (memory == NULL) {
                 addNewMemory(size);
-                memory = findFreeMemoryThatFits(size);
             } else {
                 addNewMemory(size - (*memory)->size);
             }
+            memory = findFreeMemoryThatFits(size);
         }
         void* ret = NULL;
         if (memory != NULL) {
@@ -183,9 +183,11 @@ void* krealloc(void* ptr, size_t size) {
             length += (*after)->size;
         }
         if (length < size_with_header && after != NULL && ((uintptr_t)*after + (*after)->size) == next_vaddr) {
-            size_t before = (*after)->size;
+            size_t old_size = (*after)->size;
             addNewMemory(size_with_header - length);
-            length += (*after)->size - before;
+            before = findFreeMemoryBefore(mem);
+            after = findFreeMemoryAfter(mem);
+            length += (*after)->size - old_size;
         }
         if (length >= size_with_header) {
             AllocatedMemory* start = mem;
