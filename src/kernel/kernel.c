@@ -1,9 +1,12 @@
 
 #include <stddef.h>
 #include <stdio.h>
+#include <assert.h>
+#include <string.h>
 
 #include "devices/devices.h"
 #include "error/log.h"
+#include "memory/kalloc.h"
 #include "process/process.h"
 #include "schedule/schedule.h"
 #include "interrupt/syscall.h"
@@ -49,7 +52,35 @@ void kernelMain() {
         KERNEL_LOG("[+] Devices initialized");
     }
 
+    uint8_t* test[50];
+    size_t length[50];
+    for (int i = 0; i <= 50; i++) {
+        test[i] = NULL;
+        length[i] = 0;
+    }
+    uint32_t seed = 12345;
+    for (;;) {
+        for (int i = 0; i < 50; i++) {
+            seed = (1664525 * seed + 1013904223);
+            KERNEL_LOG("seed: %x", seed & 0x00ffffff);
+            for (size_t j = 0; j < length[i]; j++) {
+                assert(test[i][j] == i);
+            }
+            if (seed & 0b00100) {
+                KERNEL_LOG("free(%p)", test[i]);
+                dealloc(test[i]);
+                test[i] = NULL;
+                length[i] = 0;
+            } else {
+                KERNEL_LOG("realloc(%p, %u)", test[i], seed >> 16);
+                length[i] = seed >> 16;
+                test[i] = krealloc(test[i], length[i]);
+                memset(test[i], i, length[i]);
+            }
+        }
+    }
+
     initProcess(&user_process, (uintptr_t)user_stack, 0, (uintptr_t)userMain);
-    enqueueProcess(&user_process);
+    /* enqueueProcess(&user_process); */
 }
 
