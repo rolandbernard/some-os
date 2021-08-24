@@ -91,7 +91,7 @@ void* kalloc(size_t size) {
     } else {
         lockSpinLock(&kalloc_lock);
         size_t length = (size + sizeof(AllocatedMemory) + KALLOC_MEM_ALIGN - 1) & -KALLOC_MEM_ALIGN;
-        FreeMemory** memory = findFreeMemoryThatFits(size);
+        FreeMemory** memory = findFreeMemoryThatFits(length);
         if (memory == NULL) {
             memory = findFreeMemoryAtEnd();
             if (memory == NULL) {
