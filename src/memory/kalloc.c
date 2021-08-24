@@ -74,6 +74,17 @@ static FreeMemory** findFreeMemoryThatFits(size_t size) {
     return NULL;
 }
 
+static FreeMemory** findFreeMemoryAtEnd() {
+    FreeMemory** current = &first_free;
+    while ((*current) != NULL) {
+        if (((uintptr_t)*current + (*current)->size) == next_vaddr) {
+            return current;
+        }
+        current = &(*current)->next;
+    }
+    return NULL;
+}
+
 void* kalloc(size_t size) {
     if (size == 0) {
         return NULL;
@@ -81,8 +92,13 @@ void* kalloc(size_t size) {
         lockSpinLock(&kalloc_lock);
         FreeMemory** memory = findFreeMemoryThatFits(size);
         if (memory == NULL) {
-            addNewMemory(size);
-            memory = findFreeMemoryThatFits(size);
+            memory = findFreeMemoryAtEnd();
+            if (memory == NULL) {
+                addNewMemory(size);
+                memory = findFreeMemoryThatFits(size);
+            } else {
+                addNewMemory(size - (*memory)->size);
+            }
         }
         void* ret = NULL;
         if (memory != NULL) {
@@ -165,6 +181,11 @@ void* krealloc(void* ptr, size_t size) {
         }
         if (after != NULL) {
             length += (*after)->size;
+        }
+        if (length < size_with_header && after != NULL && ((uintptr_t)*after + (*after)->size) == next_vaddr) {
+            size_t before = (*after)->size;
+            addNewMemory(size_with_header - length);
+            length += (*after)->size - before;
         }
         if (length >= size_with_header) {
             AllocatedMemory* start = mem;
