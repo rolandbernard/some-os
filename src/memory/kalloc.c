@@ -24,8 +24,7 @@ typedef struct AllocatedMemory_s {
 } AllocatedMemory;
 
 static FreeMemory* first_free = NULL;
-uintptr_t next_vaddr = KALLOC_MEM_START;
-/* static uintptr_t next_vaddr = KALLOC_MEM_START; */
+static uintptr_t next_vaddr = KALLOC_MEM_START;
 static SpinLock kalloc_lock;
 
 static void insertFreeMemory(FreeMemory* memory) {
