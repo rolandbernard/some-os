@@ -9,7 +9,7 @@
 #include "memory/virtmem.h"
 #include "util/spinlock.h"
 
-#define KALLOC_MEM_START 0x90000000
+#define KALLOC_MEM_START 0x100000000
 #define KALLOC_MEM_ALIGN 8
 #define KALLOC_MIN_FREE_MEM sizeof(FreeMemory)
 
@@ -66,7 +66,7 @@ static void addNewMemory(size_t size) {
 static FreeMemory** findFreeMemoryThatFits(size_t size) {
     FreeMemory** current = &first_free;
     while ((*current) != NULL) {
-        if ((*current)->size >= size + sizeof(AllocatedMemory)) {
+        if ((*current)->size >= size) {
             return current;
         }
         current = &(*current)->next;
@@ -83,6 +83,47 @@ static FreeMemory** findFreeMemoryAtEnd() {
         current = &(*current)->next;
     }
     return NULL;
+}
+
+void* kalloc(size_t size) {
+    if (size == 0) {
+        return NULL;
+    } else {
+        lockSpinLock(&kalloc_lock);
+        size_t length = (size + sizeof(AllocatedMemory) + KALLOC_MEM_ALIGN - 1) & -KALLOC_MEM_ALIGN;
+        FreeMemory** memory = findFreeMemoryThatFits(size);
+        if (memory == NULL) {
+            memory = findFreeMemoryAtEnd();
+            if (memory == NULL) {
+                addNewMemory(length);
+            } else {
+                addNewMemory(length - (*memory)->size);
+            }
+            memory = findFreeMemoryThatFits(length);
+        }
+        void* ret = NULL;
+        if (memory != NULL) {
+            AllocatedMemory* mem = (AllocatedMemory*)*memory;
+            if ((*memory)->size < length + KALLOC_MIN_FREE_MEM) {
+                *memory = (*memory)->next;
+            } else {
+                FreeMemory* next = (FreeMemory*)((uintptr_t)*memory + length);
+                next->next = (*memory)->next;
+                next->size = (*memory)->size - length;
+                *memory = next;
+                mem->size = length;
+            }
+            ret = mem->bytes;
+        }
+        unlockSpinLock(&kalloc_lock);
+        return ret;
+    }
+}
+
+void* zalloc(size_t size) {
+    void* mem = kalloc(size);
+    memset(mem, 0, size);
+    return mem;
 }
 
 static void tryFreeingOldMemory() {
@@ -111,47 +152,6 @@ static void tryFreeingOldMemory() {
         }
         setVirtualMemory(0, kernel_page_table, true);
     }
-}
-
-void* kalloc(size_t size) {
-    if (size == 0) {
-        return NULL;
-    } else {
-        lockSpinLock(&kalloc_lock);
-        FreeMemory** memory = findFreeMemoryThatFits(size);
-        if (memory == NULL) {
-            memory = findFreeMemoryAtEnd();
-            if (memory == NULL) {
-                addNewMemory(size);
-            } else {
-                addNewMemory(size - (*memory)->size);
-            }
-            memory = findFreeMemoryThatFits(size);
-        }
-        void* ret = NULL;
-        if (memory != NULL) {
-            AllocatedMemory* mem = (AllocatedMemory*)*memory;
-            size_t length = (size + sizeof(AllocatedMemory) + KALLOC_MEM_ALIGN - 1) & -KALLOC_MEM_ALIGN;
-            if ((*memory)->size < length + KALLOC_MIN_FREE_MEM) {
-                *memory = (*memory)->next;
-            } else {
-                FreeMemory* next = (FreeMemory*)((uintptr_t)*memory + length);
-                next->next = (*memory)->next;
-                next->size = (*memory)->size - length;
-                *memory = next;
-                mem->size = length;
-            }
-            ret = mem->bytes;
-        }
-        unlockSpinLock(&kalloc_lock);
-        return ret;
-    }
-}
-
-void* zalloc(size_t size) {
-    void* mem = kalloc(size);
-    memset(mem, 0, size);
-    return mem;
 }
 
 void dealloc(void* ptr) {
