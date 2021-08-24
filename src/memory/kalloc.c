@@ -4,7 +4,6 @@
 
 #include "memory/kalloc.h"
 
-#include "memory/kalloc.h"
 #include "memory/pagealloc.h"
 #include "memory/pagetable.h"
 #include "memory/virtmem.h"
@@ -25,7 +24,8 @@ typedef struct AllocatedMemory_s {
 } AllocatedMemory;
 
 static FreeMemory* first_free = NULL;
-static uintptr_t next_vaddr = KALLOC_MEM_START;
+uintptr_t next_vaddr = KALLOC_MEM_START;
+/* static uintptr_t next_vaddr = KALLOC_MEM_START; */
 static SpinLock kalloc_lock;
 
 static void insertFreeMemory(FreeMemory* memory) {
@@ -85,6 +85,34 @@ static FreeMemory** findFreeMemoryAtEnd() {
     return NULL;
 }
 
+static void tryFreeingOldMemory() {
+    FreeMemory** mem = findFreeMemoryAtEnd();
+    if (mem != NULL) {
+        uintptr_t mem_start = (uintptr_t)*mem;
+        uintptr_t mem_end = mem_start + (*mem)->size;
+        uintptr_t free_start;
+        if ((mem_start & -PAGE_SIZE) == mem_start) {
+            free_start = mem_start;
+            *mem = (*mem)->next;
+        } else {
+            free_start = (mem_start + KALLOC_MIN_FREE_MEM + PAGE_SIZE - 1) & -PAGE_SIZE;
+            (*mem)->size = free_start - mem_start;
+        }
+        if (free_start < mem_end) {
+            size_t size = (mem_end - free_start) / PAGE_SIZE;
+            for (size_t i = 0; i < size; i++) {
+                next_vaddr -= PAGE_SIZE;
+                void* page = (void*)virtToPhys(kernel_page_table, next_vaddr);
+                deallocPage(page);
+                lockSpinLock(&kernel_page_table_lock);
+                unmapPage(kernel_page_table, next_vaddr);
+                unlockSpinLock(&kernel_page_table_lock);
+            }
+        }
+        setVirtualMemory(0, kernel_page_table, true);
+    }
+}
+
 void* kalloc(size_t size) {
     if (size == 0) {
         return NULL;
@@ -131,6 +159,7 @@ void dealloc(void* ptr) {
         lockSpinLock(&kalloc_lock);
         FreeMemory* mem = (FreeMemory*)(ptr - sizeof(AllocatedMemory));
         insertFreeMemory(mem);
+        tryFreeingOldMemory();
         unlockSpinLock(&kalloc_lock);
     }
 }
@@ -216,6 +245,7 @@ void* krealloc(void* ptr, size_t size) {
                 first_free = next;
                 start->size = size_with_header;
             }
+            tryFreeingOldMemory();
             unlockSpinLock(&kalloc_lock);
             return start->bytes;
         } else {
