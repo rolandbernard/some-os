@@ -6,4 +6,8 @@
 // Initialize all the kernel systems
 Error initAllSystems();
 
+void initHart();
+
+void initHarts();
+
 #endif

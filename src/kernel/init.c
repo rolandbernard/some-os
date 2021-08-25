@@ -15,3 +15,11 @@ Error initAllSystems() {
     return simpleError(SUCCESS);
 }
 
+void initHart() {
+    // TODO:
+}
+
+void initHarts() {
+    // TODO:
+}
+
