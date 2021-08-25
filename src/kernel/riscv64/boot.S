@@ -17,7 +17,9 @@ _start:
 .option pop
 
     # Initialize trap data
-    jal trapInit
+    la t0, machineTrapVector
+    csrw mtvec, t0
+    csrw mie, zero
 
     # Disable address translation
     csrw satp, zero
@@ -40,4 +42,19 @@ _start:
 1:
     wfi
     j 1b
+
+.align 4
+# Called for machine mode traps, call out to C code
+machineTrapVector:
+    csrr a0, mcause
+    csrr a1, mepc
+    csrr a2, mtval
+    csrr a3, mscratch
+.option push
+.option norelax
+    la gp, __global_pointer
+    la sp, __stack_top
+.option pop
+    jal machineTrap
+    mret
 

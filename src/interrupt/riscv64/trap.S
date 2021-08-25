@@ -20,22 +20,10 @@ trapInit:
     li t0, 0xffff
     csrw medeleg, t0
     csrw mideleg, t0
+    li t0, 0xffff
+    csrw mie, t0
+    csrw sie, t0
     ret
-
-.align 4
-# Called for machine traps, call out to C code
-machineTrapVector:
-    csrr a0, mcause
-    csrr a1, mepc
-    csrr a2, mtval
-    csrr a3, mscratch
-.option push
-.option norelax
-    la gp, __global_pointer
-    la sp, __stack_top
-.option pop
-    jal machineTrap
-    mret
 
 # Enter as user at a1 and save registers at a0
 enterUserMode:
