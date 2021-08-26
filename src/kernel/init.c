@@ -5,6 +5,7 @@
 #include "process/process.h"
 #include "memory/pagealloc.h"
 #include "memory/virtmem.h"
+#include "interrupt/trap.h"
 
 Error initAllSystems() {
     CHECKED(initPageAllocator());

@@ -4,7 +4,7 @@
 #include "process/process.h"
 
 // Initialize CSRs for traps
-void trapInit();
+void initTraps();
 
 // Simple wrapper around wfi
 void waitForInterrupt();

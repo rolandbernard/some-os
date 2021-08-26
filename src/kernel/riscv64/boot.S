@@ -5,10 +5,6 @@
 .global _start
 
 _start:
-    # Go into infinite loop with all but one hart
-    csrr t0, mhartid
-    bnez t0, 1f
-
     # Set global and stack pointer
 .option push
 .option norelax
@@ -20,6 +16,10 @@ _start:
     la t0, machineTrapVector
     csrw mtvec, t0
     csrw mie, zero
+
+    # Go into infinite loop with all but one hart
+    csrr t0, mhartid
+    bnez t0, 1f
 
     # Disable address translation
     csrw satp, zero

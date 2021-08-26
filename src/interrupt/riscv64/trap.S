@@ -1,7 +1,7 @@
 
 .option norvc
 .section .text
-.global trapInit
+.global initTraps
 .global enterUserMode
 .global enterKernelMode
 .global waitForInterrupt
@@ -11,8 +11,8 @@ waitForInterrupt:
     wfi
     ret
 
-# Initialize 
-trapInit:
+# Initialize CSRs for traps
+initTraps:
     la t0, kernelTrapVector
     csrw stvec, t0
     csrw sscratch, zero
