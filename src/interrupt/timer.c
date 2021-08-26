@@ -11,7 +11,7 @@
 
 typedef struct {
     Timeout id;
-    uint64_t time;
+    Time time;
     TimeoutFunction function;
     void* udata;
 } TimeoutEntry;
@@ -21,10 +21,10 @@ static TimeoutEntry* timeouts = NULL;
 static size_t capacity = 0;
 static size_t length = 0;
 
-Timeout setTimeout(uint64_t delay, TimeoutFunction function, void* udata) {
+Timeout setTimeout(Time delay, TimeoutFunction function, void* udata) {
     if (capacity <= length) {
         capacity += 32;
-        timeouts = krealloc(timeouts, capacity);
+        timeouts = krealloc(timeouts, capacity * sizeof(TimeoutEntry));
     }
     Timeout id = next_id;
     next_id++;
@@ -46,14 +46,14 @@ void clearTimeout(Timeout timeout) {
     }
 }
 
-static void setTimeCmp(uint64_t time) {
-    *(volatile uint64_t*)(memory_map[VIRT_CLINT].base + 0x4000) = time;
+static void setTimeCmp(Time time) {
+    *(volatile Time*)(memory_map[VIRT_CLINT].base + 0x4000) = time;
 }
 
 void handleTimerInterrupt() {
     for (;;) {
-        uint64_t time = getTime();
-        uint64_t min = 0;
+        Time time = getTime();
+        Time min = 0;
         for (size_t i = 0; i < length;) {
             if (timeouts[i].time < time) {
                 timeouts[i].function(time, timeouts[i].udata);
@@ -74,7 +74,7 @@ void handleTimerInterrupt() {
     }
 }
 
-uint64_t getTime() {
-    return *(volatile uint64_t*)(memory_map[VIRT_CLINT].base + 0xbff8);
+Time getTime() {
+    return *(volatile Time*)(memory_map[VIRT_CLINT].base + 0xbff8);
 }
 

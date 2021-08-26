@@ -27,7 +27,7 @@ void enterProcessAsKernel(Process* process) {
     enterKernelMode(process, process->pc);
 }
 
-uintptr_t exitSyscall(Process* process, SyscallArgs args) {
+uintptr_t exitSyscall(bool is_kernel, Process* process, SyscallArgs args) {
     process->state = TERMINATED;
     return 0;
 }

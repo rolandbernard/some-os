@@ -7,14 +7,15 @@
 
 #define CLOCKS_PER_SEC 10000000 // 10Mhz
 
-typedef void (*TimeoutFunction)(uint64_t time, void* udata);
 typedef uint64_t Timeout;
+typedef uint64_t Time;
+typedef void (*TimeoutFunction)(Time time, void* udata);
 
 void handleTimerInterrupt();
 
-uint64_t getTime();
+Time getTime();
 
-Timeout setTimeout(uint64_t delay, TimeoutFunction function, void* udata);
+Timeout setTimeout(Time delay, TimeoutFunction function, void* udata);
 
 void clearTimeout(Timeout timeout);
 

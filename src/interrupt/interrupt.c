@@ -8,6 +8,7 @@
 #include "process/process.h"
 #include "interrupt/syscall.h"
 #include "interrupt/timer.h"
+#include "interrupt/plic.h"
 #include "schedule/schedule.h"
 
 const char* getCauseString(bool interrupt, int code) {
@@ -55,27 +56,40 @@ void machineTrap(uintptr_t cause, uintptr_t pc, uintptr_t val, uintptr_t scratch
 void kernelTrap(uintptr_t cause, uintptr_t pc, uintptr_t val, Process* process) {
     bool interrupt = cause >> (sizeof(uintptr_t) * 8 - 1);
     int code = cause & 0xff;
+    process->state = READY;
     if (interrupt) {
         switch (code) {
             case 4: // Timer interrupt U-mode
             case 5: // Timer interrupt S-mode
             case 7: // Timer interrupt M-mode
-                process->state = READY;
                 handleTimerInterrupt();
-                enqueueProcess(process);
+                break;
+            case 8: // External interrupt U-mode
+            case 9: // External interrupt S-mode
+            case 11: // External interrupt M-mode
+                handleExternalInterrupt();
+                break;
+            default:
+                KERNEL_LOG("[!] Unhandled trap: %p %p %p %s", pc, val, process, getCauseString(interrupt, code));
+                panic();
                 break;
         }
     } else {
+        process->pc = pc + 4;
         switch (code) {
             case 8: // Environment call from U-mode
-                process->pc = pc + 4;
-                process->state = READY;
                 runSyscall(process);
-                enqueueProcess(process);
+                break;
+            case 9: // Environment call from S-mode
+            case 11: // Environment call from M-mode
+                runKernelSyscall(process);
+                break;
+            default:
+                KERNEL_LOG("[!] Unhandled trap: %p %p %p %s", pc, val, process, getCauseString(interrupt, code));
+                panic();
                 break;
         }
     }
-    KERNEL_LOG("[!] Unhandled trap: %p %p %p %s", pc, val, process, getCauseString(interrupt, code));
-    panic();
+    enqueueProcess(process);
 }
 

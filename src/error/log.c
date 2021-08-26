@@ -17,7 +17,7 @@ Error logKernelMessage(const char* fmt, ...) {
     return writeToSerial(serial, "%s\n", string);
 }
 
-uintptr_t printSyscall(Process* process, SyscallArgs args) {
+uintptr_t printSyscall(bool is_kernel, Process* process, SyscallArgs args) {
     logKernelMessage("%s", (const char*)args[0]);
     return 0;
 }
