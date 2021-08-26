@@ -47,7 +47,7 @@ void clearTimeout(Timeout timeout) {
 }
 
 static void setTimeCmp(uint64_t time) {
-    *(uint64_t*)(memory_map[VIRT_CLINT].base + 0x4000) = time;
+    *(volatile uint64_t*)(memory_map[VIRT_CLINT].base + 0x4000) = time;
 }
 
 void handleTimerInterrupt() {
@@ -75,6 +75,6 @@ void handleTimerInterrupt() {
 }
 
 uint64_t getTime() {
-    return *(uint64_t*)(memory_map[VIRT_CLINT].base + 0xbff8);
+    return *(volatile uint64_t*)(memory_map[VIRT_CLINT].base + 0xbff8);
 }
 
