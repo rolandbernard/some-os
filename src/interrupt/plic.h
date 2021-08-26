@@ -15,6 +15,8 @@ void clearInterruptFunction(ExternalInterrupt timeout);
 
 void enableInterrupt(ExternalInterrupt id);
 
+void disableInterrupt(ExternalInterrupt id);
+
 void setInterruptPriority(ExternalInterrupt id, InterruptPriority priority);
 
 void setPlicPriorityThreshold(InterruptPriority priority);
