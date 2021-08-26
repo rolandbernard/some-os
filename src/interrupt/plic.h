@@ -11,7 +11,7 @@ void handleExternalInterrupt();
 
 void setInterruptFunction(ExternalInterrupt id, ExternalInterruptFunction function, void* udata);
 
-void clearInterruptFunction(ExternalInterrupt timeout);
+void clearInterruptFunction(ExternalInterrupt id, ExternalInterruptFunction function, void* udata);
 
 void enableInterrupt(ExternalInterrupt id);
 
