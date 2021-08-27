@@ -1,7 +1,9 @@
 
-.option norvc
+.altmacro
+
 .section .text
 .global initTraps
+.global enableInterrupts
 .global enterUserMode
 .global enterKernelMode
 .global waitForInterrupt
@@ -25,6 +27,11 @@ initTraps:
     csrw sie, t0
     ret
 
+// Write to the supervisor interrupt enable register
+enableInterrupts:
+    csrrsi zero, sstatus, 1 << 1 # Directly enable interrupts
+    ret
+
 # Enter as user at a1 and save registers at a0
 enterUserMode:
     # 0b00 << 11 MPP (Previous Protection Mode) is 0 (U mode)
@@ -41,95 +48,78 @@ enterKernelMode:
     csrrs zero, sstatus, t0
     j kernelTrapReturn
 
+.macro save_gp i, basereg=x31
+    sd x\i, ((\i)*8)(\basereg)
+.endm
+.macro load_gp i, basereg=x31
+    ld x\i, ((\i)*8)(\basereg)
+.endm
+.macro save_fp i, basereg=x31
+    fsd f\i, ((32+(\i))*8)(\basereg)
+.endm
+.macro load_fp i, basereg=x31
+    fld f\i, ((32+(\i))*8)(\basereg)
+.endm
+
 # Return from trap into a1 and save registers at a0
 kernelTrapReturn:
     csrw sepc, a1
     csrw sscratch, a0
-    ld  x1,   0(a0)
-    ld  x2,   8(a0)
-    ld  x3,  16(a0)
-    ld  x4,  24(a0)
-    ld  x5,  32(a0)
-    ld  x6,  40(a0)
-    ld  x7,  48(a0)
-    ld  x8,  56(a0)
-    ld  x9,  64(a0)
-    ld x11,  80(a0)
-    ld x12,  88(a0)
-    ld x13,  96(a0)
-    ld x14, 104(a0)
-    ld x15, 112(a0)
-    ld x16, 120(a0)
-    ld x17, 128(a0)
-    ld x18, 136(a0)
-    ld x19, 144(a0)
-    ld x20, 152(a0)
-    ld x21, 160(a0)
-    ld x22, 168(a0)
-    ld x23, 176(a0)
-    ld x24, 184(a0)
-    ld x25, 192(a0)
-    ld x26, 200(a0)
-    ld x27, 208(a0)
-    ld x28, 216(a0)
-    ld x29, 224(a0)
-    ld x30, 232(a0)
-    ld x31, 240(a0)
-    ld x10,  72(a0) # x10 == a0 and must therefore be loaded last
+    li t0, 0b11 << 13
+    csrrc zero, sstatus, t0
+    li t0, 0b01 << 13 | 1 << 5 # Enable FPU and SPIE
+    csrrs zero, sstatus, t0
+    mv x31, a0 # Load into x31 because it is loaded last
+    # Restore floating point registers
+.set i, 0
+.rept 32
+    load_fp %i
+    .set i, i+1
+.endr
+    # Restore integer registers
+.set i, 1
+.rept 31
+    load_gp %i
+    .set i, i+1
+.endr
     sret
 
 .align 4
 # Called on supervisor tarps, call out to C code
 kernelTrapVector:
-    csrrw x1, sscratch, x1 # Swap scratch (register save location) with x1
-    beqz x1, 1f
-    # Save user registers
-    sd  x2,   8(x1)
-    sd  x3,  16(x1)
-    sd  x4,  24(x1)
-    sd  x5,  32(x1)
-    sd  x6,  40(x1)
-    sd  x7,  48(x1)
-    sd  x8,  56(x1)
-    sd  x9,  64(x1)
-    sd x10,  72(x1)
-    sd x11,  80(x1)
-    sd x12,  88(x1)
-    sd x13,  96(x1)
-    sd x14, 104(x1)
-    sd x15, 112(x1)
-    sd x16, 120(x1)
-    sd x17, 128(x1)
-    sd x18, 136(x1)
-    sd x19, 144(x1)
-    sd x20, 152(x1)
-    sd x21, 160(x1)
-    sd x22, 168(x1)
-    sd x23, 176(x1)
-    sd x24, 184(x1)
-    sd x25, 192(x1)
-    sd x26, 200(x1)
-    sd x27, 208(x1)
-    sd x28, 216(x1)
-    sd x29, 224(x1)
-    sd x30, 232(x1)
-    sd x31, 240(x1)
-    mv a3, x1
-    # Load the user register value for x1
-    csrrw x1, sscratch, zero
-    sd x1, 0(a3) # Save the x1 user value
-    j 2f
+    csrrw x31, sscratch, x31 # Swap scratch (register save location) with x1
+    beqz x31, 1f
+    # Restore integer registers
+.set i, 1
+.rept 30
+    save_gp %i
+    .set i, i+1
+.endr
+    # Save floating point registers
+.set i, 0
+.rept 32
+    save_fp %i
+    .set i, i+1
+.endr
+    mv a3, x31
+    ld t0, 0(x31)
+    csrrw x31, sscratch, t0
+    save_gp 31 a3
+    beqz t0, 2f
+    # Load global an stack pointer
+    load_gp 2, t0
+    load_gp 3, t0
+    j 3f
 1:
     mv a3, zero
 2:
+    la gp, __global_pointer
+    la sp, __stack_top
+3:
     csrr a0, scause
     csrr a1, sepc
     csrr a2, stval
-.option push
-.option norelax
-    la gp, __global_pointer
-    la sp, __stack_top
-.option pop
     jal kernelTrap
+    mv a0, a3
     j kernelTrapReturn
 

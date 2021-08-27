@@ -7,9 +7,27 @@
 #include "devices/devices.h"
 #include "error/log.h"
 #include "memory/kalloc.h"
+#include "memory/pagetable.h"
+#include "memory/virtmem.h"
 #include "process/process.h"
+#include "process/schedule.h"
 #include "interrupt/syscall.h"
 #include "kernel/init.h"
+
+void userMain() {
+    // TODO: replace with starting init process
+    // Just some testing code
+    // Throws a Instruction page fault now, because user is not allowed to access kernel memory.
+    double test = 1.23456789;
+    for (int i = 1; i <= 5; i++) {
+        test *= test;
+        syscall(0, "Hello world!");
+    }
+    syscall(1);
+}
+
+Process user_process;
+uint64_t user_stack[512];
 
 void kernelMain() {
     Error status;
@@ -34,5 +52,9 @@ void kernelMain() {
     } else {
         KERNEL_LOG("[+] Devices initialized");
     }
+
+    setVirtualMemory(0, NULL, true);
+    initProcess(&user_process, (uintptr_t)user_stack, 0, (uintptr_t)userMain);
+    enqueueProcess(&user_process);
 }
 

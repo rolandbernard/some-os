@@ -19,7 +19,7 @@ typedef struct {
     // Be careful changing this. It's used from assembly
     struct HartProcess_s* hart;
     uintptr_t regs[31];
-    uintptr_t fregs[32];
+    double fregs[32];
 } TrapFrame;
 
 typedef struct {
