@@ -8,7 +8,6 @@
 #include "error/log.h"
 #include "memory/kalloc.h"
 #include "process/process.h"
-#include "schedule/schedule.h"
 #include "interrupt/syscall.h"
 #include "kernel/init.h"
 

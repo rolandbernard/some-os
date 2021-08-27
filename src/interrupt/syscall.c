@@ -15,16 +15,16 @@ void registerSyscall(int kind, SyscallFunction function) {
 }
 
 void runSyscall(Process* process) {
-    uintptr_t kind = (uintptr_t)process->regs[9];
+    uintptr_t kind = (uintptr_t)process->frame.regs[9];
     if (kind < TABLE_SIZE && syscall_table[kind] != NULL) {
-        process->regs[9] = syscall_table[kind](false, process, &(process->regs[10]));
+        process->frame.regs[9] = syscall_table[kind](false, process, &(process->frame.regs[10]));
     }
 }
 
 void runKernelSyscall(Process* process) {
-    uintptr_t kind = (uintptr_t)process->regs[9];
+    uintptr_t kind = (uintptr_t)process->frame.regs[9];
     if (kind < TABLE_SIZE && syscall_table[kind] != NULL) {
-        process->regs[9] = syscall_table[kind](true, process, &(process->regs[10]));
+        process->frame.regs[9] = syscall_table[kind](true, process, &(process->frame.regs[10]));
     }
 }
 

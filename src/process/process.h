@@ -4,19 +4,39 @@
 #include <stdint.h>
 
 #include "error/error.h"
+#include "memory/pagetable.h"
 
 typedef enum {
-    READY,
     RUNNING,
+    READY,
+    WAITING,
     TERMINATED,
 } ProcessState;
 
+struct HartProcess_s;
+
 typedef struct {
+    // Be careful changing this. It's used from assembly
+    struct HartProcess_s* hart;
     uintptr_t regs[31];
+    uintptr_t fregs[32];
+} TrapFrame;
+
+typedef struct {
+    TrapFrame frame;
+    uintptr_t stack_top;
+    uintptr_t globals;
+    uint64_t schedule_id;
+} HartProcess;
+
+typedef struct Process_s {
+    TrapFrame frame;
     uintptr_t pc;
     uintptr_t stack_top;
     uintptr_t globals;
     ProcessState state;
+    uint64_t pid;
+    PageTable* table;
 } Process;
 
 // Initialize process system

@@ -2,14 +2,15 @@
 #include <stdint.h>
 #include <stdbool.h>
 
+#include "devices/devices.h"
 #include "error/log.h"
 #include "error/panic.h"
-#include "devices/devices.h"
-#include "process/process.h"
+#include "interrupt/plic.h"
 #include "interrupt/syscall.h"
 #include "interrupt/timer.h"
-#include "interrupt/plic.h"
-#include "schedule/schedule.h"
+#include "memory/virtmem.h"
+#include "process/process.h"
+#include "process/schedule.h"
 
 const char* getCauseString(bool interrupt, int code) {
     if (interrupt) {
@@ -54,10 +55,12 @@ void machineTrap(uintptr_t cause, uintptr_t pc, uintptr_t val, uintptr_t scratch
 }
 
 void kernelTrap(uintptr_t cause, uintptr_t pc, uintptr_t val, Process* process) {
+    setVirtualMemory(0, kernel_page_table, true);
     bool interrupt = cause >> (sizeof(uintptr_t) * 8 - 1);
     int code = cause & 0xff;
     process->state = READY;
     if (interrupt) {
+        process->pc = pc;
         switch (code) {
             case 4: // Timer interrupt U-mode
             case 5: // Timer interrupt S-mode

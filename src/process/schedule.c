@@ -1,5 +1,5 @@
 
-#include "schedule/schedule.h"
+#include "process/schedule.h"
 
 #include "interrupt/trap.h"
 #include "error/log.h"
