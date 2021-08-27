@@ -13,7 +13,7 @@ void initProcess(Process* process, uintptr_t stack_top, uintptr_t globals, uintp
     process->frame.regs[0] = (uintptr_t)panic;
     process->frame.regs[1] = stack_top;
     process->frame.regs[2] = globals;
-    process->pc = start;
+    process->frame.pc = start;
     process->stack_top = stack_top;
     process->globals = globals;;
     process->state = READY;
@@ -21,16 +21,13 @@ void initProcess(Process* process, uintptr_t stack_top, uintptr_t globals, uintp
     process->pid = 1;
 }
 
-void enterProcessAsUser(Process* process) {
+void enterProcess(Process* process) {
     process->state = RUNNING;
-    setVirtualMemory(process->pid, process->table, false);
-    enterUserMode(process, process->pc);
-}
-
-void enterProcessAsKernel(Process* process) {
-    process->state = RUNNING;
-    setVirtualMemory(0, kernel_page_table, false);
-    enterKernelMode(process, process->pc);
+    if (process->is_kernel) {
+    enterKernelMode(&process->frame);
+    } else {
+        enterUserMode(&process->frame);
+    }
 }
 
 uintptr_t exitSyscall(bool is_kernel, Process* process, SyscallArgs args) {

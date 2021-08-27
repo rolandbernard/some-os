@@ -37,3 +37,18 @@ Error initKernelVirtualMemory() {
     return simpleError(SUCCESS);
 }
 
+void setVirtualMemory(int asid, PageTable* page_table, bool fence) {
+    if (page_table == NULL) {
+        setSatpCsr(0);
+    } else {
+        setSatpCsr(satpForMemory(asid, page_table));
+        if (fence) {
+            addressTranslationFence(asid);
+        }
+    }
+}
+
+uint64_t satpForMemory(int asid, PageTable* page_table) {
+    return 8L << 60 | (uint64_t)asid << 44L | (uintptr_t)page_table >> 12;
+}
+

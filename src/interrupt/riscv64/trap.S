@@ -32,14 +32,14 @@ enableInterrupts:
     csrrsi zero, sstatus, 1 << 1 # Directly enable interrupts
     ret
 
-# Enter as user at a1 and save registers at a0
+# Enter as user using trap frame in a0
 enterUserMode:
     # 0b00 << 11 MPP (Previous Protection Mode) is 0 (U mode)
     li t0, 0b11 << 11
     csrrc zero, sstatus, t0
     j kernelTrapReturn
 
-# Enter as superior at a1 and save registers at a0
+# Enter as superior using trap frame in a0
 enterKernelMode:
     # 0b01 << 11 MPP (Previous Protection Mode) is 1 (S mode)
     li t0, 0b11 << 11
@@ -61,9 +61,12 @@ enterKernelMode:
     fld f\i, ((32+(\i))*8)(\basereg)
 .endm
 
-# Return from trap into a1 and save registers at a0
+# Return from trap using trap frame in a0
 kernelTrapReturn:
-    csrw sepc, a1
+    ld t0, 512(a0)
+    csrw sepc, t0
+    ld t0, 520(a0)
+    csrw satp, t0
     csrw sscratch, a0
     li t0, 0b11 << 13
     csrrc zero, sstatus, t0
@@ -105,6 +108,10 @@ kernelTrapVector:
     ld t0, 0(x31)
     csrrw x31, sscratch, t0
     save_gp 31 a3
+    csrr t0, sepc
+    sd t0, 512(a3)
+    csrr t0, satp
+    sd t0, 520(a3)
     beqz t0, 2f
     # Load global an stack pointer
     load_gp 2, t0

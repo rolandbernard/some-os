@@ -53,7 +53,6 @@ void kernelMain() {
         KERNEL_LOG("[+] Devices initialized");
     }
 
-    setVirtualMemory(0, NULL, true);
     initProcess(&user_process, (uintptr_t)(user_stack + 512), 0, (uintptr_t)userMain);
     enqueueProcess(&user_process);
 }

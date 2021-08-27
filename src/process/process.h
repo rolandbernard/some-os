@@ -20,11 +20,13 @@ typedef struct {
     struct HartProcess_s* hart;
     uintptr_t regs[31];
     double fregs[32];
+    uintptr_t pc;
+    uintptr_t satp;
 } TrapFrame;
 
 typedef struct {
     TrapFrame frame;
-    uintptr_t pc;
+    bool is_kernel;
     uintptr_t stack_top;
     uintptr_t globals;
     ProcessState state;
@@ -43,10 +45,7 @@ Error initProcessSystem();
 // Initialize a process for the given stack_top, globals and start pc
 void initProcess(Process* process, uintptr_t stack_top, uintptr_t globals, uintptr_t start);
 
-// Enter process into user mode
-void enterProcessAsUser(Process* process);
-
-// Enter process into supervisor mode
-void enterProcessAsKernel(Process* process);
+// Enter process into the user ot kernel mode depending on process.is_kernel
+void enterProcess(Process* process);
 
 #endif

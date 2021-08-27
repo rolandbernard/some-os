@@ -7,7 +7,7 @@
 void enqueueProcess(Process* process) {
     // TODO
     if (process->state == READY) {
-        enterProcessAsUser(process);
+        enterProcess(process);
     } else {
         for (;;) {
             waitForInterrupt();

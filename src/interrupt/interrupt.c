@@ -64,7 +64,7 @@ void kernelTrap(uintptr_t cause, uintptr_t pc, uintptr_t val, Process* process) 
     } else {
         process->state = READY;
         if (interrupt) {
-            process->pc = pc;
+            process->frame.pc = pc;
             switch (code) {
                 case 4: // Timer interrupt U-mode
                 case 5: // Timer interrupt S-mode
@@ -82,7 +82,7 @@ void kernelTrap(uintptr_t cause, uintptr_t pc, uintptr_t val, Process* process) 
                     break;
             }
         } else {
-            process->pc = pc + 4;
+            process->frame.pc = pc + 4;
             switch (code) {
                 case 8: // Environment call from U-mode
                     runSyscall(process);

@@ -13,9 +13,9 @@ void enableInterrupts();
 void waitForInterrupt();
 
 // Enter process at pc into user mode
-void enterUserMode(Process* process, uintptr_t pc);
+void enterUserMode(TrapFrame* process);
 
 // Enter process at pc into supervisor mode
-void enterKernelMode(Process* process, uintptr_t pc);
+void enterKernelMode(TrapFrame* process);
 
 #endif
