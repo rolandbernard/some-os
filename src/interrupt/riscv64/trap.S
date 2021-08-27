@@ -36,7 +36,7 @@ enableInterrupts:
 enterUserMode:
     # 0b00 << 11 MPP (Previous Protection Mode) is 0 (U mode)
     li t0, 0b11 << 11
-    csrrc x0, sstatus, t0
+    csrrc zero, sstatus, t0
     j kernelTrapReturn
 
 # Enter as superior at a1 and save registers at a0

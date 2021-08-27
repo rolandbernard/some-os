@@ -26,8 +26,8 @@ void userMain() {
     syscall(1);
 }
 
-Process user_process;
 uint64_t user_stack[512];
+Process user_process;
 
 void kernelMain() {
     Error status;
@@ -54,7 +54,7 @@ void kernelMain() {
     }
 
     setVirtualMemory(0, NULL, true);
-    initProcess(&user_process, (uintptr_t)user_stack, 0, (uintptr_t)userMain);
+    initProcess(&user_process, (uintptr_t)(user_stack + 512), 0, (uintptr_t)userMain);
     enqueueProcess(&user_process);
 }
 

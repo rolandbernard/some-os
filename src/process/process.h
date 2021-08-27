@@ -24,13 +24,6 @@ typedef struct {
 
 typedef struct {
     TrapFrame frame;
-    uintptr_t stack_top;
-    uintptr_t globals;
-    uint64_t schedule_id;
-} HartProcess;
-
-typedef struct Process_s {
-    TrapFrame frame;
     uintptr_t pc;
     uintptr_t stack_top;
     uintptr_t globals;
@@ -38,6 +31,11 @@ typedef struct Process_s {
     uint64_t pid;
     PageTable* table;
 } Process;
+
+typedef struct {
+    Process process;
+    uint64_t schedule_id;
+} HartProcess;
 
 // Initialize process system
 Error initProcessSystem();
