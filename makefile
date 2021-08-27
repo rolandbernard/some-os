@@ -35,13 +35,15 @@ BINARYS        := $(patsubst %, $(BINARY_DIR)/%, $(TARGETS))
 # ==
 
 # == Tools
-CC       := clang -target $(ARCH)
-LINK     := ld.lld
+LINK := ld.lld
+CC   := clang -target $(ARCH)
+ifeq ($(ARCH),riscv64)
+CC   += -march=rv64gc
+endif
 #==
 
 # == Qemu
-QEMU      := qemu-system-riscv64
-
+QEMU      := qemu-system-$(ARCH)
 QEMU_ARGS := -M virt -smp 4 -m 128M -s
 QEMU_ARGS += -cpu rv64 -bios none -snapshot
 QEMU_ARGS += -display none -serial stdio
