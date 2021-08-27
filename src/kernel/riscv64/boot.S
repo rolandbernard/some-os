@@ -1,16 +1,11 @@
 
-.option norvc
-
 .section .text.boot
 .global _start
 
 _start:
     # Set global and stack pointer
-.option push
-.option norelax
     la gp, __global_pointer
     la sp, __stack_top
-.option pop
 
     # Initialize trap data
     la t0, machineTrapVector
@@ -20,6 +15,9 @@ _start:
     # Go into infinite loop with all but one hart
     csrr t0, mhartid
     bnez t0, 1f
+
+    # Init traps for the first hart
+    jal initTraps
 
     # Disable address translation
     csrw satp, zero
@@ -50,11 +48,8 @@ machineTrapVector:
     csrr a1, mepc
     csrr a2, mtval
     csrr a3, mscratch
-.option push
-.option norelax
     la gp, __global_pointer
     la sp, __stack_top
-.option pop
     jal machineTrap
     mret
 

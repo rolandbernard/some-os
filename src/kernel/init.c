@@ -17,7 +17,7 @@ Error initAllSystems() {
 }
 
 void initHart() {
-    // TODO:
+    initTraps();
 }
 
 void initHarts() {

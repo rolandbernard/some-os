@@ -55,7 +55,7 @@ void machineTrap(uintptr_t cause, uintptr_t pc, uintptr_t val, uintptr_t scratch
 }
 
 void kernelTrap(uintptr_t cause, uintptr_t pc, uintptr_t val, Process* process) {
-    setVirtualMemory(0, kernel_page_table, true);
+    /* setVirtualMemory(0, kernel_page_table, true); */
     bool interrupt = cause >> (sizeof(uintptr_t) * 8 - 1);
     int code = cause & 0xff;
     process->state = READY;

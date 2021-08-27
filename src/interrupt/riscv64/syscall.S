@@ -1,6 +1,4 @@
 
-.option norvc
-
 .section .text
 .global syscall
 

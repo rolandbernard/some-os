@@ -6,6 +6,7 @@
 // Initialize all the kernel systems
 Error initAllSystems();
 
+// Initialize hart. Must run in Machine mode.
 void initHart();
 
 void initHarts();

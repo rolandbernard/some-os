@@ -6,6 +6,9 @@
 // Initialize CSRs for traps
 void initTraps();
 
+// Write to the supervisor interrupt enable register
+void enableInterrupts();
+
 // Simple wrapper around wfi
 void waitForInterrupt();
 
