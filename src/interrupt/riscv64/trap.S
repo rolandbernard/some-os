@@ -7,6 +7,7 @@
 .global enterUserMode
 .global enterKernelMode
 .global waitForInterrupt
+.global kernelTrapVector
 
 # Simple function to wait for interrupt
 waitForInterrupt:
@@ -90,7 +91,7 @@ kernelTrapReturn:
 .align 4
 # Called on supervisor tarps, call out to C code
 kernelTrapVector:
-    csrrw x31, sscratch, x31 # Swap scratch (register save location) with x1
+    csrrw x31, sscratch, x31 # Swap scratch (register save location) with x31
     beqz x31, 1f
     # Restore integer registers
 .set i, 1
@@ -108,10 +109,10 @@ kernelTrapVector:
     ld t0, 0(x31)
     csrrw x31, sscratch, t0
     save_gp 31 a3
-    csrr t0, sepc
-    sd t0, 512(a3)
-    csrr t0, satp
-    sd t0, 520(a3)
+    csrr t1, sepc
+    sd t1, 512(a3)
+    csrr t1, satp
+    sd t1, 520(a3)
     beqz t0, 2f
     # Load global an stack pointer
     load_gp 2, t0
