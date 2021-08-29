@@ -13,6 +13,8 @@ typedef enum {
     TERMINATED,
 } ProcessState;
 
+typedef uint64_t Pid;
+
 struct HartProcess_s;
 
 typedef struct {
@@ -26,15 +28,14 @@ typedef struct {
 
 typedef struct {
     TrapFrame frame;
-    bool is_kernel;
     uintptr_t stack_top;
     uintptr_t globals;
     ProcessState state;
-    uint64_t pid;
+    Pid pid;
     PageTable* table;
 } Process;
 
-typedef struct {
+typedef struct HartProcess_s {
     Process process;
     uint64_t schedule_id;
 } HartProcess;
@@ -43,9 +44,9 @@ typedef struct {
 Error initProcessSystem();
 
 // Initialize a process for the given stack_top, globals and start pc
-void initProcess(Process* process, uintptr_t stack_top, uintptr_t globals, uintptr_t start);
+void initDefaultProcess(Process* process, uintptr_t stack_top, uintptr_t globals, uintptr_t start);
 
-// Enter process into the user ot kernel mode depending on process.is_kernel
+// Enter process into the user ot kernel mode depending on process.pid (pid == 0 -> kernel)
 void enterProcess(Process* process);
 
 #endif

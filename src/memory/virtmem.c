@@ -49,6 +49,10 @@ void setVirtualMemory(uint16_t asid, PageTable* page_table, bool fence) {
 }
 
 uint64_t satpForMemory(uint16_t asid, PageTable* page_table) {
-    return 8L << 60 | (uint64_t)asid << 44L | (uintptr_t)page_table >> 12;
+    if (page_table == NULL) {
+        return 0;
+    } else {
+        return 8L << 60 | (uint64_t)asid << 44L | (uintptr_t)page_table >> 12;
+    }
 }
 

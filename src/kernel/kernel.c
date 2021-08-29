@@ -7,6 +7,7 @@
 #include "devices/devices.h"
 #include "error/log.h"
 #include "memory/kalloc.h"
+#include "memory/pagealloc.h"
 #include "memory/pagetable.h"
 #include "memory/virtmem.h"
 #include "process/process.h"
@@ -26,8 +27,8 @@ void userMain() {
     syscall(1);
 }
 
-uint64_t user_stack[512];
 Process user_process;
+uint64_t user_stack[512];
 
 void kernelMain() {
     Error status;
@@ -53,7 +54,7 @@ void kernelMain() {
         KERNEL_LOG("[+] Devices initialized");
     }
 
-    initProcess(&user_process, (uintptr_t)(user_stack + 512), 0, (uintptr_t)userMain);
+    initDefaultProcess(&user_process, (uintptr_t)user_stack + sizeof(user_stack), 0, (uintptr_t)userMain);
     enqueueProcess(&user_process);
 }
 
