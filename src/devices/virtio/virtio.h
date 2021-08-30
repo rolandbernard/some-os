@@ -3,8 +3,11 @@
 
 #include <stdint.h>
 #include <stddef.h>
+#include <assert.h>
 
 #include "error/error.h"
+
+#include "memory/pagealloc.h"
 
 #define MMIO_VIRTIO_COUNT 8
 #define MMIO_VIRTIO_MAGIC 0x74726976
@@ -43,11 +46,11 @@ typedef struct {
     uint32_t guest_features_sel;
     uint64_t guest_page_size;
     uint32_t queue_sel;
-    uint32_t queue_num_sel;
+    uint32_t queue_num_max;
+    uint32_t padding1[2];
     uint32_t queue_num;
     uint32_t queue_align;
-    uint32_t queue_pfn;
-    uint32_t padding1[3];
+    uint64_t queue_pfn;
     uint32_t queue_notify;
     uint32_t padding2[3];
     uint32_t interrupt_status;
@@ -64,13 +67,74 @@ typedef enum {
     VIRTIO_BLOCK = 2,
     VIRTIO_CONSOLE = 3,
     VIRTIO_ENTROPY = 4,
-    VIRTIO_MEMORY = 5,
-    VIRTIO_IO = 6,
+    VIRTIO_MEMORY_BALLOONING = 5,
+    VIRTIO_IO_MEMORY = 6,
     VIRTIO_RPMSG = 7,
-    VIRTIO_SCSI = 8,
-    VIRTIO_9P = 9,
+    VIRTIO_SCSI_HOST = 8,
+    VIRTIO_9P_TRANSPORT = 9,
     VIRTIO_WLAN = 10,
+    VIRTIO_GPU = 16,
+    VIRTIO_INPUT = 18,
+    VIRTIO_MEMORY = 24,
 } VirtIODeviceTypes;
+
+typedef enum {
+    VIRTIO_ACKNOWLEDGE = 1,
+    VIRTIO_DRIVER = 2,
+    VIRTIO_DRIVER_OK = 4,
+    VIRTIO_FEATURES_OK = 8,
+    VIRTIO_NEEDS_RESET = 64,
+    VIRTIO_FAILED = 128,
+} VirtIOStatusField;
+
+typedef enum {
+    VIRTIO_DESC_NEXT = 1,
+    VIRTIO_DESC_WRITE = 2,
+    VIRTIO_DESC_INDIRECT = 4,
+} VirtIODescriptorFlags;
+
+typedef enum {
+    VIRTIO_AVAIL_NO_INTERRUPT = 1,
+} VirtIOAvailableFlags;
+
+typedef enum {
+    VIRTIO_USED_NO_NOTIFY = 1,
+} VirtIOUsedFlags;
+
+#define VIRTIO_RING_SIZE 1 << 7
+
+typedef struct {
+    uint64_t address;
+    uint32_t length;
+    uint16_t flags;
+    uint16_t next;
+} VirtIODescriptor;
+
+typedef struct {
+    uint16_t flags;
+    uint16_t index;
+    uint16_t ring[VIRTIO_RING_SIZE];
+    uint16_t event;
+} VirtIOAvailable;
+
+typedef struct {
+    uint32_t id;
+    uint32_t length;
+} VirtIOUsedElement;
+
+typedef struct {
+    uint16_t flags;
+    uint16_t index;
+    VirtIOUsedElement ring[VIRTIO_RING_SIZE];
+    uint16_t event;
+} VirtIOUsed;
+
+typedef struct {
+    VirtIODescriptor descriptors[VIRTIO_RING_SIZE];
+    VirtIOAvailable available;
+    uint8_t padding[PAGE_SIZE - sizeof(VirtIODescriptor[VIRTIO_RING_SIZE]) - sizeof(VirtIOAvailable)];
+    VirtIOUsed used;
+} VirtIOQueue;
 
 Error initVirtIODevices();
 
