@@ -23,6 +23,7 @@ Error initPageAllocator() {
     } else {
         free_pages.first = NULL;
     }
+    KERNEL_LOG("[>] Initialized page allocator");
     return simpleError(SUCCESS);
 }
 

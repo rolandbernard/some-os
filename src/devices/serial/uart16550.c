@@ -1,6 +1,8 @@
 
 #include "devices/serial/uart16550.h"
 
+#include "error/log.h"
+
 Error initUart16550(Uart16550* uart) {
     if (!uart->initialized) {
         // Set the word length to 8-bits by writing 1 into LCR[1:0]
@@ -20,6 +22,8 @@ Error initUart16550(Uart16550* uart) {
         uart->base_address[3] = lcr;
 
         uart->initialized = true;
+
+        KERNEL_LOG("[>] Initialized UART device");
     }
     return simpleError(SUCCESS);
 }
