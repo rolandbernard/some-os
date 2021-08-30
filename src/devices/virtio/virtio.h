@@ -2,6 +2,12 @@
 #define _VIRTIO_H_
 
 #include <stdint.h>
+#include <stddef.h>
+
+#include "error/error.h"
+
+#define MMIO_VIRTIO_COUNT 8
+#define MMIO_VIRTIO_MAGIC 0x74726976
 
 typedef enum {
     MAGIC_VALUE = 0x000,
@@ -50,6 +56,30 @@ typedef struct {
     uint32_t status;
     uint32_t padding4[35];
     uint32_t config;
-} VirtIOMemory;
+} VirtIODeviceLayout;
+
+typedef enum {
+    VIRTIO_NONE = 0,
+    VIRTIO_NETWORK = 1,
+    VIRTIO_BLOCK = 2,
+    VIRTIO_CONSOLE = 3,
+    VIRTIO_ENTROPY = 4,
+    VIRTIO_MEMORY = 5,
+    VIRTIO_IO = 6,
+    VIRTIO_RPMSG = 7,
+    VIRTIO_SCSI = 8,
+    VIRTIO_9P = 9,
+    VIRTIO_WLAN = 10,
+} VirtIODeviceTypes;
+
+Error initVirtIODevices();
+
+VirtIODeviceLayout* getDeviceWithId(int id);
+
+VirtIODeviceLayout* getAnyDeviceOfType(VirtIODeviceTypes type);
+
+size_t getDeviceCountOfType(VirtIODeviceTypes type);
+
+void getDevicesOfType(VirtIODeviceTypes type, VirtIODeviceLayout** devices);
 
 #endif
