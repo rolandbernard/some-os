@@ -77,20 +77,27 @@ void deallocPage(void* ptr) {
 
 void deallocPages(PageAllocation alloc) {
     if (alloc.ptr != NULL && alloc.size != 0) {
-        assert(alloc.ptr >= &__heap_start && alloc.ptr <= &__heap_end);
-        if (alloc.ptr + PAGE_SIZE * alloc.size == free_pages.first) {
-            FreePage* page = alloc.ptr;
-            page->size = alloc.size + free_pages.first->size;
-            page->next = free_pages.first->next;
-            free_pages.first = page;
-        } else if (((void*)free_pages.first) + PAGE_SIZE * free_pages.first->size == alloc.ptr) {
-            free_pages.first->size += alloc.size;
-        } else {
-            FreePage* page = alloc.ptr;
-            page->size = alloc.size;
-            page->next = free_pages.first;
-            free_pages.first = page;
+        assert(alloc.ptr >= &__heap_start && alloc.ptr <= &__heap_end); // Small sanity check
+        FreePage* memory = alloc.ptr;
+        memory->next = NULL;
+        memory->size = alloc.size;
+        FreePage** current = &free_pages.first;
+        while (*current != NULL) {
+            uintptr_t current_ptr = (uintptr_t)*current;
+            uintptr_t memory_ptr = (uintptr_t)memory;
+            if (memory_ptr + memory->size * PAGE_SIZE == current_ptr) {
+                memory->size += (*current)->size;
+                *current = (*current)->next;
+            } else if (current_ptr + (*current)->size * PAGE_SIZE == memory_ptr) {
+                (*current)->size += memory->size;
+                memory = *current;
+                *current = (*current)->next;
+            } else {
+                current = &(*current)->next;
+            }
         }
+        memory->next = free_pages.first;
+        free_pages.first = memory;
     }
 }
 
