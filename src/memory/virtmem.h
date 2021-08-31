@@ -19,4 +19,7 @@ void setVirtualMemory(uint16_t asid, PageTable* page_table, bool fence);
 
 uint64_t satpForMemory(uint16_t asid, PageTable* page_table);
 
+// This does not really belong here
+void memoryFence();
+
 #endif
