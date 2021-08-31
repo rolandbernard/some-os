@@ -28,40 +28,43 @@ Error initPageAllocator() {
 }
 
 void* allocPage() {
-    void* ret = allocPages(1).ptr;
-    assert(ret != NULL); // TODO: handle memory pressure
-    return ret;
+    return allocPages(1).ptr;
 }
 
-PageAllocation allocPages(size_t max_pages) {
-    if (free_pages.first != NULL && max_pages != 0) {
-        if (free_pages.first->size > max_pages) {
-            void* page = free_pages.first;
-            FreePage* moved = page + PAGE_SIZE * max_pages;
-            moved->size = free_pages.first->size - max_pages;
-            moved->next = free_pages.first->next;
-            free_pages.first = moved;
-            PageAllocation ret = {
-                .ptr = page,
-                .size = max_pages,
-            };
-            return ret;
-        } else {
-            FreePage* page = free_pages.first;
-            free_pages.first = page->next;
-            PageAllocation ret = {
-                .ptr = page,
-                .size = page->size,
-            };
-            return ret;
+PageAllocation allocPages(size_t pages) {
+    if (pages != 0) {
+        FreePage** current = &free_pages.first;
+        while (*current != NULL) {
+            if ((*current)->size > pages) {
+                FreePage* page = *current;
+                FreePage* moved = page + PAGE_SIZE * pages;
+                moved->size = page->size - pages;
+                moved->next = page->next;
+                *current = moved;
+                PageAllocation ret = {
+                    .ptr = page,
+                    .size = pages,
+                };
+                return ret;
+            } if ((*current)->size == pages) {
+                FreePage* page = *current;
+                *current = page->next;
+                PageAllocation ret = {
+                    .ptr = page,
+                    .size = page->size,
+                };
+                return ret;
+            } else {
+                current = &(*current)->next;
+            }
         }
-    } else {
-        PageAllocation ret = {
-            .ptr = NULL,
-            .size = 0,
-        };
-        return ret;
     }
+    // TODO: handle memory pressure
+    PageAllocation ret = {
+        .ptr = NULL,
+        .size = 0,
+    };
+    return ret;
 }
 
 void deallocPage(void* ptr) {
@@ -95,8 +98,8 @@ void* zallocPage() {
     return zallocPages(1).ptr;
 }
 
-PageAllocation zallocPages(size_t max_pages) {
-    PageAllocation alloc = allocPages(max_pages);
+PageAllocation zallocPages(size_t pages) {
+    PageAllocation alloc = allocPages(pages);
     memset(alloc.ptr, 0, alloc.size * PAGE_SIZE);
     return alloc;
 }

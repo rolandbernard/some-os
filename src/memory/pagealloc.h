@@ -27,8 +27,8 @@ Error initPageAllocator();
 // Allocate a new page.
 void* allocPage();
 
-// Allocate a set of continuous pages. Allocate up to max_pages.
-PageAllocation allocPages(size_t max_pages);
+// Allocate a set of continuous pages. Allocate exactly max_pages or 0.
+PageAllocation allocPages(size_t pages);
 
 // Free an allocated page. Freeing an not allocated page is undefined behavior.
 void deallocPage(void* page);
@@ -40,6 +40,6 @@ void deallocPages(PageAllocation allocation);
 void* zallocPage();
 
 // Allocate a set of continuous pages and fill the page with zeros.
-PageAllocation zallocPages(size_t max_pages);
+PageAllocation zallocPages(size_t pages);
 
 #endif
