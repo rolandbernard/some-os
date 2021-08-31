@@ -76,7 +76,7 @@ typedef enum {
     VIRTIO_GPU = 16,
     VIRTIO_INPUT = 18,
     VIRTIO_MEMORY = 24,
-} VirtIODeviceTypes;
+} VirtIODeviceType;
 
 typedef enum {
     VIRTIO_ACKNOWLEDGE = 1,
@@ -136,14 +136,22 @@ typedef struct {
     VirtIOUsed used;
 } VirtIOQueue;
 
+typedef struct {
+    VirtIODeviceType type;
+    volatile VirtIODeviceLayout* mmio;
+    volatile VirtIOQueue* queue;
+} VirtIODevice;
+
 Error initVirtIODevices();
 
-VirtIODeviceLayout* getDeviceWithId(int id);
+VirtIODevice* getDeviceWithId(int id);
 
-VirtIODeviceLayout* getAnyDeviceOfType(VirtIODeviceTypes type);
+VirtIODevice* getAnyDeviceOfType(VirtIODeviceType type);
 
-size_t getDeviceCountOfType(VirtIODeviceTypes type);
+size_t getDeviceCountOfType(VirtIODeviceType type);
 
-void getDevicesOfType(VirtIODeviceTypes type, VirtIODeviceLayout** devices);
+void getDevicesOfType(VirtIODeviceType type, VirtIODevice** devices);
+
+Error setupVirtIOQueue(VirtIODevice* device);
 
 #endif
