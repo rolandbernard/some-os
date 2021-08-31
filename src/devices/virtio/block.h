@@ -8,6 +8,6 @@ typedef struct {
     bool read_only;
 } VirtIOBlockDevice;
 
-Error initBlockDevice(int id, VirtIODevice base, VirtIODevice** output);
+Error initBlockDevice(int id, volatile VirtIODeviceLayout* base, VirtIODevice** output);
 
 #endif

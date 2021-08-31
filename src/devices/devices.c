@@ -2,6 +2,7 @@
 #include "devices/devices.h"
 
 #include "devices/serial/uart16550.h"
+#include "devices/virtio/virtio.h"
 #include "memory/memmap.h"
 
 static Uart16550 serial_mmio;
@@ -14,6 +15,7 @@ Error initBaselineDevices() {
 }
 
 Error initDevices() {
+    CHECKED(initVirtIODevices());
     return simpleError(SUCCESS);
 }
 
