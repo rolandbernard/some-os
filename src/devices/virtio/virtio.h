@@ -9,8 +9,8 @@
 
 #include "memory/pagealloc.h"
 
-#define MMIO_VIRTIO_COUNT 8
-#define MMIO_VIRTIO_MAGIC 0x74726976
+#define VIRTIO_DEVICE_COUNT 8
+#define VIRTIO_MAGIC_NUMBER 0x74726976
 
 typedef enum {
     MAGIC_VALUE = 0x000,
