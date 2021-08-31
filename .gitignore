@@ -4,7 +4,7 @@ mnt/
 tmp/
 .vim
 compile_flags.txt
-example.img
+hdd.dsk
 
 # Prerequisites
 *.d

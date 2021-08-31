@@ -32,6 +32,7 @@ TARGET_OBJECTS := $(foreach TARGET, $(TARGETS), $(OBJECTS.$(TARGET)))
 OBJECTS        := $(filter-out $(ARCH_OBJECTS) $(TARGET_OBJECTS), $(ALL_OBJECTS))
 DEPENDENCIES   := $(ALL_OBJECTS:.o=.d)
 BINARYS        := $(patsubst %, $(BINARY_DIR)/%, $(TARGETS))
+DISK           := $(BUILD_DIR)/hdd.dsk
 # ==
 
 # == Tools
@@ -44,9 +45,15 @@ endif
 
 # == Qemu
 QEMU      := qemu-system-$(ARCH)
+
+# Qemu system
 QEMU_ARGS := -M virt -smp 4 -m 128M -s
 QEMU_ARGS += -cpu rv64 -bios none -snapshot
+
+# Qemu devices
 QEMU_ARGS += -display none -serial stdio
+QEMU_ARGS += -drive format=raw,file=$(DISK),id=disk0
+QEMU_ARGS += -device virtio-blk-device,scsi=off,drive=disk0
 # ==
 
 # == Flags
@@ -99,8 +106,12 @@ $(OBJECT_DIR)/%.o: $(SOURCE_DIR)/% $(MAKEFILE_LIST) | $$(dir $$@)
 
 # Running
 
-qemu: $(BINARY_DIR)/kernel
+qemu: $(BINARY_DIR)/kernel $(DISK)
 	$(QEMU) $(QEMU_ARGS) -kernel $(BINARY_DIR)/kernel
+
+$(DISK): $(MAKEFILE_LIST)
+	@$(ECHO) "Building $@"
+	dd if=/dev/urandom of=$@ bs=1M count=32 &> /dev/null
 
 # Cleanup
 
