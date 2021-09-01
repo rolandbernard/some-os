@@ -58,7 +58,6 @@ typedef struct {
     uint32_t padding3[2];
     uint32_t status;
     uint32_t padding4[35];
-    uint32_t config;
 } VirtIODeviceLayout;
 
 typedef enum {
