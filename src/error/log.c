@@ -14,7 +14,7 @@ Error logKernelMessage(const char* fmt, ...) {
     // Logging happens to the default serial device
     Serial serial = getDefaultSerialDevice();
     FORMAT_STRING(string, fmt);
-    return writeToSerial(serial, "%s\n", string);
+    return writeToSerial(serial, "%s", string);
 }
 
 uintptr_t printSyscall(bool is_kernel, Process* process, SyscallArgs args) {

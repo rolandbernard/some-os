@@ -6,6 +6,7 @@
 
 #include "devices/devices.h"
 #include "error/log.h"
+#include "interrupt/trap.h"
 #include "memory/kalloc.h"
 #include "memory/pagealloc.h"
 #include "memory/pagetable.h"
@@ -19,10 +20,12 @@ void userMain() {
     // TODO: replace with starting init process
     // Just some testing code
     // Throws a Instruction page fault now, because user is not allowed to access kernel memory.
-    double test = 1.23456789;
-    for (int i = 1; i <= 5; i++) {
-        test *= test;
-        syscall(0, "Hello world!");
+    for (;;) {
+        for (int i = 1; i <= 50; i++) {
+            syscall(0, ".");
+            waitForInterrupt();
+        }
+        syscall(0, "\r");
     }
     syscall(1);
 }

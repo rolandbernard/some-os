@@ -9,6 +9,7 @@
 #include "memory/virtmem.h"
 #include "interrupt/trap.h"
 #include "interrupt/syscall.h"
+#include "interrupt/timer.h"
 
 extern void kernelTrapVector;
 extern void kernelTrap;
@@ -36,6 +37,7 @@ void initDefaultProcess(Process* process, uintptr_t stack_top, uintptr_t globals
 }
 
 void enterProcess(Process* process) {
+    initTimerInterrupt();
     process->state = RUNNING;
     if (process->pid == 0) {
         enterKernelMode(&process->frame);

@@ -11,6 +11,8 @@ typedef uint64_t Timeout;
 typedef uint64_t Time;
 typedef void (*TimeoutFunction)(Time time, void* udata);
 
+void initTimerInterrupt();
+
 void handleTimerInterrupt();
 
 Time getTime();

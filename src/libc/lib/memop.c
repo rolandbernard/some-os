@@ -10,7 +10,7 @@ void* memset(void* mem, int byte, size_t n) {
     }
     uint64_t big = 0;
     for (int i = 0; i < 8; i++) {
-        big |= (uint64_t)byte << (8 * i);
+        big |= ((uint64_t)byte & 0xff) << (8 * i);
     }
     while (n > 8) {
         *((uint64_t*)mem) = big;

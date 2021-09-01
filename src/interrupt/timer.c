@@ -50,6 +50,10 @@ static void setTimeCmp(Time time) {
     *(volatile Time*)(memory_map[VIRT_CLINT].base + 0x4000) = time;
 }
 
+void initTimerInterrupt() {
+    setTimeCmp(getTime() + MIN_TIME);
+}
+
 void handleTimerInterrupt() {
     for (;;) {
         Time time = getTime();

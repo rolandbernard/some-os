@@ -23,7 +23,6 @@ initTraps:
     li t0, 0xffff
     csrw medeleg, t0
     csrw mideleg, t0
-    li t0, 0xffff
     csrw mie, t0
     csrw sie, t0
     ret
