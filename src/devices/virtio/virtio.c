@@ -34,8 +34,6 @@ Error initVirtIODevices() {
                         getErrorMessage(error)
                     );
                 } else {
-                    devices[i]->type = address->device_id;
-                    devices[i]->mmio = address;
                     KERNEL_LOG("[>] Initialized VirtIO %s device %i", device_inits[type].name, i);
                 }
             } else {
@@ -80,7 +78,20 @@ void getDevicesOfType(VirtIODeviceType type, VirtIODevice** output) {
 }
 
 Error setupVirtIOQueue(VirtIODevice* device) {
-    // TODO: implement
+    uint32_t max_queues = device->mmio->queue_num_max;
+    if (max_queues < VIRTIO_RING_SIZE) {
+        return someError(UNSUPPORTED, "Queue size maximum too low");
+    }
+    device->mmio->queue_num = VIRTIO_RING_SIZE;
+    if (device->queue == NULL) {
+        device->mmio->queue_sel = 0;
+        size_t num_pages = (sizeof(VirtIOQueue) + PAGE_SIZE - 1) / PAGE_SIZE;
+        VirtIOQueue* queue = zallocPages(num_pages).ptr;
+        uint32_t queue_pfn = ((uintptr_t)queue) / PAGE_SIZE;
+        device->mmio->guest_page_size = PAGE_SIZE;
+        device->mmio->queue_pfn = queue_pfn;
+        device->queue = queue;
+    }
     return simpleError(SUCCESS);
 }
 
