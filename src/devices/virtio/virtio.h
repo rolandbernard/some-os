@@ -75,6 +75,7 @@ typedef enum {
     VIRTIO_GPU = 16,
     VIRTIO_INPUT = 18,
     VIRTIO_MEMORY = 24,
+    VIRTIO_DEVICE_TYPE_END,
 } VirtIODeviceType;
 
 typedef enum {
