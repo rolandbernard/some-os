@@ -65,8 +65,20 @@ typedef struct {
     uint32_t blk_type;
     uint32_t reserved;
     uint64_t sector;
+} VirtIOBlockRequestHeader;
+
+typedef struct {
     uint8_t* data;
+} VirtIOBlockRequestData;
+
+typedef struct {
     uint8_t status;
+} VirtIOBlockRequestStatus;
+
+typedef struct {
+    VirtIOBlockRequestHeader header;
+    VirtIOBlockRequestData data;
+    VirtIOBlockRequestStatus status;
     uint16_t head;
 } VirtIOBlockRequest;
 
@@ -81,5 +93,7 @@ typedef struct {
 } VirtIOBlockDevice;
 
 Error initBlockDevice(int id, volatile VirtIODeviceLayout* base, VirtIODevice** output);
+
+Error blockDeviceOperation(VirtIOBlockDevice* device, uint8_t* buffer, uint32_t size, bool write);
 
 #endif

@@ -11,6 +11,7 @@
 
 #define VIRTIO_DEVICE_COUNT 8
 #define VIRTIO_MAGIC_NUMBER 0x74726976
+#define VIRTIO_MEM_STROBE 0x1000
 
 typedef enum {
     MAGIC_VALUE = 0x000,
@@ -137,9 +138,11 @@ typedef struct {
 } VirtIOQueue;
 
 typedef struct {
-    VirtIODeviceType type;
     volatile VirtIODeviceLayout* mmio;
     volatile VirtIOQueue* queue;
+    VirtIODeviceType type;
+    uint16_t index;
+    uint16_t ack_index;
 } VirtIODevice;
 
 Error initVirtIODevices();
@@ -153,5 +156,7 @@ size_t getDeviceCountOfType(VirtIODeviceType type);
 void getDevicesOfType(VirtIODeviceType type, VirtIODevice** devices);
 
 Error setupVirtIOQueue(VirtIODevice* device);
+
+uint16_t fillNextDescriptor(VirtIODevice* device, VirtIODescriptor descriptor);
 
 #endif
