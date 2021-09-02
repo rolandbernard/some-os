@@ -25,6 +25,9 @@ initTraps:
     csrw mideleg, t0
     csrw mie, t0
     csrw sie, t0
+    # Some things can not be delegated
+    la t0, indirectKernelTrapVector
+    csrw mtvec, t0
     ret
 
 // Write to the supervisor interrupt enable register
@@ -34,17 +37,15 @@ enableInterrupts:
 
 # Enter as user using trap frame in a0
 enterUserMode:
-    # 0b00 << 11 MPP (Previous Protection Mode) is 0 (U mode)
-    li t0, 0b11 << 11
+    # 0b0 << 8 SPP (Previous Protection Mode) is 0 (U mode)
+    li t0, 1 << 8
     csrrc zero, sstatus, t0
     j kernelTrapReturn
 
 # Enter as superior using trap frame in a0
 enterKernelMode:
-    # 0b01 << 11 MPP (Previous Protection Mode) is 1 (S mode)
-    li t0, 0b11 << 11
-    csrrc zero, sstatus, t0
-    li t0, 0b01 << 11
+    # 0b1 << 8 SPP (Previous Protection Mode) is 1 (S mode)
+    li t0, 1 << 8
     csrrs zero, sstatus, t0
     j kernelTrapReturn
 
@@ -86,6 +87,18 @@ kernelTrapReturn:
     .set i, i+1
 .endr
     sret
+
+.align 4
+indirectKernelTrapVector:
+    csrw mscratch, t0
+    csrr t0, mcause
+    csrw scause, t0
+    csrr t0, mepc
+    csrw sepc, t0
+    csrr t0, mtval
+    csrw stval, t0
+    csrr t0, mscratch
+    j kernelTrapVector
 
 .align 4
 # Called on supervisor tarps, call out to C code

@@ -55,26 +55,24 @@ void initTimerInterrupt() {
 }
 
 void handleTimerInterrupt() {
-    for (;;) {
-        Time time = getTime();
-        Time min = 0;
-        for (size_t i = 0; i < length;) {
-            if (timeouts[i].time < time) {
-                timeouts[i].function(time, timeouts[i].udata);
-                memmove(timeouts + i, timeouts + i + 1, length - i - 1);
-                length--;
-            } else {
-                if (timeouts[i].time < timeouts[min].time) {
-                    min = i;
-                }
-                i++;
-            }
-        }
-        if (length != 0 && timeouts[min].time < time + MIN_TIME) {
-            setTimeCmp(timeouts[min].time);
+    Time time = getTime();
+    Time min = 0;
+    for (size_t i = 0; i < length;) {
+        if (timeouts[i].time < time) {
+            timeouts[i].function(time, timeouts[i].udata);
+            memmove(timeouts + i, timeouts + i + 1, length - i - 1);
+            length--;
         } else {
-            setTimeCmp(time + MIN_TIME);
+            if (timeouts[i].time < timeouts[min].time) {
+                min = i;
+            }
+            i++;
         }
+    }
+    if (length != 0 && timeouts[min].time < time + MIN_TIME) {
+        setTimeCmp(timeouts[min].time);
+    } else {
+        setTimeCmp(time + MIN_TIME);
     }
 }
 

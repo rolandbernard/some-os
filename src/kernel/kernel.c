@@ -25,7 +25,7 @@ void userMain() {
             syscall(0, ".");
             waitForInterrupt();
         }
-        syscall(0, "\r");
+        syscall(0, "\n");
     }
     syscall(1);
 }
