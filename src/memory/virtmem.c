@@ -32,6 +32,9 @@ Error initKernelVirtualMemory() {
     );
     // Identity map UART
     identityMapMapedMemory(VIRT_UART0);
+    identityMapMapedMemory(VIRT_CLINT);
+    identityMapMapedMemory(VIRT_PLIC);
+    identityMapMapedMemory(VIRT_VIRTIO);
     setVirtualMemory(0, kernel_page_table, true);
     unlockSpinLock(&kernel_page_table_lock);
     KERNEL_LOG("[>] Initialized kernel virtual memory");
@@ -39,13 +42,9 @@ Error initKernelVirtualMemory() {
 }
 
 void setVirtualMemory(uint16_t asid, PageTable* page_table, bool fence) {
-    if (page_table == NULL) {
-        setSatpCsr(0);
-    } else {
-        setSatpCsr(satpForMemory(asid, page_table));
-        if (fence) {
-            addressTranslationFence(asid);
-        }
+    setSatpCsr(satpForMemory(asid, page_table));
+    if (fence) {
+        addressTranslationFence(asid);
     }
 }
 

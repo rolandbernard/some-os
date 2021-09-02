@@ -6,7 +6,7 @@
 
 # fn (uint64_t satp);
 setSatpCsr:
-    csrw satp, t0
+    csrw satp, a0
     ret
 
 # fn (int asid);

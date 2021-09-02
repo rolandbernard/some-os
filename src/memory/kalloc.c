@@ -57,8 +57,8 @@ static void addNewMemory(size_t size) {
         unlockSpinLock(&kernel_page_table_lock);
         next_vaddr += PAGE_SIZE;
     }
-    mem->size = size * PAGE_SIZE;
     setVirtualMemory(0, kernel_page_table, true);
+    mem->size = size * PAGE_SIZE;
     insertFreeMemory(mem);
 }
 
