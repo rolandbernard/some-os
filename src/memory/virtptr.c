@@ -48,11 +48,11 @@ size_t getVirtPtrParts(VirtPtr addr, size_t length, VirtPtrBufferPart* parts, si
 void memcpyBetweenVirtPtr(VirtPtr dest, VirtPtr src, size_t n) {
     // This does not support overlaps.
     size_t dest_count = getVirtPtrParts(dest, n, NULL, 0);
-    size_t src_count = getVirtPtrParts(dest, n, NULL, 0);
+    size_t src_count = getVirtPtrParts(src, n, NULL, 0);
     VirtPtrBufferPart dest_parts[dest_count];
     VirtPtrBufferPart src_parts[src_count];
     getVirtPtrParts(dest, n, dest_parts, dest_count);
-    getVirtPtrParts(dest, n, src_parts, src_count);
+    getVirtPtrParts(src, n, src_parts, src_count);
     size_t index = 0;
     size_t dest_index = 0;
     size_t src_index = 0;
