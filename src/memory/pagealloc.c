@@ -32,7 +32,6 @@ void* allocPage() {
 }
 
 PageAllocation allocPages(size_t pages) {
-    KERNEL_LOG("first: %p %i", free_pages.first, free_pages.first->size);
     if (pages != 0) {
         FreePage** current = &free_pages.first;
         while (*current != NULL) {
@@ -42,7 +41,6 @@ PageAllocation allocPages(size_t pages) {
                 moved->size = page->size - pages;
                 moved->next = page->next;
                 *current = moved;
-                KERNEL_LOG("pages allocated: %p %i", page, pages);
                 PageAllocation ret = {
                     .ptr = page,
                     .size = pages,
@@ -51,7 +49,6 @@ PageAllocation allocPages(size_t pages) {
             } else if ((*current)->size == pages) {
                 FreePage* page = *current;
                 *current = page->next;
-                KERNEL_LOG("pages allocated: %p %i", page, pages);
                 PageAllocation ret = {
                     .ptr = page,
                     .size = page->size,
