@@ -8,6 +8,7 @@
 #include "error/error.h"
 
 #include "memory/pagealloc.h"
+#include "memory/virtptr.h"
 
 #define VIRTIO_DEVICE_COUNT 8
 #define VIRTIO_MAGIC_NUMBER 0x74726976
@@ -158,5 +159,9 @@ void getDevicesOfType(VirtIODeviceType type, VirtIODevice** devices);
 Error setupVirtIOQueue(VirtIODevice* device);
 
 uint16_t fillNextDescriptor(VirtIODevice* device, VirtIODescriptor descriptor);
+
+uint16_t addDescriptorsFor(VirtIODevice* device, VirtPtr buffer, size_t length, bool next, uint16_t* count_out);
+
+void sendRequestAt(VirtIODevice* device, uint16_t descriptor);
 
 #endif

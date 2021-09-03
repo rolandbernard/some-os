@@ -3,6 +3,7 @@
 
 #include "devices/virtio/block.h"
 #include "memory/memmap.h"
+#include "memory/virtptr.h"
 
 static VirtIODevice* devices[VIRTIO_DEVICE_COUNT];
 
@@ -102,5 +103,31 @@ uint16_t fillNextDescriptor(VirtIODevice* device, VirtIODescriptor descriptor) {
         device->queue->descriptors[device->index].next = (device->index + 1) & VIRTIO_RING_SIZE;
     }
     return device->index;
+}
+
+uint16_t addDescriptorsFor(VirtIODevice* device, VirtPtr buffer, size_t length, bool next, uint16_t* count_out) {
+    size_t part_count = getVirtPtrParts(buffer, length, NULL, 0);
+    VirtPtrBufferPart parts[part_count];
+    getVirtPtrParts(buffer, length, parts, part_count);
+    uint16_t ret = 0;
+    for (size_t i = 0; i < part_count; i++) {
+        VirtIODescriptor desc = {
+            .address = (uintptr_t)parts[i].address,
+            .length = parts[i].length,
+            .flags = ((i + 1 < part_count) || next) ? VIRTIO_DESC_NEXT : 0,
+            .next = 0,
+        };
+        uint16_t index = fillNextDescriptor(device, desc);
+        if (i == 0) {
+            ret = index;
+        }
+    }
+    return ret;
+}
+
+void sendRequestAt(VirtIODevice* device, uint16_t descriptor) {
+    device->queue->available.ring[device->queue->available.index] = descriptor;
+    device->queue->available.index = (device->queue->available.index + 1) % VIRTIO_RING_SIZE;
+    device->mmio->queue_notify = 0;
 }
 
