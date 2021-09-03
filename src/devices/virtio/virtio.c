@@ -95,3 +95,12 @@ Error setupVirtIOQueue(VirtIODevice* device) {
     return simpleError(SUCCESS);
 }
 
+uint16_t fillNextDescriptor(VirtIODevice* device, VirtIODescriptor descriptor) {
+    device->index = (device->index + 1) % VIRTIO_RING_SIZE;
+    device->queue->descriptors[device->index] = descriptor;
+    if ((descriptor.flags & VIRTIO_DESC_NEXT) != 0) {
+        device->queue->descriptors[device->index].next = (device->index + 1) & VIRTIO_RING_SIZE;
+    }
+    return device->index;
+}
+
