@@ -122,6 +122,9 @@ uint16_t addDescriptorsFor(VirtIODevice* device, VirtPtr buffer, size_t length, 
             ret = index;
         }
     }
+    if (count_out != NULL) {
+        *count_out = part_count;
+    }
     return ret;
 }
 

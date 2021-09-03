@@ -1,7 +1,13 @@
 #ifndef _BLOCK_H_
 #define _BLOCK_H_
 
+#include <assert.h>
+
 #include "devices/virtio/virtio.h"
+
+#define BLOCK_SECTOR_SIZE 512
+#define BLOCK_STATUS_MAGIC 111
+#define BLOCK_MAX_REQUESTS (1 << 5)
 
 typedef enum {
     VIRTIO_BLOCK_T_IN = 1 << 0,
@@ -68,7 +74,7 @@ typedef struct {
 } VirtIOBlockRequestHeader;
 
 typedef struct {
-    uint8_t* data;
+    VirtPtr data;
 } VirtIOBlockRequestData;
 
 typedef struct {
@@ -87,13 +93,18 @@ typedef struct {
     VirtIOBlockConfig config;
 } VirtIOBlockDeviceLayout;
 
+static_assert(BLOCK_MAX_REQUESTS < VIRTIO_RING_SIZE);
+
 typedef struct {
     VirtIODevice virtio;
+    VirtIOBlockRequest* requests[BLOCK_MAX_REQUESTS];
+    uint16_t req_index;
+    uint16_t ack_index;
     bool read_only;
 } VirtIOBlockDevice;
 
 Error initBlockDevice(int id, volatile VirtIODeviceLayout* base, VirtIODevice** output);
 
-Error blockDeviceOperation(VirtIOBlockDevice* device, uint8_t* buffer, uint32_t size, bool write);
+Error blockDeviceOperation(VirtIOBlockDevice* device, VirtPtr buffer, uint32_t offset, uint32_t size, bool write);
 
 #endif

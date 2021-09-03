@@ -13,6 +13,7 @@
 #define VIRTIO_DEVICE_COUNT 8
 #define VIRTIO_MAGIC_NUMBER 0x74726976
 #define VIRTIO_MEM_STROBE 0x1000
+#define VIRTIO_RING_SIZE (1 << 7)
 
 typedef enum {
     MAGIC_VALUE = 0x000,
@@ -102,8 +103,6 @@ typedef enum {
 typedef enum {
     VIRTIO_USED_NO_NOTIFY = 1,
 } VirtIOUsedFlags;
-
-#define VIRTIO_RING_SIZE 1 << 7
 
 typedef struct {
     uint64_t address;
