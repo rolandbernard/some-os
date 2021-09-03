@@ -8,11 +8,13 @@
 #include "memory/pagetable.h"
 #include "memory/virtmem.h"
 #include "util/spinlock.h"
+#include "error/log.h"
 
 // Allocating into virtual memory will not allow accessing it in M-mode.
 // But allocating physical memory will increase fragmentation.
 /* #define KALLOC_VIRT_MEM */
 
+#define KALLOC_MIN_PAGES_TO_FREE 64
 #define KALLOC_MEM_START 0x100000000
 #define KALLOC_MEM_ALIGN 8
 #define KALLOC_MIN_FREE_MEM sizeof(FreeMemory)
@@ -174,7 +176,51 @@ static void tryFreeingOldMemory() {
         setVirtualMemory(0, kernel_page_table, true);
     }
 #else
-    // TODO
+    FreeMemory** current = &first_free;
+    while ((*current) != NULL) {
+        uintptr_t mem_start = (uintptr_t)*current;
+        uintptr_t mem_end = mem_start + (*current)->size;
+        uintptr_t page_start;
+        uintptr_t page_end;
+        if ((mem_start & -PAGE_SIZE) == mem_start) {
+            page_start = mem_start;
+        } else {
+            page_start = (mem_start + KALLOC_MIN_FREE_MEM + PAGE_SIZE - 1) & -PAGE_SIZE;
+        }
+        if ((mem_end & -PAGE_SIZE) == mem_end) {
+            page_end = mem_end;
+        } else {
+            page_end = (mem_end - KALLOC_MIN_FREE_MEM) & -PAGE_SIZE;
+        }
+        if (
+            (page_start == mem_start && page_end == mem_end)
+            || page_end >= page_start + KALLOC_MIN_PAGES_TO_FREE * PAGE_SIZE
+        ) {
+            PageAllocation alloc = {
+                .ptr = (void*)page_start,
+                .size = (page_end - page_start) / PAGE_SIZE,
+            };
+            if (page_start == mem_start && page_end == mem_end) {
+                *current = (*current)->next;
+            } else if (mem_start != page_start) {
+                (*current)->size = page_start - mem_start;
+            } else if (mem_end != page_end) {
+                FreeMemory* next = (FreeMemory*)page_end;
+                next->next = (*current)->next;
+                next->size = mem_end - page_end;
+                *current = next;
+            } else {
+                (*current)->size = page_start - mem_start;
+                FreeMemory* next = (FreeMemory*)page_end;
+                next->next = (*current)->next;
+                next->size = mem_end - page_end;
+                (*current)->next = next;
+            }
+            deallocPages(alloc);
+        } else {
+            current = &(*current)->next;
+        }
+    }
 #endif
 }
 
