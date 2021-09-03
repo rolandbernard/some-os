@@ -50,5 +50,20 @@ Error blockDeviceOperation(VirtIOBlockDevice* device, VirtPtr buffer, uint32_t o
     return simpleError(SUCCESS);
 }
 
-
+void freePendingRequests(VirtIOBlockDevice* device) {
+    while (device->virtio.ack_index != device->virtio.queue->used.index) {
+        VirtIOUsedElement elem = device->virtio.queue->used.ring[device->virtio.ack_index];
+        device->virtio.ack_index = (device->virtio.ack_index + 1) % VIRTIO_RING_SIZE;
+        for (uint16_t i = device->ack_index; i != device->req_index; i = (i + 1) % BLOCK_MAX_REQUESTS) {
+            if (device->requests[i] != NULL && device->requests[i]->head == elem.id) {
+                dealloc(device->requests[i]);
+                device->requests[i] = NULL;
+                break;
+            }
+        }
+        while (device->ack_index != device->req_index && device->requests[device->ack_index] == NULL) {
+            device->ack_index = (device->ack_index + 1) % BLOCK_MAX_REQUESTS;
+        }
+    }
+}
 

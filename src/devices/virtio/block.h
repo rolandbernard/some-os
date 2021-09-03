@@ -93,8 +93,6 @@ typedef struct {
     VirtIOBlockConfig config;
 } VirtIOBlockDeviceLayout;
 
-static_assert(BLOCK_MAX_REQUESTS < VIRTIO_RING_SIZE);
-
 typedef struct {
     VirtIODevice virtio;
     VirtIOBlockRequest* requests[BLOCK_MAX_REQUESTS];
@@ -106,5 +104,7 @@ typedef struct {
 Error initBlockDevice(int id, volatile VirtIODeviceLayout* base, VirtIODevice** output);
 
 Error blockDeviceOperation(VirtIOBlockDevice* device, VirtPtr buffer, uint32_t offset, uint32_t size, bool write);
+
+void freePendingRequests(VirtIOBlockDevice* device);
 
 #endif
