@@ -9,6 +9,10 @@
 #include "memory/virtmem.h"
 #include "util/spinlock.h"
 
+// Allocating into virtual memory will not allow accessing it in M-mode.
+// But allocating physical memory will increase fragmentation.
+/* #define KALLOC_VIRT_MEM */
+
 #define KALLOC_MEM_START 0x100000000
 #define KALLOC_MEM_ALIGN 8
 #define KALLOC_MIN_FREE_MEM sizeof(FreeMemory)
@@ -24,8 +28,11 @@ typedef struct AllocatedMemory_s {
 } AllocatedMemory;
 
 static FreeMemory* first_free = NULL;
-static uintptr_t next_vaddr = KALLOC_MEM_START;
 static SpinLock kalloc_lock;
+
+#ifdef KALLOC_VIRT_MEM
+static uintptr_t next_vaddr = KALLOC_MEM_START;
+#endif
 
 static void insertFreeMemory(FreeMemory* memory) {
     FreeMemory** current = &first_free;
@@ -49,6 +56,7 @@ static void insertFreeMemory(FreeMemory* memory) {
 
 static void addNewMemory(size_t size) {
     size = (size + PAGE_SIZE - 1) / PAGE_SIZE;
+#ifdef KALLOC_VIRT_MEM
     FreeMemory* mem = (FreeMemory*)next_vaddr;
     for (size_t i = 0; i < size; i++) {
         void* page = allocPage();
@@ -58,6 +66,9 @@ static void addNewMemory(size_t size) {
         next_vaddr += PAGE_SIZE;
     }
     setVirtualMemory(0, kernel_page_table, true);
+#else
+    FreeMemory* mem = (FreeMemory*)allocPages(size).ptr;
+#endif
     mem->size = size * PAGE_SIZE;
     insertFreeMemory(mem);
 }
@@ -73,6 +84,8 @@ static FreeMemory** findFreeMemoryThatFits(size_t size) {
     return NULL;
 }
 
+#ifdef KALLOC_VIRT_MEM
+
 static FreeMemory** findFreeMemoryAtEnd() {
     FreeMemory** current = &first_free;
     while ((*current) != NULL) {
@@ -84,6 +97,8 @@ static FreeMemory** findFreeMemoryAtEnd() {
     return NULL;
 }
 
+#endif
+
 void* kalloc(size_t size) {
     if (size == 0) {
         return NULL;
@@ -92,12 +107,16 @@ void* kalloc(size_t size) {
         size_t length = (size + sizeof(AllocatedMemory) + KALLOC_MEM_ALIGN - 1) & -KALLOC_MEM_ALIGN;
         FreeMemory** memory = findFreeMemoryThatFits(length);
         if (memory == NULL) {
+#ifdef KALLOC_VIRT_MEM
             memory = findFreeMemoryAtEnd();
             if (memory == NULL) {
                 addNewMemory(length);
             } else {
                 addNewMemory(length - (*memory)->size);
             }
+#else
+            addNewMemory(length);
+#endif
             memory = findFreeMemoryThatFits(length);
         }
         void* ret = NULL;
@@ -121,11 +140,14 @@ void* kalloc(size_t size) {
 
 void* zalloc(size_t size) {
     void* mem = kalloc(size);
-    memset(mem, 0, size);
+    if (mem != NULL) {
+        memset(mem, 0, size);
+    }
     return mem;
 }
 
 static void tryFreeingOldMemory() {
+#ifdef KALLOC_VIRT_MEM
     FreeMemory** mem = findFreeMemoryAtEnd();
     if (mem != NULL) {
         uintptr_t mem_start = (uintptr_t)*mem;
@@ -151,6 +173,9 @@ static void tryFreeingOldMemory() {
         }
         setVirtualMemory(0, kernel_page_table, true);
     }
+#else
+    // TODO
+#endif
 }
 
 void dealloc(void* ptr) {
@@ -210,6 +235,7 @@ void* krealloc(void* ptr, size_t size) {
         if (after != NULL) {
             length += (*after)->size;
         }
+#ifdef KALLOC_VIRT_MEM
         if (length < size_with_header && after != NULL && ((uintptr_t)*after + (*after)->size) == next_vaddr) {
             size_t old_size = (*after)->size;
             addNewMemory(size_with_header - length);
@@ -217,6 +243,7 @@ void* krealloc(void* ptr, size_t size) {
             after = findFreeMemoryAfter(mem);
             length += (*after)->size - old_size;
         }
+#endif
         if (length >= size_with_header) {
             AllocatedMemory* start = mem;
             if (before != NULL) {
@@ -250,7 +277,9 @@ void* krealloc(void* ptr, size_t size) {
         } else {
             unlockSpinLock(&kalloc_lock);
             void* ret = kalloc(size);
-            memmove(ret, ptr, mem->size - sizeof(AllocatedMemory));
+            if (ret != NULL) {
+                memmove(ret, ptr, mem->size - sizeof(AllocatedMemory));
+            }
             dealloc(ptr);
             return ret;
         }
