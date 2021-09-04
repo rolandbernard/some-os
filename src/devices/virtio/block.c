@@ -3,13 +3,13 @@
 #include "memory/kalloc.h"
 
 Error initBlockDevice(int id, volatile VirtIODeviceLayout* base, VirtIODevice** output) {
-    VirtIOBlockDevice* device = kalloc(sizeof(VirtIOBlockDevice));
+    VirtIOBlockDevice* device = zalloc(sizeof(VirtIOBlockDevice));
     device->virtio.type = base->device_id;
     device->virtio.mmio = base;
     base->status = 0;
     VirtIOStatusField status = VIRTIO_ACKNOWLEDGE;
     base->status = status;
-    status |= VIRTIO_DRIVER_OK;
+    status |= VIRTIO_DRIVER;
     base->status = status;
     VirtIOBlockFeatures host_features = base->host_features;
     VirtIOBlockFeatures guest_features = host_features & ~VIRTIO_BLOCK_F_RO;
@@ -43,9 +43,9 @@ Error blockDeviceOperation(
     request->header.blk_type = write ? VIRTIO_BLOCK_T_OUT : VIRTIO_BLOCK_T_IN;
     request->data.data = buffer;
     request->status.status = BLOCK_STATUS_MAGIC;
-    uint16_t head = addDescriptorsFor(&device->virtio, virtPtrForKernel(request), sizeof(VirtIOBlockRequestHeader), true, NULL);
-    addDescriptorsFor(&device->virtio, buffer, size, true, NULL);
-    addDescriptorsFor(&device->virtio, virtPtrForKernel(&request->status), sizeof(VirtIOBlockRequestStatus), false, NULL);
+    uint16_t head = addDescriptorsFor(&device->virtio, virtPtrForKernel(request), sizeof(VirtIOBlockRequestHeader), VIRTIO_DESC_NEXT);
+    addDescriptorsFor(&device->virtio, buffer, size, VIRTIO_DESC_NEXT | (write ? 0 : VIRTIO_DESC_WRITE));
+    addDescriptorsFor(&device->virtio, virtPtrForKernel(&request->status), sizeof(VirtIOBlockRequestStatus), VIRTIO_DESC_WRITE);
     sendRequestAt(&device->virtio, head);
     request->head = head;
     request->callback = callback;

@@ -80,16 +80,16 @@ void getDevicesOfType(VirtIODeviceType type, VirtIODevice** output) {
 }
 
 Error setupVirtIOQueue(VirtIODevice* device) {
-    uint32_t max_queues = device->mmio->queue_num_max;
-    if (max_queues < VIRTIO_RING_SIZE) {
-        return someError(UNSUPPORTED, "Queue size maximum too low");
-    }
-    device->mmio->queue_num = VIRTIO_RING_SIZE;
     if (device->queue == NULL) {
+        uint32_t max_queues = device->mmio->queue_num_max;
+        if (max_queues < VIRTIO_RING_SIZE) {
+            return someError(UNSUPPORTED, "Queue size maximum too low");
+        }
+        device->mmio->queue_num = VIRTIO_RING_SIZE;
         device->mmio->queue_sel = 0;
         size_t num_pages = (sizeof(VirtIOQueue) + PAGE_SIZE - 1) / PAGE_SIZE;
         VirtIOQueue* queue = zallocPages(num_pages).ptr;
-        uint32_t queue_pfn = ((uintptr_t)queue) / PAGE_SIZE;
+        uint64_t queue_pfn = ((uintptr_t)queue) / PAGE_SIZE;
         device->mmio->guest_page_size = PAGE_SIZE;
         device->mmio->queue_pfn = queue_pfn;
         device->queue = queue;
@@ -101,12 +101,12 @@ uint16_t fillNextDescriptor(VirtIODevice* device, VirtIODescriptor descriptor) {
     device->index = (device->index + 1) % VIRTIO_RING_SIZE;
     device->queue->descriptors[device->index] = descriptor;
     if ((descriptor.flags & VIRTIO_DESC_NEXT) != 0) {
-        device->queue->descriptors[device->index].next = (device->index + 1) & VIRTIO_RING_SIZE;
+        device->queue->descriptors[device->index].next = (device->index + 1) % VIRTIO_RING_SIZE;
     }
     return device->index;
 }
 
-uint16_t addDescriptorsFor(VirtIODevice* device, VirtPtr buffer, size_t length, bool next, uint16_t* count_out) {
+uint16_t addDescriptorsFor(VirtIODevice* device, VirtPtr buffer, size_t length, VirtIODescriptorFlags flags) {
     size_t part_count = getVirtPtrParts(buffer, length, NULL, 0);
     VirtPtrBufferPart parts[part_count];
     getVirtPtrParts(buffer, length, parts, part_count);
@@ -115,16 +115,13 @@ uint16_t addDescriptorsFor(VirtIODevice* device, VirtPtr buffer, size_t length, 
         VirtIODescriptor desc = {
             .address = (uintptr_t)parts[i].address,
             .length = parts[i].length,
-            .flags = ((i + 1 < part_count) || next) ? VIRTIO_DESC_NEXT : 0,
+            .flags = flags | ((i + 1 < part_count) ? VIRTIO_DESC_NEXT : 0),
             .next = 0,
         };
         uint16_t index = fillNextDescriptor(device, desc);
         if (i == 0) {
             ret = index;
         }
-    }
-    if (count_out != NULL) {
-        *count_out = part_count;
     }
     return ret;
 }

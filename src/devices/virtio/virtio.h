@@ -159,7 +159,7 @@ Error setupVirtIOQueue(VirtIODevice* device);
 
 uint16_t fillNextDescriptor(VirtIODevice* device, VirtIODescriptor descriptor);
 
-uint16_t addDescriptorsFor(VirtIODevice* device, VirtPtr buffer, size_t length, bool next, uint16_t* count_out);
+uint16_t addDescriptorsFor(VirtIODevice* device, VirtPtr buffer, size_t length, VirtIODescriptorFlags flags);
 
 void sendRequestAt(VirtIODevice* device, uint16_t descriptor);
 
