@@ -51,8 +51,9 @@ QEMU_ARGS := -M virt -smp 4 -m 128M -s
 QEMU_ARGS += -cpu rv64 -bios none -snapshot
 
 # Qemu devices
+QEMU_ARGS += -monitor telnet:0.0.0.0:5000,server,nowait
 QEMU_ARGS += -display none -serial stdio
-QEMU_ARGS += -drive format=raw,file=$(DISK),id=disk0
+QEMU_ARGS += -drive if=none,format=raw,file=$(DISK),id=disk0
 QEMU_ARGS += -device virtio-blk-device,scsi=off,drive=disk0
 # ==
 
