@@ -3,6 +3,7 @@
 
 #include "devices/virtio/block.h"
 #include "memory/memmap.h"
+#include "memory/virtmem.h"
 #include "memory/virtptr.h"
 
 static VirtIODevice* devices[VIRTIO_DEVICE_COUNT];
@@ -131,6 +132,7 @@ uint16_t addDescriptorsFor(VirtIODevice* device, VirtPtr buffer, size_t length, 
 void sendRequestAt(VirtIODevice* device, uint16_t descriptor) {
     device->queue->available.ring[device->queue->available.index] = descriptor;
     device->queue->available.index = (device->queue->available.index + 1) % VIRTIO_RING_SIZE;
+    memoryFence();
     device->mmio->queue_notify = 0;
 }
 

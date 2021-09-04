@@ -3,7 +3,7 @@
 
 #include <stdbool.h>
 
-#define CHECKED(OP) { Error res = OP; if (isError(res)) { return res; } } 
+#define CHECKED(OP, ...) { Error res = OP; if (isError(res)) { { __VA_ARGS__ ; } ; return res; } } 
 
 typedef enum {
     SUCCESS = 0,
