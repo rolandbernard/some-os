@@ -77,7 +77,12 @@ void deallocPage(void* ptr) {
 
 void deallocPages(PageAllocation alloc) {
     if (alloc.ptr != NULL && alloc.size != 0) {
-        assert(alloc.ptr >= &__heap_start && alloc.ptr <= &__heap_end); // Small sanity check
+        // Small sanity checks to only free pages in the heap
+        assert(alloc.ptr >= &__heap_start && alloc.ptr <= &__heap_end);
+        assert(
+            alloc.ptr + alloc.size * PAGE_SIZE >= &__heap_start
+            && alloc.ptr + alloc.size * PAGE_SIZE <= &__heap_end
+        );
         FreePage* memory = alloc.ptr;
         memory->next = NULL;
         memory->size = alloc.size;

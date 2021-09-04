@@ -8,13 +8,12 @@
 #include "memory/pagetable.h"
 #include "memory/virtmem.h"
 #include "util/spinlock.h"
-#include "error/log.h"
 
 // Allocating into virtual memory will not allow accessing it in M-mode.
 // But allocating physical memory will increase fragmentation.
 /* #define KALLOC_VIRT_MEM */
 
-#define KALLOC_MIN_PAGES_TO_FREE 64
+#define KALLOC_MIN_PAGES_TO_FREE 8
 #define KALLOC_MEM_START 0x100000000
 #define KALLOC_MEM_ALIGN 8
 #define KALLOC_MIN_FREE_MEM sizeof(FreeMemory)
@@ -193,8 +192,8 @@ static void tryFreeingOldMemory() {
             page_end = (mem_end - KALLOC_MIN_FREE_MEM) & -PAGE_SIZE;
         }
         if (
-            (page_start == mem_start && page_end == mem_end)
-            || page_end >= page_start + KALLOC_MIN_PAGES_TO_FREE * PAGE_SIZE
+            (mem_start == page_start && mem_end == page_end) // If this will not create any additional fragmentation
+            || page_end >= page_start + KALLOC_MIN_PAGES_TO_FREE * PAGE_SIZE // Or free more than a minimum number of pages
         ) {
             PageAllocation alloc = {
                 .ptr = (void*)page_start,
@@ -202,9 +201,9 @@ static void tryFreeingOldMemory() {
             };
             if (page_start == mem_start && page_end == mem_end) {
                 *current = (*current)->next;
-            } else if (mem_start != page_start) {
+            } else if (mem_end == page_end) {
                 (*current)->size = page_start - mem_start;
-            } else if (mem_end != page_end) {
+            } else if (mem_start == page_start) {
                 FreeMemory* next = (FreeMemory*)page_end;
                 next->next = (*current)->next;
                 next->size = mem_end - page_end;
