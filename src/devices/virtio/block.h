@@ -6,21 +6,21 @@
 #include "devices/virtio/virtio.h"
 
 #define BLOCK_SECTOR_SIZE 512
-#define BLOCK_STATUS_MAGIC 111
 #define BLOCK_MAX_REQUESTS (1 << 5)
 
 typedef enum {
-    VIRTIO_BLOCK_T_IN = 1 << 0,
-    VIRTIO_BLOCK_T_OUT = 1 << 1,
-    VIRTIO_BLOCK_T_FLUSH = 1 << 4,
-    VIRTIO_BLOCK_T_DISCARD = 1 << 11,
-    VIRTIO_BLOCK_T_WRITE_ZEROS = 1 << 13,
+    VIRTIO_BLOCK_T_IN = 0,
+    VIRTIO_BLOCK_T_OUT = 1,
+    VIRTIO_BLOCK_T_FLUSH = 4,
+    VIRTIO_BLOCK_T_DISCARD = 11,
+    VIRTIO_BLOCK_T_WRITE_ZEROS = 13,
 } VirtIOBlockTypes;
 
 typedef enum {
-    VIRTIO_BLOCK_S_OK = 1 << 0,
-    VIRTIO_BLOCK_S_IOERR = 1 << 1,
-    VIRTIO_BLOCK_S_UNSUPP = 1 << 2,
+    VIRTIO_BLOCK_S_OK = 0,
+    VIRTIO_BLOCK_S_IOERR = 1,
+    VIRTIO_BLOCK_S_UNSUPP = 2,
+    VIRTIO_BLOCK_S_UNKNOWN,
 } VirtIOBlockStatus;
 
 typedef enum {
@@ -86,7 +86,7 @@ typedef struct {
     VirtIOBlockConfig config;
 } VirtIOBlockDeviceLayout;
 
-typedef void (*VirtIOBlockCallback)(void* udata);
+typedef void (*VirtIOBlockCallback)(VirtIOBlockStatus status, void* udata);
 
 typedef struct {
     VirtIOBlockRequestHeader header;

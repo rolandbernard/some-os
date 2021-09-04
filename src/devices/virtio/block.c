@@ -42,8 +42,8 @@ Error blockDeviceOperation(
     request->header.reserved = 0;
     request->header.blk_type = write ? VIRTIO_BLOCK_T_OUT : VIRTIO_BLOCK_T_IN;
     request->data.data = buffer;
-    request->status.status = BLOCK_STATUS_MAGIC;
-    uint16_t head = addDescriptorsFor(&device->virtio, virtPtrForKernel(request), sizeof(VirtIOBlockRequestHeader), VIRTIO_DESC_NEXT);
+    request->status.status = VIRTIO_BLOCK_S_UNKNOWN;
+    uint16_t head = addDescriptorsFor(&device->virtio, virtPtrForKernel(&request->header), sizeof(VirtIOBlockRequestHeader), VIRTIO_DESC_NEXT);
     addDescriptorsFor(&device->virtio, buffer, size, VIRTIO_DESC_NEXT | (write ? 0 : VIRTIO_DESC_WRITE));
     addDescriptorsFor(&device->virtio, virtPtrForKernel(&request->status), sizeof(VirtIOBlockRequestStatus), VIRTIO_DESC_WRITE);
     sendRequestAt(&device->virtio, head);
@@ -61,7 +61,7 @@ void freePendingRequests(VirtIOBlockDevice* device) {
         device->virtio.ack_index = (device->virtio.ack_index + 1) % VIRTIO_RING_SIZE;
         for (uint16_t i = device->ack_index; i != device->req_index; i = (i + 1) % BLOCK_MAX_REQUESTS) {
             if (device->requests[i] != NULL && device->requests[i]->head == elem.id) {
-                device->requests[i]->callback(device->requests[i]->udata);
+                device->requests[i]->callback(device->requests[i]->status.status, device->requests[i]->udata);
                 dealloc(device->requests[i]);
                 device->requests[i] = NULL;
                 break;
