@@ -47,20 +47,21 @@ typedef struct {
     uint32_t padding0[2];
     uint32_t guest_features;
     uint32_t guest_features_sel;
-    uint64_t guest_page_size;
+    uint32_t guest_page_size;
+    uint32_t padding1[1];
     uint32_t queue_sel;
     uint32_t queue_num_max;
-    uint32_t padding1[2];
     uint32_t queue_num;
     uint32_t queue_align;
     uint64_t queue_pfn;
+    uint32_t padding2[2];
     uint32_t queue_notify;
-    uint32_t padding2[3];
+    uint32_t padding3[3];
     uint32_t interrupt_status;
     uint32_t interrupt_ack;
-    uint32_t padding3[2];
+    uint32_t padding4[2];
     uint32_t status;
-    uint32_t padding4[35];
+    uint32_t padding5[35];
 } VirtIODeviceLayout;
 
 typedef enum {
