@@ -8,6 +8,7 @@
 #include "interrupt/plic.h"
 #include "interrupt/syscall.h"
 #include "interrupt/timer.h"
+#include "interrupt/trap.h"
 #include "memory/virtmem.h"
 #include "process/process.h"
 #include "process/schedule.h"
@@ -54,17 +55,17 @@ void machineTrap(uintptr_t cause, uintptr_t pc, uintptr_t val, uintptr_t scratch
     panic();
 }
 
-void kernelTrap(uintptr_t cause, uintptr_t pc, uintptr_t val, Process* process) {
+void kernelTrap(uintptr_t cause, uintptr_t pc, uintptr_t val, TrapFrame* frame) {
     setVirtualMemory(0, kernel_page_table, false);
     bool interrupt = cause >> (sizeof(uintptr_t) * 8 - 1);
     int code = cause & 0xff;
-    if (process == NULL) {
-        KERNEL_LOG("[!] Unhandled trap: %p %p %p %s", pc, val, process, getCauseString(interrupt, code));
+    if (frame == NULL) {
+        // Can't handle traps before the hart was initialized. (initBasicHart)
+        KERNEL_LOG("[!] Unhandled trap: %p %p %p %s", pc, val, frame, getCauseString(interrupt, code));
         panic();
     } else {
-        process->state = READY;
         if (interrupt) {
-            process->frame.pc = pc;
+            frame->pc = pc;
             switch (code) {
                 case 4: // Timer interrupt U-mode
                 case 5: // Timer interrupt S-mode
@@ -77,27 +78,32 @@ void kernelTrap(uintptr_t cause, uintptr_t pc, uintptr_t val, Process* process) 
                     handleExternalInterrupt();
                     break;
                 default:
-                    KERNEL_LOG("[!] Unhandled trap: %p %p %p %s", pc, val, process, getCauseString(interrupt, code));
+                    KERNEL_LOG("[!] Unhandled trap: %p %p %p %s", pc, val, frame, getCauseString(interrupt, code));
                     panic();
                     break;
             }
         } else {
-            process->frame.pc = pc + 4;
+            frame->pc = pc + 4;
             switch (code) {
                 case 8: // Environment call from U-mode
-                    runSyscall(process);
+                    runSyscall(frame);
                     break;
                 case 9: // Environment call from S-mode
                 case 11: // Environment call from M-mode
-                    runKernelSyscall(process);
+                    runKernelSyscall(frame);
                     break;
                 default:
-                    KERNEL_LOG("[!] Unhandled trap: %p %p %p %s", pc, val, process, getCauseString(interrupt, code));
+                    KERNEL_LOG("[!] Unhandled trap: %p %p %p %s", pc, val, frame, getCauseString(interrupt, code));
                     panic();
                     break;
             }
         }
-        enqueueProcess(process);
+        if (frame->hart != NULL) {
+            enqueueProcess((Process*)frame);
+        } else {
+            // This is not called from a process, but from kernel init or interrupt handler
+            enterKernelMode(frame);
+        }
     }
 }
 

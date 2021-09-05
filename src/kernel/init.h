@@ -9,6 +9,9 @@ Error initAllSystems();
 // Initialize hart. Must run in Machine mode.
 void initHart();
 
+// Initialize the hart that is initializing the kernel.
+void initPrimaryHart();
+
 void initHarts();
 
 #endif

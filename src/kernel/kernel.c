@@ -79,10 +79,6 @@ void kernelMain() {
     uint8_t buffer[512];
     blockDeviceOperation(dev, virtPtrForKernel(buffer), 0, 512, false, (VirtIOBlockCallback)readCallback, buffer);
 
-    for (;;) {
-        freePendingRequests(dev);
-    }
-
     initDefaultProcess(&user_process, (uintptr_t)user_stack + sizeof(user_stack), 0, (uintptr_t)userMain);
     enqueueProcess(&user_process);
 }

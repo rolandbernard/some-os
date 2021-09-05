@@ -103,7 +103,8 @@ indirectKernelTrapVector:
 .align 4
 # Called on supervisor tarps, call out to C code
 kernelTrapVector:
-    csrrw x31, sscratch, x31 # Swap scratch (register save location) with x31
+    csrw satp, zero
+    csrrw x31, sscratch, x31 # Swap scratch (with trap frame) with x31
     beqz x31, 1f
     # Restore integer registers
 .set i, 1
@@ -129,13 +130,12 @@ kernelTrapVector:
     # Load global an stack pointer
     load_gp 2, t0
     load_gp 3, t0
-    j 3f
+    j 2f
 1:
     mv a3, zero
-2:
     la gp, __global_pointer
     la sp, __stack_top
-3:
+2:
     csrr a0, scause
     csrr a1, sepc
     csrr a2, stval

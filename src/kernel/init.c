@@ -7,11 +7,13 @@
 #include "memory/pagealloc.h"
 #include "memory/virtmem.h"
 #include "interrupt/trap.h"
+#include "process/schedule.h"
 
 Error initAllSystems() {
     CHECKED(initPageAllocator());
     CHECKED(initKernelVirtualMemory());
     // kalloc is available from here on.
+    initPrimaryHart();
     CHECKED(initPlic());
     CHECKED(initLogSystem());
     CHECKED(initProcessSystem());
@@ -20,6 +22,10 @@ Error initAllSystems() {
 
 void initHart() {
     initTraps();
+}
+
+void initPrimaryHart() {
+    setupHartFrame();
 }
 
 void initHarts() {

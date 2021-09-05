@@ -3,6 +3,9 @@
 
 #include "process/process.h"
 
+// Create and set a hart frame for the executing hart
+HartFrame* setupHartFrame();
+
 // Enqueue the given process
 void enqueueProcess(Process* process);
 
