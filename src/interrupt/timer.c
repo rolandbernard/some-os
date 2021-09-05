@@ -4,6 +4,7 @@
 
 #include "interrupt/timer.h"
 
+#include "error/log.h"
 #include "memory/kalloc.h"
 #include "memory/memmap.h"
 #include "util/spinlock.h"
@@ -39,7 +40,7 @@ Timeout setTimeout(Time delay, TimeoutFunction function, void* udata) {
 void clearTimeout(Timeout timeout) {
     lockSpinLock(&timeout_lock);
     if (timeout < length) {
-        memmove(timeouts + timeout, timeouts + timeout + 1, length - timeout - 1);
+        memmove(timeouts + timeout, timeouts + timeout + 1, (length - timeout - 1) * sizeof(TimeoutEntry));
         length--;
     }
     unlockSpinLock(&timeout_lock);
@@ -60,7 +61,7 @@ void handleTimerInterrupt() {
     for (size_t i = 0; i < length;) {
         if (timeouts[i].time < time) {
             timeouts[i].function(time, timeouts[i].udata);
-            memmove(timeouts + i, timeouts + i + 1, length - i - 1);
+            memmove(timeouts + i, timeouts + i + 1, (length - i - 1) * sizeof(TimeoutEntry));
             length--;
         } else {
             if (timeouts[i].time < timeouts[min].time) {

@@ -20,7 +20,7 @@
 #include "kernel/init.h"
 
 void timedCallback(Time time, void* null) {
-    KERNEL_LOG("Time: %li", time);
+    KERNEL_LOG("%p Time: %li", null, time);
 }
 
 void readCallback(VirtIOBlockStatus status, uint8_t* buffer) {
@@ -37,17 +37,17 @@ void readCallback(VirtIOBlockStatus status, uint8_t* buffer) {
 }
 
 void kernelMain() {
-    setTimeout(CLOCKS_PER_SEC, timedCallback, NULL);
     // Just some testing code
     VirtIOBlockDevice* dev = (VirtIOBlockDevice*)getAnyDeviceOfType(VIRTIO_BLOCK);
     uint8_t buffer[512];
     blockDeviceOperation(dev, virtPtrForKernel(buffer), 0, 512, false, (VirtIOBlockCallback)readCallback, buffer);
-    for (;;) {
+    for (size_t j = 0;;j++) {
         for (int i = 1; i <= 50; i++) {
             syscall(0, ".");
             waitForInterrupt();
         }
         syscall(0, "\n");
+        setTimeout(CLOCKS_PER_SEC, timedCallback, (void*)j);
     }
     syscall(10);
 }

@@ -8,6 +8,7 @@
 #include "memory/pagetable.h"
 #include "memory/virtmem.h"
 #include "util/spinlock.h"
+#include "util/util.h"
 
 // Allocating into virtual memory will not allow accessing it in M-mode.
 // But allocating physical memory will increase fragmentation.
@@ -306,7 +307,7 @@ void* krealloc(void* ptr, size_t size) {
                     *after = (*after)->next;
                 }
             }
-            memmove(start->bytes, ptr, mem->size - sizeof(AllocatedMemory));
+            memmove(start->bytes, ptr, umin(mem->size - sizeof(AllocatedMemory), size));
             if (length < size_with_header + KALLOC_MIN_FREE_MEM) {
                 start->size = length;
             } else {
@@ -323,7 +324,7 @@ void* krealloc(void* ptr, size_t size) {
             unlockSpinLock(&kalloc_lock);
             void* ret = kalloc(size);
             if (ret != NULL) {
-                memmove(ret, ptr, mem->size - sizeof(AllocatedMemory));
+                memcpy(ret, ptr, umin(mem->size - sizeof(AllocatedMemory), size));
             }
             dealloc(ptr);
             return ret;

@@ -4,10 +4,12 @@
 #include <string.h>
 
 #include "memory/pagealloc.h"
+#include "util/spinlock.h"
 
 extern void __heap_start;
 extern void __heap_end;
 
+static SpinLock alloc_lock;
 static FreePages free_pages;
 
 Error initPageAllocator() {
@@ -33,6 +35,7 @@ void* allocPage() {
 
 PageAllocation allocPages(size_t pages) {
     if (pages != 0) {
+        lockSpinLock(&alloc_lock);
         FreePage** current = &free_pages.first;
         while (*current != NULL) {
             if ((*current)->size > pages) {
@@ -45,6 +48,7 @@ PageAllocation allocPages(size_t pages) {
                     .ptr = page,
                     .size = pages,
                 };
+                unlockSpinLock(&alloc_lock);
                 return ret;
             } else if ((*current)->size == pages) {
                 FreePage* page = *current;
@@ -53,11 +57,13 @@ PageAllocation allocPages(size_t pages) {
                     .ptr = page,
                     .size = page->size,
                 };
+                unlockSpinLock(&alloc_lock);
                 return ret;
             } else {
                 current = &(*current)->next;
             }
         }
+        unlockSpinLock(&alloc_lock);
     }
     // TODO: handle memory pressure
     PageAllocation ret = {
@@ -83,6 +89,7 @@ void deallocPages(PageAllocation alloc) {
             alloc.ptr + alloc.size * PAGE_SIZE >= &__heap_start
             && alloc.ptr + alloc.size * PAGE_SIZE <= &__heap_end
         );
+        lockSpinLock(&alloc_lock);
         FreePage* memory = alloc.ptr;
         memory->next = NULL;
         memory->size = alloc.size;
@@ -103,6 +110,7 @@ void deallocPages(PageAllocation alloc) {
         }
         memory->next = free_pages.first;
         free_pages.first = memory;
+        unlockSpinLock(&alloc_lock);
     }
 }
 

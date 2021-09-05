@@ -54,7 +54,7 @@ void clearInterruptFunction(ExternalInterrupt id, ExternalInterruptFunction func
     lockSpinLock(&plic_lock);
     for (size_t i = 0; i < length;) {
         if (interrupts[i].id == id && interrupts[i].function == function && interrupts[i].udata == udata) {
-            memmove(interrupts + i, interrupts + i + 1, length - i - 1);
+            memmove(interrupts + i, interrupts + i + 1, (length - i - 1) * sizeof(InterruptEntry));
             length--;
         } else {
             if (interrupts[i].id == id) {
