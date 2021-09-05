@@ -32,12 +32,9 @@ void userMain() {
     syscall(1);
 }
 
-Process user_process;
-uint64_t user_stack[512];
-
 void readCallback(VirtIOBlockStatus status, uint8_t* buffer) {
     assert(status == VIRTIO_BLOCK_S_OK);
-    for (int i = 0; i < 32 / 2 / 8; i++) {
+    for (int i = 0; i < 128 / 2 / 8; i++) {
         for (int j = 0; j < 2; j++) {
             for (int k = 0; k < 8; k++) {
                 logKernelMessage("%02x ", buffer[i * 16 + j * 8 + k]);
@@ -79,7 +76,7 @@ void kernelMain() {
     uint8_t buffer[512];
     blockDeviceOperation(dev, virtPtrForKernel(buffer), 0, 512, false, (VirtIOBlockCallback)readCallback, buffer);
 
-    initDefaultProcess(&user_process, (uintptr_t)user_stack + sizeof(user_stack), 0, (uintptr_t)userMain);
-    enqueueProcess(&user_process);
+    Process* process = createKernelProcess(userMain, 20);
+    enqueueProcess(process);
 }
 

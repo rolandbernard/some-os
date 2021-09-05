@@ -2,15 +2,18 @@
 #include <stddef.h>
 #include <assert.h>
 
-#include "memory/pagetable.h"
-
-#include "process/process.h"
-#include "error/panic.h"
 #include "error/log.h"
-#include "memory/virtmem.h"
-#include "interrupt/trap.h"
+#include "error/panic.h"
 #include "interrupt/syscall.h"
 #include "interrupt/timer.h"
+#include "interrupt/trap.h"
+#include "memory/kalloc.h"
+#include "memory/pagetable.h"
+#include "memory/virtmem.h"
+#include "process/harts.h"
+#include "process/process.h"
+
+#define STACK_SIZE (1 << 16)
 
 extern void kernelTrapVector;
 extern void kernelTrap;
@@ -18,6 +21,8 @@ extern void __data_start;
 extern void __data_end;
 
 static Pid next_pid = 1;
+
+static Process* global_first = NULL;
 
 void initTrapFrame(TrapFrame* frame, uintptr_t sp, uintptr_t gp, uintptr_t pc, HartFrame* hart, uintptr_t asid, PageTable* table) {
     frame->hart = hart;
@@ -28,24 +33,52 @@ void initTrapFrame(TrapFrame* frame, uintptr_t sp, uintptr_t gp, uintptr_t pc, H
     frame->satp = satpForMemory(asid, table);
 }
 
-void initDefaultProcess(Process* process, uintptr_t stack_top, uintptr_t globals, uintptr_t start) {
+Process* createKernelProcess(void* start, Priority priority) {
+    Process* process = zalloc(sizeof(Process));
+    process->table = kernel_page_table;
+    process->priority = priority;
+    process->state = READY;
+    process->stack = kalloc(STACK_SIZE);
+    initTrapFrame(
+        &process->frame, (uintptr_t)process->stack, (uintptr_t)getKernelGlobalPointer(),
+        (uintptr_t)start, getCurrentHartFrame(), 0, kernel_page_table
+    );
+    process->global_next = global_first;
+    global_first = process;
+    return process;
+}
+
+Process* createEmptyUserProcess(uintptr_t sp, uintptr_t gp, uintptr_t pc, Pid ppid, Priority priority) {
+    Process* process = zalloc(sizeof(Process));
     Pid pid = next_pid;
     next_pid++;
-    // TODO: create page table
-    PageTable* vmem = NULL;
-    initTrapFrame(&process->frame, stack_top, globals, start, NULL, pid, vmem);
-    process->state = READY;
-    process->table = vmem;
+    process->table = createPageTable();
     process->pid = pid;
+    process->ppid = ppid;
+    process->priority = priority;
+    process->state = READY;
+    process->stack = NULL;
+    initTrapFrame(&process->frame, sp, gp, pc, getCurrentHartFrame(), pid, process->table);
+    process->global_next = global_first;
+    global_first = process;
+    return process;
+}
+
+void freeProcess(Process* process) {
+    // TODO
 }
 
 void enterProcess(Process* process) {
     initTimerInterrupt();
     process->state = RUNNING;
-    HartFrame* hart = process->frame.hart;
+    HartFrame* hart = getCurrentHartFrame();
+    if (hart != process->frame.hart && process->pid != 0) {
+        // If this process was moved between harts
+        addressTranslationFence(process->pid);
+    }
+    process->frame.hart = hart;
     if (hart != NULL) {
         hart->frame.regs[1] = (uintptr_t)hart->stack_top;
-        hart->frame.regs[2] = (uintptr_t)hart->globals;
     }
     if (process->pid == 0) {
         enterKernelMode(&process->frame);

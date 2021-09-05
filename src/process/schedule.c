@@ -1,47 +1,71 @@
 
+#include <assert.h>
+
 #include "process/schedule.h"
 
 #include "interrupt/trap.h"
 #include "error/log.h"
-#include "memory/kalloc.h"
-#include "memory/virtmem.h"
 #include "process/process.h"
 
-extern void __global_pointer;
-extern void __stack_top;
-
-HartFrame* harts = NULL;
-size_t hart_count = 0;
-
-HartFrame* setupHartFrame() {
-    TrapFrame* existing = readSscratch();
-    if (existing == NULL) {
-        size_t id = hart_count;
-        hart_count++;
-        harts = krealloc(harts, hart_count * sizeof(HartFrame));
-        // Globals and stack_top should be changed for all but the primary hart
-        harts[id].globals = &__global_pointer;
-        harts[id].stack_top = &__stack_top;
-        initTrapFrame(&harts[id].frame, 0, 0, 0, NULL, 0, kernel_page_table);
-        writeSscratch(&harts[id].frame);
-        return &harts[id];
+void enqueueProcess(Process* process) {
+    assert(process->frame.hart != NULL);
+    ScheduleQueue* queue = &process->frame.hart->queue;
+    if (process->state == WAITING) {
+        // Don't do anything. Should be tracked somewhere else.
+    } else if (process->state == TERMINATED) {
+        freeProcess(process);
     } else {
-        if (existing->hart == NULL) {
-            return (HartFrame*)existing;
-        } else {
-            return existing->hart;
-        }
+        process->state = READY;
+        pushProcessToQueue(queue, process);
+    }
+    Process* next = pullProcessFromQueue(queue);
+    if (next != NULL) {
+        enterProcess(next);
+    } else {
+        // TODO: Create and enter idle process
     }
 }
 
-void enqueueProcess(Process* process) {
-    // TODO
-    if (process->state == READY) {
-        enterProcess(process);
+Process* pullProcessFromQueue(ScheduleQueue* queue) {
+    if (queue->head == NULL) {
+        return NULL;
     } else {
-        for (;;) {
-            waitForInterrupt();
+        Process* ret = queue->head;
+        queue->head = NULL;
+        if (queue->tails[ret->priority] == ret) {
+            if (ret->priority == 0) {
+                queue->tails[0] = NULL;
+            } else {
+                queue->tails[ret->priority] = queue->tails[ret->priority - 1];
+            }
         }
+        return ret;
     }
+}
+
+void pushProcessToQueue(ScheduleQueue* queue, Process* process) {
+    if (process->priority >= MAX_PRIORITY) {
+        process->priority = MAX_PRIORITY - 1;
+    }
+    if (queue->tails[process->priority] == NULL) {
+        process->next = queue->head;
+        queue->head = process;
+    } else {
+        process->next = queue->tails[process->priority];
+        queue->tails[process->priority] = process;
+    }
+    queue->tails[process->priority] = process;
+}
+
+Process* removeProccesFromQueue(ScheduleQueue* queue, Process* process) {
+    Process** current = &queue->head;
+    while (*current != NULL) {
+        if (*current == process) {
+            *current = (*current)->next;
+            return process;
+        }
+        *current = NULL;
+    }
+    return NULL;
 }
 
