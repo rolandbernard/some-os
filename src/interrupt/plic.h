@@ -3,9 +3,13 @@
 
 #include <stdint.h>
 
+#include "error/error.h"
+
 typedef uint8_t InterruptPriority;
 typedef uint32_t ExternalInterrupt;
 typedef void (*ExternalInterruptFunction)(ExternalInterrupt id, void* udata);
+
+Error initPlic();
 
 void handleExternalInterrupt();
 

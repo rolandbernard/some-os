@@ -5,6 +5,7 @@
 
 #include "interrupt/plic.h"
 
+#include "error/log.h"
 #include "memory/memmap.h"
 #include "memory/kalloc.h"
 
@@ -20,13 +21,14 @@ static size_t length = 0;
 
 void handleExternalInterrupt() {
     ExternalInterrupt interrupt = nextInterrupt();
-    if (interrupt != 0) {
+    while (interrupt != 0) {
         for (size_t i = 0; i < length; i++) {
             if (interrupts[i].id == interrupt) {
                 interrupts[i].function(interrupt, interrupts[i].udata);
             }
         }
         completeInterrupt(interrupt);
+        interrupt = nextInterrupt();
     }
 }
 
@@ -76,7 +78,7 @@ void disableInterrupt(ExternalInterrupt id) {
 
 void setInterruptPriority(ExternalInterrupt id, InterruptPriority priority) {
     priority &= 0x111; // Maximum priority is 7
-    *(volatile uint32_t*)(memory_map[VIRT_PLIC].base + id) = priority;;
+    *((volatile uint32_t*)memory_map[VIRT_PLIC].base + id) = priority;;
 }
 
 void setPlicPriorityThreshold(InterruptPriority priority) {
@@ -90,5 +92,11 @@ ExternalInterrupt nextInterrupt() {
 
 void completeInterrupt(ExternalInterrupt id) {
     *(volatile ExternalInterrupt*)(memory_map[VIRT_PLIC].base + 0x200004) = id;
+}
+
+Error initPlic() {
+    setPlicPriorityThreshold(0);
+    KERNEL_LOG("[>] Initialized PLIC");
+    return simpleError(SUCCESS);
 }
 
