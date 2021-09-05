@@ -10,10 +10,12 @@ void initTrapFrame(TrapFrame* frame, uintptr_t sp, uintptr_t gp, uintptr_t pc, H
 
 Process* createKernelProcess(void* start, Priority priority);
 
-Process* createUserProcess(uintptr_t sp, uintptr_t gp, uintptr_t pc, Pid ppid, Priority priority);
+Process* createUserProcess(uintptr_t sp, uintptr_t gp, uintptr_t pc, Process* parent, Priority priority);
 
 // Free all data connected with the process
 void freeProcess(Process* process);
+
+Pid freeKilledChild(Process* parent, uint64_t* status);
 
 // Enter process into the user ot kernel mode depending on process.pid (pid == 0 -> kernel)
 void enterProcess(Process* process);

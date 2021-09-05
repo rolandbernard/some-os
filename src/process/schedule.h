@@ -10,6 +10,8 @@ void runNextProcess();
 
 void runNextProcessFrom(HartFrame* hart);
 
+Process* pullProcessForHart(HartFrame* hart);
+
 Process* pullProcessFromQueue(ScheduleQueue* queue);
 
 void pushProcessToQueue(ScheduleQueue* queue, Process* process);

@@ -15,6 +15,7 @@ typedef struct {
     void* udata;
 } InterruptEntry;
 
+static SpinLock plic_lock;
 static InterruptEntry* interrupts = NULL;
 static size_t capacity = 0;
 static size_t length = 0;
@@ -22,17 +23,20 @@ static size_t length = 0;
 void handleExternalInterrupt() {
     ExternalInterrupt interrupt = nextInterrupt();
     while (interrupt != 0) {
+        lockSpinLock(&plic_lock);
         for (size_t i = 0; i < length; i++) {
             if (interrupts[i].id == interrupt) {
                 interrupts[i].function(interrupt, interrupts[i].udata);
             }
         }
+        unlockSpinLock(&plic_lock);
         completeInterrupt(interrupt);
         interrupt = nextInterrupt();
     }
 }
 
 void setInterruptFunction(ExternalInterrupt id, ExternalInterruptFunction function, void* udata) {
+    lockSpinLock(&plic_lock);
     if (capacity <= length) {
         capacity += 32;
         interrupts = krealloc(interrupts, capacity * sizeof(InterruptEntry));
@@ -41,11 +45,13 @@ void setInterruptFunction(ExternalInterrupt id, ExternalInterruptFunction functi
     interrupts[length].function = function;
     interrupts[length].udata = udata;
     length++;
+    unlockSpinLock(&plic_lock);
     enableInterrupt(id);
 }
 
 void clearInterruptFunction(ExternalInterrupt id, ExternalInterruptFunction function, void* udata) {
     bool interrupt_used = false;
+    lockSpinLock(&plic_lock);
     for (size_t i = 0; i < length;) {
         if (interrupts[i].id == id && interrupts[i].function == function && interrupts[i].udata == udata) {
             memmove(interrupts + i, interrupts + i + 1, length - i - 1);
@@ -57,6 +63,7 @@ void clearInterruptFunction(ExternalInterrupt id, ExternalInterruptFunction func
             i++;
         }
     }
+    unlockSpinLock(&plic_lock);
     if (!interrupt_used) {
         disableInterrupt(id);
     }

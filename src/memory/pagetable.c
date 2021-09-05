@@ -136,6 +136,23 @@ void unmapAllPages(PageTable* root) {
     }
 }
 
+void unmapAllPagesAndFreeUsers(PageTable* root) {
+    for (int i = 0; i < PAGE_TABLE_SIZE; i++) {
+        PageTableEntry* entry = &root->entries[i];
+        if (entry->v) {
+            if ((entry->bits & 0b1110) == 0) {
+                PageTable* table = (PageTable*)(entry->paddr << 12);
+                unmapAllPagesAndFreeUsers(table);
+                deallocPage(table);
+            } else if ((entry->bits & PAGE_ENTRY_USER) != 0) {
+                void* page = (void*)(entry->paddr << 12);
+                deallocPage(page);
+            }
+        }
+        entry->entry = 0;
+    }
+}
+
 // from_vaddr and to_vaddr should be aligned to page boundaries.
 static void tryMapingRangeAtLevel(PageTable* root, uintptr_t from_vaddr, uintptr_t to_vaddr, uintptr_t paddr, int bits, int level) {
     if (from_vaddr != to_vaddr) {

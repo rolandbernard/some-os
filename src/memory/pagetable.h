@@ -65,6 +65,9 @@ void unmapPage(PageTable* root, uintptr_t vaddr);
 // Remove all maps from the given page root.
 void unmapAllPages(PageTable* root);
 
+// Remove all maps from the given page root and free pages if they are for the user.
+void unmapAllPagesAndFreeUsers(PageTable* root);
+
 // Map all pages between from_vaddr (inc) and to_vaddr (exc) to continuos addresses starting at paddr. Use the
 // best fitting page level to do the mapping.
 void mapPageRange(PageTable* root, uintptr_t from_vaddr, uintptr_t to_vaddr, uintptr_t paddr, int bits);

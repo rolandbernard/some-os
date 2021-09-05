@@ -7,6 +7,8 @@ uintptr_t exitSyscall(bool is_kernel, TrapFrame* frame, SyscallArgs args);
 
 uintptr_t yieldSyscall(bool is_kernel, TrapFrame* frame, SyscallArgs args);
 
+void exit();
+
 void yield();
 
 #endif

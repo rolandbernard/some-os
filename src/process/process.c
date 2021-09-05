@@ -9,10 +9,12 @@
 #include "interrupt/trap.h"
 #include "memory/kalloc.h"
 #include "memory/pagetable.h"
+#include "memory/pagealloc.h"
 #include "memory/virtmem.h"
 #include "process/harts.h"
 #include "process/process.h"
 #include "process/syscall.h"
+#include "util/spinlock.h"
 
 #define STACK_SIZE (1 << 16)
 
@@ -23,11 +25,12 @@ extern void __data_end;
 
 static Pid next_pid = 1;
 
+static SpinLock process_lock;
 static Process* global_first = NULL;
 
 void initTrapFrame(TrapFrame* frame, uintptr_t sp, uintptr_t gp, uintptr_t pc, HartFrame* hart, uintptr_t asid, PageTable* table) {
     frame->hart = hart;
-    frame->regs[0] = 0;
+    frame->regs[0] = (uintptr_t)exit;
     frame->regs[1] = sp;
     frame->regs[2] = gp;
     frame->pc = pc;
@@ -45,41 +48,93 @@ Process* createKernelProcess(void* start, Priority priority) {
         (uintptr_t)getKernelGlobalPointer(), (uintptr_t)start, getCurrentHartFrame(), 0,
         kernel_page_table
     );
+    lockSpinLock(&process_lock); 
     process->global_next = global_first;
     if (global_first != NULL) {
         global_first->global_prev = process;
     }
     global_first = process;
+    unlockSpinLock(&process_lock); 
     return process;
 }
 
-Process* createEmptyUserProcess(uintptr_t sp, uintptr_t gp, uintptr_t pc, Pid ppid, Priority priority) {
+Process* createEmptyUserProcess(uintptr_t sp, uintptr_t gp, uintptr_t pc, Process* parent, Priority priority) {
     Process* process = zalloc(sizeof(Process));
     Pid pid = next_pid;
     next_pid++;
     process->table = createPageTable();
     process->pid = pid;
-    process->ppid = ppid;
+    process->parent = parent;
     process->priority = priority;
     process->state = READY;
     process->stack = NULL;
     initTrapFrame(&process->frame, sp, gp, pc, getCurrentHartFrame(), pid, process->table);
+    lockSpinLock(&process_lock); 
     process->global_next = global_first;
     if (global_first != NULL) {
         global_first->global_prev = process;
     }
     global_first = process;
+    if (parent != NULL) {
+        process->child_next = parent->children;
+        parent->children = process;
+    }
+    unlockSpinLock(&process_lock); 
     return process;
 }
 
 void freeProcess(Process* process) {
-    if (process->global_prev == NULL) {
-        global_first = process->global_next;
-    } else {
-        process->global_prev->global_next = process->global_next;
+    if (process->state != KILLED) {
+        process->state = KILLED;
+        lockSpinLock(&process_lock); 
+        if (process->global_prev == NULL) {
+            global_first = process->global_next;
+        } else {
+            process->global_prev->global_next = process->global_next;
+        }
+        if (process->global_next != NULL) {
+            process->global_next->global_prev = process->global_prev;
+        }
+        // Reparent children
+        Process* child = process->children;
+        while (child != NULL) {
+            child->parent = process->parent;
+            if (process->parent != NULL) {
+                child->child_next = process->parent->children;
+                process->parent->children = child;
+            }
+        }
+        unlockSpinLock(&process_lock); 
+        dealloc(process->stack);
+        if (process->pid != 0) {
+            // If this is not a kernel process, free its page table.
+            unmapAllPagesAndFreeUsers(process->table);
+            deallocPage(process->table);
+        }
+        if (process->parent == NULL) {
+            // If we have no parent, no one can wait for the child.
+            dealloc(process);
+        }
     }
-    dealloc(process->stack);
-    dealloc(process);
+}
+
+Pid freeKilledChild(Process* parent, uint64_t* status) {
+    lockSpinLock(&process_lock); 
+    Process** child = &parent->children;
+    while (*child != NULL) {
+        if ((*child)->state == KILLED) {
+            Process* ret = *child;
+            *child = ret->child_next;
+            unlockSpinLock(&process_lock); 
+            Pid pid = ret->pid;
+            *status = ret->status;
+            dealloc(ret);
+            return pid;
+        }
+        child = &(*child)->child_next;
+    }
+    unlockSpinLock(&process_lock); 
+    return 0;
 }
 
 void enterProcess(Process* process) {

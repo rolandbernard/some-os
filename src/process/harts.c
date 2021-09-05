@@ -10,27 +10,31 @@
 extern void __global_pointer;
 extern void __stack_top;
 
-HartFrame* harts = NULL;
-size_t hart_count = 0;
+static SpinLock hart_lock;
+HartFrame* harts_head = NULL; // This will be a circular linked list
+HartFrame* harts_tail = NULL;
 
 HartFrame* setupHartFrame() {
-    TrapFrame* existing = readSscratch();
+    HartFrame* existing = getCurrentHartFrame();
     if (existing == NULL) {
-        size_t id = hart_count;
-        hart_count++;
-        harts = krealloc(harts, hart_count * sizeof(HartFrame));
-        memset(&harts[id], 0, sizeof(HartFrame));
-        // Globals and stack_top should be changed for all but the primary hart
-        harts[id].stack_top = &__stack_top;
-        initTrapFrame(&harts[id].frame, (uintptr_t)&__stack_top, (uintptr_t)&__global_pointer, 0, NULL, 0, kernel_page_table);
-        writeSscratch(&harts[id].frame);
-        return &harts[id];
-    } else {
-        if (existing->hart == NULL) {
-            return (HartFrame*)existing;
+        HartFrame* hart = kalloc(sizeof(HartFrame));
+        lockSpinLock(&hart_lock); 
+        hart->next = harts_head;
+        harts_head = hart;
+        if (harts_tail == NULL) {
+            harts_tail = hart;
         } else {
-            return existing->hart;
+            harts_tail->next = hart;
         }
+        unlockSpinLock(&hart_lock); 
+        memset(hart, 0, sizeof(HartFrame));
+        // Stack_top should be changed for all but the primary hart
+        hart->stack_top = &__stack_top;
+        initTrapFrame(&hart->frame, (uintptr_t)&__stack_top, (uintptr_t)&__global_pointer, 0, NULL, 0, kernel_page_table);
+        writeSscratch(&hart->frame);
+        return hart;
+    } else {
+        return existing;
     }
 }
 

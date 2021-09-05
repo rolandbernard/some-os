@@ -6,6 +6,7 @@
 #include <stdint.h>
 
 #include "memory/pagetable.h"
+#include "util/spinlock.h"
 
 struct HartFrame_s;
 
@@ -23,6 +24,7 @@ typedef struct {
 struct Process_s;
 
 typedef struct {
+    SpinLock lock;
     struct Process_s* head;
     struct Process_s* tails[MAX_PRIORITY];
 } ScheduleQueue;
@@ -39,6 +41,7 @@ typedef enum {
     READY,
     WAITING,
     TERMINATED,
+    KILLED,
 } ProcessState;
 
 typedef uint64_t Pid;
@@ -46,13 +49,16 @@ typedef uint8_t Priority;
 
 typedef struct Process_s {
     TrapFrame frame;
-    ProcessState state;
+    uint64_t status; // This is the status returned from wait
     Pid pid;
-    Pid ppid;
     PageTable* table;
     Priority priority;
+    ProcessState state;
     void* stack; // This is only used for a kernel process
-    struct Process_s* next; // Used for ready and waiting lists
+    struct Process_s* parent;
+    struct Process_s* children;
+    struct Process_s* child_next;
+    struct Process_s* sched_next; // Used for ready and waiting lists
     struct Process_s* global_next; // Used for list off every process
     struct Process_s* global_prev;
 } Process;

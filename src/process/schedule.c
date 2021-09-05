@@ -33,7 +33,7 @@ void runNextProcess() {
 }
 
 void runNextProcessFrom(HartFrame* hart) {
-    Process* next = pullProcessFromQueue(&hart->queue);
+    Process* next = pullProcessForHart(hart);
     if (next != NULL) {
         enterProcess(next);
     } else {
@@ -41,12 +41,27 @@ void runNextProcessFrom(HartFrame* hart) {
     }
 }
 
+Process* pullProcessForHart(HartFrame* hart) {
+    HartFrame* current = hart;
+    do {
+        Process* process = pullProcessFromQueue(&current->queue);
+        if (process != NULL) {
+            return process;
+        } else {
+            current = hart->next;
+        }
+    } while (current != hart);
+    return NULL;
+}
+
 Process* pullProcessFromQueue(ScheduleQueue* queue) {
+    lockSpinLock(&queue->lock);
     if (queue->head == NULL) {
+        unlockSpinLock(&queue->lock);
         return NULL;
     } else {
         Process* ret = queue->head;
-        queue->head = ret->next;
+        queue->head = ret->sched_next;
         if (queue->tails[ret->priority] == ret) {
             if (ret->priority == 0) {
                 queue->tails[0] = NULL;
@@ -54,33 +69,39 @@ Process* pullProcessFromQueue(ScheduleQueue* queue) {
                 queue->tails[ret->priority] = queue->tails[ret->priority - 1];
             }
         }
+        unlockSpinLock(&queue->lock);
         return ret;
     }
 }
 
 void pushProcessToQueue(ScheduleQueue* queue, Process* process) {
+    lockSpinLock(&queue->lock);
     if (process->priority >= MAX_PRIORITY) {
         process->priority = MAX_PRIORITY - 1;
     }
     if (queue->tails[process->priority] == NULL) {
-        process->next = queue->head;
+        process->sched_next = queue->head;
         queue->head = process;
     } else {
-        process->next = queue->tails[process->priority];
+        process->sched_next = queue->tails[process->priority];
         queue->tails[process->priority] = process;
     }
     queue->tails[process->priority] = process;
+    unlockSpinLock(&queue->lock);
 }
 
 Process* removeProccesFromQueue(ScheduleQueue* queue, Process* process) {
+    lockSpinLock(&queue->lock);
     Process** current = &queue->head;
     while (*current != NULL) {
         if (*current == process) {
-            *current = (*current)->next;
+            *current = (*current)->sched_next;
+            unlockSpinLock(&queue->lock);
             return process;
         }
         *current = NULL;
     }
+    unlockSpinLock(&queue->lock);
     return NULL;
 }
 

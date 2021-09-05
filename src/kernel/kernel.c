@@ -8,6 +8,7 @@
 #include "devices/virtio/block.h"
 #include "devices/virtio/virtio.h"
 #include "error/log.h"
+#include "interrupt/timer.h"
 #include "interrupt/trap.h"
 #include "memory/kalloc.h"
 #include "memory/pagealloc.h"
@@ -17,6 +18,10 @@
 #include "process/schedule.h"
 #include "interrupt/syscall.h"
 #include "kernel/init.h"
+
+void timedCallback(Time time, void* null) {
+    KERNEL_LOG("Time: %li", time);
+}
 
 void readCallback(VirtIOBlockStatus status, uint8_t* buffer) {
     assert(status == VIRTIO_BLOCK_S_OK);
@@ -32,6 +37,7 @@ void readCallback(VirtIOBlockStatus status, uint8_t* buffer) {
 }
 
 void kernelMain() {
+    setTimeout(CLOCKS_PER_SEC, timedCallback, NULL);
     // Just some testing code
     VirtIOBlockDevice* dev = (VirtIOBlockDevice*)getAnyDeviceOfType(VIRTIO_BLOCK);
     uint8_t buffer[512];

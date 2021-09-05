@@ -1,7 +1,9 @@
 #ifndef _PANIC_H_
 #define _PANIC_H_
 
+#include <stdnoreturn.h>
+
 // Terminate the kernel
-void panic();
+noreturn void panic();
 
 #endif
