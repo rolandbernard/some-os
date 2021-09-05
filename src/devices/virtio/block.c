@@ -1,6 +1,11 @@
 
 #include "devices/virtio/block.h"
+#include "interrupt/plic.h"
 #include "memory/kalloc.h"
+
+static void handleInterrupt(ExternalInterrupt id, void* udata) {
+    freePendingRequests((VirtIOBlockDevice*)udata);
+}
 
 Error initBlockDevice(int id, volatile VirtIODeviceLayout* base, VirtIODevice** output) {
     VirtIOBlockDevice* device = zalloc(sizeof(VirtIOBlockDevice));
@@ -25,6 +30,8 @@ Error initBlockDevice(int id, volatile VirtIODeviceLayout* base, VirtIODevice** 
     status |= VIRTIO_DRIVER_OK;
     base->status = status;
     *output = (VirtIODevice*)device;
+    setInterruptFunction(id + 1, handleInterrupt, device);
+    setInterruptPriority(id + 1, 1);
     return simpleError(SUCCESS);
 }
 

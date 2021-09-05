@@ -18,7 +18,7 @@ HartFrame* setupHartFrame() {
     if (existing == NULL) {
         size_t id = hart_count;
         hart_count++;
-        harts = krealloc(harts, hart_count);
+        harts = krealloc(harts, hart_count * sizeof(HartFrame));
         // Globals and stack_top should be changed for all but the primary hart
         harts[id].globals = &__global_pointer;
         harts[id].stack_top = &__stack_top;
