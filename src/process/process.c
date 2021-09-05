@@ -12,6 +12,7 @@
 #include "memory/virtmem.h"
 #include "process/harts.h"
 #include "process/process.h"
+#include "process/syscall.h"
 
 #define STACK_SIZE (1 << 16)
 
@@ -40,10 +41,14 @@ Process* createKernelProcess(void* start, Priority priority) {
     process->state = READY;
     process->stack = kalloc(STACK_SIZE);
     initTrapFrame(
-        &process->frame, (uintptr_t)process->stack, (uintptr_t)getKernelGlobalPointer(),
-        (uintptr_t)start, getCurrentHartFrame(), 0, kernel_page_table
+        &process->frame, (uintptr_t)process->stack + STACK_SIZE,
+        (uintptr_t)getKernelGlobalPointer(), (uintptr_t)start, getCurrentHartFrame(), 0,
+        kernel_page_table
     );
     process->global_next = global_first;
+    if (global_first != NULL) {
+        global_first->global_prev = process;
+    }
     global_first = process;
     return process;
 }
@@ -60,12 +65,21 @@ Process* createEmptyUserProcess(uintptr_t sp, uintptr_t gp, uintptr_t pc, Pid pp
     process->stack = NULL;
     initTrapFrame(&process->frame, sp, gp, pc, getCurrentHartFrame(), pid, process->table);
     process->global_next = global_first;
+    if (global_first != NULL) {
+        global_first->global_prev = process;
+    }
     global_first = process;
     return process;
 }
 
 void freeProcess(Process* process) {
-    // TODO
+    if (process->global_prev == NULL) {
+        global_first = process->global_next;
+    } else {
+        process->global_prev->global_next = process->global_next;
+    }
+    dealloc(process->stack);
+    dealloc(process);
 }
 
 void enterProcess(Process* process) {
@@ -85,17 +99,5 @@ void enterProcess(Process* process) {
     } else {
         enterUserMode(&process->frame);
     }
-}
-
-uintptr_t exitSyscall(bool is_kernel, TrapFrame* frame, SyscallArgs args) {
-    assert(frame->hart != NULL);
-    Process* process = (Process*)frame;
-    process->state = TERMINATED;
-    return 0;
-}
-
-Error initProcessSystem() {
-    registerSyscall(1, exitSyscall);
-    return simpleError(SUCCESS);
 }
 

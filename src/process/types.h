@@ -54,6 +54,7 @@ typedef struct Process_s {
     void* stack; // This is only used for a kernel process
     struct Process_s* next; // Used for ready and waiting lists
     struct Process_s* global_next; // Used for list off every process
+    struct Process_s* global_prev;
 } Process;
 
 #endif

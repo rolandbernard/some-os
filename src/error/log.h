@@ -4,6 +4,7 @@
 #include "error/error.h"
 #include "util/text.h"
 #include "util/macro.h"
+#include "interrupt/syscall.h"
 
 // Initialize the log system
 Error initLogSystem();
@@ -20,5 +21,7 @@ Error logKernelMessage(const char* fmt, ...);
     logKernelMessage(FMT "\n" __VA_OPT__(,) __VA_ARGS__); \
 }
 #endif
+
+uintptr_t printSyscall(bool is_kernel, TrapFrame* frame, SyscallArgs args);
 
 #endif

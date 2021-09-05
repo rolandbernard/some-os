@@ -86,11 +86,11 @@ void kernelTrap(uintptr_t cause, uintptr_t pc, uintptr_t val, TrapFrame* frame) 
             frame->pc = pc + 4;
             switch (code) {
                 case 8: // Environment call from U-mode
-                    runSyscall(frame);
+                    runSyscall(frame, false);
                     break;
                 case 9: // Environment call from S-mode
                 case 11: // Environment call from M-mode
-                    runKernelSyscall(frame);
+                    runSyscall(frame, true);
                     break;
                 default:
                     KERNEL_LOG("[!] Unhandled trap: %p %p %p %s", pc, val, frame, getCauseString(interrupt, code));
@@ -100,6 +100,7 @@ void kernelTrap(uintptr_t cause, uintptr_t pc, uintptr_t val, TrapFrame* frame) 
         }
         if (frame->hart != NULL) {
             enqueueProcess((Process*)frame);
+            runNextProcess();
         } else {
             // This is not called from a process, but from kernel init or interrupt handler
             enterKernelMode(frame);

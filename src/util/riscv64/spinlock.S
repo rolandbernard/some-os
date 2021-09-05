@@ -8,7 +8,10 @@ lockSpinLock:
 1:
     amoswap.w t0, t0, (a0)
     fence
-    bnez t0, 1b
+    beqz t0, 1f
+    call yield
+    j 1b
+1:
     ret
 
 unlockSpinLock:

@@ -68,9 +68,10 @@ void freePendingRequests(VirtIOBlockDevice* device) {
         device->virtio.ack_index = (device->virtio.ack_index + 1) % VIRTIO_RING_SIZE;
         for (uint16_t i = device->ack_index; i != device->req_index; i = (i + 1) % BLOCK_MAX_REQUESTS) {
             if (device->requests[i] != NULL && device->requests[i]->head == elem.id) {
-                device->requests[i]->callback(device->requests[i]->status.status, device->requests[i]->udata);
-                dealloc(device->requests[i]);
+                VirtIOBlockRequest* request = device->requests[i];
                 device->requests[i] = NULL;
+                request->callback(request->status.status, request->udata);
+                dealloc(request);
                 break;
             }
         }

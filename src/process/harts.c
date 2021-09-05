@@ -47,3 +47,12 @@ void* getKernelGlobalPointer() {
     return &__global_pointer;
 }
 
+Process* getCurrentProcess() {
+    TrapFrame* frame = readSscratch();
+    if (frame != NULL && frame->hart != NULL) {
+        return (Process*)frame;
+    } else {
+        return NULL;
+    }
+}
+

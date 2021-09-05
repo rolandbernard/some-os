@@ -6,9 +6,6 @@
 #include "error/error.h"
 #include "process/types.h"
 
-// Initialize process system
-Error initProcessSystem();
-
 void initTrapFrame(TrapFrame* frame, uintptr_t sp, uintptr_t gp, uintptr_t pc, HartFrame* hart, uintptr_t asid, PageTable* table);
 
 Process* createKernelProcess(void* start, Priority priority);

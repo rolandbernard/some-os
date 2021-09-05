@@ -1,6 +1,8 @@
 
 #include <assert.h>
 
+#include "interrupt/syscall.h"
+#include "process/harts.h"
 #include "process/schedule.h"
 
 #include "interrupt/trap.h"
@@ -18,7 +20,20 @@ void enqueueProcess(Process* process) {
         process->state = READY;
         pushProcessToQueue(queue, process);
     }
-    Process* next = pullProcessFromQueue(queue);
+}
+
+void runNextProcess() {
+    Process* current = getCurrentProcess();
+    if (current != NULL) {
+        // If this is called from inside a process. Call exit syscall.
+        syscall(SYSCALL_EXIT);
+    } else {
+        runNextProcessFrom(getCurrentHartFrame());
+    }
+}
+
+void runNextProcessFrom(HartFrame* hart) {
+    Process* next = pullProcessFromQueue(&hart->queue);
     if (next != NULL) {
         enterProcess(next);
     } else {
@@ -31,7 +46,7 @@ Process* pullProcessFromQueue(ScheduleQueue* queue) {
         return NULL;
     } else {
         Process* ret = queue->head;
-        queue->head = NULL;
+        queue->head = ret->next;
         if (queue->tails[ret->priority] == ret) {
             if (ret->priority == 0) {
                 queue->tails[0] = NULL;

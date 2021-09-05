@@ -18,20 +18,6 @@
 #include "interrupt/syscall.h"
 #include "kernel/init.h"
 
-void userMain() {
-    // TODO: replace with starting init process
-    // Just some testing code
-    // Throws a Instruction page fault now, because user is not allowed to access kernel memory.
-    for (;;) {
-        for (int i = 1; i <= 50; i++) {
-            syscall(0, ".");
-            waitForInterrupt();
-        }
-        syscall(0, "\n");
-    }
-    syscall(1);
-}
-
 void readCallback(VirtIOBlockStatus status, uint8_t* buffer) {
     assert(status == VIRTIO_BLOCK_S_OK);
     for (int i = 0; i < 128 / 2 / 8; i++) {
@@ -46,6 +32,21 @@ void readCallback(VirtIOBlockStatus status, uint8_t* buffer) {
 }
 
 void kernelMain() {
+    // Just some testing code
+    VirtIOBlockDevice* dev = (VirtIOBlockDevice*)getAnyDeviceOfType(VIRTIO_BLOCK);
+    uint8_t buffer[512];
+    blockDeviceOperation(dev, virtPtrForKernel(buffer), 0, 512, false, (VirtIOBlockCallback)readCallback, buffer);
+    for (;;) {
+        for (int i = 1; i <= 50; i++) {
+            syscall(0, ".");
+            waitForInterrupt();
+        }
+        syscall(0, "\n");
+    }
+    syscall(10);
+}
+
+void kernelInit() {
     Error status;
     // Initialize baseline devices
     status = initBaselineDevices();
@@ -72,11 +73,8 @@ void kernelMain() {
         KERNEL_LOG("[+] Devices initialized");
     }
 
-    VirtIOBlockDevice* dev = (VirtIOBlockDevice*)getAnyDeviceOfType(VIRTIO_BLOCK);
-    uint8_t buffer[512];
-    blockDeviceOperation(dev, virtPtrForKernel(buffer), 0, 512, false, (VirtIOBlockCallback)readCallback, buffer);
-
-    Process* process = createKernelProcess(userMain, 20);
+    Process* process = createKernelProcess(kernelMain, 20);
     enqueueProcess(process);
+    runNextProcess();
 }
 

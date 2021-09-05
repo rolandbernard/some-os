@@ -22,8 +22,3 @@ uintptr_t printSyscall(bool is_kernel, TrapFrame* frame, SyscallArgs args) {
     return 0;
 }
 
-Error initLogSystem() {
-    registerSyscall(0, printSyscall);
-    return simpleError(SUCCESS);
-}
-

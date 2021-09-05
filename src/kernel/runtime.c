@@ -2,7 +2,7 @@
 #include <stdint.h>
 #include <string.h>
 
-extern void kernelMain();
+extern void kernelInit();
 
 extern void __bss_start;
 extern void __bss_end;
@@ -13,6 +13,6 @@ static void clearBss() {
 
 void runtimeInit() {
     clearBss();
-    kernelMain();
+    kernelInit();
 }
 

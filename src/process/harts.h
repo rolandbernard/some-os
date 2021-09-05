@@ -14,4 +14,6 @@ HartFrame* getCurrentHartFrame();
 
 void* getKernelGlobalPointer();
 
+Process* getCurrentProcess();
+
 #endif

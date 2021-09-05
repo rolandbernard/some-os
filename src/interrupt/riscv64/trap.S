@@ -21,8 +21,9 @@ initTraps:
     csrw sscratch, zero
     # Delagate all exceptions and interrupts
     li t0, 0xffff
-    csrw medeleg, t0
-    csrw mideleg, t0
+    # NOTE: Delegation disabled for now. 
+    # csrw medeleg, t0
+    # csrw mideleg, t0
     csrw mie, t0
     csrw sie, t0
     # Some things can not be delegated
