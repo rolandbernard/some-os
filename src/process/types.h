@@ -40,9 +40,10 @@ typedef struct HartFrame_s {
 typedef enum {
     RUNNING,
     READY,
+    YIELDED, // Like ready but if possible don't enqueue at the start (even if it has the highest priority)
     WAITING,
-    TERMINATED,
-    KILLED,
+    TERMINATED, // Still has resources
+    KILLED, // Resources have been freed
 } ProcessState;
 
 typedef uint64_t Pid;

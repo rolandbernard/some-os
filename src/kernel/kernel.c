@@ -19,14 +19,29 @@
 #include "interrupt/syscall.h"
 #include "kernel/init.h"
 
-void kernelMain() {
+void kernelMain1() {
     // Just some testing code
-    for (size_t j = 0; j < 10;j++) {
-        for (int i = 1; i <= 50; i++) {
-            syscall(SYSCALL_PRINT, ".");
-            waitForInterrupt();
-        }
-        syscall(SYSCALL_PRINT, "\n");
+    for (int i = 1;; i++) {
+        syscall(SYSCALL_PRINT, "KERNEL_MAIN 1\n");
+        waitForInterrupt();
+    }
+    syscall(SYSCALL_EXIT);
+}
+
+void kernelMain2() {
+    // Just some testing code
+    for (int i = 1;; i++) {
+        syscall(SYSCALL_PRINT, "KERNEL_MAIN 2\n");
+        waitForInterrupt();
+    }
+    syscall(SYSCALL_EXIT);
+}
+
+void kernelHigh() {
+    // Just some testing code
+    for (int i = 1;; i++) {
+        syscall(SYSCALL_PRINT, "KERNEL_HIGH\n");
+        syscall(SYSCALL_YIELD);
     }
     syscall(SYSCALL_EXIT);
 }
@@ -58,7 +73,11 @@ void kernelInit() {
         KERNEL_LOG("[+] Devices initialized");
     }
 
-    Process* process = createKernelProcess(kernelMain, 20, 1 << 16);
+    Process* process = createKernelProcess(kernelMain1, 20, 1 << 16);
+    enqueueProcess(process);
+    process = createKernelProcess(kernelMain2, 20, 1 << 16);
+    enqueueProcess(process);
+    process = createKernelProcess(kernelHigh, 0, 1 << 16);
     enqueueProcess(process);
     runNextProcess();
 }

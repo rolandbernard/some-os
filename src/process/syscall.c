@@ -11,6 +11,10 @@
 #include "process/schedule.h"
 #include "process/types.h"
 
+uintptr_t forkSyscall(bool is_kernel, TrapFrame* frame, SyscallArgs args) {
+    return 0;
+}
+
 uintptr_t exitSyscall(bool is_kernel, TrapFrame* frame, SyscallArgs args) {
     assert(frame->hart != NULL);
     Process* process = (Process*)frame;
@@ -19,7 +23,9 @@ uintptr_t exitSyscall(bool is_kernel, TrapFrame* frame, SyscallArgs args) {
 }
 
 uintptr_t yieldSyscall(bool is_kernel, TrapFrame* frame, SyscallArgs args) {
-    // If this is a process. Calling a syscall will yield anyways.
+    assert(frame->hart != NULL); // Only a process can be yielded
+    Process* process = (Process*)frame;
+    process->state = YIELDED;
     return 0;
 }
 

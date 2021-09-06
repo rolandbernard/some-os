@@ -15,9 +15,14 @@ void enqueueProcess(Process* process) {
     ScheduleQueue* queue = &hart->queue;
     if (hart->idle_process != process) { // Ignore the idle process
         if (process->state == WAITING) {
-            // Don't do anything. Should be tracked somewhere else.
+            // Don't do anything. Waiting processes should be tracked somewhere else.
         } else if (process->state == TERMINATED) {
             freeProcess(process);
+        } else if (process->state == KILLED) {
+            // This is propably an error
+            KERNEL_LOG("[!] Killed process %li was enqueued", process->pid);
+        } else if (process->state == YIELDED) {
+            pushYieldedProcessToQueue(queue, process);
         } else {
             process->state = READY;
             pushProcessToQueue(queue, process);
@@ -69,6 +74,9 @@ Process* pullProcessFromQueue(ScheduleQueue* queue) {
             } else {
                 queue->tails[ret->priority] = queue->tails[ret->priority - 1];
             }
+            for (Priority i = ret->priority + 1; i < MAX_PRIORITY && queue->tails[i] == ret; i++) {
+                queue->tails[i] = queue->tails[i - 1];
+            }
         }
         unlockSpinLock(&queue->lock);
         return ret;
@@ -76,19 +84,48 @@ Process* pullProcessFromQueue(ScheduleQueue* queue) {
 }
 
 void pushProcessToQueue(ScheduleQueue* queue, Process* process) {
-    lockSpinLock(&queue->lock);
     if (process->priority >= MAX_PRIORITY) {
         process->priority = MAX_PRIORITY - 1;
     }
+    lockSpinLock(&queue->lock);
     if (queue->tails[process->priority] == NULL) {
         process->sched_next = queue->head;
         queue->head = process;
     } else {
-        process->sched_next = queue->tails[process->priority];
-        queue->tails[process->priority] = process;
+        process->sched_next = queue->tails[process->priority]->sched_next;
+        queue->tails[process->priority]->sched_next = process;
     }
     queue->tails[process->priority] = process;
+    for (Priority i = process->priority + 1; i < MAX_PRIORITY && queue->tails[i] == NULL; i++) {
+        queue->tails[i] = process;
+    }
     unlockSpinLock(&queue->lock);
+}
+
+void pushYieldedProcessToQueue(ScheduleQueue* queue, Process* process) {
+    // A yielded process can not be entered as the first process
+    if (process->priority >= MAX_PRIORITY) {
+        process->priority = MAX_PRIORITY - 1;
+    }
+    if (queue->head == NULL || queue->head->priority < process->priority) {
+        pushProcessToQueue(queue, process);
+    } else {
+        lockSpinLock(&queue->lock);
+        // This process has higher priority that the head.
+        // Because we yielded, enter the process as the second one.
+        process->sched_next = queue->head->sched_next;
+        queue->head->sched_next = process;
+        queue->tails[process->priority] = process;
+        // All tails that would insert before the process must be changed
+        for (
+            Priority i = process->priority + 1;
+            i < MAX_PRIORITY && (queue->tails[i] == NULL || queue->tails[i] == queue->head);
+            i++
+        ) {
+            queue->tails[i] = process;
+        }
+        unlockSpinLock(&queue->lock);
+    }
 }
 
 Process* removeProccesFromQueue(ScheduleQueue* queue, Process* process) {

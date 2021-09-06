@@ -16,6 +16,8 @@ Process* pullProcessFromQueue(ScheduleQueue* queue);
 
 void pushProcessToQueue(ScheduleQueue* queue, Process* process);
 
+void pushYieldedProcessToQueue(ScheduleQueue* queue, Process* process);
+
 Process* removeProccesFromQueue(ScheduleQueue* queue, Process* process);
 
 #endif
