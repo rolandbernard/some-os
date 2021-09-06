@@ -95,8 +95,8 @@ void pushProcessToQueue(ScheduleQueue* queue, Process* process) {
         process->sched_next = queue->tails[process->priority]->sched_next;
         queue->tails[process->priority]->sched_next = process;
     }
-    queue->tails[process->priority] = process;
-    for (Priority i = process->priority + 1; i < MAX_PRIORITY && queue->tails[i] == NULL; i++) {
+    Process* old = queue->tails[process->priority];
+    for (Priority i = process->priority; i < MAX_PRIORITY && queue->tails[i] == old; i++) {
         queue->tails[i] = process;
     }
     unlockSpinLock(&queue->lock);
@@ -115,11 +115,11 @@ void pushYieldedProcessToQueue(ScheduleQueue* queue, Process* process) {
         // Because we yielded, enter the process as the second one.
         process->sched_next = queue->head->sched_next;
         queue->head->sched_next = process;
-        queue->tails[process->priority] = process;
         // All tails that would insert before the process must be changed
+        Process* old = queue->tails[process->priority];
         for (
-            Priority i = process->priority + 1;
-            i < MAX_PRIORITY && (queue->tails[i] == NULL || queue->tails[i] == queue->head);
+            Priority i = process->priority;
+            i < MAX_PRIORITY && (queue->tails[i] == old || queue->tails[i] == queue->head);
             i++
         ) {
             queue->tails[i] = process;

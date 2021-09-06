@@ -19,21 +19,12 @@
 #include "interrupt/syscall.h"
 #include "kernel/init.h"
 
-void kernelMain1() {
+void kernelMain(int id) {
     // Just some testing code
-    for (int i = 1;; i++) {
-        syscall(SYSCALL_PRINT, "KERNEL_MAIN 1\n");
-        waitForInterrupt();
-    }
-    syscall(SYSCALL_EXIT);
-}
-
-void kernelMain2() {
-    // Just some testing code
-    for (int i = 1;; i++) {
-        syscall(SYSCALL_PRINT, "KERNEL_MAIN 2\n");
-        waitForInterrupt();
-    }
+    syscall(SYSCALL_PRINT, "KERNEL_ENTER %i\n", id);
+    syscall(SYSCALL_YIELD);
+    waitForInterrupt();
+    syscall(SYSCALL_PRINT, "KERNEL_EXIT %i\n", id);
     syscall(SYSCALL_EXIT);
 }
 
@@ -42,6 +33,7 @@ void kernelHigh() {
     for (int i = 1;; i++) {
         syscall(SYSCALL_PRINT, "KERNEL_HIGH\n");
         syscall(SYSCALL_YIELD);
+        waitForInterrupt();
     }
     syscall(SYSCALL_EXIT);
 }
@@ -73,10 +65,12 @@ void kernelInit() {
         KERNEL_LOG("[+] Devices initialized");
     }
 
-    Process* process = createKernelProcess(kernelMain1, 20, 1 << 16);
-    enqueueProcess(process);
-    process = createKernelProcess(kernelMain2, 20, 1 << 16);
-    enqueueProcess(process);
+    Process* process;
+    for (int i = 0; i < MAX_PRIORITY; i++) {
+        process = createKernelProcess(kernelMain, i, 1 << 16);
+        process->frame.regs[9] = i;
+        enqueueProcess(process);
+    }
     process = createKernelProcess(kernelHigh, 0, 1 << 16);
     enqueueProcess(process);
     runNextProcess();

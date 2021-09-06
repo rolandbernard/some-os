@@ -18,7 +18,8 @@ Error logKernelMessage(const char* fmt, ...) {
 }
 
 uintptr_t printSyscall(bool is_kernel, TrapFrame* frame, SyscallArgs args) {
-    logKernelMessage("%s", (const char*)args[0]);
+    // TODO: REMOVE! This is just for testing. This is really unsafe.
+    logKernelMessage((const char*)args[0], args[1], args[2], args[3], args[4], args[5], args[6]);
     return 0;
 }
 

@@ -12,6 +12,7 @@ SyscallFunction syscall_table[TABLE_SIZE] = {
     [SYSCALL_PRINT] = printSyscall,
     [SYSCALL_EXIT] = exitSyscall,
     [SYSCALL_YIELD] = yieldSyscall,
+    [SYSCALL_FORK] = forkSyscall,
 };
 
 void registerSyscall(int kind, SyscallFunction function) {
