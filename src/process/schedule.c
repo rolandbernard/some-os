@@ -11,14 +11,17 @@
 
 void enqueueProcess(Process* process) {
     assert(process->frame.hart != NULL);
-    ScheduleQueue* queue = &process->frame.hart->queue;
-    if (process->state == WAITING) {
-        // Don't do anything. Should be tracked somewhere else.
-    } else if (process->state == TERMINATED) {
-        freeProcess(process);
-    } else {
-        process->state = READY;
-        pushProcessToQueue(queue, process);
+    HartFrame* hart = process->frame.hart;
+    ScheduleQueue* queue = &hart->queue;
+    if (hart->idle_process != process) { // Ignore the idle process
+        if (process->state == WAITING) {
+            // Don't do anything. Should be tracked somewhere else.
+        } else if (process->state == TERMINATED) {
+            freeProcess(process);
+        } else {
+            process->state = READY;
+            pushProcessToQueue(queue, process);
+        }
     }
 }
 
@@ -34,14 +37,12 @@ void runNextProcess() {
 
 void runNextProcessFrom(HartFrame* hart) {
     Process* next = pullProcessForHart(hart);
-    if (next != NULL) {
-        enterProcess(next);
-    } else {
-        // TODO: Create and enter idle process
-    }
+    assert(next != NULL);
+    enterProcess(next);
 }
 
 Process* pullProcessForHart(HartFrame* hart) {
+    assert(hart != NULL);
     HartFrame* current = hart;
     do {
         Process* process = pullProcessFromQueue(&current->queue);
@@ -51,7 +52,7 @@ Process* pullProcessForHart(HartFrame* hart) {
             current = hart->next;
         }
     } while (current != hart);
-    return NULL;
+    return hart->idle_process;
 }
 
 Process* pullProcessFromQueue(ScheduleQueue* queue) {

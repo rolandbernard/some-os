@@ -16,8 +16,6 @@
 #include "process/syscall.h"
 #include "util/spinlock.h"
 
-#define STACK_SIZE (1 << 16)
-
 extern void kernelTrapVector;
 extern void kernelTrap;
 extern void __data_start;
@@ -37,14 +35,14 @@ void initTrapFrame(TrapFrame* frame, uintptr_t sp, uintptr_t gp, uintptr_t pc, H
     frame->satp = satpForMemory(asid, table);
 }
 
-Process* createKernelProcess(void* start, Priority priority) {
+Process* createKernelProcess(void* start, Priority priority, size_t stack_size) {
     Process* process = zalloc(sizeof(Process));
     process->table = kernel_page_table;
     process->priority = priority;
     process->state = READY;
-    process->stack = kalloc(STACK_SIZE);
+    process->stack = kalloc(stack_size);
     initTrapFrame(
-        &process->frame, (uintptr_t)process->stack + STACK_SIZE,
+        &process->frame, (uintptr_t)process->stack + stack_size,
         (uintptr_t)getKernelGlobalPointer(), (uintptr_t)start, getCurrentHartFrame(), 0,
         kernel_page_table
     );

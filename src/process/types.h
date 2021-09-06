@@ -33,6 +33,7 @@ typedef struct HartFrame_s {
     TrapFrame frame;
     void* stack_top;
     ScheduleQueue queue;
+    struct Process_s* idle_process;
     struct HartFrame_s* next; // Next hart. Used for scheduling
 } HartFrame;
 

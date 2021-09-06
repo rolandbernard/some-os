@@ -19,37 +19,16 @@
 #include "interrupt/syscall.h"
 #include "kernel/init.h"
 
-void timedCallback(Time time, void* null) {
-    KERNEL_LOG("%p Time: %li", null, time);
-}
-
-void readCallback(VirtIOBlockStatus status, uint8_t* buffer) {
-    assert(status == VIRTIO_BLOCK_S_OK);
-    for (int i = 0; i < 128 / 2 / 8; i++) {
-        for (int j = 0; j < 2; j++) {
-            for (int k = 0; k < 8; k++) {
-                logKernelMessage("%02x ", buffer[i * 16 + j * 8 + k]);
-            }
-            logKernelMessage(" ");
-        }
-        logKernelMessage("\n");
-    }
-}
-
 void kernelMain() {
     // Just some testing code
-    VirtIOBlockDevice* dev = (VirtIOBlockDevice*)getAnyDeviceOfType(VIRTIO_BLOCK);
-    uint8_t buffer[512];
-    blockDeviceOperation(dev, virtPtrForKernel(buffer), 0, 512, false, (VirtIOBlockCallback)readCallback, buffer);
-    for (size_t j = 0;;j++) {
+    for (size_t j = 0; j < 10;j++) {
         for (int i = 1; i <= 50; i++) {
-            syscall(0, ".");
+            syscall(SYSCALL_PRINT, ".");
             waitForInterrupt();
         }
-        syscall(0, "\n");
-        setTimeout(CLOCKS_PER_SEC, timedCallback, (void*)j);
+        syscall(SYSCALL_PRINT, "\n");
     }
-    syscall(10);
+    syscall(SYSCALL_EXIT);
 }
 
 void kernelInit() {
@@ -79,7 +58,7 @@ void kernelInit() {
         KERNEL_LOG("[+] Devices initialized");
     }
 
-    Process* process = createKernelProcess(kernelMain, 20);
+    Process* process = createKernelProcess(kernelMain, 20, 1 << 16);
     enqueueProcess(process);
     runNextProcess();
 }

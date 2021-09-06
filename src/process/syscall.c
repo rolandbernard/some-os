@@ -13,7 +13,6 @@
 
 uintptr_t exitSyscall(bool is_kernel, TrapFrame* frame, SyscallArgs args) {
     assert(frame->hart != NULL);
-    KERNEL_LOG("Exit");
     Process* process = (Process*)frame;
     process->state = TERMINATED;
     return 0;
@@ -35,7 +34,6 @@ void yield() {
         syscall(SYSCALL_YIELD);
     } else {
         // TODO: How to fix deadlock?
-        // This means calls to 
     }
 }
 
