@@ -332,3 +332,8 @@ void* krealloc(void* ptr, size_t size) {
     }
 }
 
+size_t kallocSize(void* ptr) {
+    FreeMemory* mem = (FreeMemory*)(ptr - sizeof(AllocatedMemory));
+    return mem->size;
+}
+
