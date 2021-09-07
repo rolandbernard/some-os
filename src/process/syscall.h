@@ -11,6 +11,4 @@ uintptr_t yieldSyscall(bool is_kernel, TrapFrame* frame, SyscallArgs args);
 
 void exit();
 
-void yield();
-
 #endif

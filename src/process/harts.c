@@ -37,7 +37,7 @@ HartFrame* setupHartFrame() {
         hart->stack_top = &__stack_top;
         initTrapFrame(&hart->frame, (uintptr_t)&__stack_top, (uintptr_t)&__global_pointer, 0, NULL, 0, kernel_page_table);
         writeSscratch(&hart->frame);
-        hart->idle_process = createKernelProcess(idle, MAX_PRIORITY, 64); // Every hart needs an idle process
+        hart->idle_process = createKernelProcess(idle, LOWEST_PRIORITY, IDLE_STACK_SIZE); // Every hart needs an idle process
         return hart;
     } else {
         return existing;

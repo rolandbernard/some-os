@@ -15,7 +15,6 @@ Error initAllSystems() {
     CHECKED(initKernelVirtualMemory());
     // kalloc is available from here on.
     initPrimaryHart();
-    yield();
     CHECKED(initPlic());
     return simpleError(SUCCESS);
 }

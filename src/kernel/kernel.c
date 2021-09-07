@@ -21,20 +21,15 @@
 
 void kernelMain(int id) {
     // Just some testing code
-    syscall(SYSCALL_PRINT, "KERNEL_ENTER %i\n", id);
-    syscall(SYSCALL_YIELD);
-    waitForInterrupt();
-    syscall(SYSCALL_PRINT, "KERNEL_EXIT %i\n", id);
-    syscall(SYSCALL_EXIT);
-}
-
-void kernelHigh() {
-    // Just some testing code
-    for (int i = 1;; i++) {
-        syscall(SYSCALL_PRINT, "KERNEL_HIGH\n");
+    KERNEL_LOG("Enter %i", id);
+    if (syscall(SYSCALL_FORK) != 0) {
+        KERNEL_LOG("Child");
         syscall(SYSCALL_YIELD);
-        waitForInterrupt();
+        kernelMain(id + 1);
+    } else {
+        KERNEL_LOG("Parent");
     }
+    KERNEL_LOG("Exit %i", id);
     syscall(SYSCALL_EXIT);
 }
 
@@ -65,14 +60,9 @@ void kernelInit() {
         KERNEL_LOG("[+] Devices initialized");
     }
 
-    Process* process;
-    for (int i = 0; i < MAX_PRIORITY; i++) {
-        process = createKernelProcess(kernelMain, i, 1 << 16);
-        process->frame.regs[9] = i;
-        enqueueProcess(process);
+    if (syscall(SYSCALL_FORK) != 0) {
+        kernelMain(0);
     }
-    process = createKernelProcess(kernelHigh, 0, 1 << 16);
-    enqueueProcess(process);
     runNextProcess();
 }
 

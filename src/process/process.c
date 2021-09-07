@@ -14,6 +14,7 @@
 #include "process/harts.h"
 #include "process/process.h"
 #include "process/syscall.h"
+#include "process/types.h"
 #include "util/spinlock.h"
 
 extern void kernelTrapVector;
@@ -28,9 +29,9 @@ static Process* global_first = NULL;
 
 void initTrapFrame(TrapFrame* frame, uintptr_t sp, uintptr_t gp, uintptr_t pc, HartFrame* hart, uintptr_t asid, PageTable* table) {
     frame->hart = hart;
-    frame->regs[0] = (uintptr_t)exit;
-    frame->regs[1] = sp;
-    frame->regs[2] = gp;
+    frame->regs[REG_RETURN_ADDRESS] = (uintptr_t)exit;
+    frame->regs[REG_STACK_POINTER] = sp;
+    frame->regs[REG_GLOBAL_POINTER] = gp;
     frame->pc = pc;
     frame->satp = satpForMemory(asid, table);
 }
@@ -145,7 +146,7 @@ void enterProcess(Process* process) {
     }
     process->frame.hart = hart;
     if (hart != NULL) {
-        hart->frame.regs[1] = (uintptr_t)hart->stack_top;
+        hart->frame.regs[REG_STACK_POINTER] = (uintptr_t)hart->stack_top;
     }
     if (process->pid == 0) {
         enterKernelMode(&process->frame);
