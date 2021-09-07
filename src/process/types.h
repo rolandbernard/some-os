@@ -40,7 +40,6 @@ typedef struct HartFrame_s {
 typedef enum {
     RUNNING,
     READY,
-    YIELDED, // Like ready but if possible don't enqueue at the start (even if it has the highest priority)
     WAITING,
     TERMINATED, // Still has resources
     KILLED, // Resources have been freed
@@ -55,6 +54,7 @@ typedef struct Process_s {
     Pid pid;
     PageTable* table;
     Priority priority;
+    Priority sched_priority; // Is a maximum of priority, but will be decreased over time
     ProcessState state;
     void* stack; // This is only used for a kernel process
     struct Process_s* parent;

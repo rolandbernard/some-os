@@ -10,8 +10,10 @@
 #include "process/syscall.h"
 #include "process/schedule.h"
 #include "process/types.h"
+#include "util/util.h"
 
 uintptr_t forkSyscall(bool is_kernel, TrapFrame* frame, SyscallArgs args) {
+    // TODO
     return 0;
 }
 
@@ -25,7 +27,9 @@ uintptr_t exitSyscall(bool is_kernel, TrapFrame* frame, SyscallArgs args) {
 uintptr_t yieldSyscall(bool is_kernel, TrapFrame* frame, SyscallArgs args) {
     assert(frame->hart != NULL); // Only a process can be yielded
     Process* process = (Process*)frame;
-    process->state = YIELDED;
+    // Decrease priority to allow other processes to run
+    // All other processes will be run at least once before running this one again
+    process->sched_priority = MAX_PRIORITY;
     return 0;
 }
 
