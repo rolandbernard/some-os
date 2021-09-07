@@ -21,7 +21,9 @@ initTraps:
     csrw sscratch, zero
     # Delagate all exceptions and interrupts
     li t0, 0xffff
-    # NOTE: Delegation disabled for now. 
+    # NOTE: Delegation disabled for now.
+    # (How to handle M-mode interrupt while handling S-mode interrupt?)
+    # (SpinLocks are a problem.)
     # csrw medeleg, t0
     # csrw mideleg, t0
     csrw mie, t0

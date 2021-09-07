@@ -25,6 +25,7 @@ uintptr_t exitSyscall(bool is_kernel, TrapFrame* frame, SyscallArgs args) {
 }
 
 uintptr_t yieldSyscall(bool is_kernel, TrapFrame* frame, SyscallArgs args) {
+    // TODO: Improve the scheduler completely
     assert(frame->hart != NULL); // Only a process can be yielded
     Process* process = (Process*)frame;
     // Decrease priority to allow other processes to run
