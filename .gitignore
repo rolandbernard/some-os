@@ -2,7 +2,8 @@
 build/
 mnt/
 tmp/
-.vim
+.vscode
+.vim*
 compile_flags.txt
 hdd.dsk
 
