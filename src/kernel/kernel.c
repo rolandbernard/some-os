@@ -22,12 +22,14 @@
 void kernelMain(int id) {
     // Just some testing code
     KERNEL_LOG("Enter %i", id);
-    if (syscall(SYSCALL_FORK) != 0) {
-        KERNEL_LOG("Child");
-        syscall(SYSCALL_YIELD);
-        kernelMain(id + 1);
-    } else {
-        KERNEL_LOG("Parent");
+    if (id < 10) {
+        if (syscall(SYSCALL_FORK) != 0) {
+            KERNEL_LOG("Child");
+            kernelMain(id + 1);
+        } else {
+            KERNEL_LOG("Parent");
+            kernelMain(id + 1);
+        }
     }
     KERNEL_LOG("Exit %i", id);
     syscall(SYSCALL_EXIT);

@@ -89,6 +89,7 @@ Error setupVirtIOQueue(VirtIODevice* device) {
         device->mmio->queue_sel = 0;
         size_t num_pages = (sizeof(VirtIOQueue) + PAGE_SIZE - 1) / PAGE_SIZE;
         VirtIOQueue* queue = zallocPages(num_pages).ptr;
+        assert(queue != NULL);
         uint64_t queue_pfn = ((uintptr_t)queue) / PAGE_SIZE;
         device->mmio->guest_page_size = PAGE_SIZE;
         device->mmio->queue_pfn = queue_pfn;
