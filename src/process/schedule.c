@@ -87,8 +87,8 @@ Process* pullProcessFromQueue(ScheduleQueue* queue) {
 }
 
 void pushProcessToQueue(ScheduleQueue* queue, Process* process) {
-    if (process->sched_priority >= MAX_PRIORITY) {
-        process->sched_priority = MAX_PRIORITY - 1;
+    if (process->sched_priority > LOWEST_PRIORITY) {
+        process->sched_priority = LOWEST_PRIORITY;
     }
     lockSpinLock(&queue->lock);
     if (queue->tails[process->sched_priority] == NULL) {

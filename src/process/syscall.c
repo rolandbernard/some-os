@@ -53,6 +53,7 @@ uintptr_t forkSyscall(bool is_kernel, TrapFrame* frame, SyscallArgs args) {
 uintptr_t exitSyscall(bool is_kernel, TrapFrame* frame, SyscallArgs args) {
     assert(frame->hart != NULL);
     Process* process = (Process*)frame;
+    process->state = args[0];
     process->state = TERMINATED;
     return 0;
 }
