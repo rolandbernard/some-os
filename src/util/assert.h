@@ -6,12 +6,12 @@
 #include "util/macro.h"
 
 #ifdef DEBUG
-#define ASSERT(COND) { if (!(COND)) { \
-        KERNEL_LOG("[!] Assertion failed: %s", #COND); \
+#define ASSERT(COND, ...) { if (!(COND)) { \
+        KERNEL_LOG("[!] Assertion failed: %s", IFE(__VA_ARGS__)(#COND) __VA_ARGS__); \
         panic(); \
     } }
 #else
-#define ASSERT(COND) { /* NOOP */ }
+#define ASSERT(COND, ...) { /* NOOP */ }
 #endif
 
 #define STATIC_ASSERT(COND, ...) _Static_assert(COND, IFE(__VA_ARGS__)(#COND) __VA_ARGS__)

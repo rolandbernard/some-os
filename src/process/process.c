@@ -38,10 +38,12 @@ void initTrapFrame(TrapFrame* frame, uintptr_t sp, uintptr_t gp, uintptr_t pc, H
 
 Process* createKernelProcess(void* start, Priority priority, size_t stack_size) {
     Process* process = zalloc(sizeof(Process));
+    assert(process != NULL);
     process->table = kernel_page_table;
     process->priority = priority;
     process->state = READY;
     process->stack = kalloc(stack_size);
+    assert(process->stack != NULL);
     initTrapFrame(
         &process->frame, (uintptr_t)process->stack + stack_size,
         (uintptr_t)getKernelGlobalPointer(), (uintptr_t)start, getCurrentHartFrame(), 0,
@@ -59,6 +61,7 @@ Process* createKernelProcess(void* start, Priority priority, size_t stack_size) 
 
 Process* createEmptyUserProcess(uintptr_t sp, uintptr_t gp, uintptr_t pc, Process* parent, Priority priority) {
     Process* process = zalloc(sizeof(Process));
+    assert(process != NULL);
     Pid pid = next_pid;
     next_pid++;
     process->table = createPageTable();

@@ -62,6 +62,11 @@ static void addNewMemory(size_t size) {
     FreeMemory* mem = (FreeMemory*)next_vaddr;
     for (size_t i = 0; i < size; i++) {
         void* page = allocPage();
+        if (page == NULL) {
+            // Out of memory. Add the memory we were able to allocate.
+            size = i;
+            break;
+        }
         lockSpinLock(&kernel_page_table_lock);
         mapPage(kernel_page_table, next_vaddr, (uintptr_t)page, PAGE_ENTRY_AD_RW, 0);
         unlockSpinLock(&kernel_page_table_lock);
@@ -71,8 +76,10 @@ static void addNewMemory(size_t size) {
 #else
     FreeMemory* mem = (FreeMemory*)allocPages(size).ptr;
 #endif
-    mem->size = size * PAGE_SIZE;
-    insertFreeMemory(mem);
+    if (mem != NULL && size > 0) {
+        mem->size = size * PAGE_SIZE;
+        insertFreeMemory(mem);
+    }
 }
 
 static FreeMemory** findFreeMemoryThatFits(size_t size) {

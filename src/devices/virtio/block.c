@@ -9,6 +9,7 @@ static void handleInterrupt(ExternalInterrupt id, void* udata) {
 
 Error initBlockDevice(int id, volatile VirtIODeviceLayout* base, VirtIODevice** output) {
     VirtIOBlockDevice* device = zalloc(sizeof(VirtIOBlockDevice));
+    assert(device != NULL);
     device->virtio.type = base->device_id;
     device->virtio.mmio = base;
     base->status = 0;
@@ -45,6 +46,7 @@ Error blockDeviceOperation(
     }
     uint32_t sector = offset / BLOCK_SECTOR_SIZE;
     VirtIOBlockRequest* request = kalloc(sizeof(VirtIOBlockRequest));
+    assert(request != NULL);
     request->header.sector = sector;
     request->header.reserved = 0;
     request->header.blk_type = write ? VIRTIO_BLOCK_T_OUT : VIRTIO_BLOCK_T_IN;

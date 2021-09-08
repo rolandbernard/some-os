@@ -1,4 +1,5 @@
 
+#include <assert.h>
 #include <stddef.h>
 #include <string.h>
 
@@ -27,6 +28,7 @@ Timeout setTimeout(Time delay, TimeoutFunction function, void* udata) {
     if (capacity <= length) {
         capacity += 32;
         timeouts = krealloc(timeouts, capacity * sizeof(TimeoutEntry));
+        assert(timeouts != NULL);
     }
     Timeout id = length;
     timeouts[id].time = getTime() + delay;

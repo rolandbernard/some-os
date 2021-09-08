@@ -1,4 +1,5 @@
 
+#include <assert.h>
 #include <stddef.h>
 #include <stdbool.h>
 #include <string.h>
@@ -40,6 +41,7 @@ void setInterruptFunction(ExternalInterrupt id, ExternalInterruptFunction functi
     if (capacity <= length) {
         capacity += 32;
         interrupts = krealloc(interrupts, capacity * sizeof(InterruptEntry));
+        assert(interrupts != NULL);
     }
     interrupts[length].id = id;
     interrupts[length].function = function;
