@@ -27,8 +27,8 @@ static Pid next_pid = 1;
 static SpinLock process_lock;
 static Process* global_first = NULL;
 
-void initTrapFrame(TrapFrame* frame, uintptr_t sp, uintptr_t gp, uintptr_t pc, HartFrame* hart, uintptr_t asid, PageTable* table) {
-    frame->hart = hart;
+void initTrapFrame(TrapFrame* frame, uintptr_t sp, uintptr_t gp, uintptr_t pc, uintptr_t asid, PageTable* table) {
+    frame->hart = NULL; // Set to NULL for now. Will be set when enqueuing
     frame->regs[REG_RETURN_ADDRESS] = (uintptr_t)exit;
     frame->regs[REG_STACK_POINTER] = sp;
     frame->regs[REG_GLOBAL_POINTER] = gp;
@@ -46,8 +46,7 @@ Process* createKernelProcess(void* start, Priority priority, size_t stack_size) 
     assert(process->stack != NULL);
     initTrapFrame(
         &process->frame, (uintptr_t)process->stack + stack_size,
-        (uintptr_t)getKernelGlobalPointer(), (uintptr_t)start, getCurrentHartFrame(), 0,
-        kernel_page_table
+        (uintptr_t)getKernelGlobalPointer(), (uintptr_t)start, 0, kernel_page_table
     );
     lockSpinLock(&process_lock); 
     process->global_next = global_first;
@@ -70,7 +69,7 @@ Process* createEmptyUserProcess(uintptr_t sp, uintptr_t gp, uintptr_t pc, Proces
     process->priority = priority;
     process->state = READY;
     process->stack = NULL;
-    initTrapFrame(&process->frame, sp, gp, pc, getCurrentHartFrame(), pid, process->table);
+    initTrapFrame(&process->frame, sp, gp, pc, pid, process->table);
     lockSpinLock(&process_lock); 
     process->global_next = global_first;
     if (global_first != NULL) {

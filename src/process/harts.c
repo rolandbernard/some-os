@@ -35,7 +35,7 @@ HartFrame* setupHartFrame() {
         unlockSpinLock(&hart_lock); 
         // Stack_top should be changed for all but the primary hart
         hart->stack_top = &__stack_top;
-        initTrapFrame(&hart->frame, (uintptr_t)&__stack_top, (uintptr_t)&__global_pointer, 0, NULL, 0, kernel_page_table);
+        initTrapFrame(&hart->frame, (uintptr_t)&__stack_top, (uintptr_t)&__global_pointer, 0, 0, kernel_page_table);
         writeSscratch(&hart->frame);
         hart->idle_process = createKernelProcess(idle, LOWEST_PRIORITY, IDLE_STACK_SIZE); // Every hart needs an idle process
         return hart;
