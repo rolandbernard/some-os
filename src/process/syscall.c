@@ -5,6 +5,7 @@
 #include <string.h>
 
 #include "interrupt/syscall.h"
+#include "interrupt/timer.h"
 #include "memory/kalloc.h"
 #include "memory/virtptr.h"
 #include "process/harts.h"
@@ -65,6 +66,29 @@ uintptr_t yieldSyscall(bool is_kernel, TrapFrame* frame, SyscallArgs args) {
     // Decrease priority to allow other processes to run
     // All other processes will be run at least once before running this one again
     process->sched_priority = LOWEST_PRIORITY;
+    return 0;
+}
+
+static void awakenFromSleep(Time time, void* udata) {
+    Process* process = (Process*)udata;
+    process->state = READY;
+    enqueueProcess(process);
+}
+
+uintptr_t sleepSyscall(bool is_kernel, TrapFrame* frame, SyscallArgs args) {
+    Time delay = args[0] * CLOCKS_PER_SEC / 1000000000UL; // Argument is in nanoseconds
+    if (frame->hart == NULL) {
+        // If this is not a process. Just loop.
+        Time end = getTime() + delay;
+        while (end > getTime()) {
+            // Wait for the time to come
+        }
+    } else {
+        // This is a process. We can put it into wait.
+        Process* process = (Process*)frame;
+        process->state = WAITING;
+        setTimeout(delay, awakenFromSleep, process);
+    }
     return 0;
 }
 

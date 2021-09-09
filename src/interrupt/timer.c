@@ -48,7 +48,7 @@ void clearTimeout(Timeout timeout) {
     unlockSpinLock(&timeout_lock);
 }
 
-static void setTimeCmp(Time time) {
+void setTimeCmp(Time time) {
     *(volatile Time*)(memory_map[VIRT_CLINT].base + 0x4000) = time;
 }
 

@@ -5,7 +5,7 @@
 
 #include "error/error.h"
 
-#define CLOCKS_PER_SEC 10000000 // 10Mhz
+#define CLOCKS_PER_SEC 10000000UL // 10Mhz
 
 typedef uint64_t Timeout;
 typedef uint64_t Time;
@@ -16,6 +16,8 @@ void initTimerInterrupt();
 void handleTimerInterrupt();
 
 Time getTime();
+
+void setTimeCmp(Time time);
 
 Timeout setTimeout(Time delay, TimeoutFunction function, void* udata);
 

@@ -8,6 +8,7 @@ typedef enum {
     SYSCALL_EXIT,
     SYSCALL_YIELD,
     SYSCALL_FORK,
+    SYSCALL_SLEEP,
 } Syscalls;
 
 // Simple wrapper around ecall

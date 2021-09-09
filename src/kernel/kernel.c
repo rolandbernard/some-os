@@ -14,24 +14,19 @@
 #include "memory/pagealloc.h"
 #include "memory/pagetable.h"
 #include "memory/virtmem.h"
+#include "process/harts.h"
 #include "process/process.h"
 #include "process/schedule.h"
 #include "interrupt/syscall.h"
 #include "kernel/init.h"
+#include "process/types.h"
 
-void kernelMain(int id) {
+void kernelMain() {
     // Just some testing code
-    KERNEL_LOG("Enter %i", id);
-    if (id < 10) {
-        if (syscall(SYSCALL_FORK) != 0) {
-            KERNEL_LOG("Child");
-            kernelMain(id + 1);
-        } else {
-            KERNEL_LOG("Parent");
-            kernelMain(id + 1);
-        }
+    for (uint64_t i = 0;; i++) {
+        syscall(SYSCALL_PRINT, "Hello, sleeping for %is\n", i);
+        syscall(SYSCALL_SLEEP, i * 1000000000UL);
     }
-    KERNEL_LOG("Exit %i", id);
     syscall(SYSCALL_EXIT);
 }
 
@@ -62,9 +57,7 @@ void kernelInit() {
         KERNEL_LOG("[+] Devices initialized");
     }
 
-    if (syscall(SYSCALL_FORK) != 0) {
-        kernelMain(0);
-    }
+    enqueueProcess(createKernelProcess(kernelMain, DEFAULT_PRIORITY, HART_STACK_SIZE));
     runNextProcess();
 }
 

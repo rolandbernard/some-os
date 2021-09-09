@@ -11,12 +11,12 @@
 #include "util/util.h"
 
 void enqueueProcess(Process* process) {
-    assert(process->frame.hart != NULL);
     HartFrame* hart = process->frame.hart;
     if (hart == NULL) {
         // Prefer the last hart of the process, but if NULL enqueue for the current
         hart = getCurrentHartFrame();
     }
+    assert(hart != NULL);
     ScheduleQueue* queue = &hart->queue;
     if (hart->idle_process != process) { // Ignore the idle process
         if (process->state == WAITING) {
