@@ -1,6 +1,9 @@
 
 #include <string.h>
+#include <assert.h>
 
+#include "error/panic.h"
+#include "memory/pagetable.h"
 #include "memory/virtptr.h"
 
 #include "memory/pagealloc.h"
@@ -79,6 +82,50 @@ void memsetVirtPtr(VirtPtr dest, int byte, size_t n) {
     getVirtPtrParts(dest, n, parts, count);
     for (size_t i = 0; i < count; i++) {
         memset(parts[i].address, byte, parts[i].length);
+    }
+}
+
+uint64_t readInt(VirtPtr addr, size_t size) {
+    assert(size == 8 || size == 16 || size == 32 || size == 64);
+    uintptr_t phys = virtToPhys(addr.table, addr.address);
+    assert(phys != 0);
+    if (size == 8) {
+        return *(uint8_t*)phys;
+    } else if (size == 16) {
+        return *(uint16_t*)phys;
+    } else if (size == 32) {
+        return *(uint32_t*)phys;
+    } else {
+        return *(uint64_t*)phys;
+    }
+}
+
+void writeInt(VirtPtr addr, size_t size, uint64_t value) {
+    assert(size == 8 || size == 16 || size == 32 || size == 64);
+    uintptr_t phys = virtToPhys(addr.table, addr.address);
+    assert(phys != 0);
+    if (size == 8) {
+        *(uint8_t*)phys = value;
+    } else if (size == 16) {
+        *(uint16_t*)phys = value;
+    } else if (size == 32) {
+        *(uint32_t*)phys = value;
+    } else {
+        *(uint64_t*)phys = value;
+    }
+}
+
+uint64_t readMisaligned(VirtPtr addr, size_t size) {
+    uint64_t ret = 0;
+    for (size_t i = 0; i < size; i += 8, addr.address++) {
+        ret |= readInt(addr, 8) << i;
+    }
+    return ret;
+}
+
+void writeMisaligned(VirtPtr addr, size_t size, uint64_t value) {
+    for (size_t i = 0; i < size; i += 8, addr.address++) {
+        writeInt(addr, 8, (value >> i) & 0xff);
     }
 }
 

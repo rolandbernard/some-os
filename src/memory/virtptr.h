@@ -29,4 +29,12 @@ void memcpyBetweenVirtPtr(VirtPtr dest, VirtPtr src, size_t n);
 
 void memsetVirtPtr(VirtPtr dest, int byte, size_t n);
 
+uint64_t readInt(VirtPtr addr, size_t size);
+
+void writeInt(VirtPtr addr, size_t size, uint64_t value);
+
+uint64_t readMisaligned(VirtPtr addr, size_t size);
+
+void writeMisaligned(VirtPtr addr, size_t size, uint64_t value);
+
 #endif
