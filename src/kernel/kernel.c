@@ -21,14 +21,8 @@
 #include "kernel/init.h"
 #include "process/types.h"
 
-void kernelMain() {
-    // Just some testing code
-    for (uint64_t i = 0;; i++) {
-        syscall(SYSCALL_PRINT, "Hello, sleeping for %is\n", i);
-        syscall(SYSCALL_SLEEP, i * 1000000000UL);
-    }
-    syscall(SYSCALL_EXIT);
-}
+void kernelMain();
+void testingCode();
 
 void kernelInit() {
     Error status;
@@ -40,13 +34,28 @@ void kernelInit() {
     } else {
         KERNEL_LOG("[+] Kernel started");
     }
-    // Initialize kernel systems
+    // Initialize basic kernel systems
+    status = initBasicSystems();
+    if (isError(status)) {
+        KERNEL_LOG("[!] Failed to initialize kernel: %s", getErrorMessage(status));
+        panic();
+    } else {
+        KERNEL_LOG("[+] Kernel scheduler initialized");
+    }
+
+    enqueueProcess(createKernelProcess(kernelMain, DEFAULT_PRIORITY, HART_STACK_SIZE));
+    runNextProcess();
+}
+
+void kernelMain() {
+    Error status;
+    // Initialize all kernel systems
     status = initAllSystems();
     if (isError(status)) {
         KERNEL_LOG("[!] Failed to initialize kernel: %s", getErrorMessage(status));
         panic();
     } else {
-        KERNEL_LOG("[+] Kernel initialized");
+        KERNEL_LOG("[+] Kernel completely initialized");
     }
     // Initialize devices
     status = initDevices();
@@ -56,8 +65,16 @@ void kernelInit() {
     } else {
         KERNEL_LOG("[+] Devices initialized");
     }
-
-    enqueueProcess(createKernelProcess(kernelMain, DEFAULT_PRIORITY, HART_STACK_SIZE));
-    runNextProcess();
+    testingCode();
 }
+
+void testingCode() {
+    // Just some testing code
+    for (uint64_t i = 0;; i++) {
+        syscall(SYSCALL_PRINT, "Hello, sleeping for %is\n", i);
+        syscall(SYSCALL_SLEEP, i * 1000000000UL);
+    }
+    syscall(SYSCALL_EXIT);
+}
+
 
