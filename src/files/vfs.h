@@ -125,10 +125,10 @@ typedef struct {
 Error initVirtualFileSystem();
 
 // This function will take ownership over the name variable
-void openNodeNamed(char* name, bool create, VfsFunctionCallbackNode callback, void* udata);
+void openNodeNamed(char* path, bool create, VfsFunctionCallbackNode callback, void* udata);
 
 // This is to be used for example for devices
-Error insertVirtualNode(char* name, VfsNode* file);
+Error insertVirtualNode(char* path, VfsNode* file);
 
 VfsVirtualDirectory* createVirtualDirectory();
 
