@@ -2,6 +2,7 @@
 #define _VFS_H_
 
 #include "error/error.h"
+#include "memory/virtptr.h"
 #include <stddef.h>
 #include <stdint.h>
 
@@ -42,8 +43,8 @@ typedef void (*VfsFunctionCallbackStat)(Error error, VfsStat stat, void* udata);
 
 typedef void (*TellFunction)(struct VfsFile_s* file, VfsFunctionCallbackSizeT callback, void* udata);
 typedef void (*SeekFunction)(struct VfsFile_s* file, size_t offset, VfsFileSeekFlags flags, VfsFunctionCallbackVoid callback, void* udata);
-typedef void (*ReadFunction)(struct VfsFile_s* file, void* buffer, size_t size, VfsFunctionCallbackSizeT callback, void* udata);
-typedef void (*WriteFunction)(struct VfsFile_s* file, void* buffer, size_t size, VfsFunctionCallbackSizeT callback, void* udata);
+typedef void (*ReadFunction)(struct VfsFile_s* file, VirtPtr buffer, size_t size, VfsFunctionCallbackSizeT callback, void* udata);
+typedef void (*WriteFunction)(struct VfsFile_s* file, VirtPtr buffer, size_t size, VfsFunctionCallbackSizeT callback, void* udata);
 typedef void (*CloseFunction)(struct VfsFile_s* file, VfsFunctionCallbackVoid callback, void* udata);
 typedef void (*DeleteFunction)(struct VfsFile_s* file, VfsFunctionCallbackVoid callback, void* udata);
 typedef void (*StatFileFunction)(struct VfsFile_s* file, VfsFunctionCallbackStat callback, void* udata);

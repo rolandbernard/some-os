@@ -12,6 +12,7 @@ typedef enum {
     UNSUPPORTED,
     NOT_INITIALIZED,
     IO_ERROR,
+    ILLEGAL_ARGUMENTS,
 } ErrorKind;
 
 typedef struct {
