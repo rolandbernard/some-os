@@ -37,4 +37,8 @@ uint64_t readMisaligned(VirtPtr addr, size_t size);
 
 void writeMisaligned(VirtPtr addr, size_t size, uint64_t value);
 
+size_t strlenVirtPtr(VirtPtr str);
+
+void strcpyVirtPtr(VirtPtr dest, VirtPtr src);
+
 #endif

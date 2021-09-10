@@ -30,6 +30,9 @@ size_t getVirtPtrParts(VirtPtr addr, size_t length, VirtPtrBufferPart* parts, si
     while (part_position < addr.address + length) {
         next_position = (next_position + PAGE_SIZE) & -PAGE_SIZE;
         uintptr_t phys_start = virtToPhys(addr.table, part_position);
+        if (phys_start == 0) {
+            return part_index;
+        }
         uintptr_t phys_end = virtToPhys(addr.table, next_position);
         if (phys_end - phys_start != next_position - part_position || next_position > addr.address + length) {
             if (part_index < max_parts) {
@@ -88,7 +91,6 @@ void memsetVirtPtr(VirtPtr dest, int byte, size_t n) {
 uint64_t readInt(VirtPtr addr, size_t size) {
     assert(size == 8 || size == 16 || size == 32 || size == 64);
     uintptr_t phys = virtToPhys(addr.table, addr.address);
-    assert(phys != 0);
     if (size == 8) {
         return *(uint8_t*)phys;
     } else if (size == 16) {
@@ -103,7 +105,6 @@ uint64_t readInt(VirtPtr addr, size_t size) {
 void writeInt(VirtPtr addr, size_t size, uint64_t value) {
     assert(size == 8 || size == 16 || size == 32 || size == 64);
     uintptr_t phys = virtToPhys(addr.table, addr.address);
-    assert(phys != 0);
     if (size == 8) {
         *(uint8_t*)phys = value;
     } else if (size == 16) {
@@ -127,5 +128,19 @@ void writeMisaligned(VirtPtr addr, size_t size, uint64_t value) {
     for (size_t i = 0; i < size; i += 8, addr.address++) {
         writeInt(addr, 8, (value >> i) & 0xff);
     }
+}
+
+size_t strlenVirtPtr(VirtPtr str) {
+    size_t length = 0;
+    while (readInt(str, 8) != 0) {
+        str.address++;
+        length++;
+    }
+    return length;
+}
+
+void strcpyVirtPtr(VirtPtr dest, VirtPtr src) {
+    size_t length = strlenVirtPtr(src);
+    memcpyBetweenVirtPtr(dest, src, length + 1);
 }
 
