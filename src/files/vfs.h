@@ -5,19 +5,13 @@
 #include <stddef.h>
 #include <stdint.h>
 
-typedef struct {
-    bool directory : 1;
-    bool read : 1;
-    bool write : 1;
-    bool execute : 1;
-    bool tty : 1;
-} VfsNodeFlags;
-
-#define VFS_BASE_NODE \
-    VfsNodeFlags flags;
+typedef enum {
+    VFS_NODE_REGULAR,
+    VFS_NODE_DIRECTORY,
+} VfsNodeKind;
 
 typedef struct {
-    VFS_BASE_NODE;
+    VfsNodeKind kind;
 } VfsNode;
 
 struct VfsFile_s;
@@ -28,15 +22,30 @@ typedef enum {
     VFS_SEEK_END,
 } VfsFileSeekFlags;
 
+typedef struct {
+    size_t id;
+    uint16_t mode;
+    size_t nlinks;
+    uint64_t uid;
+    uint64_t gid;
+    size_t size;
+    size_t block_size;
+    uint64_t st_atime;
+    uint64_t st_mtime;
+    uint64_t st_ctime;
+} VfsStat;
+
 typedef void (*VfsFunctionCallbackVoid)(Error error, void* udata);
 typedef void (*VfsFunctionCallbackSizeT)(Error error, size_t size, void* udata);
+typedef void (*VfsFunctionCallbackStat)(Error error, VfsStat stat, void* udata);
 
 typedef void (*TellFunction)(struct VfsFile_s* file, VfsFunctionCallbackSizeT callback, void* udata);
 typedef void (*SeekFunction)(struct VfsFile_s* file, size_t offset, VfsFileSeekFlags flags, VfsFunctionCallbackVoid callback, void* udata);
 typedef void (*ReadFunction)(struct VfsFile_s* file, void* buffer, size_t size, VfsFunctionCallbackSizeT callback, void* udata);
 typedef void (*WriteFunction)(struct VfsFile_s* file, void* buffer, size_t size, VfsFunctionCallbackSizeT callback, void* udata);
 typedef void (*CloseFunction)(struct VfsFile_s* file, VfsFunctionCallbackVoid callback, void* udata);
-typedef void (*SizeFunction)(struct VfsFile_s* file, VfsFunctionCallbackSizeT callback, void* udata);
+typedef void (*DeleteFunction)(struct VfsFile_s* file, VfsFunctionCallbackVoid callback, void* udata);
+typedef void (*StatFileFunction)(struct VfsFile_s* file, VfsFunctionCallbackStat callback, void* udata);
 
 typedef struct {
     ReadFunction read;
@@ -44,12 +53,12 @@ typedef struct {
     SeekFunction seek;
     TellFunction tell;
     CloseFunction close;
-    SizeFunction size;
+    DeleteFunction delete;
+    StatFileFunction stat;
 } VfsFileVtable;
 
 typedef struct VfsFile_s {
-    VFS_BASE_NODE;
-    size_t block_size; // 0 means this is a character device
+    VfsNode base;
     const VfsFileVtable* functions;
 } VfsFile;
 
@@ -64,21 +73,52 @@ typedef void (*VfsFunctionCallbackEntry)(Error error, VfsDirectoryEntry* entry, 
 typedef void (*VfsFunctionCallbackNode)(Error error, VfsNode* entry, void* udata);
 
 typedef void (*OpenFunction)(struct VfsDirectory_s* dir, size_t id, VfsFunctionCallbackNode callback, void* udata);
+typedef void (*UnlinkFunction)(struct VfsDirectory_s* dir, size_t id, VfsFunctionCallbackVoid callback, void* udata);
 typedef void (*ReadDirFunction)(struct VfsDirectory_s* dir, VfsFunctionCallbackEntry callback, void* udata);
+typedef void (*ResetFunction)(struct VfsDirectory_s* dir, VfsFunctionCallbackVoid callback, void* udata);
+typedef void (*CreateFunction)(struct VfsDirectory_s* dir, char* name, VfsFunctionCallbackSizeT callback, void* udata);
+typedef void (*StatDirFunction)(struct VfsDirectory_s* file, VfsFunctionCallbackStat callback, void* udata);
 
 typedef struct {
-    ReadFunction open;
-    WriteFunction write;
+    OpenFunction open;
+    ReadDirFunction read_dir;
+    ResetFunction reset;
+    CreateFunction create;
+    StatDirFunction stat;
 } VfsDirectoryVtable;
 
 typedef struct VfsDirectory_s {
-    VFS_BASE_NODE;
+    VfsNode base;
     const VfsDirectoryVtable* functions;
 } VfsDirectory;
+
+typedef struct {
+    char* name;
+    VfsNode* node;
+} VfsVirtualDirectoryEntry;
+
+typedef struct {
+    VfsDirectory base;
+    size_t count;
+    VfsVirtualDirectoryEntry* entries;
+} VfsVirtualDirectory;
+
+typedef struct {
+    VfsFile base;
+    size_t count;
+    VfsVirtualDirectoryEntry* entries;
+} VfsVirtualFile;
 
 Error initVirtualFileSystem();
 
 // This function will take ownership over the name variable
-void openNodeNamed(char* name, VfsFunctionCallbackNode callback, void* udata);
+void openNodeNamed(char* name, bool create, VfsFunctionCallbackNode callback, void* udata);
+
+// This is to be used for example for devices
+void insertVirtualNode(char* name, VfsNode* file);
+
+VfsVirtualDirectory* createVirtualDirectory();
+
+VfsVirtualFile* createVirtualFile();
 
 #endif
