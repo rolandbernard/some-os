@@ -6,8 +6,9 @@
 #include <stdint.h>
 
 typedef enum {
-    VFS_NODE_REGULAR,
     VFS_NODE_DIRECTORY,
+    VFS_NODE_REGULAR,
+    VFS_NODE_BLOCK,
 } VfsNodeKind;
 
 typedef struct {
@@ -78,12 +79,17 @@ typedef void (*ReadDirFunction)(struct VfsDirectory_s* dir, VfsFunctionCallbackE
 typedef void (*ResetFunction)(struct VfsDirectory_s* dir, VfsFunctionCallbackVoid callback, void* udata);
 typedef void (*CreateFunction)(struct VfsDirectory_s* dir, char* name, VfsFunctionCallbackSizeT callback, void* udata);
 typedef void (*StatDirFunction)(struct VfsDirectory_s* file, VfsFunctionCallbackStat callback, void* udata);
+typedef void (*CloseDirFunction)(struct VfsDirectory_s* file, VfsFunctionCallbackVoid callback, void* udata);
+typedef void (*DeleteDirFunction)(struct VfsDirectory_s* file, VfsFunctionCallbackVoid callback, void* udata);
 
 typedef struct {
-    OpenFunction open;
-    ReadDirFunction read_dir;
-    ResetFunction reset;
     CreateFunction create;
+    OpenFunction open;
+    UnlinkFunction unlink;
+    ResetFunction reset;
+    ReadDirFunction readdir;
+    CloseDirFunction close;
+    DeleteDirFunction delete;
     StatDirFunction stat;
 } VfsDirectoryVtable;
 
@@ -92,21 +98,27 @@ typedef struct VfsDirectory_s {
     const VfsDirectoryVtable* functions;
 } VfsDirectory;
 
-typedef struct {
-    char* name;
-    VfsNode* node;
-} VfsVirtualDirectoryEntry;
+struct VfsVirtualDirectory_s;
 
 typedef struct {
+    char* name;
+    struct VfsVirtualDirectory_s* node;
+} VfsVirtualDirectoryEntry;
+
+typedef struct VfsVirtualDirectory_s {
     VfsDirectory base;
-    size_t count;
+    VfsStat stats;
+    size_t parallel_count;
+    VfsNode* parallel;
+    size_t entry_count;
     VfsVirtualDirectoryEntry* entries;
 } VfsVirtualDirectory;
 
 typedef struct {
     VfsFile base;
-    size_t count;
-    VfsVirtualDirectoryEntry* entries;
+    VfsStat stats;
+    size_t size;
+    uint8_t* data;
 } VfsVirtualFile;
 
 Error initVirtualFileSystem();
@@ -115,7 +127,7 @@ Error initVirtualFileSystem();
 void openNodeNamed(char* name, bool create, VfsFunctionCallbackNode callback, void* udata);
 
 // This is to be used for example for devices
-void insertVirtualNode(char* name, VfsNode* file);
+Error insertVirtualNode(char* name, VfsNode* file);
 
 VfsVirtualDirectory* createVirtualDirectory();
 

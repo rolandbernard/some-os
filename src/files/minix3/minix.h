@@ -3,6 +3,8 @@
 
 #include <stdint.h>
 
+#include "files/vfs.h"
+
 #define MINIX_MAGIC 0x4d5a
 #define BLOCK_SIZE 1024
 #define NUM_IPTRS BLOCK_SIZE / 4
@@ -41,5 +43,13 @@ typedef struct {
     uint32_t inode;
     uint8_t name[60];
 } DirEntry;
+
+typedef struct { // A file system is basically just a directory
+    VfsDirectory base;
+    MinixSuperblock superblock;
+    VfsFile* block_device;
+} MinixFilesystem;
+
+MinixFilesystem* createMinixFilesystem(VfsFile* block_device);
 
 #endif
