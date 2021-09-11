@@ -85,22 +85,34 @@ typedef enum {
 
 typedef uint64_t Pid;
 typedef uint8_t Priority;
+typedef uint64_t Uid;
+typedef uint64_t Gid;
 
 typedef struct Process_s {
     TrapFrame frame;
-    uint64_t status; // This is the status returned from wait
+
+    // General
     Pid pid;
-    PageTable* table;
-    Priority priority;
-    Priority sched_priority; // Is a maximum of priority, but will be decreased over time
-    ProcessState state;
-    void* stack; // This is only used for a kernel process
     struct Process_s* parent;
     struct Process_s* children;
     struct Process_s* child_next;
-    struct Process_s* sched_next; // Used for ready and waiting lists
     struct Process_s* global_next; // Used for list off every process
     struct Process_s* global_prev;
+    uint64_t status; // This is the status returned from wait
+
+    // Scheduling
+    Priority priority;
+    Priority sched_priority; // Is a maximum of priority, but will be decreased over time
+    ProcessState state;
+    struct Process_s* sched_next; // Used for ready and waiting lists
+
+    // Memory
+    PageTable* table;
+    void* stack; // This is only used for a kernel process
+
+    // Resources
+    Uid uid;
+    Gid gid;
 } Process;
 
 #endif
