@@ -7,13 +7,15 @@
 
 typedef enum {
     SUCCESS = 0,
+    UNKNOWN,
 
-    NO_DATA,
-    UNSUPPORTED,
-    NOT_INITIALIZED,
-    IO_ERROR,
+    ALREADY_IN_USE,
     ILLEGAL_ARGUMENTS,
+    IO_ERROR,
+    NOT_INITIALIZED,
+    NO_DATA,
     NO_SUCH_FILE,
+    UNSUPPORTED,
     WRONG_FILE_TYPE,
 } ErrorKind;
 

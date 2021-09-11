@@ -1,14 +1,15 @@
 
 #include "devices/virtio/block.h"
+#include "error/error.h"
 #include "interrupt/plic.h"
 #include "memory/kalloc.h"
 #include "util/spinlock.h"
 
 static void handleInterrupt(ExternalInterrupt id, void* udata) {
-    freePendingRequests((VirtIOBlockDevice*)udata);
+    virtIOBlockFreePendingRequests((VirtIOBlockDevice*)udata);
 }
 
-Error initBlockDevice(int id, volatile VirtIODeviceLayout* base, VirtIODevice** output) {
+Error initVirtIOBlockDevice(int id, volatile VirtIODeviceLayout* base, VirtIODevice** output) {
     VirtIOBlockDevice* device = zalloc(sizeof(VirtIOBlockDevice));
     assert(device != NULL);
     device->virtio.type = base->device_id;
@@ -37,7 +38,7 @@ Error initBlockDevice(int id, volatile VirtIODeviceLayout* base, VirtIODevice** 
     return simpleError(SUCCESS);
 }
 
-Error blockDeviceOperation(
+Error virtIOBlockDeviceOperation(
     VirtIOBlockDevice* device, VirtPtr buffer, uint32_t offset, uint32_t size, bool write,
     VirtIOBlockCallback callback, void* udata
 ) {
@@ -67,7 +68,7 @@ Error blockDeviceOperation(
     return simpleError(SUCCESS);
 }
 
-void freePendingRequests(VirtIOBlockDevice* device) {
+void virtIOBlockFreePendingRequests(VirtIOBlockDevice* device) {
     lockSpinLock(&device->lock);
     while (device->virtio.ack_index != device->virtio.queue->used.index) {
         VirtIOUsedElement elem = device->virtio.queue->used.ring[device->virtio.ack_index];
@@ -76,7 +77,22 @@ void freePendingRequests(VirtIOBlockDevice* device) {
             if (device->requests[i] != NULL && device->requests[i]->head == elem.id) {
                 VirtIOBlockRequest* request = device->requests[i];
                 device->requests[i] = NULL;
-                request->callback(request->status.status, request->udata);
+                Error error;
+                switch (request->status.status) {
+                    case VIRTIO_BLOCK_S_OK:
+                        error = simpleError(SUCCESS);
+                        break;
+                    case VIRTIO_BLOCK_S_IOERR:
+                        error = simpleError(IO_ERROR);
+                        break;
+                    case VIRTIO_BLOCK_S_UNSUPP:
+                        error = simpleError(UNSUPPORTED);
+                        break;
+                    case VIRTIO_BLOCK_S_UNKNOWN:
+                        error = simpleError(UNKNOWN);
+                        break;
+                }
+                request->callback(error, request->udata);
                 dealloc(request);
                 break;
             }
