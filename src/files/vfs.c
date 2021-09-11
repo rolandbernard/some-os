@@ -104,27 +104,44 @@ Error umount(VirtualFilesystem* fs, const char* from) {
     return simpleError(SUCCESS);
 }
 
-void vfsOpen(VirtualFilesystem* fs, Uid uid, Gid gid, const char* path, VfsOpenFlags flags, VfsMode mode, VfsFunctionCallbackFile callback, void* udata) {
+static void internalVfsOpen(VirtualFilesystem* fs, Uid uid, Gid gid, char* path, VfsOpenFlags flags, VfsMode mode, VfsFunctionCallbackFile callback, void* udata) {
     lockSpinLock(&fs->lock);
     for (size_t i = fs->mount_count; i != 0;) {
         i--;
-        if (strncmp(fs->mounts[i].path, path, strlen(fs->mounts[i].path)) == 0) {
-            /* switch (fs->mounts[i].type) { */
-            /*     case MOUNT_TYPE_FILE: { */
-            /*         VfsFile* file = (VfsFile*)fs->mounts[i].data; */
-            /*         unlockSpinLock(&fs->lock); */
-            /*         file->functions->dup(file, uid, gid, callback, udata); */
-            /*         return; */
-            /*     } */
-            /*     case MOUNT_TYPE_FS: { */
-            /*         VfsFilesystem* filesystem = (VfsFilesystem*)fs->mounts[i].data; */
-            /*         filesystem->functions->open(filesystem, uid, gid); */
-            /*         break; */
-            /*     } */
-            /*     case MOUNT_TYPE_BIND: */
-            /*         dealloc(mount->data); */
-            /*         break; */
-            /* } */
+        const char* mount_path = fs->mounts[i].path;
+        size_t mount_path_length = strlen(mount_path);
+        if (strncmp(mount_path, path, mount_path_length) == 0 && (path[mount_path_length] == 0 || path[mount_path_length] == '/')) {
+            switch (fs->mounts[i].type) {
+                case MOUNT_TYPE_FILE: {
+                    VfsFile* file = (VfsFile*)fs->mounts[i].data;
+                    unlockSpinLock(&fs->lock);
+                    file->functions->dup(file, uid, gid, callback, udata);
+                    dealloc(path);
+                    return;
+                }
+                case MOUNT_TYPE_FS: {
+                    VfsFilesystem* filesystem = (VfsFilesystem*)fs->mounts[i].data;
+                    unlockSpinLock(&fs->lock);
+                    filesystem->functions->open(filesystem, uid, gid, path, flags, mode, callback, udata);
+                    dealloc(path);
+                    return;
+                }
+                case MOUNT_TYPE_BIND: {
+                    const char* new_path = (const char*)fs->mounts[i].data;
+                    size_t new_path_length = strlen(new_path);
+                    size_t path_length = strlen(path) - mount_path_length;
+                    char* compined = kalloc(new_path_length + path_length + 2);
+                    memcpy(compined, new_path, new_path_length);
+                    compined[new_path_length] = '/';
+                    memcpy(compined + new_path_length + 1, path + mount_path_length, path_length);
+                    compined[new_path_length + path_length + 1] = '/';
+                    dealloc(path);
+                    path = compined;
+                    inlineReducePath(path);
+                    // Continue searching for the complete path
+                    break;
+                }
+            }
         }
     }
     unlockSpinLock(&fs->lock);
@@ -133,6 +150,12 @@ void vfsOpen(VirtualFilesystem* fs, Uid uid, Gid gid, const char* path, VfsOpenF
     } else {
         callback(simpleError(NO_SUCH_FILE), NULL, udata);
     }
+    dealloc(path);
+}
+
+void vfsOpen(VirtualFilesystem* fs, Uid uid, Gid gid, const char* path, VfsOpenFlags flags, VfsMode mode, VfsFunctionCallbackFile callback, void* udata) {
+    char* path_copy = reducedPathCopy(path);
+    internalVfsOpen(fs, uid, gid, path_copy, flags, mode, callback, udata);
 }
 
 void vfsUnlink(VirtualFilesystem* fs, Uid uid, Gid gid, const char* path, VfsFunctionCallbackVoid callback, void* udata);
