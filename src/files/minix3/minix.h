@@ -4,6 +4,7 @@
 #include <stdint.h>
 
 #include "files/vfs.h"
+#include "util/spinlock.h"
 
 #define MINIX_MAGIC 0x4d5a
 #define BLOCK_SIZE 1024
@@ -44,8 +45,9 @@ typedef struct {
     uint8_t name[60];
 } DirEntry;
 
-typedef struct { // A file system is basically just a directory
-    VfsDirectory base;
+typedef struct {
+    VfsFilesystem base;
+    SpinLock lock;
     MinixSuperblock superblock;
     VfsFile* block_device;
 } MinixFilesystem;

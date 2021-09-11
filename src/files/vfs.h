@@ -1,161 +1,144 @@
 #ifndef _VFS_H_
 #define _VFS_H_
 
-#include "error/error.h"
-#include "memory/virtptr.h"
-#include "util/spinlock.h"
 #include <stddef.h>
 #include <stdint.h>
 
-typedef enum {
-    VFS_NODE_DIRECTORY,
-    VFS_NODE_REGULAR,
-    VFS_NODE_BLOCK,
-} VfsNodeKind;
-
-struct VfsNode_s;
-
-typedef void (*VfsFunctionCallbackVoid)(Error error, void* udata);
-
-typedef void (*CloseFunction)(struct VfsNode_s* node, VfsFunctionCallbackVoid callback, void* udata);
-typedef void (*DeleteFunction)(struct VfsNode_s* node, VfsFunctionCallbackVoid callback, void* udata);
-
-#define VFS_NODE_BASE_FUNCTIONS \
-    CloseFunction close; \
-    DeleteFunction delete;
-
-typedef struct {
-    VFS_NODE_BASE_FUNCTIONS;
-} VfsCommonVtable;
-
-#define VFS_NODE_BASE \
-    VfsNodeKind kind; \
-    bool virtual;
-
-typedef struct VfsNode_s {
-    VFS_NODE_BASE;
-    const VfsCommonVtable* functions;
-} VfsNode;
-
-struct VfsFile_s;
+#include "error/error.h"
+#include "memory/virtptr.h"
+#include "process/types.h"
+#include "util/spinlock.h"
+#include "interrupt/timer.h"
 
 typedef enum {
-    VFS_SEEK_SET,
-    VFS_SEEK_CUR,
-    VFS_SEEK_END,
-} VfsFileSeekFlags;
+    VFS_TYPE_UNKNOWN = 0,
+    VFS_TYPE_DIR = 1,
+    VFS_TYPE_REG = 2,
+    VFS_TYPE_BLOCK = 3,
+} VfsFileType;
+
+typedef enum {
+    VFS_SEEK_CUR = 0,
+    VFS_SEEK_SET = 1,
+    VFS_SEEK_END = 2,
+} VfsSeekWhence;
+
+typedef enum {
+    VFS_OPEN_CREATE = (1 << 0),
+    VFS_OPEN_APPEND = (1 << 1),
+    VFS_OPEN_TRUNC = (1 << 2),
+    VFS_OPEN_DIRECTORY = (1 << 3),
+    VFS_OPEN_NOATIME = (1 << 4),
+} VfsOpenFlags;
+
+typedef uint16_t VfsMode;
 
 typedef struct {
     size_t id;
-    uint16_t mode;
+    VfsMode mode;
     size_t nlinks;
-    uint64_t uid;
-    uint64_t gid;
+    Uid uid;
+    Gid gid;
     size_t size;
     size_t block_size;
-    uint64_t st_atime;
-    uint64_t st_mtime;
-    uint64_t st_ctime;
+    Time st_atime;
+    Time st_mtime;
+    Time st_ctime;
 } VfsStat;
-
-typedef void (*VfsFunctionCallbackSizeT)(Error error, size_t size, void* udata);
-typedef void (*VfsFunctionCallbackStat)(Error error, VfsStat stat, void* udata);
-
-typedef void (*TellFunction)(struct VfsFile_s* file, VfsFunctionCallbackSizeT callback, void* udata);
-typedef void (*SeekFunction)(struct VfsFile_s* file, size_t offset, VfsFileSeekFlags flags, VfsFunctionCallbackVoid callback, void* udata);
-typedef void (*ReadFunction)(struct VfsFile_s* file, VirtPtr buffer, size_t size, VfsFunctionCallbackSizeT callback, void* udata);
-typedef void (*WriteFunction)(struct VfsFile_s* file, VirtPtr buffer, size_t size, VfsFunctionCallbackSizeT callback, void* udata);
-typedef void (*StatFileFunction)(struct VfsFile_s* file, VfsFunctionCallbackStat callback, void* udata);
-
-typedef struct {
-    VFS_NODE_BASE_FUNCTIONS;
-    ReadFunction read;
-    WriteFunction write;
-    SeekFunction seek;
-    TellFunction tell;
-    StatFileFunction stat;
-} VfsFileVtable;
-
-typedef struct VfsFile_s {
-    VFS_NODE_BASE;
-    const VfsFileVtable* functions;
-} VfsFile;
-
-struct VfsDirectory_s;
 
 typedef struct {
     size_t id;
+    size_t off;
+    size_t len;
+    VfsFileType type;
     char name[];
 } VfsDirectoryEntry;
 
-typedef void (*VfsFunctionCallbackEntry)(Error error, VfsDirectoryEntry* entry, void* udata);
-typedef void (*VfsFunctionCallbackNode)(Error error, VfsNode* entry, void* udata);
+struct VfsFile_s;
 
-typedef void (*OpenFunction)(struct VfsDirectory_s* dir, const char*, VfsFunctionCallbackNode callback, void* udata);
-typedef void (*UnlinkFunction)(struct VfsDirectory_s* dir, const char*, VfsFunctionCallbackVoid callback, void* udata);
-typedef void (*ReadDirFunction)(struct VfsDirectory_s* dir, VfsFunctionCallbackEntry callback, void* udata);
-typedef void (*ResetFunction)(struct VfsDirectory_s* dir, VfsFunctionCallbackVoid callback, void* udata);
-typedef void (*CreateDirFunction)(struct VfsDirectory_s* dir, const char*, VfsFunctionCallbackSizeT callback, void* udata);
-typedef void (*CreateFileFunction)(struct VfsDirectory_s* dir, const char*, VfsFunctionCallbackSizeT callback, void* udata);
-typedef void (*StatDirFunction)(struct VfsDirectory_s* file, VfsFunctionCallbackStat callback, void* udata);
+typedef void (*VfsFunctionCallbackVoid)(Error error, void* udata);
+typedef void (*VfsFunctionCallbackSizeT)(Error error, size_t size, void* udata);
+typedef void (*VfsFunctionCallbackStat)(Error error, VfsStat stat, void* udata);
 
-typedef struct {
-    VFS_NODE_BASE_FUNCTIONS;
-    CreateDirFunction createdir;
-    CreateFileFunction createfile;
-    OpenFunction open;
-    UnlinkFunction unlink;
-    ResetFunction reset;
-    ReadDirFunction readdir;
-    StatDirFunction stat;
-} VfsDirectoryVtable;
-
-typedef struct VfsDirectory_s {
-    VFS_NODE_BASE;
-    const VfsDirectoryVtable* functions;
-} VfsDirectory;
+typedef void (*SeekFunction)(struct VfsFile_s* file, Uid uid, Gid gid, size_t offset, VfsSeekWhence whence, VfsFunctionCallbackSizeT callback, void* udata);
+typedef void (*ReadFunction)(struct VfsFile_s* file, Uid uid, Gid gid, VirtPtr buffer, size_t size, VfsFunctionCallbackSizeT callback, void* udata);
+typedef void (*WriteFunction)(struct VfsFile_s* file, Uid uid, Gid gid, VirtPtr buffer, size_t size, VfsFunctionCallbackSizeT callback, void* udata);
+typedef void (*StatFileFunction)(struct VfsFile_s* file, Uid uid, Gid gid, VfsFunctionCallbackStat callback, void* udata);
+typedef void (*CloseFunction)(struct VfsFile_s* file, Uid uid, Gid gid, VfsFunctionCallbackVoid callback, void* udata);
 
 typedef struct {
-    char* name;
-    VfsNode* node;
-} VfsVirtualDirectoryEntry;
+    SeekFunction seek;
+    ReadFunction read;
+    WriteFunction write;
+    CloseFunction close;
+    StatFileFunction stat;
+} VfsFileVtable;
 
-typedef struct VfsVirtualDirectory_s {
-    VfsDirectory base;
-    SpinLock lock;
-    VfsStat stats;
-    VfsDirectory* mount;
-    size_t entry_count;
-    VfsVirtualDirectoryEntry* entries;
-    size_t read_head;
-} VfsVirtualDirectory;
+typedef struct VfsNode_s {
+    VfsFileVtable* functions;
+} VfsFile;
 
-typedef struct {
-    VfsFile base;
-    SpinLock lock;
-    VfsStat stats;
-    size_t size;
-    uint8_t* data;
-} VfsVirtualFile;
-
-Error initVirtualFileSystem();
+struct VfsFilesystem_s;
 
 typedef void (*VfsFunctionCallbackFile)(Error error, VfsFile* entry, void* udata);
 
-typedef void (*VfsFunctionCallbackDirectory)(Error error, VfsDirectory* entry, void* udata);
+typedef void (*OpenFunction)(struct VfsFilesystem_s* fs, Uid uid, Gid gid, const char* path, VfsOpenFlags flags, VfsMode mode, VfsFunctionCallbackFile callback, void* udata);
+typedef void (*UnlinkFunction)(struct VfsFilesystem_s* fs, Uid uid, Gid gid, const char* path, VfsFunctionCallbackVoid callback, void* udata);
+typedef void (*LinkFunction)(struct VfsFilesystem_s* fs, Uid uid, Gid gid, const char* old, const char* new, VfsFunctionCallbackVoid callback, void* udata);
+typedef void (*RenameFunction)(struct VfsFilesystem_s* fs, Uid uid, Gid gid, const char* old, const char* new, VfsFunctionCallbackVoid callback, void* udata);
 
-// These functions will take ownership over the path variable and free it using dealloc
-void openFileNamed(char* path, bool create, VfsFunctionCallbackFile callback, void* udata);
+typedef struct {
+    OpenFunction open;
+    UnlinkFunction unlink;
+    LinkFunction link;
+    RenameFunction rename;
+} VfsFilesystemVtable;
 
-void openDirectoryNamed(char* path, bool create, VfsFunctionCallbackDirectory callback, void* udata);
+typedef struct VfsFilesystem_s {
+    const VfsFilesystemVtable* functions;
+} VfsFilesystem;
 
-void openNodeNamed(char* path, bool create, VfsFunctionCallbackNode callback, void* udata);
+typedef enum {
+    MOUNT_TYPE_FS,
+    MOUNT_TYPE_FILE,
+    MOUNT_TYPE_BIND,
+} FilesystemMountType;
 
-// This is to be used for example for devices
-Error insertVirtualNode(char* path, VfsNode* file);
+typedef struct {
+    FilesystemMountType type;
+    char* from;
+    void* to;
+} FilesystemMount;
 
-VfsVirtualDirectory* createVirtualDirectory();
+typedef struct VirtualFilesystem_s {
+    struct VirtualFilesystem_s* parent;
+    SpinLock lock;
+    size_t mount_count;
+    FilesystemMount* mounts;
+} VirtualFilesystem;
 
-VfsVirtualFile* createVirtualFile();
+extern VirtualFilesystem global_file_system;
+
+Error initVirtualFileSystem();
+
+VirtualFilesystem* createVirtualFilesystem();
+
+void freeVirtualFilesystem(VirtualFilesystem* fs);
+
+Error mountFilesystem(VirtualFilesystem* fs, VfsFilesystem* filesystem, const char* path);
+
+Error mountFile(VirtualFilesystem* fs, VfsFile* file, const char* path);
+
+Error mountRedirect(VirtualFilesystem* fs, const char* from, const char* to);
+
+Error umount(VirtualFilesystem* fs, const char* from);
+
+void vfsOpen(VirtualFilesystem* fs, Uid uid, Gid gid, const char* path, VfsOpenFlags flags, VfsMode mode, VfsFunctionCallbackFile callback, void* udata);
+
+void vfsUnlink(VirtualFilesystem* fs, Uid uid, Gid gid, const char* path, VfsFunctionCallbackVoid callback, void* udata);
+
+void vfsLink(VirtualFilesystem* fs, Uid uid, Gid gid, const char* old, const char* new, VfsFunctionCallbackVoid callback, void* udata);
+
+void vfsRename(VirtualFilesystem* fs, Uid uid, Gid gid, const char* old, const char* new, VfsFunctionCallbackVoid callback, void* udata);
 
 #endif
