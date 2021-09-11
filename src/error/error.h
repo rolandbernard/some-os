@@ -13,6 +13,8 @@ typedef enum {
     NOT_INITIALIZED,
     IO_ERROR,
     ILLEGAL_ARGUMENTS,
+    NO_SUCH_FILE,
+    WRONG_FILE_TYPE,
 } ErrorKind;
 
 typedef struct {

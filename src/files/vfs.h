@@ -3,6 +3,7 @@
 
 #include "error/error.h"
 #include "memory/virtptr.h"
+#include "util/spinlock.h"
 #include <stddef.h>
 #include <stdint.h>
 
@@ -12,8 +13,28 @@ typedef enum {
     VFS_NODE_BLOCK,
 } VfsNodeKind;
 
+struct VfsNode_s;
+
+typedef void (*VfsFunctionCallbackVoid)(Error error, void* udata);
+
+typedef void (*CloseFunction)(struct VfsNode_s* node, VfsFunctionCallbackVoid callback, void* udata);
+typedef void (*DeleteFunction)(struct VfsNode_s* node, VfsFunctionCallbackVoid callback, void* udata);
+
+#define VFS_NODE_BASE_FUNCTIONS \
+    CloseFunction close; \
+    DeleteFunction delete;
+
 typedef struct {
-    VfsNodeKind kind;
+    VFS_NODE_BASE_FUNCTIONS;
+} VfsCommonVtable;
+
+#define VFS_NODE_BASE \
+    VfsNodeKind kind; \
+    bool virtual;
+
+typedef struct VfsNode_s {
+    VFS_NODE_BASE;
+    const VfsCommonVtable* functions;
 } VfsNode;
 
 struct VfsFile_s;
@@ -37,7 +58,6 @@ typedef struct {
     uint64_t st_ctime;
 } VfsStat;
 
-typedef void (*VfsFunctionCallbackVoid)(Error error, void* udata);
 typedef void (*VfsFunctionCallbackSizeT)(Error error, size_t size, void* udata);
 typedef void (*VfsFunctionCallbackStat)(Error error, VfsStat stat, void* udata);
 
@@ -45,22 +65,19 @@ typedef void (*TellFunction)(struct VfsFile_s* file, VfsFunctionCallbackSizeT ca
 typedef void (*SeekFunction)(struct VfsFile_s* file, size_t offset, VfsFileSeekFlags flags, VfsFunctionCallbackVoid callback, void* udata);
 typedef void (*ReadFunction)(struct VfsFile_s* file, VirtPtr buffer, size_t size, VfsFunctionCallbackSizeT callback, void* udata);
 typedef void (*WriteFunction)(struct VfsFile_s* file, VirtPtr buffer, size_t size, VfsFunctionCallbackSizeT callback, void* udata);
-typedef void (*CloseFunction)(struct VfsFile_s* file, VfsFunctionCallbackVoid callback, void* udata);
-typedef void (*DeleteFunction)(struct VfsFile_s* file, VfsFunctionCallbackVoid callback, void* udata);
 typedef void (*StatFileFunction)(struct VfsFile_s* file, VfsFunctionCallbackStat callback, void* udata);
 
 typedef struct {
+    VFS_NODE_BASE_FUNCTIONS;
     ReadFunction read;
     WriteFunction write;
     SeekFunction seek;
     TellFunction tell;
-    CloseFunction close;
-    DeleteFunction delete;
     StatFileFunction stat;
 } VfsFileVtable;
 
 typedef struct VfsFile_s {
-    VfsNode base;
+    VFS_NODE_BASE;
     const VfsFileVtable* functions;
 } VfsFile;
 
@@ -74,49 +91,48 @@ typedef struct {
 typedef void (*VfsFunctionCallbackEntry)(Error error, VfsDirectoryEntry* entry, void* udata);
 typedef void (*VfsFunctionCallbackNode)(Error error, VfsNode* entry, void* udata);
 
-typedef void (*OpenFunction)(struct VfsDirectory_s* dir, size_t id, VfsFunctionCallbackNode callback, void* udata);
-typedef void (*UnlinkFunction)(struct VfsDirectory_s* dir, size_t id, VfsFunctionCallbackVoid callback, void* udata);
+typedef void (*OpenFunction)(struct VfsDirectory_s* dir, const char*, VfsFunctionCallbackNode callback, void* udata);
+typedef void (*UnlinkFunction)(struct VfsDirectory_s* dir, const char*, VfsFunctionCallbackVoid callback, void* udata);
 typedef void (*ReadDirFunction)(struct VfsDirectory_s* dir, VfsFunctionCallbackEntry callback, void* udata);
 typedef void (*ResetFunction)(struct VfsDirectory_s* dir, VfsFunctionCallbackVoid callback, void* udata);
-typedef void (*CreateFunction)(struct VfsDirectory_s* dir, char* name, VfsFunctionCallbackSizeT callback, void* udata);
+typedef void (*CreateDirFunction)(struct VfsDirectory_s* dir, const char*, VfsFunctionCallbackSizeT callback, void* udata);
+typedef void (*CreateFileFunction)(struct VfsDirectory_s* dir, const char*, VfsFunctionCallbackSizeT callback, void* udata);
 typedef void (*StatDirFunction)(struct VfsDirectory_s* file, VfsFunctionCallbackStat callback, void* udata);
-typedef void (*CloseDirFunction)(struct VfsDirectory_s* file, VfsFunctionCallbackVoid callback, void* udata);
-typedef void (*DeleteDirFunction)(struct VfsDirectory_s* file, VfsFunctionCallbackVoid callback, void* udata);
 
 typedef struct {
-    CreateFunction create;
+    VFS_NODE_BASE_FUNCTIONS;
+    CreateDirFunction createdir;
+    CreateFileFunction createfile;
     OpenFunction open;
     UnlinkFunction unlink;
     ResetFunction reset;
     ReadDirFunction readdir;
-    CloseDirFunction close;
-    DeleteDirFunction delete;
     StatDirFunction stat;
 } VfsDirectoryVtable;
 
 typedef struct VfsDirectory_s {
-    VfsNode base;
+    VFS_NODE_BASE;
     const VfsDirectoryVtable* functions;
 } VfsDirectory;
 
-struct VfsVirtualDirectory_s;
-
 typedef struct {
     char* name;
-    struct VfsVirtualDirectory_s* node;
+    VfsNode* node;
 } VfsVirtualDirectoryEntry;
 
 typedef struct VfsVirtualDirectory_s {
     VfsDirectory base;
+    SpinLock lock;
     VfsStat stats;
-    size_t parallel_count;
-    VfsNode* parallel;
+    VfsDirectory* mount;
     size_t entry_count;
     VfsVirtualDirectoryEntry* entries;
+    size_t read_head;
 } VfsVirtualDirectory;
 
 typedef struct {
     VfsFile base;
+    SpinLock lock;
     VfsStat stats;
     size_t size;
     uint8_t* data;
@@ -124,7 +140,15 @@ typedef struct {
 
 Error initVirtualFileSystem();
 
-// This function will take ownership over the name variable
+typedef void (*VfsFunctionCallbackFile)(Error error, VfsFile* entry, void* udata);
+
+typedef void (*VfsFunctionCallbackDirectory)(Error error, VfsDirectory* entry, void* udata);
+
+// These functions will take ownership over the path variable and free it using dealloc
+void openFileNamed(char* path, bool create, VfsFunctionCallbackFile callback, void* udata);
+
+void openDirectoryNamed(char* path, bool create, VfsFunctionCallbackDirectory callback, void* udata);
+
 void openNodeNamed(char* path, bool create, VfsFunctionCallbackNode callback, void* udata);
 
 // This is to be used for example for devices
