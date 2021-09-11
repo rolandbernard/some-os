@@ -3,4 +3,6 @@
 
 void inlineReducePath(char* path);
 
+char* reducedPathCopy(const char* path);
+
 #endif

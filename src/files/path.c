@@ -1,7 +1,10 @@
 
 #include <stdbool.h>
+#include <stddef.h>
+#include <string.h>
 
 #include "files/path.h"
+#include "memory/kalloc.h"
 
 void inlineReducePath(char* path) {
     int read_pos = 0;
@@ -63,5 +66,13 @@ void inlineReducePath(char* path) {
         insert_pos--;
     }
     path[insert_pos] = 0;
+}
+
+char* reducedPathCopy(const char* path) {
+    size_t path_length = strlen(path);
+    char* new_path = kalloc(path_length + 1);
+    memcpy(new_path, path, path_length + 1);
+    inlineReducePath(new_path);
+    return new_path;
 }
 
