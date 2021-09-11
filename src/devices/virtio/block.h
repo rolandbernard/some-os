@@ -4,6 +4,7 @@
 #include <assert.h>
 
 #include "devices/virtio/virtio.h"
+#include "util/spinlock.h"
 
 #define BLOCK_SECTOR_SIZE 512
 #define BLOCK_MAX_REQUESTS (1 << 5)
@@ -99,6 +100,7 @@ typedef struct {
 
 typedef struct {
     VirtIODevice virtio;
+    SpinLock lock;
     VirtIOBlockRequest* requests[BLOCK_MAX_REQUESTS];
     uint16_t req_index;
     uint16_t ack_index;

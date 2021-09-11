@@ -2,6 +2,7 @@
 #include "devices/virtio/block.h"
 #include "interrupt/plic.h"
 #include "memory/kalloc.h"
+#include "util/spinlock.h"
 
 static void handleInterrupt(ExternalInterrupt id, void* udata) {
     freePendingRequests((VirtIOBlockDevice*)udata);
@@ -44,6 +45,7 @@ Error blockDeviceOperation(
     if (write && device->read_only) {
         return someError(UNSUPPORTED, "Read-only device write attempt");
     }
+    lockSpinLock(&device->lock);
     uint32_t sector = offset / BLOCK_SECTOR_SIZE;
     VirtIOBlockRequest* request = kalloc(sizeof(VirtIOBlockRequest));
     assert(request != NULL);
@@ -61,10 +63,12 @@ Error blockDeviceOperation(
     request->udata = udata;
     device->requests[device->req_index] = request;
     device->req_index = (device->req_index + 1) % BLOCK_MAX_REQUESTS;
+    unlockSpinLock(&device->lock);
     return simpleError(SUCCESS);
 }
 
 void freePendingRequests(VirtIOBlockDevice* device) {
+    lockSpinLock(&device->lock);
     while (device->virtio.ack_index != device->virtio.queue->used.index) {
         VirtIOUsedElement elem = device->virtio.queue->used.ring[device->virtio.ack_index];
         device->virtio.ack_index = (device->virtio.ack_index + 1) % VIRTIO_RING_SIZE;
@@ -81,5 +85,6 @@ void freePendingRequests(VirtIOBlockDevice* device) {
             device->ack_index = (device->ack_index + 1) % BLOCK_MAX_REQUESTS;
         }
     }
+    unlockSpinLock(&device->lock);
 }
 
