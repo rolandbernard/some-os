@@ -19,11 +19,9 @@ void enqueueProcess(Process* process) {
     assert(hart != NULL);
     ScheduleQueue* queue = &hart->queue;
     if (hart->idle_process != process) { // Ignore the idle process
-        if (process->state == WAITING) {
-            // Don't do anything. Waiting processes should be tracked somewhere else.
-        } else if (process->state == TERMINATED) {
+        if (process->state == TERMINATED) {
             freeProcess(process);
-        } else {
+        } else if (process->state == ENQUEUEABLE) {
             process->state = READY;
             if (process->sched_priority < process->priority) {
                 process->sched_priority = process->priority;
@@ -83,6 +81,7 @@ Process* pullProcessFromQueue(ScheduleQueue* queue) {
             }
         }
         unlockSpinLock(&queue->lock);
+        ret->state = ENQUEUEABLE;
         return ret;
     }
 }

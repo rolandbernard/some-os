@@ -42,7 +42,7 @@ Process* createKernelProcess(void* start, Priority priority, size_t stack_size) 
     assert(process != NULL);
     process->table = kernel_page_table;
     process->priority = priority;
-    process->state = READY;
+    process->state = ENQUEUEABLE;
     process->stack = kalloc(stack_size);
     assert(process->stack != NULL);
     initTrapFrame(
@@ -71,7 +71,7 @@ Process* createEmptyUserProcess(uintptr_t sp, uintptr_t gp, uintptr_t pc, Proces
     process->table = createPageTable();
     process->parent = parent;
     process->priority = priority;
-    process->state = READY;
+    process->state = ENQUEUEABLE;
     process->stack = NULL;
     initTrapFrame(&process->frame, sp, gp, pc, process->pid, process->table);
     lockSpinLock(&process_lock); 

@@ -64,6 +64,10 @@ void kernelTrap(uintptr_t cause, uintptr_t pc, uintptr_t val, TrapFrame* frame) 
         KERNEL_LOG("[!] Unhandled trap: %p %p %p %s", pc, val, frame, getCauseString(interrupt, code));
         panic();
     } else {
+        if (frame->hart != NULL) {
+            Process* process = (Process*)frame;
+            process->state = ENQUEUEABLE;
+        }
         if (interrupt) {
             frame->pc = pc;
             switch (code) {

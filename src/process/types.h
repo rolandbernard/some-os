@@ -76,6 +76,7 @@ typedef struct HartFrame_s {
 } HartFrame;
 
 typedef enum {
+    ENQUEUEABLE,
     RUNNING,
     READY,
     WAITING,
