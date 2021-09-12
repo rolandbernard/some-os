@@ -104,28 +104,25 @@ Error umount(VirtualFilesystem* fs, const char* from) {
     return simpleError(SUCCESS);
 }
 
-static void internalVfsOpen(VirtualFilesystem* fs, Uid uid, Gid gid, char* path, VfsOpenFlags flags, VfsMode mode, VfsFunctionCallbackFile callback, void* udata) {
-    lockSpinLock(&fs->lock);
+static FilesystemMount* findMountHandling(VirtualFilesystem* fs, char* path) {
     for (size_t i = fs->mount_count; i != 0;) {
         i--;
         const char* mount_path = fs->mounts[i].path;
         size_t mount_path_length = strlen(mount_path);
-        if (strncmp(mount_path, path, mount_path_length) == 0 && (path[mount_path_length] == 0 || path[mount_path_length] == '/')) {
+        if (
+            strncmp(mount_path, path, mount_path_length) == 0
+            && (
+                path[mount_path_length] == 0 || path[mount_path_length] == '/'
+                || mount_path_length == 1
+            )
+        ) {
             switch (fs->mounts[i].type) {
-                case MOUNT_TYPE_FILE: {
-                    VfsFile* file = (VfsFile*)fs->mounts[i].data;
-                    unlockSpinLock(&fs->lock);
-                    file->functions->dup(file, uid, gid, callback, udata);
-                    dealloc(path);
-                    return;
-                }
-                case MOUNT_TYPE_FS: {
-                    VfsFilesystem* filesystem = (VfsFilesystem*)fs->mounts[i].data;
-                    unlockSpinLock(&fs->lock);
-                    filesystem->functions->open(filesystem, uid, gid, path, flags, mode, callback, udata);
-                    dealloc(path);
-                    return;
-                }
+                case MOUNT_TYPE_FILE:
+                    if (strcmp(mount_path, path) == 0) { // Only an exact match is possible here
+                        return &fs->mounts[i];
+                    }
+                case MOUNT_TYPE_FS:
+                    return &fs->mounts[i];
                 case MOUNT_TYPE_BIND: {
                     const char* new_path = (const char*)fs->mounts[i].data;
                     size_t new_path_length = strlen(new_path);
@@ -144,23 +141,92 @@ static void internalVfsOpen(VirtualFilesystem* fs, Uid uid, Gid gid, char* path,
             }
         }
     }
-    unlockSpinLock(&fs->lock);
     if (fs->parent != NULL) {
-        vfsOpen(fs->parent, uid, gid, path, flags, mode, callback, udata);
+        return findMountHandling(fs->parent, path);
     } else {
-        callback(simpleError(NO_SUCH_FILE), NULL, udata);
+        dealloc(path);
+        return NULL;
     }
-    dealloc(path);
 }
 
 void vfsOpen(VirtualFilesystem* fs, Uid uid, Gid gid, const char* path, VfsOpenFlags flags, VfsMode mode, VfsFunctionCallbackFile callback, void* udata) {
-    char* path_copy = reducedPathCopy(path);
-    internalVfsOpen(fs, uid, gid, path_copy, flags, mode, callback, udata);
+    lockSpinLock(&fs->lock);
+    FilesystemMount* mount = findMountHandling(fs, reducedPathCopy(path));
+    if (mount != NULL) {
+        switch (mount->type) {
+            case MOUNT_TYPE_FILE: {
+                VfsFile* file = (VfsFile*)mount->data;
+                file->functions->dup(file, uid, gid, callback, udata);
+                break;
+            }
+            case MOUNT_TYPE_FS: {
+                VfsFilesystem* filesystem = (VfsFilesystem*)mount->data;
+                filesystem->functions->open(filesystem, uid, gid, path, flags, mode, callback, udata);
+                break;
+            }
+            case MOUNT_TYPE_BIND: panic(); // Can't happen. Would return NULL.
+        }
+    } else {
+        callback(simpleError(NO_SUCH_FILE), NULL, udata);
+    }
+    unlockSpinLock(&fs->lock);
 }
 
-void vfsUnlink(VirtualFilesystem* fs, Uid uid, Gid gid, const char* path, VfsFunctionCallbackVoid callback, void* udata);
+void vfsUnlink(VirtualFilesystem* fs, Uid uid, Gid gid, const char* path, VfsFunctionCallbackVoid callback, void* udata) {
+    lockSpinLock(&fs->lock);
+    FilesystemMount* mount = findMountHandling(fs, reducedPathCopy(path));
+    if (mount != NULL) {
+        switch (mount->type) {
+            case MOUNT_TYPE_FILE: {
+                callback(simpleError(UNSUPPORTED), udata);
+                break;
+            }
+            case MOUNT_TYPE_FS: {
+                VfsFilesystem* filesystem = (VfsFilesystem*)mount->data;
+                filesystem->functions->unlink(filesystem, uid, gid, path, callback, udata);
+                break;
+            }
+            case MOUNT_TYPE_BIND: panic(); // Can't happen. Would return NULL.
+        }
+    } else {
+        callback(simpleError(NO_SUCH_FILE), udata);
+    }
+    unlockSpinLock(&fs->lock);
+}
 
-void vfsLink(VirtualFilesystem* fs, Uid uid, Gid gid, const char* old, const char* new, VfsFunctionCallbackVoid callback, void* udata);
+void vfsLink(VirtualFilesystem* fs, Uid uid, Gid gid, const char* old, const char* new, VfsFunctionCallbackVoid callback, void* udata) {
+    lockSpinLock(&fs->lock);
+    FilesystemMount* mount_old = findMountHandling(fs, reducedPathCopy(old));
+    FilesystemMount* mount_new = findMountHandling(fs, reducedPathCopy(new));
+    if (mount_old != NULL && mount_new != NULL) {
+        if (mount_new == mount_old && mount_new->type == MOUNT_TYPE_FS) {
+            // Linking across filesystem boundaries is impossible
+            VfsFilesystem* filesystem = (VfsFilesystem*)mount_old->data;
+            filesystem->functions->link(filesystem, uid, gid, old, new, callback, udata);
+        } else {
+            callback(simpleError(UNSUPPORTED), udata);
+        }
+    } else {
+        callback(simpleError(NO_SUCH_FILE), udata);
+    }
+    unlockSpinLock(&fs->lock);
+}
 
-void vfsRename(VirtualFilesystem* fs, Uid uid, Gid gid, const char* old, const char* new, VfsFunctionCallbackVoid callback, void* udata);
+void vfsRename(VirtualFilesystem* fs, Uid uid, Gid gid, const char* old, const char* new, VfsFunctionCallbackVoid callback, void* udata) {
+    lockSpinLock(&fs->lock);
+    FilesystemMount* mount_old = findMountHandling(fs, reducedPathCopy(old));
+    FilesystemMount* mount_new = findMountHandling(fs, reducedPathCopy(new));
+    if (mount_old != NULL && mount_new != NULL) {
+        if (mount_new == mount_old && mount_new->type == MOUNT_TYPE_FS) {
+            // Moving across filesystem boundaries requires copying
+            VfsFilesystem* filesystem = (VfsFilesystem*)mount_old->data;
+            filesystem->functions->rename(filesystem, uid, gid, old, new, callback, udata);
+        } else {
+            callback(simpleError(UNSUPPORTED), udata);
+        }
+    } else {
+        callback(simpleError(NO_SUCH_FILE), udata);
+    }
+    unlockSpinLock(&fs->lock);
+}
 
