@@ -14,6 +14,11 @@ addressTranslationFence:
     sfence.vma zero, a0
     ret
 
+# fn (int asid, uintptr_t virt_addr)
+addressTranslationFenceAt:
+    sfence.vma a1, a0
+    ret
+
 # fn ();
 memoryFence:
     fence
