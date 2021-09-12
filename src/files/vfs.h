@@ -12,9 +12,10 @@
 
 typedef enum {
     VFS_TYPE_UNKNOWN = 0,
-    VFS_TYPE_DIR = 1,
-    VFS_TYPE_REG = 2,
-    VFS_TYPE_BLOCK = 3,
+    VFS_TYPE_REG = 8,
+    VFS_TYPE_DIR = 4,
+    VFS_TYPE_BLOCK = 2,
+    VFS_TYPE_CHAR = 3,
 } VfsFileType;
 
 typedef enum {
@@ -30,6 +31,31 @@ typedef enum {
     VFS_OPEN_DIRECTORY = (1 << 3),
     VFS_OPEN_NOATIME = (1 << 4),
 } VfsOpenFlags;
+
+typedef enum {
+    VFS_MODE_A_X = (1 << 0),
+    VFS_MODE_A_W = (1 << 1),
+    VFS_MODE_A_R = (1 << 2),
+    VFS_MODE_G_X = (1 << 3),
+    VFS_MODE_G_W = (1 << 4),
+    VFS_MODE_G_R = (1 << 5),
+    VFS_MODE_O_X = (1 << 6),
+    VFS_MODE_O_W = (1 << 7),
+    VFS_MODE_O_R = (1 << 8),
+    VFS_MODE_STICKY = (1 << 9),
+    VFS_MODE_SETUID = (1 << 10),
+    VFS_MODE_SETGID = (1 << 11),
+    VFS_MODE_TYPE = (0xf << 12),
+} VfsModeFlags;
+
+#define VFS_MODE_A_RW (VFS_MODE_A_R | VFS_MODE_A_W)
+#define VFS_MODE_G_RW (VFS_MODE_G_R | VFS_MODE_G_W)
+#define VFS_MODE_O_RW (VFS_MODE_O_R | VFS_MODE_O_W)
+#define VFS_MODE_OG_RW (VFS_MODE_O_RW | VFS_MODE_G_RW)
+#define VFS_MODE_OGA_RW (VFS_MODE_OG_RW | VFS_MODE_A_RW)
+
+#define MODE_TYPE(mode) (mode >> 12)
+#define TYPE_MODE(type) (type << 12)
 
 typedef uint16_t VfsMode;
 
@@ -78,7 +104,7 @@ typedef struct {
 } VfsFileVtable;
 
 typedef struct VfsFile_s {
-    VfsFileVtable* functions;
+    const VfsFileVtable* functions;
 } VfsFile;
 
 struct VfsFilesystem_s;

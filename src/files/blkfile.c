@@ -1,5 +1,175 @@
 
-#include "files/blkfile.h"
+#include <string.h>
 
-BlockDeviceFile* createBlockDeviceFile(BlockOperationFunction block_op, void* block_dev);
+#include "error/error.h"
+#include "files/blkfile.h"
+#include "memory/kalloc.h"
+#include "memory/virtptr.h"
+#include "util/util.h"
+
+static void blockSeekFunction(BlockDeviceFile* file, Uid uid, Gid gid, size_t offset, VfsSeekWhence whence, VfsFunctionCallbackSizeT callback, void* udata) {
+    lockSpinLock(&file->lock);
+    size_t new_position;
+    switch (whence) {
+        case VFS_SEEK_CUR:
+            new_position = file->position + offset;
+            break;
+        case VFS_SEEK_SET:
+            new_position = offset;
+            break;
+        case VFS_SEEK_END:
+            new_position = file->size + offset;
+            break;
+    }
+    file->position = new_position;
+    unlockSpinLock(&file->lock);
+    callback(simpleError(SUCCESS), new_position, udata);
+}
+
+typedef struct {
+    void* block_dev;
+    size_t block_size;
+    bool write;
+    BlockOperationFunction block_op;
+    VirtPtr buffer;
+    size_t offset;
+    size_t size;
+    size_t read;
+    size_t current_read;
+    VfsFunctionCallbackSizeT callback;
+    void* udata;
+    uint8_t tmp_buffer[];
+} BlockFileRequest;
+
+static void blockOperatonFileCallback(Error status, BlockFileRequest* request) {
+    if (isError(status)) {
+        request->callback(status, request->read, request->udata);
+        dealloc(request);
+    } else {
+        if (request->current_read != 0) {
+            size_t offset = request->offset % request->block_size;
+            memcpyBetweenVirtPtr(request->buffer, virtPtrForKernel(request->tmp_buffer + offset), request->current_read);
+            request->read += request->current_read;
+            request->offset += request->current_read;
+            request->offset -= request->current_read;
+            request->buffer.address += request->current_read;
+        }
+        if (request->size == 0) {
+            request->callback(simpleError(SUCCESS), request->read, request->udata);
+            dealloc(request);
+        } else {
+            if (request->offset % request->block_size == 0) {
+                if (request->size < request->block_size) {
+                    request->current_read = request->size;
+                    request->block_op(
+                        request->block_dev, virtPtrForKernel(request->tmp_buffer), request->offset,
+                        request->block_size, request->write,
+                        (BlockOperatonCallback)blockOperatonFileCallback, request
+                    );
+                } else {
+                    size_t read_end = (request->offset + request->size) & -request->block_size;
+                    request->current_read = read_end - request->offset; // This is a multiple of the block size
+                    request->block_op(
+                        request->block_dev, request->buffer, request->offset, request->current_read,
+                        request->write, (BlockOperatonCallback)blockOperatonFileCallback, request
+                    );
+                }
+            } else {
+                size_t read_start = request->offset & -request->block_size;
+                request->current_read = umin(request->offset + request->size - read_start, request->block_size);
+                request->block_op(
+                    request->block_dev, virtPtrForKernel(request->tmp_buffer), read_start,
+                    request->block_size, request->write,
+                    (BlockOperatonCallback)blockOperatonFileCallback, request
+                );
+            }
+        }
+    }
+}
+
+static void genericBlockFileFunction(BlockDeviceFile* file, bool write, VirtPtr buffer, size_t size, VfsFunctionCallbackSizeT callback, void* udata) {
+    BlockFileRequest request;
+    lockSpinLock(&file->lock);
+    if (file->position > file->size) {
+        size = 0;
+    } else if (file->position + size > file->size) {
+        size = file->size - file->position;
+    }
+    file->position += size;
+    request.block_dev = file->device;
+    request.block_size = file->block_size;
+    request.block_op = file->block_operation;
+    request.buffer = buffer;
+    request.offset = file->position;
+    request.size = size;
+    unlockSpinLock(&file->lock);
+    BlockFileRequest* req = kalloc(sizeof(BlockFileRequest) + request.block_size);
+    memcpy(req, &request, sizeof(BlockFileRequest));
+    req->write = write;
+    req->read = 0;
+    req->current_read = 0;
+    req->callback = callback;
+    req->udata = udata;
+    blockOperatonFileCallback(simpleError(SUCCESS), req);
+}
+
+static void blockReadFunction(BlockDeviceFile* file, Uid uid, Gid gid, VirtPtr buffer, size_t size, VfsFunctionCallbackSizeT callback, void* udata) {
+    genericBlockFileFunction(file, false, buffer, size, callback, udata);
+}
+
+static void blockWriteFunction(BlockDeviceFile* file, Uid uid, Gid gid, VirtPtr buffer, size_t size, VfsFunctionCallbackSizeT callback, void* udata) {
+    genericBlockFileFunction(file, true, buffer, size, callback, udata);
+}
+
+static void blockStatFunction(BlockDeviceFile* file, Uid uid, Gid gid, VfsFunctionCallbackStat callback, void* udata) {
+    lockSpinLock(&file->lock);
+    VfsStat ret = {
+        // TODO: use real values
+        .id = 0,
+        .mode = TYPE_MODE(VFS_TYPE_BLOCK) | VFS_MODE_OG_RW,
+        .nlinks = 0,
+        .uid = 0,
+        .gid = 0,
+        .size = file->block_size,
+        .block_size = file->block_size,
+        .st_atime = 0,
+        .st_mtime = 0,
+        .st_ctime = 0,
+    };
+    unlockSpinLock(&file->lock);
+    callback(simpleError(SUCCESS), ret, udata);
+}
+
+static void blockCloseFunction(BlockDeviceFile* file, Uid uid, Gid gid, VfsFunctionCallbackVoid callback, void* udata) {
+    lockSpinLock(&file->lock);
+    dealloc(file);
+    callback(simpleError(SUCCESS), udata);
+}
+
+static void blockDupFunction(BlockDeviceFile* file, Uid uid, Gid gid, VfsFunctionCallbackFile callback, void* udata) {
+    lockSpinLock(&file->lock);
+    BlockDeviceFile* copy = kalloc(sizeof(BlockDeviceFile));
+    memcpy(copy, file, sizeof(BlockDeviceFile));
+    unlockSpinLock(&file->lock);
+    unlockSpinLock(&copy->lock); // Also unlock the new file
+    callback(simpleError(SUCCESS), (VfsFile*)copy, udata);
+}
+
+static const VfsFileVtable functions = {
+    .seek = (SeekFunction)blockSeekFunction,
+    .read = (ReadFunction)blockReadFunction,
+    .write = (WriteFunction)blockWriteFunction,
+    .stat = (StatFunction)blockStatFunction,
+    .close = (CloseFunction)blockCloseFunction,
+    .dup = (DupFunction)blockDupFunction,
+};
+
+BlockDeviceFile* createBlockDeviceFile(void* block_dev, size_t block_size, size_t size, BlockOperationFunction block_op) {
+    BlockDeviceFile* file = zalloc(sizeof(BlockDeviceFile));
+    file->base.functions = &functions;
+    file->device = block_dev;
+    file->size = size;
+    file->block_operation = block_op;
+    return file;
+}
 

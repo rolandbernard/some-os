@@ -2,6 +2,7 @@
 #define _BLKFILE_H_
 
 #include "files/vfs.h"
+#include "util/spinlock.h"
 
 // File wrapper around a block device operation
 
@@ -13,12 +14,15 @@ typedef Error (*BlockOperationFunction)(
 );
 
 typedef struct {
-    VfsFile file;
+    VfsFile base;
+    SpinLock lock;
     size_t position;
     void* device;
+    size_t size;
+    size_t block_size;
     BlockOperationFunction block_operation;
 } BlockDeviceFile;
 
-BlockDeviceFile* createBlockDeviceFile(BlockOperationFunction block_op, void* block_dev);
+BlockDeviceFile* createBlockDeviceFile(void* block_dev, size_t block_size, size_t size, BlockOperationFunction block_op);
 
 #endif
