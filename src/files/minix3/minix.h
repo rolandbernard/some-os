@@ -6,12 +6,6 @@
 #include "files/vfs.h"
 #include "util/spinlock.h"
 
-#define MINIX_MAGIC 0x4d5a
-#define BLOCK_SIZE 1024
-#define NUM_IPTRS BLOCK_SIZE / 4
-#define S_IFDIR 0o040000
-#define S_IFREG 0o100000
-
 typedef struct {
     uint32_t ninodes;
     uint16_t pad0;
@@ -52,6 +46,6 @@ typedef struct {
     VfsFile* block_device;
 } MinixFilesystem;
 
-MinixFilesystem* createMinixFilesystem(VfsFile* block_device);
+MinixFilesystem* createMinixFilesystem(VfsFile* block_device, void* data);
 
 #endif
