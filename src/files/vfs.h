@@ -114,6 +114,7 @@ typedef void (*UnlinkFunction)(struct VfsFilesystem_s* fs, Uid uid, Gid gid, con
 typedef void (*LinkFunction)(struct VfsFilesystem_s* fs, Uid uid, Gid gid, const char* old, const char* new, VfsFunctionCallbackVoid callback, void* udata);
 typedef void (*RenameFunction)(struct VfsFilesystem_s* fs, Uid uid, Gid gid, const char* old, const char* new, VfsFunctionCallbackVoid callback, void* udata);
 typedef void (*FreeFunction)(struct VfsFilesystem_s* fs, Uid uid, Gid gid, VfsFunctionCallbackVoid callback, void* udata);
+typedef void (*InitFunction)(struct VfsFilesystem_s* fs, Uid uid, Gid gid, VfsFunctionCallbackVoid callback, void* udata);
 
 typedef struct {
     OpenFunction open;
@@ -121,10 +122,12 @@ typedef struct {
     LinkFunction link;
     RenameFunction rename;
     FreeFunction free;
+    InitFunction init;
 } VfsFilesystemVtable;
 
 typedef struct VfsFilesystem_s {
     const VfsFilesystemVtable* functions;
+    size_t open_files;
 } VfsFilesystem;
 
 typedef enum {
