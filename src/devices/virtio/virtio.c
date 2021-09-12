@@ -17,7 +17,7 @@ typedef struct {
 
 static const VirtIODeviceInitEntry device_inits[VIRTIO_DEVICE_TYPE_END] = {
     [VIRTIO_BLOCK] = {
-        .init = initBlockDevice,
+        .init = initVirtIOBlockDevice,
         .name = "block",
     },
 };
