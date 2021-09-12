@@ -23,6 +23,7 @@ extern void __data_start;
 extern void __data_end;
 
 static Pid next_pid = 1;
+static Tid next_tid = 1;
 
 static SpinLock process_lock;
 static Process* global_first = NULL;
@@ -49,6 +50,8 @@ Process* createKernelProcess(void* start, Priority priority, size_t stack_size) 
         (uintptr_t)getKernelGlobalPointer(), (uintptr_t)start, 0, kernel_page_table
     );
     lockSpinLock(&process_lock); 
+    process->tid = next_tid;
+    next_tid++;
     process->global_next = global_first;
     if (global_first != NULL) {
         global_first->global_prev = process;
@@ -61,16 +64,19 @@ Process* createKernelProcess(void* start, Priority priority, size_t stack_size) 
 Process* createEmptyUserProcess(uintptr_t sp, uintptr_t gp, uintptr_t pc, Process* parent, Priority priority) {
     Process* process = zalloc(sizeof(Process));
     assert(process != NULL);
-    Pid pid = next_pid;
+    lockSpinLock(&process_lock); 
+    process->pid = next_pid;
     next_pid++;
+    unlockSpinLock(&process_lock); 
     process->table = createPageTable();
-    process->pid = pid;
     process->parent = parent;
     process->priority = priority;
     process->state = READY;
     process->stack = NULL;
-    initTrapFrame(&process->frame, sp, gp, pc, pid, process->table);
+    initTrapFrame(&process->frame, sp, gp, pc, process->pid, process->table);
     lockSpinLock(&process_lock); 
+    process->tid = next_tid;
+    next_tid++;
     process->global_next = global_first;
     if (global_first != NULL) {
         global_first->global_prev = process;
@@ -85,8 +91,8 @@ Process* createEmptyUserProcess(uintptr_t sp, uintptr_t gp, uintptr_t pc, Proces
 }
 
 void freeProcess(Process* process) {
-    if (process->state != KILLED) {
-        process->state = KILLED;
+    if (process->state != FREED) {
+        process->state = FREED;
         lockSpinLock(&process_lock); 
         if (process->global_prev == NULL) {
             global_first = process->global_next;
@@ -123,7 +129,7 @@ Pid freeKilledChild(Process* parent, uint64_t* status) {
     lockSpinLock(&process_lock); 
     Process** child = &parent->children;
     while (*child != NULL) {
-        if ((*child)->state == KILLED) {
+        if ((*child)->state == FREED) {
             Process* ret = *child;
             *child = ret->child_next;
             unlockSpinLock(&process_lock); 

@@ -80,9 +80,10 @@ typedef enum {
     READY,
     WAITING,
     TERMINATED, // Still has resources
-    KILLED, // Resources have been freed
+    FREED, // Resources have been freed
 } ProcessState;
 
+typedef uint64_t Tid;
 typedef uint64_t Pid;
 typedef uint8_t Priority;
 typedef uint64_t Uid;
@@ -92,6 +93,7 @@ typedef struct Process_s {
     TrapFrame frame;
 
     // General
+    Tid tid;
     Pid pid;
     struct Process_s* parent;
     struct Process_s* children;

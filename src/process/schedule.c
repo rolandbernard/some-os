@@ -23,9 +23,6 @@ void enqueueProcess(Process* process) {
             // Don't do anything. Waiting processes should be tracked somewhere else.
         } else if (process->state == TERMINATED) {
             freeProcess(process);
-        } else if (process->state == KILLED) {
-            // This is propably an error
-            KERNEL_LOG("[!] Killed process %li was enqueued", process->pid);
         } else {
             process->state = READY;
             if (process->sched_priority < process->priority) {
