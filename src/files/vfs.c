@@ -256,11 +256,12 @@ typedef struct {
     VirtPtr buffer;
     size_t offset;
     size_t size;
+    bool write;
     VfsFunctionCallbackSizeT callback;
     void* udata;
 } VfsReadAtRequest;
 
-static void vfsReadAtReadCallback(Error error, size_t read, VfsReadAtRequest* request) {
+static void vfsOperationAtReadWriteCallback(Error error, size_t read, VfsReadAtRequest* request) {
     if (isError(error)) {
         request->callback(error, 0, request->udata);
         dealloc(request);
@@ -272,11 +273,18 @@ static void vfsReadAtReadCallback(Error error, size_t read, VfsReadAtRequest* re
         request->offset += read;
         request->buffer.address += read;
         if (request->size != 0) {
-            // Try to read the remaining bytes
-            request->file->functions->read(
-                request->file, request->uid, request->gid, request->buffer, request->size,
-                (VfsFunctionCallbackSizeT)vfsReadAtReadCallback, request
-            );
+            // Try to read/write the remaining bytes
+            if (request->write) {
+                request->file->functions->write(
+                    request->file, request->uid, request->gid, request->buffer, request->size,
+                    (VfsFunctionCallbackSizeT)vfsOperationAtReadWriteCallback, request
+                );
+            } else {
+                request->file->functions->read(
+                    request->file, request->uid, request->gid, request->buffer, request->size,
+                    (VfsFunctionCallbackSizeT)vfsOperationAtReadWriteCallback, request
+                );
+            }
         } else {
             // Don't read more for now
             request->callback(simpleError(SUCCESS), request->offset, request->udata);
@@ -285,7 +293,7 @@ static void vfsReadAtReadCallback(Error error, size_t read, VfsReadAtRequest* re
     }
 }
 
-static void vfsReadAtSeekCallback(Error error, size_t offset, VfsReadAtRequest* request) {
+static void vfsOperationAtSeekCallback(Error error, size_t offset, VfsReadAtRequest* request) {
     if (isError(error)) {
         request->callback(error, 0, request->udata);
         dealloc(request);
@@ -294,14 +302,24 @@ static void vfsReadAtSeekCallback(Error error, size_t offset, VfsReadAtRequest* 
         dealloc(request);
     } else {
         request->offset = 0;
-        request->file->functions->read(
-            request->file, request->uid, request->gid, request->buffer, request->size,
-            (VfsFunctionCallbackSizeT)vfsReadAtReadCallback, request
-        );
+        if (request->write) {
+            request->file->functions->write(
+                request->file, request->uid, request->gid, request->buffer, request->size,
+                (VfsFunctionCallbackSizeT)vfsOperationAtReadWriteCallback, request
+            );
+        } else {
+            request->file->functions->read(
+                request->file, request->uid, request->gid, request->buffer, request->size,
+                (VfsFunctionCallbackSizeT)vfsOperationAtReadWriteCallback, request
+            );
+        }
     }
 }
 
-void vfsReadAt(VfsFile* file, Uid uid, Gid gid, VirtPtr ptr, size_t size, size_t offset, VfsFunctionCallbackSizeT callback, void* udata) {
+static void vfsGenericOperationAt(
+    VfsFile* file, Uid uid, Gid gid, VirtPtr ptr, size_t size, size_t offset,
+    bool write, VfsFunctionCallbackSizeT callback, void* udata
+) {
     VfsReadAtRequest* request = kalloc(sizeof(VfsReadAtRequest));
     request->file = file;
     request->uid = uid;
@@ -309,11 +327,20 @@ void vfsReadAt(VfsFile* file, Uid uid, Gid gid, VirtPtr ptr, size_t size, size_t
     request->buffer = ptr;
     request->offset = offset;
     request->size = size;
+    request->write = write;
     request->callback = callback;
     request->udata = udata;
     file->functions->seek(
         file, request->uid, request->gid, offset, VFS_SEEK_SET,
-        (VfsFunctionCallbackSizeT)vfsReadAtSeekCallback, request
+        (VfsFunctionCallbackSizeT)vfsOperationAtSeekCallback, request
     );
+}
+
+void vfsReadAt(VfsFile* file, Uid uid, Gid gid, VirtPtr ptr, size_t size, size_t offset, VfsFunctionCallbackSizeT callback, void* udata) {
+    vfsGenericOperationAt(file, uid, gid, ptr, size, offset, false, callback, udata);
+}
+
+void vfsWriteAt(VfsFile* file, Uid uid, Gid gid, VirtPtr ptr, size_t size, size_t offset, VfsFunctionCallbackSizeT callback, void* udata) {
+    vfsGenericOperationAt(file, uid, gid, ptr, size, offset, true, callback, udata);
 }
 
