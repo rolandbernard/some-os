@@ -249,3 +249,71 @@ void vfsRename(VirtualFilesystem* fs, Uid uid, Gid gid, const char* old, const c
     unlockSpinLock(&fs->lock);
 }
 
+typedef struct {
+    VfsFile* file;
+    Uid uid;
+    Gid gid;
+    VirtPtr buffer;
+    size_t offset;
+    size_t size;
+    VfsFunctionCallbackSizeT callback;
+    void* udata;
+} VfsReadAtRequest;
+
+static void vfsReadAtReadCallback(Error error, size_t read, VfsReadAtRequest* request) {
+    if (isError(error)) {
+        request->callback(error, 0, request->udata);
+        dealloc(request);
+    } else if (read == 0 && request->size != 0) {
+        request->callback(simpleError(SUCCESS), request->offset, request->udata);
+        dealloc(request);
+    } else {
+        request->size -= read;
+        request->offset += read;
+        request->buffer.address += read;
+        if (request->size != 0) {
+            // Try to read the remaining bytes
+            request->file->functions->read(
+                request->file, request->uid, request->gid, request->buffer, request->size,
+                (VfsFunctionCallbackSizeT)vfsReadAtReadCallback, request
+            );
+        } else {
+            // Don't read more for now
+            request->callback(simpleError(SUCCESS), request->offset, request->udata);
+            dealloc(request);
+        }
+    }
+}
+
+static void vfsReadAtSeekCallback(Error error, size_t offset, VfsReadAtRequest* request) {
+    if (isError(error)) {
+        request->callback(error, 0, request->udata);
+        dealloc(request);
+    } else if (offset != request->offset) {
+        request->callback(simpleError(IO_ERROR), 0, request->udata);
+        dealloc(request);
+    } else {
+        request->offset = 0;
+        request->file->functions->read(
+            request->file, request->uid, request->gid, request->buffer, request->size,
+            (VfsFunctionCallbackSizeT)vfsReadAtReadCallback, request
+        );
+    }
+}
+
+void vfsReadAt(VfsFile* file, Uid uid, Gid gid, VirtPtr ptr, size_t size, size_t offset, VfsFunctionCallbackSizeT callback, void* udata) {
+    VfsReadAtRequest* request = kalloc(sizeof(VfsReadAtRequest));
+    request->file = file;
+    request->uid = uid;
+    request->gid = gid;
+    request->buffer = ptr;
+    request->offset = offset;
+    request->size = size;
+    request->callback = callback;
+    request->udata = udata;
+    file->functions->seek(
+        file, request->uid, request->gid, offset, VFS_SEEK_SET,
+        (VfsFunctionCallbackSizeT)vfsReadAtSeekCallback, request
+    );
+}
+
