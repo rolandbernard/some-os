@@ -32,16 +32,15 @@ typedef struct {
     uint32_t mtime;
     uint32_t ctime;
     uint32_t zones[10];
-} Inode;
+} MinixInode;
 
 typedef struct {
     uint32_t inode;
     uint8_t name[60];
-} DirEntry;
+} MinixDirEntry;
 
 typedef struct {
     VfsFilesystem base;
-    SpinLock lock;
     MinixSuperblock superblock;
     VfsFile* block_device;
 } MinixFilesystem;
