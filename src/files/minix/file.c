@@ -51,6 +51,12 @@ static void minixGenericReadStepCallback(Error error, size_t read, MinixOperatio
         request->callback(error, request->read, request->udata);
         dealloc(request);
     } else {
+        size_t size = umin(MINIX_BLOCK_SIZE - request->offset, request->size);
+        request->size -= size;
+        request->file->position += size;
+        request->read += size;
+        request->offset = 0;
+        request->buffer.address += size;
         minixGenericZoneWalkStep(request);
     }
 }
@@ -67,10 +73,6 @@ static void minixOperationAtZone(MinixOperationRequest* request, size_t zone) {
         request->blocks_seen++;
         size_t size = umin(MINIX_BLOCK_SIZE - request->offset, request->size);
         size_t offset = zone * MINIX_BLOCK_SIZE + request->offset;
-        request->size -= size;
-        request->file->position += size;
-        request->read += size;
-        request->offset = 0;
         if (request->write) {
             vfsWriteAt(
                 request->file->fs->block_device, request->uid, request->gid, request->buffer, size,
@@ -132,8 +134,7 @@ static void minixGenericZoneWalkStep(MinixOperationRequest* request) {
                     (VfsFunctionCallbackSizeT)minixGenericReadStepCallback, request
                 );
             }
-        } else if (request->depth == 1 && request->position[2] == 0) { // We have to read level 2
-                                                                       // zones
+        } else if (request->depth == 1 && request->position[2] == 0) { // We have to read level 2 zones
             size_t pos = request->position[1];
             request->position[1]++;
             if (request->position[1] == MINIX_NUM_IPTRS) {
@@ -183,8 +184,7 @@ static void minixGenericZoneWalkStep(MinixOperationRequest* request) {
                     (VfsFunctionCallbackSizeT)minixGenericReadStepCallback, request
                 );
             }
-        } else if (request->depth == 1 && request->position[2] == 0) { // We have to read level 2
-                                                                       // zones
+        } else if (request->depth == 1 && request->position[2] == 0) { // We have to read level 2 zones
             size_t pos = request->position[1];
             request->position[1]++;
             if (request->position[1] == MINIX_NUM_IPTRS) {
@@ -207,8 +207,7 @@ static void minixGenericZoneWalkStep(MinixOperationRequest* request) {
                     );
                 }
             }
-        } else if (request->depth == 2 && request->position[3] == 0) { // We have to read level 3
-                                                                       // zones
+        } else if (request->depth == 2 && request->position[3] == 0) { // We have to read level 3 zones
             size_t pos = request->position[2];
             request->position[2]++;
             if (request->position[2] == MINIX_NUM_IPTRS) {
