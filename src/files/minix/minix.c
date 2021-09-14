@@ -2,6 +2,7 @@
 #include "files/minix/minix.h"
 #include "error/error.h"
 #include "files/vfs.h"
+#include "kernel/time.h"
 #include "memory/kalloc.h"
 #include "memory/virtptr.h"
 #include "util/util.h"
@@ -21,7 +22,9 @@ typedef struct {
     const MinixFilesystem* fs;
     Uid uid;
     Gid gid;
+    uint32_t inodenum;
     VirtPtr buffer;
+    size_t blocks_seen;
     size_t read;
     size_t offset;
     size_t size;
@@ -36,6 +39,16 @@ typedef struct {
 
 static void minixGenericZoneWalkStep(MinixOperationRequest* request);
 
+static void minixGenericFinishedCallback(Error error, size_t read, MinixOperationRequest* request) {
+    if (isError(error)) {
+        request->callback(error, request->read, request->udata);
+        dealloc(request);
+    } else {
+        request->callback(simpleError(SUCCESS), request->read, request->udata);
+        dealloc(request);
+    }
+}
+
 static void minixGenericReadStepCallback(Error error, size_t read, MinixOperationRequest* request) {
     if (isError(error)) {
         request->callback(error, request->read, request->udata);
@@ -47,11 +60,14 @@ static void minixGenericReadStepCallback(Error error, size_t read, MinixOperatio
 
 static void minixOperationAtZone(MinixOperationRequest* request, size_t zone) {
     if (zone == 0) {
+        // TODO: if writing and going over the end of the file, allocate new zones
         minixGenericZoneWalkStep(request);
     } else if (request->offset > BLOCK_SIZE) {
+        request->blocks_seen++;
         request->offset -= BLOCK_SIZE;
         minixGenericZoneWalkStep(request);
     } else {
+        request->blocks_seen++;
         size_t size = umin(BLOCK_SIZE - request->offset, request->size);
         size_t offset = zone * BLOCK_SIZE + request->offset;
         request->size -= size;
@@ -79,13 +95,18 @@ static void minixGenericZoneWalkStep(MinixOperationRequest* request) {
     } else if (request->position[0] == 7) {
         if (request->depth == 0 && request->position[1] == 0) { // We have to read level 1 zones
             request->depth = 1;
-            size_t offset = request->inode.zones[7] * BLOCK_SIZE + request->offset;
-            request->position[1] = 0;
-            vfsReadAt(
-                request->fs->block_device, request->uid, request->gid,
-                virtPtrForKernel(request->zones[0]), BLOCK_SIZE, offset,
-                (VfsFunctionCallbackSizeT)minixGenericReadStepCallback, request
-            );
+            size_t zone = request->inode.zones[7];
+            if (zone == 0) {
+                request->position[0]++;
+                request->depth = 0;
+            } else {
+                size_t offset = zone * BLOCK_SIZE + request->offset;
+                vfsReadAt(
+                    request->fs->block_device, request->uid, request->gid,
+                    virtPtrForKernel(request->zones[0]), BLOCK_SIZE, offset,
+                    (VfsFunctionCallbackSizeT)minixGenericReadStepCallback, request
+                );
+            }
         } else {
             size_t pos = request->position[1];
             request->position[1]++;
@@ -101,12 +122,18 @@ static void minixGenericZoneWalkStep(MinixOperationRequest* request) {
     } else if (request->position[0] == 8) {
         if (request->depth == 0 && request->position[1] == 0) { // We have to read level 1 zones
             request->depth = 1;
-            size_t offset = request->inode.zones[7] * BLOCK_SIZE + request->offset;
-            vfsReadAt(
-                request->fs->block_device, request->uid, request->gid,
-                virtPtrForKernel(request->zones[0]), BLOCK_SIZE, offset,
-                (VfsFunctionCallbackSizeT)minixGenericReadStepCallback, request
-            );
+            size_t zone = request->inode.zones[8];
+            if (zone == 0) {
+                request->position[0]++;
+                request->depth = 0;
+            } else {
+                size_t offset = zone * BLOCK_SIZE + request->offset;
+                vfsReadAt(
+                    request->fs->block_device, request->uid, request->gid,
+                    virtPtrForKernel(request->zones[0]), BLOCK_SIZE, offset,
+                    (VfsFunctionCallbackSizeT)minixGenericReadStepCallback, request
+                );
+            }
         } else if (request->depth == 1 && request->position[2] == 0) { // We have to read level 2 zones
             size_t pos = request->position[1];
             request->position[1]++;
@@ -117,12 +144,18 @@ static void minixGenericZoneWalkStep(MinixOperationRequest* request) {
                 minixGenericZoneWalkStep(request);
             } else {
                 request->depth = 2;
-                size_t offset = request->zones[0][pos] * BLOCK_SIZE + request->offset;
-                vfsReadAt(
-                    request->fs->block_device, request->uid, request->gid,
-                    virtPtrForKernel(request->zones[1]), BLOCK_SIZE, offset,
-                    (VfsFunctionCallbackSizeT)minixGenericReadStepCallback, request
-                );
+                size_t zone = request->zones[0][pos];
+                if (zone == 0) {
+                    request->position[1]++;
+                    request->depth = 1;
+                } else {
+                    size_t offset = zone * BLOCK_SIZE + request->offset;
+                    vfsReadAt(
+                        request->fs->block_device, request->uid, request->gid,
+                        virtPtrForKernel(request->zones[1]), BLOCK_SIZE, offset,
+                        (VfsFunctionCallbackSizeT)minixGenericReadStepCallback, request
+                    );
+                }
             }
         } else {
             size_t pos = request->position[2];
@@ -139,12 +172,18 @@ static void minixGenericZoneWalkStep(MinixOperationRequest* request) {
     } else if (request->position[0] == 9) {
         if (request->depth == 0 && request->position[1] == 0) { // We have to read level 1 zones
             request->depth = 1;
-            size_t offset = request->inode.zones[7] * BLOCK_SIZE + request->offset;
-            vfsReadAt(
-                request->fs->block_device, request->uid, request->gid,
-                virtPtrForKernel(request->zones[0]), BLOCK_SIZE, offset,
-                (VfsFunctionCallbackSizeT)minixGenericReadStepCallback, request
-            );
+            size_t zone = request->inode.zones[9];
+            if (zone == 0) {
+                request->position[0]++;
+                request->depth = 0;
+            } else {
+                size_t offset = zone * BLOCK_SIZE + request->offset;
+                vfsReadAt(
+                    request->fs->block_device, request->uid, request->gid,
+                    virtPtrForKernel(request->zones[0]), BLOCK_SIZE, offset,
+                    (VfsFunctionCallbackSizeT)minixGenericReadStepCallback, request
+                );
+            }
         } else if (request->depth == 1 && request->position[2] == 0) { // We have to read level 2 zones
             size_t pos = request->position[1];
             request->position[1]++;
@@ -155,12 +194,18 @@ static void minixGenericZoneWalkStep(MinixOperationRequest* request) {
                 minixGenericZoneWalkStep(request);
             } else {
                 request->depth = 2;
-                size_t offset = request->zones[0][pos] * BLOCK_SIZE + request->offset;
-                vfsReadAt(
-                    request->fs->block_device, request->uid, request->gid,
-                    virtPtrForKernel(request->zones[1]), BLOCK_SIZE, offset,
-                    (VfsFunctionCallbackSizeT)minixGenericReadStepCallback, request
-                );
+                size_t zone = request->zones[0][pos];
+                if (zone == 0) {
+                    request->position[1]++;
+                    request->depth = 1;
+                } else {
+                    size_t offset = zone * BLOCK_SIZE + request->offset;
+                    vfsReadAt(
+                        request->fs->block_device, request->uid, request->gid,
+                        virtPtrForKernel(request->zones[1]), BLOCK_SIZE, offset,
+                        (VfsFunctionCallbackSizeT)minixGenericReadStepCallback, request
+                    );
+                }
             }
         } else if (request->depth == 2 && request->position[3] == 0) { // We have to read level 3 zones
             size_t pos = request->position[2];
@@ -172,12 +217,18 @@ static void minixGenericZoneWalkStep(MinixOperationRequest* request) {
                 minixGenericZoneWalkStep(request);
             } else {
                 request->depth = 3;
-                size_t offset = request->zones[1][pos] * BLOCK_SIZE + request->offset;
-                vfsReadAt(
-                    request->fs->block_device, request->uid, request->gid,
-                    virtPtrForKernel(request->zones[2]), BLOCK_SIZE, offset,
-                    (VfsFunctionCallbackSizeT)minixGenericReadStepCallback, request
-                );
+                size_t zone = request->zones[1][pos];
+                if (zone == 0) {
+                    request->position[2]++;
+                    request->depth = 2;
+                } else {
+                    size_t offset = zone * BLOCK_SIZE + request->offset;
+                    vfsReadAt(
+                        request->fs->block_device, request->uid, request->gid,
+                        virtPtrForKernel(request->zones[2]), BLOCK_SIZE, offset,
+                        (VfsFunctionCallbackSizeT)minixGenericReadStepCallback, request
+                    );
+                }
             }
         } else {
             size_t pos = request->position[3];
@@ -192,8 +243,16 @@ static void minixGenericZoneWalkStep(MinixOperationRequest* request) {
             }
         }
     } else {
-        request->callback(simpleError(SUCCESS), request->read, request->udata);
-        dealloc(request);
+        request->inode.atime = getUnixTime();
+        if (request->write) {
+            request->inode.mtime = getUnixTime();
+        }
+        vfsWriteAt(
+            request->fs->block_device, request->uid, request->gid,
+            virtPtrForKernel(&request->inode), sizeof(MinixInode),
+            offsetForINode(request->fs, request->inodenum),
+            (VfsFunctionCallbackSizeT)minixGenericFinishedCallback, request
+        );
     }
 }
 
@@ -205,6 +264,7 @@ static void minixGenericReadINodeCallback(Error error, size_t read, MinixOperati
         request->callback(simpleError(IO_ERROR), 0, request->udata);
         dealloc(request);
     } else {
+        // TODO: test for user permissions
         request->position[0] = 0;
         request->position[1] = 0;
         request->position[2] = 0;
@@ -222,6 +282,7 @@ void minixGenericOperation(
     request->fs = fs;
     request->uid = uid;
     request->gid = gid;
+    request->inodenum = inode;
     request->buffer = buffer;
     request->offset = offset;
     request->read = 0;
