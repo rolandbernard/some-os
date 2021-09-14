@@ -30,6 +30,7 @@ typedef struct {
     void* block_dev;
     size_t block_size;
     bool write;
+    bool tmp_read;
     BlockOperationFunction block_op;
     VirtPtr buffer;
     size_t offset;
@@ -47,8 +48,12 @@ static void blockOperatonFileCallback(Error status, BlockFileRequest* request) {
         dealloc(request);
     } else {
         if (request->current_read != 0) {
-            size_t offset = request->offset % request->block_size;
-            memcpyBetweenVirtPtr(request->buffer, virtPtrForKernel(request->tmp_buffer + offset), request->current_read);
+            if (!request->write) {
+                size_t offset = request->offset % request->block_size;
+                if (offset != 0 || request->current_read < request->block_size) {
+                    memcpyBetweenVirtPtr(request->buffer, virtPtrForKernel(request->tmp_buffer + offset), request->current_read);
+                } // Otherwise we have already read directly to the buffer
+            }
             request->read += request->current_read;
             request->offset += request->current_read;
             request->offset -= request->current_read;
@@ -61,12 +66,29 @@ static void blockOperatonFileCallback(Error status, BlockFileRequest* request) {
             if (request->offset % request->block_size == 0) {
                 if (request->size < request->block_size) {
                     request->current_read = request->size;
-                    request->block_op(
-                        request->block_dev, virtPtrForKernel(request->tmp_buffer), request->offset,
-                        request->block_size, request->write,
-                        (BlockOperatonCallback)blockOperatonFileCallback, request
-                    );
+                    if (request->write && !request->tmp_read) {
+                        request->tmp_read = true;
+                        request->current_read = 0;
+                        // We first have to load the current data into the tmp buffer
+                        request->block_op(
+                            request->block_dev, virtPtrForKernel(request->tmp_buffer), request->offset,
+                            request->block_size, false,
+                            (BlockOperatonCallback)blockOperatonFileCallback, request
+                        );
+                    } else {
+                        request->tmp_read = false;
+                        request->current_read = request->size;
+                        if (request->write) {
+                            memcpyBetweenVirtPtr(virtPtrForKernel(request->tmp_buffer), request->buffer, request->current_read);
+                        }
+                        request->block_op(
+                            request->block_dev, virtPtrForKernel(request->tmp_buffer),
+                            request->offset, request->block_size, request->write,
+                            (BlockOperatonCallback)blockOperatonFileCallback, request
+                        );
+                    }
                 } else {
+                    request->tmp_read = false;
                     size_t read_end = (request->offset + request->size) & -request->block_size;
                     request->current_read = read_end - request->offset; // This is a multiple of the block size
                     request->block_op(
@@ -76,12 +98,28 @@ static void blockOperatonFileCallback(Error status, BlockFileRequest* request) {
                 }
             } else {
                 size_t read_start = request->offset & -request->block_size;
-                request->current_read = umin(request->offset + request->size - read_start, request->block_size);
-                request->block_op(
-                    request->block_dev, virtPtrForKernel(request->tmp_buffer), read_start,
-                    request->block_size, request->write,
-                    (BlockOperatonCallback)blockOperatonFileCallback, request
-                );
+                if (request->write && !request->tmp_read) {
+                    request->tmp_read = true;
+                    request->current_read = 0;
+                    // We first have to load the current data into the tmp buffer
+                    request->block_op(
+                        request->block_dev, virtPtrForKernel(request->tmp_buffer), read_start,
+                        request->block_size, false,
+                        (BlockOperatonCallback)blockOperatonFileCallback, request
+                    );
+                } else {
+                    request->tmp_read = false;
+                    request->current_read = umin(request->offset + request->size - read_start, request->block_size);
+                    if (request->write) {
+                        size_t offset = request->offset % request->block_size;
+                        memcpyBetweenVirtPtr(virtPtrForKernel(request->tmp_buffer + offset), request->buffer, request->current_read);
+                    }
+                    request->block_op(
+                        request->block_dev, virtPtrForKernel(request->tmp_buffer), read_start,
+                        request->block_size, request->write,
+                        (BlockOperatonCallback)blockOperatonFileCallback, request
+                    );
+                }
             }
         }
     }
@@ -108,6 +146,7 @@ static void genericBlockFileFunction(BlockDeviceFile* file, bool write, VirtPtr 
     req->write = write;
     req->read = 0;
     req->current_read = 0;
+    req->tmp_read = false;
     req->callback = callback;
     req->udata = udata;
     blockOperatonFileCallback(simpleError(SUCCESS), req);
