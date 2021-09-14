@@ -1,6 +1,9 @@
 
+#include <string.h>
+
 #include "files/minix/file.h"
 
+#include "error/panic.h"
 #include "kernel/time.h"
 #include "memory/kalloc.h"
 #include "util/util.h"
@@ -11,7 +14,7 @@ size_t offsetForINode(const MinixFilesystem* fs, uint32_t inode) {
 }
 
 typedef struct {
-    const MinixFile* file;
+    MinixFile* file;
     Uid uid;
     Gid gid;
     VirtPtr buffer;
@@ -20,9 +23,9 @@ typedef struct {
     size_t offset;
     size_t size;
     bool write;
-    MinixInode inode;
     VfsFunctionCallbackSizeT callback;
     void* udata;
+    MinixInode inode;
     uint16_t depth;
     uint16_t position[4];
     uint32_t zones[3][MINIX_NUM_IPTRS];
@@ -32,9 +35,11 @@ static void minixGenericZoneWalkStep(MinixOperationRequest* request);
 
 static void minixGenericFinishedCallback(Error error, size_t read, MinixOperationRequest* request) {
     if (isError(error)) {
+        unlockSpinLock(&request->file->lock);
         request->callback(error, request->read, request->udata);
         dealloc(request);
     } else {
+        unlockSpinLock(&request->file->lock);
         request->callback(simpleError(SUCCESS), request->read, request->udata);
         dealloc(request);
     }
@@ -42,6 +47,7 @@ static void minixGenericFinishedCallback(Error error, size_t read, MinixOperatio
 
 static void minixGenericReadStepCallback(Error error, size_t read, MinixOperationRequest* request) {
     if (isError(error)) {
+        unlockSpinLock(&request->file->lock);
         request->callback(error, request->read, request->udata);
         dealloc(request);
     } else {
@@ -62,6 +68,7 @@ static void minixOperationAtZone(MinixOperationRequest* request, size_t zone) {
         size_t size = umin(MINIX_BLOCK_SIZE - request->offset, request->size);
         size_t offset = zone * MINIX_BLOCK_SIZE + request->offset;
         request->size -= size;
+        request->file->position += size;
         request->read += size;
         request->offset = 0;
         if (request->write) {
@@ -125,7 +132,8 @@ static void minixGenericZoneWalkStep(MinixOperationRequest* request) {
                     (VfsFunctionCallbackSizeT)minixGenericReadStepCallback, request
                 );
             }
-        } else if (request->depth == 1 && request->position[2] == 0) { // We have to read level 2 zones
+        } else if (request->depth == 1 && request->position[2] == 0) { // We have to read level 2
+                                                                       // zones
             size_t pos = request->position[1];
             request->position[1]++;
             if (request->position[1] == MINIX_NUM_IPTRS) {
@@ -175,7 +183,8 @@ static void minixGenericZoneWalkStep(MinixOperationRequest* request) {
                     (VfsFunctionCallbackSizeT)minixGenericReadStepCallback, request
                 );
             }
-        } else if (request->depth == 1 && request->position[2] == 0) { // We have to read level 2 zones
+        } else if (request->depth == 1 && request->position[2] == 0) { // We have to read level 2
+                                                                       // zones
             size_t pos = request->position[1];
             request->position[1]++;
             if (request->position[1] == MINIX_NUM_IPTRS) {
@@ -198,7 +207,8 @@ static void minixGenericZoneWalkStep(MinixOperationRequest* request) {
                     );
                 }
             }
-        } else if (request->depth == 2 && request->position[3] == 0) { // We have to read level 3 zones
+        } else if (request->depth == 2 && request->position[3] == 0) { // We have to read level 3
+                                                                       // zones
             size_t pos = request->position[2];
             request->position[2]++;
             if (request->position[2] == MINIX_NUM_IPTRS) {
@@ -249,9 +259,11 @@ static void minixGenericZoneWalkStep(MinixOperationRequest* request) {
 
 static void minixGenericReadINodeCallback(Error error, size_t read, MinixOperationRequest* request) {
     if (isError(error)) {
+        unlockSpinLock(&request->file->lock);
         request->callback(error, 0, request->udata);
         dealloc(request);
     } else if (read != sizeof(MinixInode)) {
+        unlockSpinLock(&request->file->lock);
         request->callback(simpleError(IO_ERROR), 0, request->udata);
         dealloc(request);
     } else {
@@ -266,15 +278,15 @@ static void minixGenericReadINodeCallback(Error error, size_t read, MinixOperati
 }
 
 static void minixGenericOperation(
-    const MinixFile* file, Uid uid, Gid gid, VirtPtr buffer, size_t length, size_t offset,
-    bool write, VfsFunctionCallbackSizeT callback, void* udata
+    MinixFile* file, Uid uid, Gid gid, VirtPtr buffer, size_t length, bool write,
+    VfsFunctionCallbackSizeT callback, void* udata
 ) {
     MinixOperationRequest* request = kalloc(sizeof(MinixOperationRequest));
     request->file = file;
     request->uid = uid;
     request->gid = gid;
     request->buffer = buffer;
-    request->offset = offset;
+    request->offset = file->position;
     request->read = 0;
     request->size = length;
     request->write = write;
@@ -287,7 +299,153 @@ static void minixGenericOperation(
     );
 }
 
+typedef struct {
+    MinixFile* file;
+    size_t offset;
+    VfsFunctionCallbackSizeT callback;
+    void* udata;
+    MinixInode inode;
+} MinixSeekRequest;
+
+static void minixSeekINodeCallback(Error error, size_t read, MinixSeekRequest* request) {
+    if (isError(error)) {
+        unlockSpinLock(&request->file->lock);
+        request->callback(error, 0, request->udata);
+        dealloc(request);
+    } else if (read != sizeof(MinixInode)) {
+        unlockSpinLock(&request->file->lock);
+        request->callback(simpleError(IO_ERROR), 0, request->udata);
+        dealloc(request);
+    } else {
+        size_t new_position = request->inode.size + request->offset; // This is only used for SEEK_END
+        request->file->position = new_position;
+        unlockSpinLock(&request->file->lock);
+        request->callback(simpleError(SUCCESS), new_position, request->udata);
+        dealloc(request);
+    }
+}
+
+static void minixSeekFunction(MinixFile* file, Uid uid, Gid gid, size_t offset, VfsSeekWhence whence, VfsFunctionCallbackSizeT callback, void* udata) {
+    if (whence == VFS_SEEK_END) { // We have to read the size to know where the end is
+        MinixSeekRequest* request = kalloc(sizeof(MinixSeekRequest));
+        lockSpinLock(&file->lock);
+        request->file = file;
+        request->offset = offset;
+        request->callback = callback;
+        request->udata = udata;
+        vfsReadAt(
+            file->fs->block_device, uid, gid, virtPtrForKernel(&request->inode), sizeof(MinixInode),
+            offsetForINode(file->fs, file->inodenum),
+            (VfsFunctionCallbackSizeT)minixSeekINodeCallback, request
+        );
+    } else {
+        lockSpinLock(&file->lock);
+        size_t new_position;
+        switch (whence) {
+            case VFS_SEEK_CUR:
+                new_position = file->position + offset;
+                break;
+            case VFS_SEEK_SET:
+                new_position = offset;
+                break;
+            case VFS_SEEK_END:
+                panic();
+        }
+        file->position = new_position;
+        unlockSpinLock(&file->lock);
+        callback(simpleError(SUCCESS), new_position, udata);
+    }
+}
+
+static void minixReadFunction(
+    MinixFile* file, Uid uid, Gid gid, VirtPtr buffer, size_t size,
+    VfsFunctionCallbackSizeT callback, void* udata
+) {
+    minixGenericOperation(file, uid, gid, buffer, size, false, callback, udata);
+}
+
+static void minixWriteFunction(
+    MinixFile* file, Uid uid, Gid gid, VirtPtr buffer, size_t size,
+    VfsFunctionCallbackSizeT callback, void* udata
+) {
+    minixGenericOperation(file, uid, gid, buffer, size, true, callback, udata);
+}
+
+typedef struct {
+    MinixFile* file;
+    VfsFunctionCallbackStat callback;
+    void* udata;
+    MinixInode inode;
+} MinixStatRequest;
+
+static void minixStatINodeCallback(Error error, size_t read, MinixStatRequest* request) {
+    if (isError(error)) {
+        unlockSpinLock(&request->file->lock);
+        VfsStat ret = {};
+        request->callback(error, ret, request->udata);
+        dealloc(request);
+    } else if (read != sizeof(MinixInode)) {
+        unlockSpinLock(&request->file->lock);
+        VfsStat ret = {};
+        request->callback(simpleError(IO_ERROR), ret, request->udata);
+        dealloc(request);
+    } else {
+        unlockSpinLock(&request->file->lock);
+        VfsStat ret = {
+            .id = request->file->inodenum,
+            .mode = request->inode.mode,
+            .nlinks = request->inode.nlinks,
+            .uid = request->inode.uid,
+            .gid = request->inode.gid,
+            .size = request->inode.size,
+            .block_size = 1,
+            .st_atime = request->inode.atime,
+            .st_mtime = request->inode.mtime,
+            .st_ctime = request->inode.ctime,
+        };
+        request->callback(simpleError(SUCCESS), ret, request->udata);
+    }
+}
+
+static void minixStatFunction(
+    MinixFile* file, Uid uid, Gid gid, VfsFunctionCallbackStat callback, void* udata
+) {
+    MinixStatRequest* request = kalloc(sizeof(MinixStatRequest));
+    lockSpinLock(&file->lock);
+    request->file = file;
+    request->callback = callback;
+    request->udata = udata;
+    vfsReadAt(
+        file->fs->block_device, uid, gid, virtPtrForKernel(&request->inode), sizeof(MinixInode),
+        offsetForINode(file->fs, file->inodenum), (VfsFunctionCallbackSizeT)minixStatINodeCallback,
+        request
+    );
+}
+
+static void minixCloseFunction(
+    MinixFile* file, Uid uid, Gid gid, VfsFunctionCallbackVoid callback, void* udata
+) {
+    lockSpinLock(&file->lock);
+    dealloc(file);
+    callback(simpleError(SUCCESS), udata);
+}
+
+static void minixDupFunction(MinixFile* file, Uid uid, Gid gid, VfsFunctionCallbackFile callback, void* udata) {
+    lockSpinLock(&file->lock);
+    MinixFile* copy = kalloc(sizeof(MinixFile));
+    memcpy(copy, file, sizeof(MinixFile));
+    unlockSpinLock(&file->lock);
+    unlockSpinLock(&copy->lock); // Also unlock the new file
+    callback(simpleError(SUCCESS), (VfsFile*)copy, udata);
+}
+
 static VfsFileVtable functions = {
+    .seek = (SeekFunction)minixSeekFunction,
+    .read = (ReadFunction)minixReadFunction,
+    .write = (WriteFunction)minixWriteFunction,
+    .stat = (StatFunction)minixStatFunction,
+    .close = (CloseFunction)minixCloseFunction,
+    .dup = (DupFunction)minixDupFunction,
 };
 
 MinixFile* createMinixFileForINode(const MinixFilesystem* fs, uint32_t inode) {
@@ -295,7 +453,6 @@ MinixFile* createMinixFileForINode(const MinixFilesystem* fs, uint32_t inode) {
     file->base.functions = &functions;
     file->fs = fs;
     file->inodenum = inode;
-    file->read_position = 0;
+    file->position = 0;
     return file;
 }
-

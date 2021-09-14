@@ -9,8 +9,6 @@
 #define MINIX_MAGIC 0x4d5a
 #define MINIX_BLOCK_SIZE 1024
 #define MINIX_NUM_IPTRS MINIX_BLOCK_SIZE / 4
-#define MINIX_S_IFDIR 0o040000
-#define MINIX_S_IFREG 0o100000
 
 typedef struct {
     uint32_t ninodes;

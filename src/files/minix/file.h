@@ -6,13 +6,15 @@
 typedef struct {
     VfsFile base;
     const MinixFilesystem* fs;
-    size_t read_position;
+    SpinLock lock;
+    size_t position;
     uint32_t inodenum;
 } MinixFile;
 
 MinixFile* createMinixFileForINode(const MinixFilesystem* fs, uint32_t inode);
 
-// Special function to read the complete file and return it's contents
-MinixDirEntry* readAllFromFile(MinixFile* file);
+// Utility function to read the complete file and return it's contents.
+// If the file is not a directory, return NULL
+MinixDirEntry* readAllFromDirectory(MinixFile* file);
 
 #endif
