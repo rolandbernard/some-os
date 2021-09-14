@@ -6,6 +6,12 @@
 #include "files/vfs.h"
 #include "util/spinlock.h"
 
+#define MINIX_MAGIC 0x4d5a
+#define MINIX_BLOCK_SIZE 1024
+#define MINIX_NUM_IPTRS MINIX_BLOCK_SIZE / 4
+#define MINIX_S_IFDIR 0o040000
+#define MINIX_S_IFREG 0o100000
+
 typedef struct {
     uint32_t ninodes;
     uint16_t pad0;
@@ -46,12 +52,5 @@ typedef struct {
 } MinixFilesystem;
 
 MinixFilesystem* createMinixFilesystem(VfsFile* block_device, void* data);
-
-size_t offsetForINode(const MinixFilesystem* fs, uint32_t inode);
-
-void minixGenericOperation(
-    const MinixFilesystem* fs, Uid uid, Gid gid, uint32_t inode, VirtPtr buffer, size_t length,
-    size_t offset, bool write, VfsFunctionCallbackSizeT callback, void* udata
-);
 
 #endif
