@@ -455,3 +455,4 @@ MinixFile* createMinixFileForINode(const MinixFilesystem* fs, uint32_t inode) {
     file->position = 0;
     return file;
 }
+
