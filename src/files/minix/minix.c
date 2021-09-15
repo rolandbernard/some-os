@@ -5,6 +5,7 @@
 #include "files/minix/minix.h"
 #include "files/minix/file.h"
 
+#include "files/path.h"
 #include "memory/kalloc.h"
 #include "memory/virtptr.h"
 
@@ -100,14 +101,70 @@ typedef struct {
     const MinixFilesystem* fs;
     Uid uid;
     Gid gid;
-    const char* path;
+    char* path;
     char* path_copy;
     MinixINodeCallback callback;
     void* udata;
+    Error error;
+    uint32_t inode;
+    MinixFile* file;
 } MinixFindINodeRequest;
 
+static void minixFindINodeStepCallback(Error error, uint32_t inode, MinixFindINodeRequest* request);
+
+static void minixFindINodeCloseCallback(Error error, MinixFindINodeRequest* request) {
+    if (isError(request->error)) {
+        dealloc(request->path_copy);
+        request->callback(request->error, 0, request->udata);
+        dealloc(request);
+    } else if (isError(error)) {
+        dealloc(request->path_copy);
+        request->callback(error, 0, request->udata);
+        dealloc(request);
+    } else if (request->path[0] == 0) {
+        dealloc(request->path_copy);
+        request->callback(simpleError(SUCCESS), request->inode, request->udata);
+        dealloc(request);
+    } else {
+        const char* name = request->path;
+        while (*request->path != 0 && *request->path != '/') {
+            request->path++;
+        }
+        if (*request->path == '/') {
+            *request->path = 0;
+            request->path++;
+        }
+        request->file = createMinixFileForINode(request->fs, request->inode);
+        minixFindINodeForNameIn(
+            request->file, request->uid, request->gid, name,
+            (MinixINodeCallback)minixFindINodeStepCallback, request
+        );
+    }
+}
+
+static void minixFindINodeStepCallback(Error error, uint32_t inode, MinixFindINodeRequest* request) {
+    request->error = error;
+    request->inode = inode;
+    if (request->file != NULL) {
+        request->file->base.functions->close(
+            (VfsFile*)request->file, request->uid, request->gid,
+            (VfsFunctionCallbackVoid)minixFindINodeCloseCallback, request
+        );
+    } else {
+        minixFindINodeCloseCallback(simpleError(SUCCESS), request);
+    }
+}
+
 static void minixFindINodeForPath(const MinixFilesystem* fs, Uid uid, Gid gid, const char* path, MinixINodeCallback callback, void* udata) {
-    
+    MinixFindINodeRequest* request = kalloc(sizeof(MinixFindINodeRequest));
+    request->fs = fs;
+    request->uid = uid;
+    request->gid = gid;
+    request->path_copy = reducedPathCopy(path);
+    request->path = request->path_copy + 1; // all paths start with /, skip it
+    request->callback = callback;
+    request->udata = udata;
+    minixFindINodeStepCallback(simpleError(SUCCESS), 1, request); // Start searching at the root node
 }
 
 typedef struct {
