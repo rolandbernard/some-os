@@ -29,7 +29,6 @@ typedef enum {
     VFS_OPEN_APPEND = (1 << 1),
     VFS_OPEN_TRUNC = (1 << 2),
     VFS_OPEN_DIRECTORY = (1 << 3),
-    VFS_OPEN_NOATIME = (1 << 4),
 } VfsOpenFlags;
 
 typedef enum {

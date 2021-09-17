@@ -8,11 +8,6 @@
 #include "memory/kalloc.h"
 #include "util/util.h"
 
-size_t offsetForINode(const MinixFilesystem* fs, uint32_t inode) {
-    return (2 + fs->superblock.imap_blocks + fs->superblock.zmap_blocks) * MINIX_BLOCK_SIZE
-           + (inode - 1) * sizeof(MinixInode);
-}
-
 typedef struct {
     MinixFile* file;
     Uid uid;
@@ -454,5 +449,10 @@ MinixFile* createMinixFileForINode(const MinixFilesystem* fs, uint32_t inode) {
     file->inodenum = inode;
     file->position = 0;
     return file;
+}
+
+void truncateMinixFile(MinixFile* file, Uid uid, Gid gid, VfsFunctionCallbackVoid callback, void* udata) {
+    file->position = 0;
+    // TODO!
 }
 

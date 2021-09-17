@@ -6,8 +6,14 @@
 #include "files/minix/file.h"
 
 #include "files/path.h"
+#include "files/vfs.h"
 #include "memory/kalloc.h"
 #include "memory/virtptr.h"
+
+size_t offsetForINode(const MinixFilesystem* fs, uint32_t inode) {
+    return (2 + fs->superblock.imap_blocks + fs->superblock.zmap_blocks) * MINIX_BLOCK_SIZE
+           + (inode - 1) * sizeof(MinixInode);
+}
 
 typedef void (*MinixINodeCallback)(Error error, uint32_t inode, void* udata);
 
@@ -168,20 +174,96 @@ static void minixFindINodeForPath(const MinixFilesystem* fs, Uid uid, Gid gid, c
 }
 
 typedef struct {
-    MinixFilesystem* fs;
+    const MinixFilesystem* fs;
     Uid uid;
     Gid gid;
+    VfsOpenFlags flags;
+    VfsMode mode;
     VfsFunctionCallbackFile callback;
     void* udata;
+    VfsFile* file;
+    uint32_t inodenum;
+    MinixInode inode;
 } MinixOpenRequest;
 
-static void minixOpenINodeCallback(Error error, uint32_t inode, void* udata) {
+static void minixOpenSeekCallback(Error error, size_t pos, MinixOpenRequest* request) {
+    if (isError(error)) {
+        request->callback(error, NULL, request->udata);
+        dealloc(request);
+    } else {
+        request->callback(simpleError(SUCCESS), request->file, request->udata);
+        dealloc(request);
+    }
+}
+
+static void minixOpenTruncCallback(Error error, MinixOpenRequest* request) {
+
+}
+
+static void minixOpenReadCallback(Error error, size_t read, MinixOpenRequest* request) {
+    if (isError(error)) {
+        request->callback(error, NULL, request->udata);
+        dealloc(request);
+    } else if (read != sizeof(MinixInode)) {
+        request->callback(simpleError(IO_ERROR), NULL, request->udata);
+        dealloc(request);
+    } else
+        // TODO: check permissions
+        if (MODE_TYPE(request->inode.mode) != VFS_TYPE_DIR && (request->flags & VFS_OPEN_DIRECTORY) != 0) {
+        request->callback(simpleError(WRONG_FILE_TYPE), NULL, request->udata);
+        dealloc(request);
+    } else if (MODE_TYPE(request->inode.mode) == VFS_TYPE_DIR && (request->flags & VFS_OPEN_DIRECTORY) == 0) {
+        request->callback(simpleError(WRONG_FILE_TYPE), NULL, request->udata);
+        dealloc(request);
+    } else {
+        MinixFile* file = createMinixFileForINode(request->fs, request->inodenum);
+        request->file = (VfsFile*)file;
+        if ((request->flags & VFS_OPEN_APPEND) != 0) {
+            file->base.functions->seek(
+                request->file, request->uid, request->gid, request->inode.size, VFS_SEEK_SET,
+                (VfsFunctionCallbackSizeT)minixOpenSeekCallback, request
+            );
+        } else if ((request->flags & VFS_OPEN_TRUNC) != 0) {
+            truncateMinixFile(
+                file, request->uid, request->gid, (VfsFunctionCallbackVoid)minixOpenTruncCallback,
+                request
+            );
+        } else {
+            request->callback(simpleError(SUCCESS), request->file, request->udata);
+            dealloc(request);
+        }
+    }
+}
+
+static void minixOpenINodeCallback(Error error, uint32_t inode, MinixOpenRequest* request) {
+    if (error.kind == NO_SUCH_FILE && (request->flags & VFS_OPEN_CREATE) != 0) {
+    } else if (isError(error)) {
+        request->callback(error, NULL, request->udata);
+        dealloc(request);
+    } else {
+        request->inodenum = inode;
+        vfsReadAt(
+            request->fs->block_device, request->uid, request->gid,
+            virtPtrForKernel(&request->inode), sizeof(MinixInode),
+            offsetForINode(request->fs, inode), (VfsFunctionCallbackSizeT)minixOpenReadCallback,
+            request
+        );
+    }
 }
 
 static void minixOpenFunction(
     const MinixFilesystem* fs, Uid uid, Gid gid, const char* path, VfsOpenFlags flags, VfsMode mode,
     VfsFunctionCallbackFile callback, void* udata
 ) {
+    MinixOpenRequest* request = kalloc(sizeof(MinixOpenRequest));
+    request->fs = fs;
+    request->uid = uid;
+    request->gid = gid;
+    request->flags = flags;
+    request->mode = mode;
+    request->callback = callback;
+    request->udata = udata;
+    minixFindINodeForPath(fs, uid, gid, path, (MinixINodeCallback)minixOpenINodeCallback, request);
 }
 
 static void minixUnlinkFunction(const MinixFilesystem* fs, Uid uid, Gid gid, const char* path, VfsFunctionCallbackVoid callback, void* udata) {

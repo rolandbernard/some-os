@@ -51,4 +51,6 @@ typedef struct {
 
 MinixFilesystem* createMinixFilesystem(VfsFile* block_device, void* data);
 
+size_t offsetForINode(const MinixFilesystem* fs, uint32_t inode);
+
 #endif
