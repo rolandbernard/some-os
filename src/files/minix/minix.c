@@ -197,7 +197,13 @@ static void minixOpenSeekCallback(Error error, size_t pos, MinixOpenRequest* req
 }
 
 static void minixOpenTruncCallback(Error error, MinixOpenRequest* request) {
-
+    if (isError(error)) {
+        request->callback(error, NULL, request->udata);
+        dealloc(request);
+    } else {
+        request->callback(simpleError(SUCCESS), request->file, request->udata);
+        dealloc(request);
+    }
 }
 
 static void minixOpenReadCallback(Error error, size_t read, MinixOpenRequest* request) {
@@ -237,6 +243,7 @@ static void minixOpenReadCallback(Error error, size_t read, MinixOpenRequest* re
 
 static void minixOpenINodeCallback(Error error, uint32_t inode, MinixOpenRequest* request) {
     if (error.kind == NO_SUCH_FILE && (request->flags & VFS_OPEN_CREATE) != 0) {
+        // TODO!
     } else if (isError(error)) {
         request->callback(error, NULL, request->udata);
         dealloc(request);
@@ -272,7 +279,39 @@ static void minixUnlinkFunction(const MinixFilesystem* fs, Uid uid, Gid gid, con
 static void minixLinkFunction(const MinixFilesystem* fs, Uid uid, Gid gid, const char* old, const char* new, VfsFunctionCallbackVoid callback, void* udata) {
 }
 
+typedef struct {
+    const MinixFilesystem* fs;
+    Uid uid;
+    Gid gid;
+    const char* old;
+    VfsFunctionCallbackVoid callback;
+    void* udata;
+} MinixRenameRequest;
+
+static void minixRenameLinkCallback(Error error, MinixRenameRequest* request) {
+    if (isError(error)) {
+        request->callback(error, request->udata);
+        dealloc(request);
+    } else {
+        minixUnlinkFunction(
+            request->fs, request->uid, request->gid, request->old, request->callback, request->udata
+        );
+        dealloc(request);
+    }
+}
+
 static void minixRenameFunction(const MinixFilesystem* fs, Uid uid, Gid gid, const char* old, const char* new, VfsFunctionCallbackVoid callback, void* udata) {
+    // TODO: Optimize
+    MinixRenameRequest* request = kalloc(sizeof(MinixRenameRequest));
+    request->fs = fs;
+    request->uid = uid;
+    request->gid = gid;
+    request->old = old;
+    request->callback = callback;
+    request->udata = udata;
+    minixLinkFunction(
+        fs, uid, gid, old, new, (VfsFunctionCallbackVoid)minixRenameLinkCallback, request
+    );
 }
 
 static void minixFreeFunction(MinixFilesystem* fs, Uid uid, Gid gid, VfsFunctionCallbackVoid callback, void* udata) {
