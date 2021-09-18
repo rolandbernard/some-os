@@ -2,6 +2,7 @@
 #include "kernel/init.h"
 
 #include "error/log.h"
+#include "files/vfs.h"
 #include "interrupt/plic.h"
 #include "process/process.h"
 #include "memory/pagealloc.h"
@@ -20,6 +21,7 @@ Error initBasicSystems() {
 
 Error initAllSystems() {
     CHECKED(initPlic()); // Not required for running a process. Timer interrupts work already.
+    CHECKED(initVirtualFileSystem());
     return simpleError(SUCCESS);
 }
 
