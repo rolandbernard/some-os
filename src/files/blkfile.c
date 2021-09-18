@@ -5,6 +5,7 @@
 #include "files/blkfile.h"
 #include "memory/kalloc.h"
 #include "memory/virtptr.h"
+#include "error/log.h"
 #include "util/util.h"
 
 static void blockSeekFunction(BlockDeviceFile* file, Uid uid, Gid gid, size_t offset, VfsSeekWhence whence, VfsFunctionCallbackSizeT callback, void* udata) {
@@ -56,7 +57,7 @@ static void blockOperatonFileCallback(Error status, BlockFileRequest* request) {
             }
             request->read += request->current_read;
             request->offset += request->current_read;
-            request->offset -= request->current_read;
+            request->size -= request->current_read;
             request->buffer.address += request->current_read;
         }
         if (request->size == 0) {
@@ -133,13 +134,13 @@ static void genericBlockFileFunction(BlockDeviceFile* file, bool write, VirtPtr 
     } else if (file->position + size > file->size) {
         size = file->size - file->position;
     }
-    file->position += size;
     request.block_dev = file->device;
     request.block_size = file->block_size;
     request.block_op = file->block_operation;
     request.buffer = buffer;
     request.offset = file->position;
     request.size = size;
+    file->position += size;
     unlockSpinLock(&file->lock);
     BlockFileRequest* req = kalloc(sizeof(BlockFileRequest) + request.block_size);
     memcpy(req, &request, sizeof(BlockFileRequest));
@@ -208,6 +209,7 @@ BlockDeviceFile* createBlockDeviceFile(void* block_dev, size_t block_size, size_
     file->base.functions = &functions;
     file->device = block_dev;
     file->size = size;
+    file->block_size = block_size;
     file->block_operation = block_op;
     return file;
 }

@@ -38,15 +38,21 @@ Error initVirtIOBlockDevice(int id, volatile VirtIODeviceLayout* base, VirtIODev
     return simpleError(SUCCESS);
 }
 
-Error virtIOBlockDeviceOperation(
+void virtIOBlockDeviceOperation(
     VirtIOBlockDevice* device, VirtPtr buffer, uint32_t offset, uint32_t size, bool write,
     VirtIOBlockCallback callback, void* udata
 ) {
     assert(size % BLOCK_SECTOR_SIZE == 0);
     if (write && device->read_only) {
-        return someError(UNSUPPORTED, "Read-only device write attempt");
+        callback(someError(UNSUPPORTED, "Read-only device write attempt"), udata);
     }
     lockSpinLock(&device->lock);
+    if (
+        device->virtio.ack_index == (device->virtio.queue->available.index + 1) % VIRTIO_RING_SIZE
+        || device->ack_index == (device->req_index + 1) % BLOCK_MAX_REQUESTS
+    ) {
+        callback(someError(ALREADY_IN_USE, "Queue is full"), udata);
+    }
     uint32_t sector = offset / BLOCK_SECTOR_SIZE;
     VirtIOBlockRequest* request = kalloc(sizeof(VirtIOBlockRequest));
     assert(request != NULL);
@@ -65,7 +71,6 @@ Error virtIOBlockDeviceOperation(
     device->requests[device->req_index] = request;
     device->req_index = (device->req_index + 1) % BLOCK_MAX_REQUESTS;
     unlockSpinLock(&device->lock);
-    return simpleError(SUCCESS);
 }
 
 void virtIOBlockFreePendingRequests(VirtIOBlockDevice* device) {
