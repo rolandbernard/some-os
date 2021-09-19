@@ -15,6 +15,7 @@
 #include "memory/pagealloc.h"
 #include "memory/pagetable.h"
 #include "memory/virtmem.h"
+#include "memory/virtptr.h"
 #include "process/harts.h"
 #include "process/process.h"
 #include "process/schedule.h"
@@ -72,9 +73,19 @@ void kernelMain() {
 #include "files/minix/minix.h"
 #include "files/blkfile.h"
 
+void readCallback(Error error, size_t read, char* string) {
+    KERNEL_LOG("[!] Error: %s", getErrorMessage(error));
+    string[read] = 0;
+    KERNEL_LOG("[!] Read: '%s'", string);
+}
+
 void openCallback(Error error, VfsFile* file, void* udata) {
     KERNEL_LOG("[!] Error: %s", getErrorMessage(error));
     KERNEL_LOG("[!] File:  %p", file);
+    char* buff = kalloc(512);
+    file->functions->read(
+        file, 0, 0, virtPtrForKernel(buff), 510, (VfsFunctionCallbackSizeT)readCallback, buff
+    );
 }
 
 void initCallback(Error error, VfsFilesystem* fs) {
@@ -88,7 +99,7 @@ void testingCode() {
     VirtIOBlockDevice* device = (VirtIOBlockDevice*)getAnyDeviceOfType(VIRTIO_BLOCK);
     VirtIOBlockDeviceLayout* layout = (VirtIOBlockDeviceLayout*)device->virtio.mmio;
     BlockDeviceFile* file = createBlockDeviceFile(
-        device, layout->config.blk_size, layout->config.capacity,
+        device, layout->config.blk_size, layout->config.capacity * layout->config.blk_size,
         (BlockOperationFunction)virtIOBlockDeviceOperation
     );
     MinixFilesystem* fs = createMinixFilesystem((VfsFile*)file, NULL);
