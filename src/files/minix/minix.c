@@ -49,9 +49,11 @@ static void readEntriesForRequest(MinixFindInDirectoryRequest* request) {
             request->entries = kalloc(size);
         }
         request->entry_count = size / sizeof(MinixDirEntry);
+        // Use uid 0 here because the system is traversing the file tree, not the user.
+        // User can traverse with only x permissions, but not actually read or write.
         request->file->base.functions->read(
-            (VfsFile*)request->file, request->uid, request->gid, virtPtrForKernel(request->entries),
-            size, (VfsFunctionCallbackSizeT)minixFindINodeInReadCallback, request
+            (VfsFile*)request->file, 0, 0, virtPtrForKernel(request->entries), size,
+            (VfsFunctionCallbackSizeT)minixFindINodeInReadCallback, request
         );
     }
 }
@@ -67,7 +69,7 @@ static void minixFindINodeInReadCallback(Error error, size_t read, MinixFindInDi
         dealloc(request);
     } else {
         for (size_t i = 0; i < request->entry_count; i++) {
-            if (strcmp((char*)request->entries[i].name, request->name) == 0) {
+            if (request->entries[i].inode != 0 && strcmp((char*)request->entries[i].name, request->name) == 0) {
                 uint32_t inode = request->entries[i].inode;
                 dealloc(request->entries);
                 request->callback(simpleError(SUCCESS), inode, request->udata);
@@ -86,6 +88,10 @@ static void minixFindINodeInStatCallback(Error error, VfsStat stat, MinixFindInD
     } else if (MODE_TYPE(stat.mode) != VFS_TYPE_DIR) {
         // File is not a directory
         request->callback(simpleError(WRONG_FILE_TYPE), 0, request->udata);
+        dealloc(request);
+    } else if (!canAccess(stat.mode, stat.uid, stat.gid, request->uid, request->gid, VFS_ACCESS_X)) {
+        unlockSpinLock(&request->file->lock);
+        request->callback(simpleError(FORBIDDEN), 0, request->udata);
         dealloc(request);
     } else {
         request->size = stat.size;
@@ -214,9 +220,7 @@ static void minixOpenReadCallback(Error error, size_t read, MinixOpenRequest* re
     } else if (read != sizeof(MinixInode)) {
         request->callback(simpleError(IO_ERROR), NULL, request->udata);
         dealloc(request);
-    } else
-        // TODO: check permissions
-        if (MODE_TYPE(request->inode.mode) != VFS_TYPE_DIR && (request->flags & VFS_OPEN_DIRECTORY) != 0) {
+    } else if (MODE_TYPE(request->inode.mode) != VFS_TYPE_DIR && (request->flags & VFS_OPEN_DIRECTORY) != 0) {
         request->callback(simpleError(WRONG_FILE_TYPE), NULL, request->udata);
         dealloc(request);
     } else if (MODE_TYPE(request->inode.mode) == VFS_TYPE_DIR && (request->flags & VFS_OPEN_DIRECTORY) == 0) {

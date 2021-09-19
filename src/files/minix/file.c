@@ -5,6 +5,7 @@
 #include "files/minix/file.h"
 
 #include "error/panic.h"
+#include "files/vfs.h"
 #include "kernel/time.h"
 #include "memory/kalloc.h"
 #include "util/util.h"
@@ -261,8 +262,15 @@ static void minixGenericReadINodeCallback(Error error, size_t read, MinixOperati
         unlockSpinLock(&request->file->lock);
         request->callback(simpleError(IO_ERROR), 0, request->udata);
         dealloc(request);
+    } else if (request->write && !canAccess(request->inode.mode, request->inode.uid, request->inode.gid, request->uid, request->gid, VFS_ACCESS_W)) {
+        unlockSpinLock(&request->file->lock);
+        request->callback(simpleError(FORBIDDEN), 0, request->udata);
+        dealloc(request);
+    } else if (!request->write && !canAccess(request->inode.mode, request->inode.uid, request->inode.gid, request->uid, request->gid, VFS_ACCESS_R)) {
+        unlockSpinLock(&request->file->lock);
+        request->callback(simpleError(FORBIDDEN), 0, request->udata);
+        dealloc(request);
     } else {
-        // TODO: test for user permissions
         request->position[0] = 0;
         request->position[1] = 0;
         request->position[2] = 0;

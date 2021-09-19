@@ -32,6 +32,14 @@ typedef enum {
 } VfsOpenFlags;
 
 typedef enum {
+    VFS_ACCESS_R = (1 << 0),
+    VFS_ACCESS_W = (1 << 1),
+    VFS_ACCESS_X = (1 << 2),
+    VFS_ACCESS_REG = (1 << 3),
+    VFS_ACCESS_DIR = (1 << 4),
+} VfsAccessFlags;
+
+typedef enum {
     VFS_MODE_A_X = (1 << 0),
     VFS_MODE_A_W = (1 << 1),
     VFS_MODE_A_R = (1 << 2),
@@ -179,5 +187,7 @@ void vfsReadAt(VfsFile* file, Uid uid, Gid gid, VirtPtr ptr, size_t size, size_t
 
 // Utility function that calls seek and write on a file to write at a specific offset
 void vfsWriteAt(VfsFile* file, Uid uid, Gid gid, VirtPtr ptr, size_t size, size_t offset, VfsFunctionCallbackSizeT callback, void* udata);
+
+bool canAccess(VfsMode mode, Uid file_uid, Gid file_gid, Uid uid, Gid gid, VfsAccessFlags flags);
 
 #endif
