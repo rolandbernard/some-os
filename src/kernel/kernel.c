@@ -73,18 +73,39 @@ void kernelMain() {
 #include "files/minix/minix.h"
 #include "files/blkfile.h"
 
-void readCallback(Error error, size_t read, char* string) {
+VfsFile* file;
+char buff[512];
+
+void read2Callback(Error error, size_t read, char* string) {
     KERNEL_LOG("[!] Error: %s", getErrorMessage(error));
     string[read] = 0;
     KERNEL_LOG("[!] Read: '%s'", string);
 }
 
-void openCallback(Error error, VfsFile* file, void* udata) {
+void writeCallback(Error error, size_t read, const char* string) {
+    KERNEL_LOG("[!] Error: %s", getErrorMessage(error));
+    KERNEL_LOG("[!] Wrote:'%s'", string);
+    vfsReadAt(
+        file, 0, 0, virtPtrForKernel(buff), 511, 0, (VfsFunctionCallbackSizeT)read2Callback, buff
+    );
+}
+
+void read1Callback(Error error, size_t read, char* string) {
+    KERNEL_LOG("[!] Error: %s", getErrorMessage(error));
+    string[read] = 0;
+    KERNEL_LOG("[!] Read: '%s'", string);
+    memcpy(buff, "HELLO", 6);
+    vfsWriteAt(
+        file, 0, 0, virtPtrForKernel(buff), 5, 0, (VfsFunctionCallbackSizeT)writeCallback, buff
+    );
+}
+
+void openCallback(Error error, VfsFile* f, void* udata) {
+    file = f;
     KERNEL_LOG("[!] Error: %s", getErrorMessage(error));
     KERNEL_LOG("[!] File:  %p", file);
-    char* buff = kalloc(512);
-    file->functions->read(
-        file, 0, 0, virtPtrForKernel(buff), 510, (VfsFunctionCallbackSizeT)readCallback, buff
+    vfsReadAt(
+        file, 0, 0, virtPtrForKernel(buff), 511, 0, (VfsFunctionCallbackSizeT)read1Callback, buff
     );
 }
 

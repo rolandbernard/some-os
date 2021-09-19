@@ -13,11 +13,13 @@
 #define MIN_TIME (CLOCKS_PER_SEC / 100)
 
 typedef struct {
+    Timeout id;
     Time time;
     TimeoutFunction function;
     void* udata;
 } TimeoutEntry;
 
+static Timeout next_id = 0;
 static SpinLock timeout_lock;
 static TimeoutEntry* timeouts = NULL;
 static size_t capacity = 0;
@@ -30,20 +32,27 @@ Timeout setTimeout(Time delay, TimeoutFunction function, void* udata) {
         timeouts = krealloc(timeouts, capacity * sizeof(TimeoutEntry));
         assert(timeouts != NULL);
     }
-    Timeout id = length;
-    timeouts[id].time = getTime() + delay;
-    timeouts[id].function = function;
-    timeouts[id].udata = udata;
+    Timeout id = next_id;
+    next_id++;
+    size_t index = length;
     length++;
+    timeouts[index].id = id;
+    timeouts[index].time = getTime() + delay;
+    timeouts[index].function = function;
+    timeouts[index].udata = udata;
     unlockSpinLock(&timeout_lock);
     return id;
 }
 
 void clearTimeout(Timeout timeout) {
     lockSpinLock(&timeout_lock);
-    if (timeout < length) {
-        memmove(timeouts + timeout, timeouts + timeout + 1, (length - timeout - 1) * sizeof(TimeoutEntry));
-        length--;
+    for (size_t i = 0; i < length;) {
+        if (timeouts[i].id == timeout) {
+            memmove(timeouts + timeout, timeouts + timeout + 1, (length - timeout - 1) * sizeof(TimeoutEntry));
+            length--;
+        } else {
+            i++;
+        }
     }
     unlockSpinLock(&timeout_lock);
 }
