@@ -92,6 +92,7 @@ typedef void (*WriteFunction)(struct VfsFile_s* file, Uid uid, Gid gid, VirtPtr 
 typedef void (*StatFunction)(struct VfsFile_s* file, Uid uid, Gid gid, VfsFunctionCallbackStat callback, void* udata);
 typedef void (*CloseFunction)(struct VfsFile_s* file, Uid uid, Gid gid, VfsFunctionCallbackVoid callback, void* udata);
 typedef void (*DupFunction)(struct VfsFile_s* file, Uid uid, Gid gid, VfsFunctionCallbackFile callback, void* udata);
+typedef void (*TruncFunction)(struct VfsFile_s* file, Uid uid, Gid gid, size_t size, VfsFunctionCallbackVoid callback, void* udata);
 
 typedef struct {
     SeekFunction seek;
@@ -100,6 +101,7 @@ typedef struct {
     CloseFunction close;
     StatFunction stat;
     DupFunction dup;
+    TruncFunction trunc;
 } VfsFileVtable;
 
 typedef struct VfsFile_s {

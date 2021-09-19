@@ -13,6 +13,4 @@ typedef struct {
 
 MinixFile* createMinixFileForINode(const MinixFilesystem* fs, uint32_t inode);
 
-void truncateMinixFile(MinixFile* file, Uid uid, Gid gid, VfsFunctionCallbackVoid callback, void* udata);
-
 #endif

@@ -262,7 +262,7 @@ static void minixGenericReadINodeCallback(Error error, size_t read, MinixOperati
         request->callback(simpleError(IO_ERROR), 0, request->udata);
         dealloc(request);
     } else {
-        // TODO: test for user permissions (Maybe only on open?)
+        // TODO: test for user permissions
         request->position[0] = 0;
         request->position[1] = 0;
         request->position[2] = 0;
@@ -285,6 +285,7 @@ static void minixGenericOperation(
     VfsFunctionCallbackSizeT callback, void* udata
 ) {
     MinixOperationRequest* request = kalloc(sizeof(MinixOperationRequest));
+    lockSpinLock(&file->lock);
     request->file = file;
     request->uid = uid;
     request->gid = gid;
@@ -442,6 +443,10 @@ static void minixDupFunction(MinixFile* file, Uid uid, Gid gid, VfsFunctionCallb
     callback(simpleError(SUCCESS), (VfsFile*)copy, udata);
 }
 
+static void minixTruncFunction(MinixFile* file, Uid uid, Gid gid, size_t size, VfsFunctionCallbackVoid callback, void* udata) {
+    // TODO: implement
+}
+
 static VfsFileVtable functions = {
     .seek = (SeekFunction)minixSeekFunction,
     .read = (ReadFunction)minixReadFunction,
@@ -449,6 +454,7 @@ static VfsFileVtable functions = {
     .stat = (StatFunction)minixStatFunction,
     .close = (CloseFunction)minixCloseFunction,
     .dup = (DupFunction)minixDupFunction,
+    .trunc = (TruncFunction)minixTruncFunction,
 };
 
 MinixFile* createMinixFileForINode(const MinixFilesystem* fs, uint32_t inode) {
@@ -458,10 +464,5 @@ MinixFile* createMinixFileForINode(const MinixFilesystem* fs, uint32_t inode) {
     file->inodenum = inode;
     file->position = 0;
     return file;
-}
-
-void truncateMinixFile(MinixFile* file, Uid uid, Gid gid, VfsFunctionCallbackVoid callback, void* udata) {
-    file->position = 0;
-    // TODO!
 }
 
