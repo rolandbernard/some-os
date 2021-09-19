@@ -22,11 +22,19 @@ bool isError(Error error) {
 const char* getErrorKindMessage(ErrorKind error) {
     switch (error) {
         case SUCCESS: return "Success";
+        case UNKNOWN: return "Unknown";
         case NO_DATA: return "No data";
         case UNSUPPORTED: return "Unsupported";
         case NOT_INITIALIZED: return "Not initialized";
-        default: return "Unknown";
+        case ALREADY_IN_USE: return "Already in use";
+        case ILLEGAL_ARGUMENTS: return "Illegal arguments";
+        case IO_ERROR: return "IO error";
+        case NO_SUCH_FILE: return "File not found";
+        case WRONG_FILE_TYPE: return "Wrong file type";
+        case FORBIDDEN: return "Permission denied";
     }
+    // Like default but we still get an warning for an incomplete switch
+    return "Unknown?";
 }
 
 const char* getErrorMessage(Error error) {
