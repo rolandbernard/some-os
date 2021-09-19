@@ -110,7 +110,7 @@ static void blockOperatonFileCallback(Error status, BlockFileRequest* request) {
                     );
                 } else {
                     request->tmp_read = false;
-                    request->current_read = umin(request->offset + request->size - read_start, request->block_size);
+                    request->current_read = umin(request->size, read_start + request->block_size - request->offset);
                     if (request->write) {
                         size_t offset = request->offset % request->block_size;
                         memcpyBetweenVirtPtr(virtPtrForKernel(request->tmp_buffer + offset), request->buffer, request->current_read);

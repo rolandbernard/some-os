@@ -6,7 +6,7 @@
 #include "files/vfs.h"
 #include "util/spinlock.h"
 
-#define MINIX_MAGIC 0x4d5a
+#define MINIX3_MAGIC 0x4d5a
 #define MINIX_BLOCK_SIZE 1024
 #define MINIX_NUM_IPTRS MINIX_BLOCK_SIZE / 4
 
@@ -24,7 +24,7 @@ typedef struct {
     uint16_t pag2;
     uint16_t block_size;
     uint8_t disk_version;
-} MinixSuperblock;
+} Minix3Superblock;
 
 typedef struct {
     uint16_t mode;
@@ -45,7 +45,7 @@ typedef struct {
 
 typedef struct {
     VfsFilesystem base;
-    MinixSuperblock superblock;
+    Minix3Superblock superblock;
     VfsFile* block_device;
 } MinixFilesystem;
 

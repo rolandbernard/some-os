@@ -2,6 +2,7 @@
 #include <stddef.h>
 #include <string.h>
 
+#include "error/log.h"
 #include "files/minix/minix.h"
 #include "files/minix/file.h"
 
@@ -274,9 +275,11 @@ static void minixOpenFunction(
 }
 
 static void minixUnlinkFunction(const MinixFilesystem* fs, Uid uid, Gid gid, const char* path, VfsFunctionCallbackVoid callback, void* udata) {
+    // TODO: implement
 }
 
 static void minixLinkFunction(const MinixFilesystem* fs, Uid uid, Gid gid, const char* old, const char* new, VfsFunctionCallbackVoid callback, void* udata) {
+    // TODO: implement
 }
 
 typedef struct {
@@ -332,10 +335,10 @@ static void minixSuperblockReadCallback(Error error, size_t read, MinixInitReque
     if (isError(error)) {
         request->callback(error, request->udata);
         dealloc(request);
-    } else if (read != sizeof(MinixSuperblock)) {
+    } else if (read != sizeof(Minix3Superblock)) {
         request->callback(simpleError(IO_ERROR), request->udata);
         dealloc(request);
-    } else if (request->fs->superblock.magic != MINIX_MAGIC) {
+    } else if (request->fs->superblock.magic != MINIX3_MAGIC) {
         request->callback(simpleError(WRONG_FILE_TYPE), request->udata);
         dealloc(request);
     } else {
@@ -353,7 +356,7 @@ static void minixInitFunction(MinixFilesystem* fs, Uid uid, Gid gid, VfsFunction
     request->callback = callback;
     request->udata = udata;
     vfsReadAt(
-        fs->block_device, uid, gid, virtPtrForKernel(&fs->superblock), sizeof(MinixSuperblock),
+        fs->block_device, uid, gid, virtPtrForKernel(&fs->superblock), sizeof(Minix3Superblock),
         MINIX_BLOCK_SIZE, (VfsFunctionCallbackSizeT)minixSuperblockReadCallback, request
     );
 }

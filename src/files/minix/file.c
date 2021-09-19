@@ -1,6 +1,7 @@
 
 #include <string.h>
 
+#include "error/log.h"
 #include "files/minix/file.h"
 
 #include "error/panic.h"
@@ -83,7 +84,18 @@ static void minixOperationAtZone(MinixOperationRequest* request, size_t zone) {
 }
 
 static void minixGenericZoneWalkStep(MinixOperationRequest* request) {
-    if (request->position[0] < 7) {
+    if (request->size == 0 || request->position[0] > 9) {
+        request->inode.atime = getUnixTime();
+        if (request->write) {
+            request->inode.mtime = getUnixTime();
+        }
+        vfsWriteAt(
+            request->file->fs->block_device, request->uid, request->gid,
+            virtPtrForKernel(&request->inode), sizeof(MinixInode),
+            offsetForINode(request->file->fs, request->file->inodenum),
+            (VfsFunctionCallbackSizeT)minixGenericFinishedCallback, request
+        );
+    } else if (request->position[0] < 7) {
         size_t pos = request->position[0];
         request->position[0]++;
         minixOperationAtZone(request, request->inode.zones[pos]);
@@ -237,17 +249,6 @@ static void minixGenericZoneWalkStep(MinixOperationRequest* request) {
                 minixOperationAtZone(request, request->zones[2][pos]);
             }
         }
-    } else {
-        request->inode.atime = getUnixTime();
-        if (request->write) {
-            request->inode.mtime = getUnixTime();
-        }
-        vfsWriteAt(
-            request->file->fs->block_device, request->uid, request->gid,
-            virtPtrForKernel(&request->inode), sizeof(MinixInode),
-            offsetForINode(request->file->fs, request->file->inodenum),
-            (VfsFunctionCallbackSizeT)minixGenericFinishedCallback, request
-        );
     }
 }
 
@@ -267,6 +268,14 @@ static void minixGenericReadINodeCallback(Error error, size_t read, MinixOperati
         request->position[2] = 0;
         request->position[3] = 0;
         request->depth = 0;
+        if (request->inode.size < request->offset + request->size && !request->write) {
+            // Can't read past the end of the file
+            if (request->inode.size < request->offset) {
+                request->size = 0;
+            } else {
+                request->size = request->inode.size - request->offset;
+            }
+        }
         minixGenericZoneWalkStep(request);
     }
 }
