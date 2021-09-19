@@ -14,6 +14,7 @@ SOURCE_DIR := src
 BUILD_DIR  := build
 OBJECT_DIR := $(BUILD_DIR)/$(BUILD)/obj
 BINARY_DIR := $(BUILD_DIR)/$(BUILD)/bin
+MOUNT_DIR  := mnt/
 # ==
 
 # == Files
@@ -110,9 +111,13 @@ $(OBJECT_DIR)/%.o: $(SOURCE_DIR)/% $(MAKEFILE_LIST) | $$(dir $$@)
 qemu: $(BINARY_DIR)/kernel $(DISK)
 	$(QEMU) $(QEMU_ARGS) -kernel $(BINARY_DIR)/kernel
 
-$(DISK): $(MAKEFILE_LIST)
+$(DISK): $(MAKEFILE_LIST) | $(MOUNT_DIR)
 	@$(ECHO) "Building $@"
-	dd if=/dev/urandom of=$@ bs=1M count=32 &> /dev/null
+	dd if=/dev/zero of=$@ bs=1M count=32 &> /dev/null
+	mkfs.minix -3 $@
+	sudo mount $@ $(MOUNT_DIR)
+	echo "Hello world!" > $(MOUNT_DIR)/test.txt
+	sudo umount $(MOUNT_DIR)
 
 # Cleanup
 
