@@ -231,9 +231,9 @@ static void minixOpenReadCallback(Error error, size_t read, MinixOpenRequest* re
                 (VfsFunctionCallbackSizeT)minixOpenSeekCallback, request
             );
         } else if ((request->flags & VFS_OPEN_TRUNC) != 0) {
-            truncateMinixFile(
-                file, request->uid, request->gid, (VfsFunctionCallbackVoid)minixOpenTruncCallback,
-                request
+            file->base.functions->trunc(
+                (VfsFile*)file, request->uid, request->gid, 0,
+                (VfsFunctionCallbackVoid)minixOpenTruncCallback, request
             );
         } else {
             request->callback(simpleError(SUCCESS), request->file, request->udata);
