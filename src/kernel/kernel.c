@@ -71,6 +71,7 @@ void kernelMain() {
 }
 
 #include "files/minix/minix.h"
+#include "files/minix/maps.h"
 #include "files/blkfile.h"
 
 VfsFile* file;
@@ -94,9 +95,10 @@ void read1Callback(Error error, size_t read, char* string) {
     KERNEL_LOG("[!] Error: %s", getErrorMessage(error));
     string[read] = 0;
     KERNEL_LOG("[!] Read: '%s'", string);
-    memcpy(buff, "HELLO", 6);
+    const char* test = "HELLO WORLD... TEST!";
+    memcpy(buff, test, strlen(test) + 1);
     vfsWriteAt(
-        file, 0, 0, virtPtrForKernel(buff), 5, 0, (VfsFunctionCallbackSizeT)writeCallback, buff
+        file, 0, 0, virtPtrForKernel(buff), strlen(test), 0, (VfsFunctionCallbackSizeT)writeCallback, buff
     );
 }
 
@@ -112,7 +114,7 @@ void openCallback(Error error, VfsFile* f, void* udata) {
 void initCallback(Error error, VfsFilesystem* fs) {
     KERNEL_LOG("[!] Error: %s", getErrorMessage(error));
     mountFilesystem(&global_file_system, fs, "/"); 
-    vfsOpen(&global_file_system, 0, 0, "/test.txt", 0, 0, openCallback, fs);
+    vfsOpen(&global_file_system, 0, 0, "/test/test.txt", 0, 0, openCallback, fs);
 }
 
 void testingCode() {

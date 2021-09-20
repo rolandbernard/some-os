@@ -116,7 +116,9 @@ $(DISK): $(MAKEFILE_LIST) | $(MOUNT_DIR)
 	dd if=/dev/zero of=$@ bs=1M count=32 &> /dev/null
 	mkfs.minix -3 $@
 	sudo mount $@ $(MOUNT_DIR)
-	echo "Hello world!" > $(MOUNT_DIR)/test.txt
+	mkdir $(MOUNT_DIR)/test
+	mkdir $(MOUNT_DIR)/test2
+	echo "Hello world!" > $(MOUNT_DIR)/test/test.txt
 	sudo umount $(MOUNT_DIR)
 
 # Cleanup
