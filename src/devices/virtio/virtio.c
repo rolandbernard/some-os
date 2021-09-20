@@ -128,8 +128,8 @@ uint16_t addDescriptorsFor(VirtIODevice* device, VirtPtr buffer, size_t length, 
 }
 
 void sendRequestAt(VirtIODevice* device, uint16_t descriptor) {
-    device->queue->available.ring[device->queue->available.index] = descriptor;
-    device->queue->available.index = (device->queue->available.index + 1) % VIRTIO_RING_SIZE;
+    device->queue->available.ring[device->queue->available.index % VIRTIO_RING_SIZE] = descriptor;
+    device->queue->available.index++;
     memoryFence();
     device->mmio->queue_notify = 0;
 }
