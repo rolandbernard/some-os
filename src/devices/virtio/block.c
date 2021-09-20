@@ -51,7 +51,9 @@ void virtIOBlockDeviceOperation(
         device->virtio.queue->available.index - device->virtio.ack_index > VIRTIO_RING_SIZE
         || device->req_index - device->ack_index > BLOCK_MAX_REQUESTS
     ) {
+        unlockSpinLock(&device->lock);
         callback(someError(ALREADY_IN_USE, "Queue is full"), udata);
+        return;
     }
     uint32_t sector = offset / BLOCK_SECTOR_SIZE;
     VirtIOBlockRequest* request = kalloc(sizeof(VirtIOBlockRequest));
@@ -74,31 +76,27 @@ void virtIOBlockDeviceOperation(
 }
 
 void virtIOBlockFreePendingRequests(VirtIOBlockDevice* device) {
+    size_t request_count = 0;
     lockSpinLock(&device->lock);
+    for (uint16_t i = device->virtio.ack_index; i != device->virtio.queue->used.index; i++) {
+        VirtIOUsedElement elem = device->virtio.queue->used.ring[device->virtio.ack_index % VIRTIO_RING_SIZE];
+        for (uint16_t i = device->ack_index; i != device->req_index; i++) {
+            if (device->requests[i % BLOCK_MAX_REQUESTS] != NULL && device->requests[i % BLOCK_MAX_REQUESTS]->head == elem.id) {
+                request_count++;
+                break;
+            }
+        }
+    }
+    VirtIOBlockRequest* requests[request_count];
+    request_count = 0;
     while (device->virtio.ack_index != device->virtio.queue->used.index) {
         VirtIOUsedElement elem = device->virtio.queue->used.ring[device->virtio.ack_index % VIRTIO_RING_SIZE];
         device->virtio.ack_index++;
         for (uint16_t i = device->ack_index; i != device->req_index; i++) {
             if (device->requests[i % BLOCK_MAX_REQUESTS] != NULL && device->requests[i % BLOCK_MAX_REQUESTS]->head == elem.id) {
-                VirtIOBlockRequest* request = device->requests[i % BLOCK_MAX_REQUESTS];
+                requests[request_count] = device->requests[i % BLOCK_MAX_REQUESTS];
+                request_count++;
                 device->requests[i % BLOCK_MAX_REQUESTS] = NULL;
-                Error error;
-                switch (request->status.status) {
-                    case VIRTIO_BLOCK_S_OK:
-                        error = simpleError(SUCCESS);
-                        break;
-                    case VIRTIO_BLOCK_S_IOERR:
-                        error = simpleError(IO_ERROR);
-                        break;
-                    case VIRTIO_BLOCK_S_UNSUPP:
-                        error = simpleError(UNSUPPORTED);
-                        break;
-                    case VIRTIO_BLOCK_S_UNKNOWN:
-                        error = simpleError(UNKNOWN);
-                        break;
-                }
-                request->callback(error, request->udata);
-                dealloc(request);
                 break;
             }
         }
@@ -107,5 +105,24 @@ void virtIOBlockFreePendingRequests(VirtIOBlockDevice* device) {
         }
     }
     unlockSpinLock(&device->lock);
+    for (size_t i = 0; i < request_count; i++) {
+        Error error;
+        switch (requests[i]->status.status) {
+            case VIRTIO_BLOCK_S_OK:
+                error = simpleError(SUCCESS);
+                break;
+            case VIRTIO_BLOCK_S_IOERR:
+                error = simpleError(IO_ERROR);
+                break;
+            case VIRTIO_BLOCK_S_UNSUPP:
+                error = simpleError(UNSUPPORTED);
+                break;
+            case VIRTIO_BLOCK_S_UNKNOWN:
+                error = simpleError(UNKNOWN);
+                break;
+        }
+        requests[i]->callback(error, requests[i]->udata);
+        dealloc(requests[i]);
+    }
 }
 

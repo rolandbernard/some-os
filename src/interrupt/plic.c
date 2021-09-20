@@ -24,13 +24,25 @@ static size_t length = 0;
 void handleExternalInterrupt() {
     ExternalInterrupt interrupt = nextInterrupt();
     while (interrupt != 0) {
+        size_t interrupt_count = 0;
         lockSpinLock(&plic_lock);
         for (size_t i = 0; i < length; i++) {
             if (interrupts[i].id == interrupt) {
-                interrupts[i].function(interrupt, interrupts[i].udata);
+                interrupt_count++;
+            }
+        }
+        InterruptEntry interrupts_to_run[interrupt_count];
+        interrupt_count = 0;
+        for (size_t i = 0; i < length; i++) {
+            if (interrupts[i].id == interrupt) {
+                interrupts_to_run[interrupt_count] = interrupts[i];
+                interrupt_count++;
             }
         }
         unlockSpinLock(&plic_lock);
+        for (size_t i = 0; i < interrupt_count; i++) {
+            interrupts_to_run[i].function(interrupt, interrupts[i].udata);
+        }
         completeInterrupt(interrupt);
         interrupt = nextInterrupt();
     }

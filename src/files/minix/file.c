@@ -71,6 +71,10 @@ static void minixOperationAtZone(MinixOperationRequest* request, size_t zone) {
         size_t size = umin(MINIX_BLOCK_SIZE - request->offset, request->size);
         size_t offset = zone * MINIX_BLOCK_SIZE + request->offset;
         if (request->write) {
+            if (request->blocks_seen * MINIX_BLOCK_SIZE + request->offset + size > request->inode.size) {
+                // Resize the file if required
+                request->inode.size = request->blocks_seen * MINIX_BLOCK_SIZE + request->offset + size;
+            }
             vfsWriteAt(
                 request->file->fs->block_device, 0, 0, request->buffer, size,
                 offset, (VfsFunctionCallbackSizeT)minixGenericReadStepCallback, request
@@ -438,6 +442,7 @@ static void minixCloseFunction(
     MinixFile* file, Uid uid, Gid gid, VfsFunctionCallbackVoid callback, void* udata
 ) {
     lockSpinLock(&file->lock);
+    file->fs->base.open_files--;
     dealloc(file);
     callback(simpleError(SUCCESS), udata);
 }
@@ -466,6 +471,7 @@ static VfsFileVtable functions = {
 };
 
 MinixFile* createMinixFileForINode(MinixFilesystem* fs, uint32_t inode) {
+    fs->base.open_files++;
     MinixFile* file = zalloc(sizeof(MinixFile));
     file->base.functions = &functions;
     file->fs = fs;

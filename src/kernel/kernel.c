@@ -74,6 +74,7 @@ void kernelMain() {
 #include "files/minix/maps.h"
 #include "files/blkfile.h"
 
+VfsFilesystem* fs;
 VfsFile* file;
 char buff[512];
 
@@ -111,7 +112,8 @@ void openCallback(Error error, VfsFile* f, void* udata) {
     );
 }
 
-void initCallback(Error error, VfsFilesystem* fs) {
+void initCallback(Error error, VfsFilesystem* f) {
+    fs = f;
     KERNEL_LOG("[!] Error: %s", getErrorMessage(error));
     mountFilesystem(&global_file_system, fs, "/"); 
     vfsOpen(&global_file_system, 0, 0, "/test/test.txt", 0, 0, openCallback, fs);

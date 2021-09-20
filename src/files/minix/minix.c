@@ -192,12 +192,17 @@ typedef struct {
     MinixInode inode;
 } MinixOpenRequest;
 
+static void minixOpenCloseCallback(Error error, MinixOpenRequest* request) {
+    request->callback(error, NULL, request->udata);
+    dealloc(request);
+}
+
 static void minixOpenSeekCallback(Error error, size_t pos, MinixOpenRequest* request) {
     if (isError(error)) {
         unlockSpinLock(&request->fs->lock);
-        dealloc(request->file);
-        request->callback(error, NULL, request->udata);
-        dealloc(request);
+        request->file->functions->close(
+            (VfsFile*)request->file, 0, 0, (VfsFunctionCallbackVoid)minixOpenCloseCallback, request
+        );
     } else {
         unlockSpinLock(&request->fs->lock);
         request->callback(simpleError(SUCCESS), request->file, request->udata);
@@ -208,9 +213,9 @@ static void minixOpenSeekCallback(Error error, size_t pos, MinixOpenRequest* req
 static void minixOpenTruncCallback(Error error, MinixOpenRequest* request) {
     if (isError(error)) {
         unlockSpinLock(&request->fs->lock);
-        dealloc(request->file);
-        request->callback(error, NULL, request->udata);
-        dealloc(request);
+        request->file->functions->close(
+            (VfsFile*)request->file, 0, 0, (VfsFunctionCallbackVoid)minixOpenCloseCallback, request
+        );
     } else {
         unlockSpinLock(&request->fs->lock);
         request->callback(simpleError(SUCCESS), request->file, request->udata);

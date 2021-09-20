@@ -68,10 +68,19 @@ void initTimerInterrupt() {
 void handleTimerInterrupt() {
     Time time = getTime();
     Time min = 0;
+    size_t timeout_count = 0;
     lockSpinLock(&timeout_lock);
+    for (size_t i = 0; i < length; i++) {
+        if (timeouts[i].time < time) {
+            timeout_count++;
+        }
+    }
+    TimeoutEntry timeouts_to_run[timeout_count];
+    timeout_count = 0;
     for (size_t i = 0; i < length;) {
         if (timeouts[i].time < time) {
-            timeouts[i].function(time, timeouts[i].udata);
+            timeouts_to_run[timeout_count] = timeouts[i];
+            timeout_count++;
             memmove(timeouts + i, timeouts + i + 1, (length - i - 1) * sizeof(TimeoutEntry));
             length--;
         } else {
@@ -82,6 +91,9 @@ void handleTimerInterrupt() {
         }
     }
     unlockSpinLock(&timeout_lock);
+    for (size_t i = 0; i < timeout_count; i++) {
+        timeouts_to_run[i].function(time, timeouts[i].udata);
+    }
     if (length != 0 && timeouts[min].time < time + MIN_TIME) {
         setTimeCmp(timeouts[min].time);
     } else {
