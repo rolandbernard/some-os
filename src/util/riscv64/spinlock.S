@@ -8,7 +8,7 @@ lockSpinLock:
 1:
     amoswap.w t0, t0, (a0)
     fence
-    bnez t0, 1f
+    bnez t0, 1b
     ret
 
 tryLockingSpinLock:
