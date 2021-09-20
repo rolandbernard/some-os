@@ -6,8 +6,6 @@
 
 typedef struct {
     MinixFilesystem* fs;
-    Uid uid;
-    Gid gid;
     size_t offset;
     size_t size;
     size_t position;
@@ -50,7 +48,7 @@ static void readBlocksForRequest(MinixGetBitMapRequest* request) {
             request->data = kalloc(size);
         }
         vfsReadAt(
-            (VfsFile*)request->fs->block_device, request->uid, request->gid,
+            (VfsFile*)request->fs->block_device, 0, 0,
             virtPtrForKernel(request->data), size, request->offset,
             (VfsFunctionCallbackSizeT)minixFindFreeBitReadCallback, request
         );
@@ -74,7 +72,7 @@ static void minixFindFreeBitReadCallback(Error error, size_t read, MinixGetBitMa
                     // This bit is free
                     request->data[i] |= (1 << j);
                     vfsWriteAt(
-                        (VfsFile*)request->fs->block_device, request->uid, request->gid,
+                        (VfsFile*)request->fs->block_device, 0, 0,
                         virtPtrForKernel(&request->data[i]), 1, request->offset + i,
                         (VfsFunctionCallbackSizeT)minixFindFreeBitWriteCallback, request
                     );
@@ -89,11 +87,9 @@ static void minixFindFreeBitReadCallback(Error error, size_t read, MinixGetBitMa
     }
 }
 
-static void genericMinixGetBitMap(MinixFilesystem* fs, Uid uid, Gid gid, size_t offset, size_t size, VfsFunctionCallbackSizeT callback, void* udata) {
+static void genericMinixGetBitMap(MinixFilesystem* fs, size_t offset, size_t size, VfsFunctionCallbackSizeT callback, void* udata) {
     MinixGetBitMapRequest* request = kalloc(sizeof(MinixGetBitMapRequest));
     request->fs = fs;
-    request->uid = uid;
-    request->gid = gid;
     request->offset = offset;
     request->size = size;
     request->position = 0;
@@ -103,16 +99,16 @@ static void genericMinixGetBitMap(MinixFilesystem* fs, Uid uid, Gid gid, size_t 
     readBlocksForRequest(request);
 }
 
-void getFreeMinixInode(MinixFilesystem* fs, Uid uid, Gid gid, MinixINodeCallback callback, void* udata) {
+void getFreeMinixInode(MinixFilesystem* fs, MinixINodeCallback callback, void* udata) {
     genericMinixGetBitMap(
-        fs, uid, gid, 2 * MINIX_BLOCK_SIZE, fs->superblock.ninodes,
+        fs, 2 * MINIX_BLOCK_SIZE, fs->superblock.ninodes,
         (VfsFunctionCallbackSizeT)callback, udata
     );
 }
 
-void getFreeMinixZone(MinixFilesystem* fs, Uid uid, Gid gid, VfsFunctionCallbackSizeT callback, void* udata) {
+void getFreeMinixZone(MinixFilesystem* fs, VfsFunctionCallbackSizeT callback, void* udata) {
     genericMinixGetBitMap(
-        fs, uid, gid, (2 + fs->superblock.imap_blocks) * MINIX_BLOCK_SIZE, fs->superblock.zones,
+        fs, (2 + fs->superblock.imap_blocks) * MINIX_BLOCK_SIZE, fs->superblock.zones,
         (VfsFunctionCallbackSizeT)callback, udata
     );
 }
@@ -151,18 +147,16 @@ static void genericMinixClearBitMapReadCallback(Error error, size_t read, MinixC
     } else {
         request->data &= ~(1 << (request->position % 8));
         vfsWriteAt(
-            (VfsFile*)request->fs->block_device, request->uid, request->gid,
+            (VfsFile*)request->fs->block_device, 0, 0,
             virtPtrForKernel(&request->data), 1, request->offset + request->position / 8,
             (VfsFunctionCallbackSizeT)genericMinixClearBitMapWriteCallback, request
         );
     }
 }
 
-static void genericMinixClearBitMap(MinixFilesystem* fs, Uid uid, Gid gid, size_t offset, size_t position, VfsFunctionCallbackVoid callback, void* udata) {
+static void genericMinixClearBitMap(MinixFilesystem* fs, size_t offset, size_t position, VfsFunctionCallbackVoid callback, void* udata) {
     MinixClearBitMapRequest* request = kalloc(sizeof(MinixClearBitMapRequest));
     request->fs = fs;
-    request->uid = uid;
-    request->gid = gid;
     request->offset = offset;
     request->position = position;
     request->callback = callback;
@@ -174,13 +168,13 @@ static void genericMinixClearBitMap(MinixFilesystem* fs, Uid uid, Gid gid, size_
     );
 }
 
-void freeMinixInode(MinixFilesystem* fs, Uid uid, Gid gid, uint32_t inode, VfsFunctionCallbackVoid callback, void* udata) {
-    genericMinixClearBitMap(fs, uid, gid, 2 * MINIX_BLOCK_SIZE, inode, callback, udata);
+void freeMinixInode(MinixFilesystem* fs, uint32_t inode, VfsFunctionCallbackVoid callback, void* udata) {
+    genericMinixClearBitMap(fs, 2 * MINIX_BLOCK_SIZE, inode, callback, udata);
 }
 
-void freeMinixZone(MinixFilesystem* fs, Uid uid, Gid gid, size_t zone, VfsFunctionCallbackVoid callback, void* udata) {
+void freeMinixZone(MinixFilesystem* fs, size_t zone, VfsFunctionCallbackVoid callback, void* udata) {
     genericMinixClearBitMap(
-        fs, uid, gid, (2 + fs->superblock.imap_blocks) * MINIX_BLOCK_SIZE, zone, callback, udata
+        fs, (2 + fs->superblock.imap_blocks) * MINIX_BLOCK_SIZE, zone, callback, udata
     );
 }
 

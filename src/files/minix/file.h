@@ -5,12 +5,12 @@
 
 typedef struct {
     VfsFile base;
-    const MinixFilesystem* fs;
+    MinixFilesystem* fs;
     SpinLock lock;
     size_t position;
     uint32_t inodenum;
 } MinixFile;
 
-MinixFile* createMinixFileForINode(const MinixFilesystem* fs, uint32_t inode);
+MinixFile* createMinixFileForINode(MinixFilesystem* fs, uint32_t inode);
 
 #endif

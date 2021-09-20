@@ -105,6 +105,7 @@ static void minixFindINodeForNameIn(MinixFile* file, Uid uid, Gid gid, const cha
     request->name = name;
     request->callback = callback;
     request->udata = udata;
+    request->entries = NULL;
     file->base.functions->stat((VfsFile*)file, uid, gid, (VfsFunctionCallbackStat)minixFindINodeInStatCallback, request);
 }
 
@@ -158,8 +159,8 @@ static void minixFindINodeStepCallback(Error error, uint32_t inode, MinixFindINo
     request->inode = inode;
     if (request->file != NULL) {
         request->file->base.functions->close(
-            (VfsFile*)request->file, request->uid, request->gid,
-            (VfsFunctionCallbackVoid)minixFindINodeCloseCallback, request
+            (VfsFile*)request->file, 0, 0, (VfsFunctionCallbackVoid)minixFindINodeCloseCallback,
+            request
         );
     } else {
         minixFindINodeCloseCallback(simpleError(SUCCESS), request);
@@ -194,6 +195,7 @@ typedef struct {
 static void minixOpenSeekCallback(Error error, size_t pos, MinixOpenRequest* request) {
     if (isError(error)) {
         unlockSpinLock(&request->fs->lock);
+        dealloc(request->file);
         request->callback(error, NULL, request->udata);
         dealloc(request);
     } else {
@@ -206,6 +208,7 @@ static void minixOpenSeekCallback(Error error, size_t pos, MinixOpenRequest* req
 static void minixOpenTruncCallback(Error error, MinixOpenRequest* request) {
     if (isError(error)) {
         unlockSpinLock(&request->fs->lock);
+        dealloc(request->file);
         request->callback(error, NULL, request->udata);
         dealloc(request);
     } else {
@@ -263,7 +266,7 @@ static void minixOpenINodeCallback(Error error, uint32_t inode, MinixOpenRequest
     } else {
         request->inodenum = inode;
         vfsReadAt(
-            request->fs->block_device, request->uid, request->gid,
+            request->fs->block_device, 0, 0,
             virtPtrForKernel(&request->inode), sizeof(MinixInode),
             offsetForINode(request->fs, inode), (VfsFunctionCallbackSizeT)minixOpenReadCallback,
             request
@@ -338,8 +341,6 @@ static void minixFreeFunction(MinixFilesystem* fs, Uid uid, Gid gid, VfsFunction
 
 typedef struct {
     MinixFilesystem* fs;
-    Uid uid;
-    Gid gid;
     VfsFunctionCallbackVoid callback;
     void* udata;
 } MinixInitRequest;
@@ -364,12 +365,10 @@ static void minixSuperblockReadCallback(Error error, size_t read, MinixInitReque
 static void minixInitFunction(MinixFilesystem* fs, Uid uid, Gid gid, VfsFunctionCallbackVoid callback, void* udata) {
     MinixInitRequest* request = kalloc(sizeof(MinixInitRequest));
     request->fs = fs;
-    request->uid = uid;
-    request->gid = gid;
     request->callback = callback;
     request->udata = udata;
     vfsReadAt(
-        fs->block_device, uid, gid, virtPtrForKernel(&fs->superblock), sizeof(Minix3Superblock),
+        fs->block_device, 0, 0, virtPtrForKernel(&fs->superblock), sizeof(Minix3Superblock),
         MINIX_BLOCK_SIZE, (VfsFunctionCallbackSizeT)minixSuperblockReadCallback, request
     );
 }
