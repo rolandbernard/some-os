@@ -1,9 +1,10 @@
 
 #include <string.h>
 
-#include "error/log.h"
 #include "files/minix/file.h"
 
+#include "files/minix/maps.h"
+#include "error/log.h"
 #include "error/panic.h"
 #include "files/vfs.h"
 #include "kernel/time.h"
@@ -19,6 +20,7 @@ typedef struct {
     size_t read;
     size_t offset;
     size_t size;
+    size_t current_size;
     bool write;
     VfsFunctionCallbackSizeT callback;
     void* udata;
@@ -26,6 +28,7 @@ typedef struct {
     uint16_t depth;
     uint16_t position[4];
     uint32_t zones[3][MINIX_NUM_IPTRS];
+    uint32_t zone_zone[3];
 } MinixOperationRequest;
 
 static void minixGenericZoneWalkStep(MinixOperationRequest* request);
@@ -48,27 +51,26 @@ static void minixGenericReadStepCallback(Error error, size_t read, MinixOperatio
         request->callback(error, request->read, request->udata);
         dealloc(request);
     } else {
-        size_t size = umin(MINIX_BLOCK_SIZE - request->offset, request->size);
-        request->size -= size;
-        request->file->position += size;
-        request->read += size;
-        request->offset = 0;
-        request->buffer.address += size;
+        if (request->current_size != 0) {
+            request->size -= request->current_size;
+            request->file->position += request->current_size;
+            request->read += request->current_size;
+            request->offset = 0;
+            request->buffer.address += request->current_size;
+        }
         minixGenericZoneWalkStep(request);
     }
 }
 
 static void minixOperationAtZone(MinixOperationRequest* request, size_t zone) {
-    if (zone == 0) {
-        // TODO: if writing and going over the end of the file, allocate new zones
-        minixGenericZoneWalkStep(request);
-    } else if (request->offset > MINIX_BLOCK_SIZE) {
+    if (request->offset >= MINIX_BLOCK_SIZE) {
         request->blocks_seen++;
         request->offset -= MINIX_BLOCK_SIZE;
         minixGenericZoneWalkStep(request);
     } else {
         size_t size = umin(MINIX_BLOCK_SIZE - request->offset, request->size);
         size_t offset = zone * MINIX_BLOCK_SIZE + request->offset;
+        request->current_size = size;
         if (request->write) {
             if (request->blocks_seen * MINIX_BLOCK_SIZE + request->offset + size > request->inode.size) {
                 // Resize the file if required
@@ -89,6 +91,76 @@ static void minixOperationAtZone(MinixOperationRequest* request, size_t zone) {
     }
 }
 
+static void minixGenericZoneCallback(Error error, size_t zone, MinixOperationRequest* request) {
+    if (isError(error)) {
+        // Unable to allocate another zone
+        request->position[request->depth]++;
+        minixGenericZoneWalkStep(request);
+    } else {
+        size_t new_zone = zone + request->file->fs->superblock.first_data_zone;
+        if (request->depth == 0) {
+            request->inode.zones[request->position[0]] = new_zone;
+        } else {
+            request->zones[request->depth - 1][request->position[request->depth]] = new_zone;
+        }
+        if (request->depth == 0) {
+            // Will be written when writing the inode
+            minixGenericZoneWalkStep(request);
+        } else {
+            request->current_size = 0;
+            size_t parent_zone = request->zone_zone[request->depth - 1];
+            size_t offset = parent_zone * MINIX_BLOCK_SIZE + request->offset;
+            vfsWriteAt(
+                request->file->fs->block_device, 0, 0,
+                virtPtrForKernel(request->zones[request->depth - 1]), MINIX_BLOCK_SIZE, offset,
+                (VfsFunctionCallbackSizeT)minixGenericReadStepCallback, request
+            );
+        }
+    }
+}
+
+static void minixIndirectZoneWalkStep(size_t max_depth, MinixOperationRequest* request) {
+    if (request->position[request->depth] == MINIX_NUM_IPTRS) {
+        request->depth--;
+        request->position[request->depth]++;
+        minixGenericZoneWalkStep(request);
+    } else {
+        size_t zone;
+        if (request->depth == 0) {
+            zone = request->inode.zones[request->position[0]];
+        } else {
+            zone = request->zones[request->depth - 1][request->position[request->depth]];
+        }
+        if (zone == 0) {
+            // If writing and going over the end of the file, allocate new zones
+            if (request->write && request->blocks_seen * MINIX_BLOCK_SIZE >= request->inode.size) {
+                getFreeMinixZone(
+                    request->file->fs, (VfsFunctionCallbackSizeT)minixGenericZoneCallback, request
+                );
+            } else {
+                request->position[request->depth]++;
+                minixGenericZoneWalkStep(request);
+            }
+        } else {
+            if (request->depth == max_depth) {
+                request->position[request->depth]++;
+                minixOperationAtZone(request, zone);
+            } else {
+                request->depth++;
+                request->zone_zone[request->depth - 1] = zone;
+                request->position[request->depth] = 0;
+                request->current_size = 0;
+                size_t offset = zone * MINIX_BLOCK_SIZE + request->offset;
+                vfsReadAt(
+                    request->file->fs->block_device, 0, 0,
+                    virtPtrForKernel(request->zones[request->depth - 1]), MINIX_BLOCK_SIZE, offset,
+                    (VfsFunctionCallbackSizeT)minixGenericReadStepCallback, request
+                );
+            }
+        }
+    }
+}
+
 static void minixGenericZoneWalkStep(MinixOperationRequest* request) {
     if (request->size == 0 || request->position[0] > 9) {
         request->inode.atime = getUnixTime();
@@ -102,165 +174,13 @@ static void minixGenericZoneWalkStep(MinixOperationRequest* request) {
             (VfsFunctionCallbackSizeT)minixGenericFinishedCallback, request
         );
     } else if (request->position[0] < 7) {
-        size_t pos = request->position[0];
-        request->position[0]++;
-        minixOperationAtZone(request, request->inode.zones[pos]);
+        minixIndirectZoneWalkStep(0, request);
     } else if (request->position[0] == 7) {
-        if (request->depth == 0 && request->position[1] == 0) { // We have to read level 1 zones
-            request->depth = 1;
-            size_t zone = request->inode.zones[7];
-            if (zone == 0) {
-                request->position[0]++;
-                request->depth = 0;
-                minixGenericZoneWalkStep(request);
-            } else {
-                size_t offset = zone * MINIX_BLOCK_SIZE + request->offset;
-                vfsReadAt(
-                    request->file->fs->block_device, 0, 0,
-                    virtPtrForKernel(request->zones[0]), MINIX_BLOCK_SIZE, offset,
-                    (VfsFunctionCallbackSizeT)minixGenericReadStepCallback, request
-                );
-            }
-        } else {
-            size_t pos = request->position[1];
-            request->position[1]++;
-            if (request->position[1] == MINIX_NUM_IPTRS) {
-                request->position[0]++;
-                request->position[1] = 0;
-                request->depth = 0;
-                minixGenericZoneWalkStep(request); // Go back to the previous depth
-            } else {
-                minixOperationAtZone(request, request->zones[0][pos]);
-            }
-        }
+        minixIndirectZoneWalkStep(1, request);
     } else if (request->position[0] == 8) {
-        if (request->depth == 0 && request->position[1] == 0) { // We have to read level 1 zones
-            request->depth = 1;
-            size_t zone = request->inode.zones[8];
-            if (zone == 0) {
-                request->position[0]++;
-                request->depth = 0;
-                minixGenericZoneWalkStep(request);
-            } else {
-                size_t offset = zone * MINIX_BLOCK_SIZE + request->offset;
-                vfsReadAt(
-                    request->file->fs->block_device, 0, 0,
-                    virtPtrForKernel(request->zones[0]), MINIX_BLOCK_SIZE, offset,
-                    (VfsFunctionCallbackSizeT)minixGenericReadStepCallback, request
-                );
-            }
-        } else if (request->depth == 1 && request->position[2] == 0) { // We have to read level 2 zones
-            size_t pos = request->position[1];
-            request->position[1]++;
-            if (request->position[1] == MINIX_NUM_IPTRS) {
-                request->position[0]++;
-                request->position[1] = 0;
-                request->depth = 0;
-                minixGenericZoneWalkStep(request);
-            } else {
-                request->depth = 2;
-                size_t zone = request->zones[0][pos];
-                if (zone == 0) {
-                    request->position[1]++;
-                    request->depth = 1;
-                    minixGenericZoneWalkStep(request);
-                } else {
-                    size_t offset = zone * MINIX_BLOCK_SIZE + request->offset;
-                    vfsReadAt(
-                        request->file->fs->block_device, 0, 0,
-                        virtPtrForKernel(request->zones[1]), MINIX_BLOCK_SIZE, offset,
-                        (VfsFunctionCallbackSizeT)minixGenericReadStepCallback, request
-                    );
-                }
-            }
-        } else {
-            size_t pos = request->position[2];
-            request->position[2]++;
-            if (request->position[2] == MINIX_NUM_IPTRS) {
-                request->position[1]++;
-                request->position[2] = 0;
-                request->depth = 1;
-                minixGenericZoneWalkStep(request);
-            } else {
-                minixOperationAtZone(request, request->zones[1][pos]);
-            }
-        }
+        minixIndirectZoneWalkStep(2, request);
     } else if (request->position[0] == 9) {
-        if (request->depth == 0 && request->position[1] == 0) { // We have to read level 1 zones
-            request->depth = 1;
-            size_t zone = request->inode.zones[9];
-            if (zone == 0) {
-                request->position[0]++;
-                request->depth = 0;
-                minixGenericZoneWalkStep(request);
-            } else {
-                size_t offset = zone * MINIX_BLOCK_SIZE + request->offset;
-                vfsReadAt(
-                    request->file->fs->block_device, 0, 0,
-                    virtPtrForKernel(request->zones[0]), MINIX_BLOCK_SIZE, offset,
-                    (VfsFunctionCallbackSizeT)minixGenericReadStepCallback, request
-                );
-            }
-        } else if (request->depth == 1 && request->position[2] == 0) { // We have to read level 2 zones
-            size_t pos = request->position[1];
-            request->position[1]++;
-            if (request->position[1] == MINIX_NUM_IPTRS) {
-                request->position[0]++;
-                request->position[1] = 0;
-                request->depth = 0;
-                minixGenericZoneWalkStep(request);
-            } else {
-                request->depth = 2;
-                size_t zone = request->zones[0][pos];
-                if (zone == 0) {
-                    request->position[1]++;
-                    request->depth = 1;
-                    minixGenericZoneWalkStep(request);
-                } else {
-                    size_t offset = zone * MINIX_BLOCK_SIZE + request->offset;
-                    vfsReadAt(
-                        request->file->fs->block_device, 0, 0,
-                        virtPtrForKernel(request->zones[1]), MINIX_BLOCK_SIZE, offset,
-                        (VfsFunctionCallbackSizeT)minixGenericReadStepCallback, request
-                    );
-                }
-            }
-        } else if (request->depth == 2 && request->position[3] == 0) { // We have to read level 3 zones
-            size_t pos = request->position[2];
-            request->position[2]++;
-            if (request->position[2] == MINIX_NUM_IPTRS) {
-                request->position[1]++;
-                request->position[2] = 0;
-                request->depth = 1;
-                minixGenericZoneWalkStep(request);
-            } else {
-                request->depth = 3;
-                size_t zone = request->zones[1][pos];
-                if (zone == 0) {
-                    request->position[2]++;
-                    request->depth = 2;
-                    minixGenericZoneWalkStep(request);
-                } else {
-                    size_t offset = zone * MINIX_BLOCK_SIZE + request->offset;
-                    vfsReadAt(
-                        request->file->fs->block_device, 0, 0,
-                        virtPtrForKernel(request->zones[2]), MINIX_BLOCK_SIZE, offset,
-                        (VfsFunctionCallbackSizeT)minixGenericReadStepCallback, request
-                    );
-                }
-            }
-        } else {
-            size_t pos = request->position[3];
-            request->position[3]++;
-            if (request->position[3] == MINIX_NUM_IPTRS) {
-                request->position[2]++;
-                request->position[3] = 0;
-                request->depth = 2;
-                minixGenericZoneWalkStep(request);
-            } else {
-                minixOperationAtZone(request, request->zones[2][pos]);
-            }
-        }
+        minixIndirectZoneWalkStep(3, request);
     }
 }
 
