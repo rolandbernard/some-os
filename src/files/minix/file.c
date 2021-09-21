@@ -67,7 +67,6 @@ static void minixOperationAtZone(MinixOperationRequest* request, size_t zone) {
         request->offset -= MINIX_BLOCK_SIZE;
         minixGenericZoneWalkStep(request);
     } else {
-        request->blocks_seen++;
         size_t size = umin(MINIX_BLOCK_SIZE - request->offset, request->size);
         size_t offset = zone * MINIX_BLOCK_SIZE + request->offset;
         if (request->write) {
@@ -75,11 +74,13 @@ static void minixOperationAtZone(MinixOperationRequest* request, size_t zone) {
                 // Resize the file if required
                 request->inode.size = request->blocks_seen * MINIX_BLOCK_SIZE + request->offset + size;
             }
+            request->blocks_seen++;
             vfsWriteAt(
                 request->file->fs->block_device, 0, 0, request->buffer, size,
                 offset, (VfsFunctionCallbackSizeT)minixGenericReadStepCallback, request
             );
         } else {
+            request->blocks_seen++;
             vfsReadAt(
                 request->file->fs->block_device, 0, 0, request->buffer, size,
                 offset, (VfsFunctionCallbackSizeT)minixGenericReadStepCallback, request
