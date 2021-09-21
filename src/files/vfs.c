@@ -265,7 +265,7 @@ static void vfsOperationAtReadWriteCallback(Error error, size_t read, VfsReadAtR
     if (isError(error)) {
         request->callback(error, 0, request->udata);
         dealloc(request);
-    } else if (read == 0 && request->size != 0) {
+    } else if (read == 0 || request->size == 0) {
         request->callback(simpleError(SUCCESS), request->offset, request->udata);
         dealloc(request);
     } else {

@@ -111,6 +111,7 @@ static void minixGenericZoneWalkStep(MinixOperationRequest* request) {
             if (zone == 0) {
                 request->position[0]++;
                 request->depth = 0;
+                minixGenericZoneWalkStep(request);
             } else {
                 size_t offset = zone * MINIX_BLOCK_SIZE + request->offset;
                 vfsReadAt(
@@ -138,6 +139,7 @@ static void minixGenericZoneWalkStep(MinixOperationRequest* request) {
             if (zone == 0) {
                 request->position[0]++;
                 request->depth = 0;
+                minixGenericZoneWalkStep(request);
             } else {
                 size_t offset = zone * MINIX_BLOCK_SIZE + request->offset;
                 vfsReadAt(
@@ -160,6 +162,7 @@ static void minixGenericZoneWalkStep(MinixOperationRequest* request) {
                 if (zone == 0) {
                     request->position[1]++;
                     request->depth = 1;
+                    minixGenericZoneWalkStep(request);
                 } else {
                     size_t offset = zone * MINIX_BLOCK_SIZE + request->offset;
                     vfsReadAt(
@@ -188,6 +191,7 @@ static void minixGenericZoneWalkStep(MinixOperationRequest* request) {
             if (zone == 0) {
                 request->position[0]++;
                 request->depth = 0;
+                minixGenericZoneWalkStep(request);
             } else {
                 size_t offset = zone * MINIX_BLOCK_SIZE + request->offset;
                 vfsReadAt(
@@ -210,6 +214,7 @@ static void minixGenericZoneWalkStep(MinixOperationRequest* request) {
                 if (zone == 0) {
                     request->position[1]++;
                     request->depth = 1;
+                    minixGenericZoneWalkStep(request);
                 } else {
                     size_t offset = zone * MINIX_BLOCK_SIZE + request->offset;
                     vfsReadAt(
@@ -233,6 +238,7 @@ static void minixGenericZoneWalkStep(MinixOperationRequest* request) {
                 if (zone == 0) {
                     request->position[2]++;
                     request->depth = 2;
+                    minixGenericZoneWalkStep(request);
                 } else {
                     size_t offset = zone * MINIX_BLOCK_SIZE + request->offset;
                     vfsReadAt(
@@ -280,6 +286,7 @@ static void minixGenericReadINodeCallback(Error error, size_t read, MinixOperati
         request->position[2] = 0;
         request->position[3] = 0;
         request->depth = 0;
+        request->blocks_seen = 0;
         if (request->inode.size < request->offset + request->size && !request->write) {
             // Can't read past the end of the file
             if (request->inode.size < request->offset) {
