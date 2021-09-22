@@ -7,6 +7,8 @@
 
 #define PAGE_SIZE (1 << 12)
 
+extern void* zero_page;
+
 typedef struct FreePage_s {
     size_t size; // Number of free pages after this one
     struct FreePage_s* next;

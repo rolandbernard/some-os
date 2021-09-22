@@ -12,6 +12,8 @@ extern void __heap_end;
 static SpinLock alloc_lock;
 static FreePages free_pages;
 
+void* zero_page;
+
 Error initPageAllocator() {
     uintptr_t start = ((uintptr_t)&__heap_start + PAGE_SIZE - 1) & -PAGE_SIZE;
     uintptr_t end = (uintptr_t)&__heap_end & -PAGE_SIZE;
@@ -26,6 +28,9 @@ Error initPageAllocator() {
         free_pages.first = NULL;
     }
     KERNEL_LOG("[>] Initialized page allocator");
+    zero_page = allocPage();
+    memset(zero_page, 0, PAGE_SIZE);
+    KERNEL_LOG("[>] Initialized zero page");
     return simpleError(SUCCESS);
 }
 
