@@ -50,6 +50,7 @@ typedef struct {
     Minix3Superblock superblock;
     VfsFile* block_device;
     SpinLock lock;
+    SpinLock maps_lock;
 } MinixFilesystem;
 
 MinixFilesystem* createMinixFilesystem(VfsFile* block_device, void* data);

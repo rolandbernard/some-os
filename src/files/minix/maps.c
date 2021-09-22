@@ -18,14 +18,17 @@ typedef struct {
 
 static void minixFindFreeBitWriteCallback(Error error, size_t written, MinixGetBitMapRequest* request) {
     if (isError(error)) {
+        unlockSpinLock(&request->fs->maps_lock);
         dealloc(request->data);
         request->callback(error, 0, request->udata);
         dealloc(request);
     } else if (written == 0) {
+        unlockSpinLock(&request->fs->maps_lock);
         dealloc(request->data);
         request->callback(simpleError(IO_ERROR), request->position, request->udata);
         dealloc(request);
     } else {
+        unlockSpinLock(&request->fs->maps_lock);
         dealloc(request->data);
         request->callback(simpleError(SUCCESS), request->position, request->udata);
         dealloc(request);
@@ -37,6 +40,7 @@ static void minixFindFreeBitReadCallback(Error error, size_t read, MinixGetBitMa
 static void readBlocksForRequest(MinixGetBitMapRequest* request) {
     size_t size = (request->size + 7) / 8;
     if (size == 0) {
+        unlockSpinLock(&request->fs->maps_lock);
         dealloc(request->data);
         request->callback(simpleError(IO_ERROR), 0, request->udata);
         dealloc(request);
@@ -57,10 +61,12 @@ static void readBlocksForRequest(MinixGetBitMapRequest* request) {
 
 static void minixFindFreeBitReadCallback(Error error, size_t read, MinixGetBitMapRequest* request) {
     if (isError(error)) {
+        unlockSpinLock(&request->fs->maps_lock);
         dealloc(request->data);
         request->callback(error, 0, request->udata);
         dealloc(request);
     } else if (read == 0) {
+        unlockSpinLock(&request->fs->maps_lock);
         dealloc(request->data);
         request->callback(simpleError(IO_ERROR), 0, request->udata);
         dealloc(request);
@@ -89,6 +95,7 @@ static void minixFindFreeBitReadCallback(Error error, size_t read, MinixGetBitMa
 
 static void genericMinixGetBitMap(MinixFilesystem* fs, size_t offset, size_t size, VfsFunctionCallbackSizeT callback, void* udata) {
     MinixGetBitMapRequest* request = kalloc(sizeof(MinixGetBitMapRequest));
+    lockSpinLock(&fs->maps_lock);
     request->fs = fs;
     request->offset = offset;
     request->size = size;
@@ -126,12 +133,15 @@ typedef struct {
 
 static void genericMinixClearBitMapWriteCallback(Error error, size_t written, MinixClearBitMapRequest* request) {
     if (isError(error)) {
+        unlockSpinLock(&request->fs->maps_lock);
         request->callback(error, request->udata);
         dealloc(request);
     } else if (written == 0) {
+        unlockSpinLock(&request->fs->maps_lock);
         request->callback(simpleError(IO_ERROR), request->udata);
         dealloc(request);
     } else {
+        unlockSpinLock(&request->fs->maps_lock);
         request->callback(simpleError(SUCCESS), request->udata);
         dealloc(request);
     }
@@ -139,9 +149,11 @@ static void genericMinixClearBitMapWriteCallback(Error error, size_t written, Mi
 
 static void genericMinixClearBitMapReadCallback(Error error, size_t read, MinixClearBitMapRequest* request) {
     if (isError(error)) {
+        unlockSpinLock(&request->fs->maps_lock);
         request->callback(error, request->udata);
         dealloc(request);
     } else if (read == 0) {
+        unlockSpinLock(&request->fs->maps_lock);
         request->callback(simpleError(IO_ERROR), request->udata);
         dealloc(request);
     } else {
@@ -156,6 +168,7 @@ static void genericMinixClearBitMapReadCallback(Error error, size_t read, MinixC
 
 static void genericMinixClearBitMap(MinixFilesystem* fs, size_t offset, size_t position, VfsFunctionCallbackVoid callback, void* udata) {
     MinixClearBitMapRequest* request = kalloc(sizeof(MinixClearBitMapRequest));
+    lockSpinLock(&fs->maps_lock);
     request->fs = fs;
     request->offset = offset;
     request->position = position;
