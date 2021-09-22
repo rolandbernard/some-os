@@ -29,7 +29,12 @@ typedef enum {
     VFS_OPEN_APPEND = (1 << 1),
     VFS_OPEN_TRUNC = (1 << 2),
     VFS_OPEN_DIRECTORY = (1 << 3),
+    VFS_OPEN_READ = (1 << 4),
+    VFS_OPEN_WRITE = (1 << 5),
+    VFS_OPEN_EXECUTE = (1 << 6),
 } VfsOpenFlags;
+
+#define OPEN_ACCESS(open_flags) ((open_flags >> 4) & 0b111)
 
 typedef enum {
     VFS_ACCESS_R = (1 << 0),
