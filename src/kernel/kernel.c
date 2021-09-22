@@ -76,47 +76,119 @@ void kernelMain() {
 
 VfsFilesystem* fs;
 VfsFile* file;
-char buff[512];
+char buff[2000000];
 
-void read2Callback(Error error, size_t read, char* string) {
+void read8Callback(Error error, size_t read, void* udata) {
     KERNEL_LOG("[!] Error: %s", getErrorMessage(error));
-    string[read] = 0;
-    KERNEL_LOG("[!] Read: '%s'", string);
+    KERNEL_LOG("[!] Read:  %i", read);
+    buff[read] = 0;
+    KERNEL_LOG("[!] Read: '%s'", buff);
 }
 
-void writeCallback(Error error, size_t read, const char* string) {
+void trunc6Callback(Error error, void* udata) {
     KERNEL_LOG("[!] Error: %s", getErrorMessage(error));
-    KERNEL_LOG("[!] Wrote:'%s'", string);
-    vfsReadAt(
-        file, 0, 0, virtPtrForKernel(buff), 511, 0, (VfsFunctionCallbackSizeT)read2Callback, buff
-    );
+    vfsReadAt(file, 0, 0, virtPtrForKernel(buff), 1000000, 0, read8Callback, buff);
 }
 
-void read1Callback(Error error, size_t read, char* string) {
+void read7Callback(Error error, size_t read, void* udata) {
     KERNEL_LOG("[!] Error: %s", getErrorMessage(error));
-    string[read] = 0;
-    KERNEL_LOG("[!] Read: '%s'", string);
-    const char* test = "HELLO WORLD... TEST!";
-    memcpy(buff, test, strlen(test) + 1);
-    vfsWriteAt(
-        file, 0, 0, virtPtrForKernel(buff), strlen(test), 0, (VfsFunctionCallbackSizeT)writeCallback, buff
-    );
+    KERNEL_LOG("[!] Read:  %i", read);
+    buff[read] = 0;
+    KERNEL_LOG("[!] Read: '%s'", buff);
+    file->functions->trunc(file, 0, 0, 0, trunc6Callback, NULL);
+}
+
+void trunc5Callback(Error error, void* udata) {
+    KERNEL_LOG("[!] Error: %s", getErrorMessage(error));
+    vfsReadAt(file, 0, 0, virtPtrForKernel(buff), 1000000, 0, read7Callback, buff);
+}
+
+void read6Callback(Error error, size_t read, void* udata) {
+    KERNEL_LOG("[!] Error: %s", getErrorMessage(error));
+    KERNEL_LOG("[!] Read:  %i", read);
+    buff[read] = 0;
+    KERNEL_LOG("[!] Read: '%s'", buff);
+    file->functions->trunc(file, 0, 0, 1000000, trunc5Callback, NULL);
+}
+
+void trunc4Callback(Error error, void* udata) {
+    KERNEL_LOG("[!] Error: %s", getErrorMessage(error));
+    vfsReadAt(file, 0, 0, virtPtrForKernel(buff), 1000000, 0, read6Callback, buff);
+}
+
+void read5Callback(Error error, size_t read, void* udata) {
+    KERNEL_LOG("[!] Error: %s", getErrorMessage(error));
+    KERNEL_LOG("[!] Read:  %i", read);
+    buff[read] = 0;
+    KERNEL_LOG("[!] Read: '%s'", buff);
+    file->functions->trunc(file, 0, 0, 100, trunc4Callback, NULL);
+}
+
+void trunc3Callback(Error error, void* udata) {
+    KERNEL_LOG("[!] Error: %s", getErrorMessage(error));
+    vfsReadAt(file, 0, 0, virtPtrForKernel(buff), 1000000, 0, read5Callback, buff);
+}
+
+void read4Callback(Error error, size_t read, void* udata) {
+    KERNEL_LOG("[!] Error: %s", getErrorMessage(error));
+    KERNEL_LOG("[!] Read:  %i", read);
+    buff[read] = 0;
+    KERNEL_LOG("[!] Read: '%s'", buff);
+    file->functions->trunc(file, 0, 0, 100000, trunc3Callback, NULL);
+}
+
+void trunc2Callback(Error error, void* udata) {
+    KERNEL_LOG("[!] Error: %s", getErrorMessage(error));
+    vfsReadAt(file, 0, 0, virtPtrForKernel(buff), 1000000, 0, read4Callback, buff);
+}
+
+void read3Callback(Error error, size_t read, void* udata) {
+    KERNEL_LOG("[!] Error: %s", getErrorMessage(error));
+    KERNEL_LOG("[!] Read:  %i", read);
+    buff[read] = 0;
+    KERNEL_LOG("[!] Read: '%s'", buff);
+    file->functions->trunc(file, 0, 0, 20000, trunc2Callback, NULL);
+}
+
+void truncCallback(Error error, void* udata) {
+    KERNEL_LOG("[!] Error: %s", getErrorMessage(error));
+    vfsReadAt(file, 0, 0, virtPtrForKernel(buff), 1000000, 0, read3Callback, buff);
+}
+
+void read2Callback(Error error, size_t read, void* udata) {
+    KERNEL_LOG("[!] Error: %s", getErrorMessage(error));
+    KERNEL_LOG("[!] Read:  %i", read);
+    buff[100] = 0;
+    KERNEL_LOG("[!] Read: '%s'", buff);
+    file->functions->trunc(file, 0, 0, 42, truncCallback, NULL);
+}
+
+void writeCallback(Error error, size_t read, void* udata) {
+    KERNEL_LOG("[!] Error: %s", getErrorMessage(error));
+    vfsReadAt(file, 0, 0, virtPtrForKernel(buff), 1000000, 0, read2Callback, NULL);
+}
+
+void read1Callback(Error error, size_t read, void* udata) {
+    KERNEL_LOG("[!] Error: %s", getErrorMessage(error));
+    buff[read] = 0;
+    KERNEL_LOG("[!] Read: '%s'", buff);
+    for (size_t i = 0; i < sizeof(buff); i++) {
+        buff[i] = '0' + (i % 50);
+    }
+    vfsWriteAt(file, 0, 0, virtPtrForKernel(buff), 100, 0, writeCallback, NULL);
 }
 
 void openCallback(Error error, VfsFile* f, void* udata) {
     file = f;
     KERNEL_LOG("[!] Error: %s", getErrorMessage(error));
     KERNEL_LOG("[!] File:  %p", file);
-    vfsReadAt(
-        file, 0, 0, virtPtrForKernel(buff), 511, 0, (VfsFunctionCallbackSizeT)read1Callback, buff
-    );
+    vfsReadAt(file, 0, 0, virtPtrForKernel(buff), 511, 0, read1Callback, NULL);
 }
 
-void initCallback(Error error, VfsFilesystem* f) {
-    fs = f;
+void initCallback(Error error, void* udata) {
     KERNEL_LOG("[!] Error: %s", getErrorMessage(error));
     mountFilesystem(&global_file_system, fs, "/"); 
-    vfsOpen(&global_file_system, 0, 0, "/test/test.txt", 0, 0, openCallback, fs);
+    vfsOpen(&global_file_system, 0, 0, "/test/test.txt", 0, 0, openCallback, NULL);
 }
 
 void testingCode() {
@@ -127,8 +199,8 @@ void testingCode() {
         device, layout->config.blk_size, layout->config.capacity * layout->config.blk_size,
         (BlockOperationFunction)virtIOBlockDeviceOperation
     );
-    MinixFilesystem* fs = createMinixFilesystem((VfsFile*)file, NULL);
-    fs->base.functions->init((VfsFilesystem*)fs, 0, 0, (VfsFunctionCallbackVoid)initCallback, fs);
+    fs = (VfsFilesystem*)createMinixFilesystem((VfsFile*)file, NULL);
+    fs->functions->init(fs, 0, 0, initCallback, NULL);
     // Just do some sleeping
     for (uint64_t i = 0;; i++) {
         syscall(SYSCALL_PRINT, "Hello, sleeping for %is\n", i);

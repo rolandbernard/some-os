@@ -1,4 +1,5 @@
 
+#include <assert.h>
 #include <string.h>
 
 #include "files/minix/file.h"
@@ -9,6 +10,7 @@
 #include "files/vfs.h"
 #include "kernel/time.h"
 #include "memory/kalloc.h"
+#include "memory/pagealloc.h"
 #include "util/util.h"
 
 typedef struct {
@@ -22,6 +24,7 @@ typedef struct {
     size_t size;
     size_t current_size;
     bool write;
+    bool trunc;
     VfsFunctionCallbackSizeT callback;
     void* udata;
     MinixInode inode;
@@ -91,7 +94,27 @@ static void minixOperationAtZone(MinixOperationRequest* request, size_t zone) {
     }
 }
 
-static void minixGenericZoneCallback(Error error, size_t zone, MinixOperationRequest* request) {
+static void minixWriteCurrentZone(MinixOperationRequest* request) {
+    if (request->depth == 0) {
+        // Will be written when writing the inode
+        minixGenericZoneWalkStep(request);
+    } else {
+        request->current_size = 0;
+        size_t parent_zone = request->zone_zone[request->depth - 1];
+        size_t offset = parent_zone * MINIX_BLOCK_SIZE;
+        vfsWriteAt(
+            request->file->fs->block_device, 0, 0,
+            virtPtrForKernel(request->zones[request->depth - 1]), MINIX_BLOCK_SIZE, offset,
+            (VfsFunctionCallbackSizeT)minixGenericReadStepCallback, request
+        );
+    }
+}
+
+static void minixGenericZeroZoneCallback(Error error, size_t written, MinixOperationRequest* request) {
+    minixWriteCurrentZone(request);
+}
+
+static void minixGenericGetZoneCallback(Error error, size_t zone, MinixOperationRequest* request) {
     if (isError(error)) {
         // Unable to allocate another zone
         request->position[request->depth]++;
@@ -103,19 +126,56 @@ static void minixGenericZoneCallback(Error error, size_t zone, MinixOperationReq
         } else {
             request->zones[request->depth - 1][request->position[request->depth]] = new_zone;
         }
+        request->current_size = 0;
+        static_assert(MINIX_BLOCK_SIZE <= PAGE_SIZE);
+        vfsWriteAt(
+            request->file->fs->block_device, 0, 0,
+            virtPtrForKernel(zero_page), MINIX_BLOCK_SIZE, new_zone * MINIX_BLOCK_SIZE,
+            (VfsFunctionCallbackSizeT)minixGenericZeroZoneCallback, request
+        );
+    }
+}
+
+static void minixGenericFreeZoneCallback(Error error, MinixOperationRequest* request) {
+    if (isError(error)) {
+        // Unable to allocate another zone
+        request->position[request->depth]++;
+        minixGenericZoneWalkStep(request);
+    } else {
         if (request->depth == 0) {
-            // Will be written when writing the inode
-            minixGenericZoneWalkStep(request);
+            request->inode.zones[request->position[0]] = 0;
         } else {
-            request->current_size = 0;
-            size_t parent_zone = request->zone_zone[request->depth - 1];
-            size_t offset = parent_zone * MINIX_BLOCK_SIZE + request->offset;
-            vfsWriteAt(
-                request->file->fs->block_device, 0, 0,
-                virtPtrForKernel(request->zones[request->depth - 1]), MINIX_BLOCK_SIZE, offset,
-                (VfsFunctionCallbackSizeT)minixGenericReadStepCallback, request
-            );
+            request->zones[request->depth - 1][request->position[request->depth]] = 0;
         }
+        minixWriteCurrentZone(request);
+    }
+}
+
+static void minixGenericFreeReadZoneCallback(Error error, MinixOperationRequest* request) {
+    if (isError(error)) {
+        // Unable to allocate another zone
+        request->position[request->depth]++;
+        minixGenericZoneWalkStep(request);
+    } else {
+        if (request->depth - 1 == 0) {
+            request->inode.zones[request->position[0]] = 0;
+        } else {
+            request->zones[request->depth - 2][request->position[request->depth - 1]] = 0;
+        }
+        minixWriteCurrentZone(request);
+    }
+}
+
+static void minixGenericReadFreeStepCallback(Error error, size_t read, MinixOperationRequest* request) {
+    if (isError(error)) {
+        unlockSpinLock(&request->file->lock);
+        request->callback(error, request->read, request->udata);
+        dealloc(request);
+    } else {
+        freeMinixZone(
+            request->file->fs, request->zone_zone[request->depth - 1] - request->file->fs->superblock.first_data_zone,
+            (VfsFunctionCallbackVoid)minixGenericFreeReadZoneCallback, request
+        );
     }
 }
 
@@ -131,11 +191,63 @@ static void minixIndirectZoneWalkStep(size_t max_depth, MinixOperationRequest* r
         } else {
             zone = request->zones[request->depth - 1][request->position[request->depth]];
         }
-        if (zone == 0) {
+        if (request->trunc) {
+            if (request->blocks_seen * MINIX_BLOCK_SIZE >= request->size) {
+                // Everything else must be freed
+                if (zone != 0) {
+                    if (request->depth == max_depth) {
+                        request->blocks_seen++;
+                        freeMinixZone(
+                            request->file->fs, zone - request->file->fs->superblock.first_data_zone,
+                            (VfsFunctionCallbackVoid)minixGenericFreeZoneCallback, request
+                        );
+                    } else {
+                        request->depth++;
+                        request->position[request->depth] = 0;
+                        request->zone_zone[request->depth - 1] = zone;
+                        request->current_size = 0;
+                        size_t offset = zone * MINIX_BLOCK_SIZE;
+                        vfsReadAt(
+                            request->file->fs->block_device, 0, 0,
+                            virtPtrForKernel(request->zones[request->depth - 1]), MINIX_BLOCK_SIZE, offset,
+                            (VfsFunctionCallbackSizeT)minixGenericReadFreeStepCallback, request
+                        );
+                    }
+                    return;
+                }
+            } else {
+                // More space needed
+                if (zone == 0) {
+                    if (request->blocks_seen * MINIX_BLOCK_SIZE >= request->inode.size) {
+                        getFreeMinixZone(
+                            request->file->fs, (VfsFunctionCallbackSizeT)minixGenericGetZoneCallback, request
+                        );
+                        return;
+                    }
+                } else if (request->depth == max_depth) {
+                    request->blocks_seen++;
+                }
+            }
+            if (request->depth != max_depth && zone != 0) {
+                request->depth++;
+                request->zone_zone[request->depth - 1] = zone;
+                request->position[request->depth] = 0;
+                request->current_size = 0;
+                size_t offset = zone * MINIX_BLOCK_SIZE;
+                vfsReadAt(
+                    request->file->fs->block_device, 0, 0,
+                    virtPtrForKernel(request->zones[request->depth - 1]), MINIX_BLOCK_SIZE, offset,
+                    (VfsFunctionCallbackSizeT)minixGenericReadStepCallback, request
+                );
+            } else {
+                request->position[request->depth]++;
+                minixGenericZoneWalkStep(request);
+            }
+        } else if (zone == 0) {
             // If writing and going over the end of the file, allocate new zones
             if (request->write && request->blocks_seen * MINIX_BLOCK_SIZE >= request->inode.size) {
                 getFreeMinixZone(
-                    request->file->fs, (VfsFunctionCallbackSizeT)minixGenericZoneCallback, request
+                    request->file->fs, (VfsFunctionCallbackSizeT)minixGenericGetZoneCallback, request
                 );
             } else {
                 request->position[request->depth]++;
@@ -150,7 +262,7 @@ static void minixIndirectZoneWalkStep(size_t max_depth, MinixOperationRequest* r
                 request->zone_zone[request->depth - 1] = zone;
                 request->position[request->depth] = 0;
                 request->current_size = 0;
-                size_t offset = zone * MINIX_BLOCK_SIZE + request->offset;
+                size_t offset = zone * MINIX_BLOCK_SIZE;
                 vfsReadAt(
                     request->file->fs->block_device, 0, 0,
                     virtPtrForKernel(request->zones[request->depth - 1]), MINIX_BLOCK_SIZE, offset,
@@ -162,9 +274,12 @@ static void minixIndirectZoneWalkStep(size_t max_depth, MinixOperationRequest* r
 }
 
 static void minixGenericZoneWalkStep(MinixOperationRequest* request) {
-    if (request->size == 0 || request->position[0] > 9) {
+    if ((!request->trunc && request->size == 0) || request->position[0] > 9) {
         request->inode.atime = getUnixTime();
-        if (request->write) {
+        if (request->trunc) {
+            request->inode.size = request->size;
+        }
+        if (request->write || request->trunc) {
             request->inode.mtime = getUnixTime();
         }
         vfsWriteAt(
@@ -208,7 +323,7 @@ static void minixGenericReadINodeCallback(Error error, size_t read, MinixOperati
         request->position[3] = 0;
         request->depth = 0;
         request->blocks_seen = 0;
-        if (request->inode.size < request->offset + request->size && !request->write) {
+        if (request->inode.size < request->offset + request->size && !request->write && !request->trunc) {
             // Can't read past the end of the file
             if (request->inode.size < request->offset) {
                 request->size = 0;
@@ -221,7 +336,7 @@ static void minixGenericReadINodeCallback(Error error, size_t read, MinixOperati
 }
 
 static void minixGenericOperation(
-    MinixFile* file, Uid uid, Gid gid, VirtPtr buffer, size_t length, bool write,
+    MinixFile* file, Uid uid, Gid gid, VirtPtr buffer, size_t length, bool write, bool trunc,
     VfsFunctionCallbackSizeT callback, void* udata
 ) {
     MinixOperationRequest* request = kalloc(sizeof(MinixOperationRequest));
@@ -234,6 +349,7 @@ static void minixGenericOperation(
     request->read = 0;
     request->size = length;
     request->write = write;
+    request->trunc = trunc;
     request->callback = callback;
     request->udata = udata;
     vfsReadAt(
@@ -305,14 +421,14 @@ static void minixReadFunction(
     MinixFile* file, Uid uid, Gid gid, VirtPtr buffer, size_t size,
     VfsFunctionCallbackSizeT callback, void* udata
 ) {
-    minixGenericOperation(file, uid, gid, buffer, size, false, callback, udata);
+    minixGenericOperation(file, uid, gid, buffer, size, false, false, callback, udata);
 }
 
 static void minixWriteFunction(
     MinixFile* file, Uid uid, Gid gid, VirtPtr buffer, size_t size,
     VfsFunctionCallbackSizeT callback, void* udata
 ) {
-    minixGenericOperation(file, uid, gid, buffer, size, true, callback, udata);
+    minixGenericOperation(file, uid, gid, buffer, size, true, false, callback, udata);
 }
 
 typedef struct {
@@ -384,8 +500,24 @@ static void minixDupFunction(MinixFile* file, Uid uid, Gid gid, VfsFunctionCallb
     callback(simpleError(SUCCESS), (VfsFile*)copy, udata);
 }
 
+typedef struct {
+    VfsFunctionCallbackVoid callback;
+    void* udata;
+} MinixTruncRequest;
+
+static void minixTruncCallback(Error error, size_t ignore, MinixTruncRequest* request) {
+    request->callback(error, request->udata);
+    dealloc(request);
+}
+
 static void minixTruncFunction(MinixFile* file, Uid uid, Gid gid, size_t size, VfsFunctionCallbackVoid callback, void* udata) {
-    // TODO: implement
+    MinixTruncRequest* request = kalloc(sizeof(MinixStatRequest));
+    request->callback = callback;
+    request->udata = udata;
+    minixGenericOperation(
+        file, uid, gid, virtPtrForKernel(NULL), size, false, true,
+        (VfsFunctionCallbackSizeT)minixTruncCallback, request
+    );
 }
 
 static VfsFileVtable functions = {
