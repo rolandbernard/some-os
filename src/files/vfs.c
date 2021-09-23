@@ -196,20 +196,22 @@ void vfsUnlink(VirtualFilesystem* fs, Uid uid, Gid gid, const char* path, VfsFun
     if (mount != NULL) {
         switch (mount->type) {
             case MOUNT_TYPE_FILE: {
+                unlockSpinLock(&fs->lock);
                 callback(simpleError(UNSUPPORTED), udata);
                 break;
             }
             case MOUNT_TYPE_FS: {
                 VfsFilesystem* filesystem = (VfsFilesystem*)mount->data;
+                unlockSpinLock(&fs->lock);
                 filesystem->functions->unlink(filesystem, uid, gid, path, callback, udata);
                 break;
             }
             case MOUNT_TYPE_BIND: panic(); // Can't happen. Would return NULL.
         }
     } else {
+        unlockSpinLock(&fs->lock);
         callback(simpleError(NO_SUCH_FILE), udata);
     }
-    unlockSpinLock(&fs->lock);
 }
 
 void vfsLink(VirtualFilesystem* fs, Uid uid, Gid gid, const char* old, const char* new, VfsFunctionCallbackVoid callback, void* udata) {
@@ -220,14 +222,16 @@ void vfsLink(VirtualFilesystem* fs, Uid uid, Gid gid, const char* old, const cha
         if (mount_new == mount_old && mount_new->type == MOUNT_TYPE_FS) {
             // Linking across filesystem boundaries is impossible
             VfsFilesystem* filesystem = (VfsFilesystem*)mount_old->data;
+            unlockSpinLock(&fs->lock);
             filesystem->functions->link(filesystem, uid, gid, old, new, callback, udata);
         } else {
+            unlockSpinLock(&fs->lock);
             callback(simpleError(UNSUPPORTED), udata);
         }
     } else {
+        unlockSpinLock(&fs->lock);
         callback(simpleError(NO_SUCH_FILE), udata);
     }
-    unlockSpinLock(&fs->lock);
 }
 
 void vfsRename(VirtualFilesystem* fs, Uid uid, Gid gid, const char* old, const char* new, VfsFunctionCallbackVoid callback, void* udata) {
@@ -239,14 +243,16 @@ void vfsRename(VirtualFilesystem* fs, Uid uid, Gid gid, const char* old, const c
         if (mount_new == mount_old && mount_new->type == MOUNT_TYPE_FS) {
             // Moving across filesystem boundaries requires copying
             VfsFilesystem* filesystem = (VfsFilesystem*)mount_old->data;
+            unlockSpinLock(&fs->lock);
             filesystem->functions->rename(filesystem, uid, gid, old, new, callback, udata);
         } else {
+            unlockSpinLock(&fs->lock);
             callback(simpleError(UNSUPPORTED), udata);
         }
     } else {
+        unlockSpinLock(&fs->lock);
         callback(simpleError(NO_SUCH_FILE), udata);
     }
-    unlockSpinLock(&fs->lock);
 }
 
 typedef struct {
