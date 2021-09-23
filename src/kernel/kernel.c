@@ -185,10 +185,15 @@ void openCallback(Error error, VfsFile* f, void* udata) {
     vfsReadAt(file, 0, 0, virtPtrForKernel(buff), 511, 0, read1Callback, NULL);
 }
 
+void linkCallback(Error error, void* udata) {
+    KERNEL_LOG("[!] Error: %s", getErrorMessage(error));
+    vfsOpen(&global_file_system, 0, 0, "/test/test2.txt", 0, 0, openCallback, NULL);
+}
+
 void initCallback(Error error, void* udata) {
     KERNEL_LOG("[!] Error: %s", getErrorMessage(error));
     mountFilesystem(&global_file_system, fs, "/"); 
-    vfsOpen(&global_file_system, 0, 0, "/test/test.txt", 0, 0, openCallback, NULL);
+    vfsLink(&global_file_system, 0, 0, "/test/test.txt", "/test/test2.txt", linkCallback, NULL);
 }
 
 void testingCode() {
