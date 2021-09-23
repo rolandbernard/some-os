@@ -61,7 +61,7 @@ static void formatInteger(char* buf, size_t* pos, size_t max, long long num, int
         j++;
     }
     if ((flags & FLAG_ALTERNATE) != 0) {
-        if (base == 8 || base == 16) {
+        if (base == 2 || base == 8 || base == 16) {
             prefix[j] = '0';
             j++;
             if (base == 16) {
@@ -70,6 +70,9 @@ static void formatInteger(char* buf, size_t* pos, size_t max, long long num, int
                 } else {
                     prefix[j] = 'x';
                 }
+                j++;
+            } else if (base == 2) {
+                prefix[j] = 'b';
                 j++;
             }
         }
@@ -217,7 +220,7 @@ int vsnprintf(char* buf, size_t size, const char* fmt, va_list args) {
                     length = LENGTH_LONG;
                 }
             }
-            if (*fmt == 'i' || *fmt == 'd' || *fmt == 'o' || *fmt == 'u' || *fmt == 'x' || *fmt == 'X') {
+            if (*fmt == 'i' || *fmt == 'd' || *fmt == 'o' || *fmt == 'u' || *fmt == 'x' || *fmt == 'X' || *fmt == 'b') {
                 long long num = 0;
                 if (length == LENGTH_LONG_LONG) {
                     num = va_arg(args, long long);
@@ -241,6 +244,8 @@ int vsnprintf(char* buf, size_t size, const char* fmt, va_list args) {
                     base = 16;
                 } else if (*fmt == 'o') {
                     base = 8;
+                } else if (*fmt == 'b') {
+                    base = 1;
                 }
                 formatInteger(buf, &pos, size, num, base, width, flags);
             } else if (*fmt == 'p') {
