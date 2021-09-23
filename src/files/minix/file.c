@@ -476,7 +476,7 @@ static void minixStatFunction(
     request->callback = callback;
     request->udata = udata;
     vfsReadAt(
-        file->fs->block_device, uid, gid, virtPtrForKernel(&request->inode), sizeof(MinixInode),
+        file->fs->block_device, 0, 0, virtPtrForKernel(&request->inode), sizeof(MinixInode),
         offsetForINode(file->fs, file->inodenum), (VfsFunctionCallbackSizeT)minixStatINodeCallback,
         request
     );
@@ -520,6 +520,92 @@ static void minixTruncFunction(MinixFile* file, Uid uid, Gid gid, size_t size, V
     );
 }
 
+typedef struct {
+    MinixFile* file;
+    Uid uid;
+    VfsMode mode;
+    Uid new_uid;
+    Gid new_gid;
+    bool chown;
+    VfsFunctionCallbackVoid callback;
+    void* udata;
+    MinixInode inode;
+} MinixChRequest;
+
+static void minixChWriteCallback(Error error, size_t read, MinixChRequest* request) {
+    if (isError(error)) {
+        unlockSpinLock(&request->file->lock);
+        request->callback(error, request->udata);
+        dealloc(request);
+    } else if (read != sizeof(MinixInode)) {
+        unlockSpinLock(&request->file->lock);
+        request->callback(simpleError(IO_ERROR), request->udata);
+        dealloc(request);
+    } else {
+        unlockSpinLock(&request->file->lock);
+        request->callback(simpleError(SUCCESS), request->udata);
+        dealloc(request);
+    }
+}
+
+static void minixChReadCallback(Error error, size_t read, MinixChRequest* request) {
+    if (isError(error)) {
+        unlockSpinLock(&request->file->lock);
+        request->callback(error, request->udata);
+        dealloc(request);
+    } else if (read != sizeof(MinixInode)) {
+        unlockSpinLock(&request->file->lock);
+        request->callback(simpleError(IO_ERROR), request->udata);
+        dealloc(request);
+    } else if (request->uid != 0 && request->uid != request->inode.uid) {
+        unlockSpinLock(&request->file->lock);
+        request->callback(simpleError(FORBIDDEN), request->udata);
+        dealloc(request);
+    } else {
+        if (request->chown) {
+            request->inode.uid = request->new_uid;
+            request->inode.gid = request->new_gid;
+        } else {
+            request->inode.mode &= VFS_MODE_TYPE; // Clear everything but the type
+            request->inode.mode |= request->mode & ~VFS_MODE_TYPE; // Don't allow changing the type
+        }
+        vfsWriteAt(
+            request->file->fs->block_device, 0, 0, virtPtrForKernel(&request->inode),
+            sizeof(MinixInode), offsetForINode(request->file->fs, request->file->inodenum),
+            (VfsFunctionCallbackSizeT)minixChWriteCallback, request
+        );
+    }
+}
+
+static void minixChFunction(
+    MinixFile* file, Uid uid, Gid gid, VfsMode mode, Uid new_uid, Gid new_gid, bool chown,
+    VfsFunctionCallbackVoid callback, void* udata
+) {
+    MinixChRequest* request = kalloc(sizeof(MinixChRequest));
+    lockSpinLock(&file->lock);
+    request->file = file;
+    request->uid = uid;
+    request->new_uid = new_uid;
+    request->new_gid = new_gid;
+    request->chown = chown;
+    request->mode = mode;
+    request->callback = callback;
+    request->udata = udata;
+    vfsReadAt(
+        file->fs->block_device, 0, 0, virtPtrForKernel(&request->inode), sizeof(MinixInode),
+        offsetForINode(file->fs, file->inodenum),
+        (VfsFunctionCallbackSizeT)minixChReadCallback, request
+    );
+}
+
+static void minixChmodFunction(MinixFile* file, Uid uid, Gid gid, VfsMode mode, VfsFunctionCallbackVoid callback, void* udata) {
+    minixChFunction(file, uid, gid, mode, 0, 0, false, callback, udata);
+}
+
+static void minixChownFunction(MinixFile* file, Uid uid, Gid gid, Uid new_uid, Gid new_gid, VfsFunctionCallbackVoid callback, void* udata) {
+    minixChFunction(file, uid, gid, 0, new_uid, new_gid, true, callback, udata);
+}
+
 static VfsFileVtable functions = {
     .seek = (SeekFunction)minixSeekFunction,
     .read = (ReadFunction)minixReadFunction,
@@ -528,6 +614,8 @@ static VfsFileVtable functions = {
     .close = (CloseFunction)minixCloseFunction,
     .dup = (DupFunction)minixDupFunction,
     .trunc = (TruncFunction)minixTruncFunction,
+    .chmod = (ChmodFunction)minixChmodFunction,
+    .chown = (ChownFunction)minixChownFunction,
 };
 
 MinixFile* createMinixFileForINode(MinixFilesystem* fs, uint32_t inode) {

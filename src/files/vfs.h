@@ -106,6 +106,8 @@ typedef void (*StatFunction)(struct VfsFile_s* file, Uid uid, Gid gid, VfsFuncti
 typedef void (*CloseFunction)(struct VfsFile_s* file, Uid uid, Gid gid, VfsFunctionCallbackVoid callback, void* udata);
 typedef void (*DupFunction)(struct VfsFile_s* file, Uid uid, Gid gid, VfsFunctionCallbackFile callback, void* udata);
 typedef void (*TruncFunction)(struct VfsFile_s* file, Uid uid, Gid gid, size_t size, VfsFunctionCallbackVoid callback, void* udata);
+typedef void (*ChmodFunction)(struct VfsFile_s* file, Uid uid, Gid gid, VfsMode mode, VfsFunctionCallbackVoid callback, void* udata);
+typedef void (*ChownFunction)(struct VfsFile_s* file, Uid uid, Gid gid, Uid new_uid, Gid new_gid, VfsFunctionCallbackVoid callback, void* udata);
 
 typedef struct {
     SeekFunction seek;
@@ -115,6 +117,8 @@ typedef struct {
     StatFunction stat;
     DupFunction dup;
     TruncFunction trunc;
+    ChmodFunction chmod;
+    ChownFunction chown;
 } VfsFileVtable;
 
 typedef struct VfsFile_s {
