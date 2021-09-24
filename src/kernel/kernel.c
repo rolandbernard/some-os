@@ -178,22 +178,34 @@ void read1Callback(Error error, size_t read, void* udata) {
     vfsWriteAt(file, 0, 0, virtPtrForKernel(buff), 100, 0, writeCallback, NULL);
 }
 
+void chmodCallback(Error error, void* udata) {
+    KERNEL_LOG("[!] Error: %s", getErrorMessage(error));
+    vfsReadAt(file, 0, 0, virtPtrForKernel(buff), 511, 0, read1Callback, NULL);
+}
+
+void chownCallback(Error error, void* udata) {
+    KERNEL_LOG("[!] Error: %s", getErrorMessage(error));
+    file->functions->chmod(file, 0, 0, 0711, chmodCallback, NULL);
+}
+
 void openCallback(Error error, VfsFile* f, void* udata) {
     file = f;
     KERNEL_LOG("[!] Error: %s", getErrorMessage(error));
     KERNEL_LOG("[!] File:  %p", file);
-    vfsReadAt(file, 0, 0, virtPtrForKernel(buff), 511, 0, read1Callback, NULL);
+    file->functions->chown(file, 0, 0, 70, 70, chownCallback, NULL);
 }
 
 void linkCallback(Error error, void* udata) {
     KERNEL_LOG("[!] Error: %s", getErrorMessage(error));
-    vfsOpen(&global_file_system, 0, 0, "/test/test2.txt", 0, 0, openCallback, NULL);
+    vfsOpen(&global_file_system, 0, 0, "/test/test.txt", 0, 0, openCallback, NULL);
 }
 
 void initCallback(Error error, void* udata) {
     KERNEL_LOG("[!] Error: %s", getErrorMessage(error));
     mountFilesystem(&global_file_system, fs, "/"); 
     vfsLink(&global_file_system, 0, 0, "/test/test.txt", "/test/test2.txt", linkCallback, NULL);
+    /* vfsUnlink(&global_file_system, 0, 0, "/test/test.txt", linkCallback, NULL); */
+    /* vfsUnlink(&global_file_system, 0, 0, "/test/test.txt", linkCallback, NULL); */
 }
 
 void testingCode() {
