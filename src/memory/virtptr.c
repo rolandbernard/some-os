@@ -51,6 +51,32 @@ size_t getVirtPtrParts(VirtPtr addr, size_t length, VirtPtrBufferPart* parts, si
     return part_index;
 }
 
+void* virtPtrPartsDo(VirtPtr addr, size_t length, VirtPtrPartsDoCallback callback, void* udata) {
+    uintptr_t part_position = addr.address;
+    uintptr_t next_position = addr.address;
+    while (part_position < addr.address + length) {
+        next_position = (next_position + PAGE_SIZE) & -PAGE_SIZE;
+        uintptr_t phys_start = virtToPhys(addr.table, part_position);
+        if (phys_start == 0) {
+            return udata;
+        }
+        uintptr_t phys_end = virtToPhys(addr.table, next_position);
+        if (phys_end - phys_start != next_position - part_position || next_position > addr.address + length) {
+            VirtPtrBufferPart part;
+            part.address = (void*)phys_start;
+            part.offset = part_position - addr.address;
+            if (next_position > addr.address + length) {
+                part.length = addr.address + length - part_position;
+            } else {
+                part.length = next_position - part_position;
+            }
+            part_position = next_position;
+            udata = callback(part, udata);
+        }
+    }
+    return udata;
+}
+
 void memcpyBetweenVirtPtr(VirtPtr dest, VirtPtr src, size_t n) {
     // This does not support overlaps.
     size_t dest_count = getVirtPtrParts(dest, n, NULL, 0);

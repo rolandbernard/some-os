@@ -25,6 +25,10 @@ VirtPtr virtPtrFor(uintptr_t addr, PageTable* table);
 // Parts are segments of the buffer in the same page
 size_t getVirtPtrParts(VirtPtr addr, size_t length, VirtPtrBufferPart* parts, size_t max_parts);
 
+typedef void* (*VirtPtrPartsDoCallback)(VirtPtrBufferPart part, void* udata);
+
+void* virtPtrPartsDo(VirtPtr addr, size_t length, VirtPtrPartsDoCallback callback, void* udata);
+
 void memcpyBetweenVirtPtr(VirtPtr dest, VirtPtr src, size_t n);
 
 void memsetVirtPtr(VirtPtr dest, int byte, size_t n);
