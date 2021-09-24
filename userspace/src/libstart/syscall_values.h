@@ -1,0 +1,10 @@
+#ifndef _SYSCALL_VALUES_H_
+#define _SYSCALL_VALUES_H_
+
+#define SYSCALL_PRINT 0
+#define SYSCALL_EXIT 1
+#define SYSCALL_YIELD 2
+#define SYSCALL_FORK 3
+#define SYSCALL_SLEEP 4
+
+#endif

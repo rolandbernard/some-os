@@ -14,7 +14,9 @@ SOURCE_DIR := src
 BUILD_DIR  := build
 OBJECT_DIR := $(BUILD_DIR)/$(BUILD)/obj
 BINARY_DIR := $(BUILD_DIR)/$(BUILD)/bin
-MOUNT_DIR  := mnt/
+MOUNT_DIR  := mnt
+USERSPACE_DIR  := userspace
+USERSPACE_DISK_DIR  := $(USERSPACE_DIR)/disk
 # ==
 
 # == Files
@@ -113,12 +115,11 @@ qemu: $(BINARY_DIR)/kernel $(DISK)
 
 $(DISK): $(MAKEFILE_LIST) | $(MOUNT_DIR)
 	@$(ECHO) "Building $@"
+	make -C $(USERSPACE_DIR)
 	dd if=/dev/zero of=$@ bs=1M count=32 &> /dev/null
 	mkfs.minix -3 $@
 	sudo mount $@ $(MOUNT_DIR)
-	mkdir $(MOUNT_DIR)/test
-	mkdir $(MOUNT_DIR)/test2
-	echo "Hello world!" > $(MOUNT_DIR)/test/test.txt
+	cp -r $(USERSPACE_DISK_DIR)/* $(MOUNT_DIR)/
 	sudo umount $(MOUNT_DIR)
 
 # Cleanup
