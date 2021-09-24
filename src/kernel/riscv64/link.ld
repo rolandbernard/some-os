@@ -12,26 +12,22 @@ PHDRS {
 }
 
 SECTIONS {
-    .text : {
+    .text ALIGN(4k): {
         PROVIDE(__text_start = .);
         *(.text.boot)
         *(.text .text*)
         PROVIDE(__text_end = .);
     } >ram AT>ram :text
 
-    .rodata : {
-        . = ALIGN(4K); /* Align to page boundaries */
+    .data ALIGN(4k): {
         PROVIDE(__data_start = .);
         *(.rodata .rodata*)
-    } >ram AT>ram :text
-
-    .data : {
         *(.sdata .sdata*)
         *(.data .data*)
         PROVIDE(__data_end = .);
     } >ram AT>ram :data
 
-    .bss ALIGN(8): {
+    .bss ALIGN(4k): {
         PROVIDE(__bss_start = .);
         *(.sbss .sbss*)
         *(.bss .bss*)

@@ -66,7 +66,7 @@ LDFLAGS.debug   += -O0 -g
 CCFLAGS.release += -O3
 LDFLAGS.release += -O3
 
-CCFLAGS += $(CCFLAGS.$(BUILD)) $(WARNINGS) -MMD -MP -nostdlib -mno-relax -fpic
+CCFLAGS += $(CCFLAGS.$(BUILD)) $(WARNINGS) -MMD -MP -nostdlib -mno-relax -fpic -ffreestanding
 CCFLAGS += -I$(SOURCE_DIR) -I$(SOURCE_DIR)/libc/include
 LDFLAGS += $(LDFLAGS.$(BUILD)) -static
 # ==
