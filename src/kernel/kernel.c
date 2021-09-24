@@ -219,9 +219,9 @@ void testingCode() {
     fs = (VfsFilesystem*)createMinixFilesystem((VfsFile*)file, NULL);
     fs->functions->init(fs, 0, 0, initCallback, NULL);
     // Just do some sleeping
-    for (uint64_t i = 0;; i++) {
-        syscall(SYSCALL_PRINT, "Hello, sleeping for %is\n", i);
-        syscall(SYSCALL_SLEEP, i * 1000000000UL);
+    for (;;) {
+        syscall(SYSCALL_PRINT, "Hello, sleeping...\n");
+        syscall(SYSCALL_SLEEP, 1000000000UL);
     }
     syscall(SYSCALL_EXIT);
 }

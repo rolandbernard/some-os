@@ -5,10 +5,12 @@
 
 #include "error/log.h"
 
+#include "process/types.h"
 #include "util/text.h"
 #include "devices/devices.h"
 #include "devices/serial/serial.h"
 #include "interrupt/syscall.h"
+#include "memory/virtptr.h"
 
 Error logKernelMessage(const char* fmt, ...) {
     // Logging happens to the default serial device
@@ -17,9 +19,22 @@ Error logKernelMessage(const char* fmt, ...) {
     return writeToSerial(serial, "%s", string);
 }
 
+static void* writeVirtPtrString(VirtPtrBufferPart part, void* udata) {
+    Serial serial = getDefaultSerialDevice();
+    writeStringNToSerial(serial, part.address, part.length);
+    return udata;
+}
+
 uintptr_t printSyscall(bool is_kernel, TrapFrame* frame, SyscallArgs args) {
-    // TODO: REMOVE! This is just for testing. This is really unsafe.
-    logKernelMessage((const char*)args[0], args[1], args[2], args[3], args[4], args[5], args[6]);
+    VirtPtr str;
+    if (frame->hart == NULL) {
+        str = virtPtrForKernel((void*)args[0]);
+    } else {
+        Process* process = (Process*)frame;
+        str = virtPtrFor(args[0], process->table);
+    }
+    size_t length = strlenVirtPtr(str);
+    virtPtrPartsDo(str, length, writeVirtPtrString, NULL);
     return 0;
 }
 

@@ -14,6 +14,15 @@ Error writeStringToSerial(Serial serial, const char* str) {
     return simpleError(SUCCESS);
 }
 
+Error writeStringNToSerial(Serial serial, const char* str, size_t length) {
+    while (length > 0) {
+        CHECKED(serial.write(serial.data, *str));
+        length--;
+        str++;
+    }
+    return simpleError(SUCCESS);
+}
+
 Error writeToSerial(Serial serial, const char* fmt, ...) {
     FORMAT_STRING(string, fmt);
     return writeStringToSerial(serial, string);

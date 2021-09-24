@@ -4,11 +4,11 @@
 #include "process/process.h"
 
 typedef enum {
-    SYSCALL_PRINT,
-    SYSCALL_EXIT,
-    SYSCALL_YIELD,
-    SYSCALL_FORK,
-    SYSCALL_SLEEP,
+    SYSCALL_PRINT = 0,
+    SYSCALL_EXIT = 1,
+    SYSCALL_YIELD = 2,
+    SYSCALL_FORK = 3,
+    SYSCALL_SLEEP = 4,
 } Syscalls;
 
 // Simple wrapper around ecall

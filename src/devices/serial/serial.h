@@ -19,6 +19,9 @@ typedef struct {
 // Write null-terminated string to the given serial device
 Error writeStringToSerial(Serial serial, const char* str);
 
+// Write string of given length to the given serial device
+Error writeStringNToSerial(Serial serial, const char* str, size_t length);
+
 // Write format string to the serial device
 Error writeToSerial(Serial serial, const char* fmt, ...);
 
