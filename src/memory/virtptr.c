@@ -88,7 +88,7 @@ void memcpyBetweenVirtPtr(VirtPtr dest, VirtPtr src, size_t n) {
     size_t index = 0;
     size_t dest_index = 0;
     size_t src_index = 0;
-    while (index < n) {
+    while (index < n && dest_index < dest_count && src_index < src_count) {
         size_t dest_next = dest_parts[dest_index].offset + dest_parts[dest_index].length;
         size_t src_next = src_parts[src_index].offset + src_parts[src_index].length;
         size_t dest_off = index - dest_parts[dest_index].offset;

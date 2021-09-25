@@ -240,7 +240,7 @@ static void dupCallback(Error error, VfsFile* file, void* udata) {
     Process* process = (Process*)udata;
     if (isError(error)) {
         process->frame.regs[REG_ARGUMENT_0] = -error.kind;
-    } else if ((intptr_t)process->frame.regs[REG_ARGUMENT_2] < 0) {
+    } else if ((int)process->frame.regs[REG_ARGUMENT_2] < 0) {
         size_t fd = allocateNewFileDescriptor(process);
         putNewFileDescriptor(process, fd, file);
         process->frame.regs[REG_ARGUMENT_0] = fd;

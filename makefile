@@ -115,7 +115,7 @@ qemu: $(BINARY_DIR)/kernel $(DISK)
 
 $(DISK): $(MAKEFILE_LIST) | $(MOUNT_DIR)
 	@$(ECHO) "Building $@"
-	make -C $(USERSPACE_DIR)
+	make BUILD=$(BUILD) -C $(USERSPACE_DIR)
 	dd if=/dev/zero of=$@ bs=1M count=32 &> /dev/null
 	mkfs.minix -3 $@
 	sudo mount $@ $(MOUNT_DIR)

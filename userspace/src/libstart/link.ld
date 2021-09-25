@@ -16,6 +16,7 @@ SECTIONS {
 
     .data ALIGN(4K): {
         PROVIDE(__data_start = .);
+        *(.got)
         *(.rodata .rodata*)
         *(.sdata .sdata*)
         *(.data .data*)
@@ -31,3 +32,4 @@ SECTIONS {
 
     PROVIDE(__global_pointer = __data_start);
 }
+

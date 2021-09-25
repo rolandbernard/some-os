@@ -5,6 +5,7 @@
 
 #include "error/error.h"
 #include "files/vfs.h"
+#include "process/types.h"
 #include "memory/virtptr.h"
 
 // This is in little endian: 0x7f byte followed by "ELF"
@@ -56,8 +57,8 @@ typedef struct {
     uintptr_t align;
 } ElfProgramHeader;
 
-Error loadProgramFromElfFilePath(Process* process, const char* path);
+typedef void (*ElfFileLoadCallback)(Error error, void* udata);
 
-Error loadProgramFromElfFile(Process* process, VfsFile* file);
+void loadProgramFromElfFile(Process* process, VfsFile* file, ElfFileLoadCallback callback, void* udata);
 
 #endif

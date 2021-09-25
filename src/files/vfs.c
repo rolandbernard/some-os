@@ -94,7 +94,8 @@ Error mountRedirect(VirtualFilesystem* fs, const char* from, const char* to) {
 
 Error umount(VirtualFilesystem* fs, const char* from) {
     lockSpinLock(&fs->lock);
-    for (size_t i = 0; i < fs->mount_count;) {
+    for (size_t i = fs->mount_count; i > 0;) {
+        i--;
         if (strcmp(fs->mounts[i].path, from) == 0) {
             if (freeFilesystemMount(&fs->mounts[i], false)) {
                 fs->mount_count--;
@@ -105,8 +106,6 @@ Error umount(VirtualFilesystem* fs, const char* from) {
                 unlockSpinLock(&fs->lock);
                 return simpleError(ALREADY_IN_USE);
             }
-        } else {
-            i++;
         }
     }
     if (fs->parent != NULL) {
