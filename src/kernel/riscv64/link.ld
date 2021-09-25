@@ -21,6 +21,7 @@ SECTIONS {
 
     .data ALIGN(4k): {
         PROVIDE(__data_start = .);
+        *(.got)
         *(.rodata .rodata*)
         *(.sdata .sdata*)
         *(.data .data*)
