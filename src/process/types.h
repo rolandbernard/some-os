@@ -4,9 +4,11 @@
 // This file combines some of the types in one file to avoid recursive imports
 
 #include <stdint.h>
+#include <stddef.h>
 
 #include "memory/pagetable.h"
 #include "util/spinlock.h"
+#include "files/vfs.h"
 
 struct HartFrame_s;
 
@@ -80,6 +82,7 @@ typedef enum {
     RUNNING,
     READY,
     WAITING,
+    SLEEPING,
     TERMINATED, // Still has resources
     FREED, // Resources have been freed
 } ProcessState;
@@ -87,35 +90,44 @@ typedef enum {
 typedef uint64_t Tid;
 typedef uint64_t Pid;
 typedef uint8_t Priority;
-typedef uint64_t Uid;
-typedef uint64_t Gid;
 
-typedef struct Process_s {
-    TrapFrame frame;
+typedef struct {
+    Priority priority;
+    Priority queue_priority; // Is a maximum of priority, but will be decreased over time
+    uint16_t runs;
+    ProcessState state;
+    struct Process_s* sched_next; // Used for ready and waiting lists
+} ProcessScheduling;
 
-    // General
-    Tid tid;
-    Pid pid;
+typedef struct {
+    PageTable* table;
+    void* stack; // This is only used for a kernel process
+} ProcessMemory;
+
+typedef struct {
+    Uid uid;
+    Gid gid;
+    size_t fd_count;
+    VfsFile** files;
+} ProcessResources;
+
+typedef struct {
     struct Process_s* parent;
     struct Process_s* children;
     struct Process_s* child_next;
+    struct Process_s* child_prev;
     struct Process_s* global_next; // Used for list off every process
     struct Process_s* global_prev;
+} ProcessTree;
+
+typedef struct Process_s {
+    TrapFrame frame;
+    Pid pid;
     uint64_t status; // This is the status returned from wait
-
-    // Scheduling
-    Priority priority;
-    Priority sched_priority; // Is a maximum of priority, but will be decreased over time
-    ProcessState state;
-    struct Process_s* sched_next; // Used for ready and waiting lists
-
-    // Memory
-    PageTable* table;
-    void* stack; // This is only used for a kernel process
-
-    // Resources
-    Uid uid;
-    Gid gid;
+    ProcessTree tree;
+    ProcessScheduling sched;
+    ProcessMemory memory;
+    ProcessResources resources;
 } Process;
 
 #endif

@@ -18,4 +18,6 @@ void pushProcessToQueue(ScheduleQueue* queue, Process* process);
 
 Process* removeProccesFromQueue(ScheduleQueue* queue, Process* process);
 
+bool moveToSchedState(Process* process, ProcessState state);
+
 #endif

@@ -31,7 +31,7 @@ uintptr_t printSyscall(bool is_kernel, TrapFrame* frame, SyscallArgs args) {
         str = virtPtrForKernel((void*)args[0]);
     } else {
         Process* process = (Process*)frame;
-        str = virtPtrFor(args[0], process->table);
+        str = virtPtrFor(args[0], process->memory.table);
     }
     size_t length = strlenVirtPtr(str);
     virtPtrPartsDo(str, length, writeVirtPtrString, NULL);

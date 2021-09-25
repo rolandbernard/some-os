@@ -7,6 +7,8 @@
 #include "error/error.h"
 #include "process/types.h"
 
+extern SpinLock process_lock;
+
 void initTrapFrame(TrapFrame* frame, uintptr_t sp, uintptr_t gp, uintptr_t pc, uintptr_t asid, PageTable* table);
 
 Process* createKernelProcess(void* start, Priority priority, size_t stack_size);

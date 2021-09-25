@@ -13,6 +13,7 @@
 #include "memory/virtmem.h"
 #include "process/harts.h"
 #include "process/process.h"
+#include "process/schedule.h"
 #include "process/syscall.h"
 #include "process/types.h"
 #include "util/spinlock.h"
@@ -23,10 +24,9 @@ extern void __data_start;
 extern void __data_end;
 
 static Pid next_pid = 1;
-static Tid next_tid = 1;
 
-static SpinLock process_lock;
 static Process* global_first = NULL;
+SpinLock process_lock;
 
 void initTrapFrame(TrapFrame* frame, uintptr_t sp, uintptr_t gp, uintptr_t pc, uintptr_t asid, PageTable* table) {
     frame->hart = NULL; // Set to NULL for now. Will be set when enqueuing
@@ -40,21 +40,19 @@ void initTrapFrame(TrapFrame* frame, uintptr_t sp, uintptr_t gp, uintptr_t pc, u
 Process* createKernelProcess(void* start, Priority priority, size_t stack_size) {
     Process* process = zalloc(sizeof(Process));
     assert(process != NULL);
-    process->table = kernel_page_table;
-    process->priority = priority;
-    process->state = ENQUEUEABLE;
-    process->stack = kalloc(stack_size);
-    assert(process->stack != NULL);
+    process->memory.table = kernel_page_table;
+    process->memory.stack = kalloc(stack_size);
+    assert(process->memory.stack != NULL);
+    process->sched.priority = priority;
+    process->sched.state = ENQUEUEABLE;
     initTrapFrame(
-        &process->frame, (uintptr_t)process->stack + stack_size,
+        &process->frame, (uintptr_t)process->memory.stack + stack_size,
         (uintptr_t)getKernelGlobalPointer(), (uintptr_t)start, 0, kernel_page_table
     );
     lockSpinLock(&process_lock); 
-    process->tid = next_tid;
-    next_tid++;
-    process->global_next = global_first;
+    process->tree.global_next = global_first;
     if (global_first != NULL) {
-        global_first->global_prev = process;
+        global_first->tree.global_prev = process;
     }
     global_first = process;
     unlockSpinLock(&process_lock); 
@@ -68,85 +66,64 @@ Process* createEmptyUserProcess(uintptr_t sp, uintptr_t gp, uintptr_t pc, Proces
     process->pid = next_pid;
     next_pid++;
     unlockSpinLock(&process_lock); 
-    process->table = createPageTable();
-    process->parent = parent;
-    process->priority = priority;
-    process->state = ENQUEUEABLE;
-    process->stack = NULL;
-    initTrapFrame(&process->frame, sp, gp, pc, process->pid, process->table);
+    process->memory.table = createPageTable();
+    process->memory.stack = NULL;
+    process->sched.priority = priority;
+    process->sched.state = ENQUEUEABLE;
+    initTrapFrame(&process->frame, sp, gp, pc, process->pid, process->memory.table);
     lockSpinLock(&process_lock); 
-    process->tid = next_tid;
-    next_tid++;
-    process->global_next = global_first;
+    process->tree.global_next = global_first;
     if (global_first != NULL) {
-        global_first->global_prev = process;
+        global_first->tree.global_prev = process;
     }
     global_first = process;
     if (parent != NULL) {
-        process->child_next = parent->children;
-        parent->children = process;
+        process->tree.parent = parent;
+        if (parent->tree.children != NULL) {
+            parent->tree.children->tree.child_prev = process;
+        }
+        process->tree.child_next = parent->tree.children;
+        parent->tree.children = process;
     }
     unlockSpinLock(&process_lock); 
     return process;
 }
 
 void freeProcess(Process* process) {
-    if (process->state != FREED) {
-        process->state = FREED;
+    if (process->sched.state != FREED) {
+        process->sched.state = FREED;
         lockSpinLock(&process_lock); 
-        if (process->global_prev == NULL) {
-            global_first = process->global_next;
-        } else {
-            process->global_prev->global_next = process->global_next;
-        }
-        if (process->global_next != NULL) {
-            process->global_next->global_prev = process->global_prev;
-        }
         // Reparent children
-        Process* child = process->children;
+        Process* child = process->tree.children;
         while (child != NULL) {
-            child->parent = process->parent;
-            if (process->parent != NULL) {
-                child->child_next = process->parent->children;
-                process->parent->children = child;
+            child->tree.parent = process->tree.parent;
+            if (process->tree.parent != NULL) {
+                child->tree.child_next = process->tree.parent->tree.children;
+                process->tree.parent->tree.children = child;
             }
         }
+        if (process->tree.global_prev == NULL) {
+            global_first = process->tree.global_next;
+        } else {
+            process->tree.global_prev->tree.global_next = process->tree.global_next;
+        }
+        if (process->tree.global_next != NULL) {
+            process->tree.global_next->tree.global_prev = process->tree.global_prev;
+        }
         unlockSpinLock(&process_lock); 
-        dealloc(process->stack);
+        dealloc(process->memory.stack);
         if (process->pid != 0) {
             // If this is not a kernel process, free its page table.
-            unmapAllPagesAndFreeUsers(process->table);
-            deallocPage(process->table);
+            unmapAllPagesAndFreeUsers(process->memory.table);
+            deallocPage(process->memory.table);
         }
-        if (process->parent == NULL) {
-            // If we have no parent, no one can wait for the child.
-            dealloc(process);
-        }
+        dealloc(process);
     }
-}
-
-Pid freeKilledChild(Process* parent, uint64_t* status) {
-    lockSpinLock(&process_lock); 
-    Process** child = &parent->children;
-    while (*child != NULL) {
-        if ((*child)->state == FREED) {
-            Process* ret = *child;
-            *child = ret->child_next;
-            unlockSpinLock(&process_lock); 
-            Pid pid = ret->pid;
-            *status = ret->status;
-            dealloc(ret);
-            return pid;
-        }
-        child = &(*child)->child_next;
-    }
-    unlockSpinLock(&process_lock); 
-    return 0;
 }
 
 void enterProcess(Process* process) {
     initTimerInterrupt();
-    process->state = RUNNING;
+    moveToSchedState(process, RUNNING);
     HartFrame* hart = getCurrentHartFrame();
     if (hart != process->frame.hart && process->pid != 0) {
         // If this process was moved between harts

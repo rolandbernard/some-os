@@ -66,7 +66,7 @@ void kernelTrap(uintptr_t cause, uintptr_t pc, uintptr_t val, TrapFrame* frame) 
     } else {
         if (frame->hart != NULL) {
             Process* process = (Process*)frame;
-            process->state = ENQUEUEABLE;
+            process->sched.state = ENQUEUEABLE;
         }
         if (interrupt) {
             frame->pc = pc;

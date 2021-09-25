@@ -25,9 +25,9 @@ uintptr_t forkSyscall(bool is_kernel, TrapFrame* frame, SyscallArgs args) {
         if (frame->hart == NULL) {
             old_stack_top = ((HartFrame*)frame)->stack_top;
         } else {
-            priority = process->priority;
-            stack_size = kallocSize(process->stack);
-            old_stack_top = process->stack + stack_size;
+            priority = process->sched.priority;
+            stack_size = kallocSize(process->memory.stack);
+            old_stack_top = process->memory.stack + stack_size;
         }
         Process* new_process = createKernelProcess((void*)frame->pc, priority, stack_size);
         // Copy registers
@@ -35,7 +35,7 @@ uintptr_t forkSyscall(bool is_kernel, TrapFrame* frame, SyscallArgs args) {
         // Copy stack
         void* old_stack_pointer = (void*)frame->regs[REG_STACK_POINTER];
         size_t used_size = old_stack_top - old_stack_pointer;
-        void* new_stack_pointer = new_process->stack + stack_size - used_size;
+        void* new_stack_pointer = new_process->memory.stack + stack_size - used_size;
         memcpy(new_stack_pointer, old_stack_pointer, used_size);
         // Update stack pointer and hart value
         new_process->frame.regs[REG_STACK_POINTER] = (uintptr_t)new_stack_pointer;
@@ -55,23 +55,20 @@ uintptr_t exitSyscall(bool is_kernel, TrapFrame* frame, SyscallArgs args) {
     assert(frame->hart != NULL);
     Process* process = (Process*)frame;
     process->status = (process->status & ~0xff) | (args[0] & 0xff);
-    process->state = TERMINATED;
+    moveToSchedState(process, TERMINATED);
     return 0;
 }
 
 uintptr_t yieldSyscall(bool is_kernel, TrapFrame* frame, SyscallArgs args) {
-    // TODO: Improve the scheduler completely
     assert(frame->hart != NULL); // Only a process can be yielded
-    Process* process = (Process*)frame;
-    // Decrease priority to allow other processes to run
-    // All other processes will be run at least once before running this one again
-    process->sched_priority = LOWEST_PRIORITY;
+    // Do nothing, process will be enqueued
     return 0;
 }
 
+// TODO: implement sleep differently
 static void awakenFromSleep(Time time, void* udata) {
     Process* process = (Process*)udata;
-    process->state = ENQUEUEABLE;
+    moveToSchedState(process, ENQUEUEABLE);
     enqueueProcess(process);
 }
 
@@ -86,7 +83,7 @@ uintptr_t sleepSyscall(bool is_kernel, TrapFrame* frame, SyscallArgs args) {
     } else {
         // This is a process. We can put it into wait.
         Process* process = (Process*)frame;
-        process->state = WAITING;
+        moveToSchedState(process, SLEEPING);
         setTimeout(delay, awakenFromSleep, process);
     }
     return 0;

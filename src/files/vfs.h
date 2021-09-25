@@ -6,7 +6,6 @@
 
 #include "error/error.h"
 #include "memory/virtptr.h"
-#include "process/types.h"
 #include "util/spinlock.h"
 #include "interrupt/timer.h"
 
@@ -70,6 +69,8 @@ typedef enum {
 #define TYPE_MODE(type) (type << 12)
 
 typedef uint16_t VfsMode;
+typedef uint64_t Uid;
+typedef uint64_t Gid;
 
 typedef struct {
     size_t id;
