@@ -61,7 +61,7 @@ Error mountFilesystem(VirtualFilesystem* fs, VfsFilesystem* filesystem, const ch
     lockSpinLock(&fs->lock);
     fs->mounts = krealloc(fs->mounts, (fs->mount_count + 1) * sizeof(FilesystemMount));
     fs->mounts[fs->mount_count].type = MOUNT_TYPE_FS;
-    fs->mounts[fs->mount_count].path = reducedPathCopy(path);
+    fs->mounts[fs->mount_count].path = stringClone(path);
     fs->mounts[fs->mount_count].data = filesystem;
     fs->mount_count++;
     unlockSpinLock(&fs->lock);
@@ -73,7 +73,7 @@ Error mountFile(VirtualFilesystem* fs, VfsFile* file, const char* path) {
     lockSpinLock(&fs->lock);
     fs->mounts = krealloc(fs->mounts, (fs->mount_count + 1) * sizeof(FilesystemMount));
     fs->mounts[fs->mount_count].type = MOUNT_TYPE_FILE;
-    fs->mounts[fs->mount_count].path = reducedPathCopy(path);
+    fs->mounts[fs->mount_count].path = stringClone(path);
     fs->mounts[fs->mount_count].data = file;
     fs->mount_count++;
     unlockSpinLock(&fs->lock);
@@ -85,8 +85,8 @@ Error mountRedirect(VirtualFilesystem* fs, const char* from, const char* to) {
     lockSpinLock(&fs->lock);
     fs->mounts = krealloc(fs->mounts, (fs->mount_count + 1) * sizeof(FilesystemMount));
     fs->mounts[fs->mount_count].type = MOUNT_TYPE_BIND;
-    fs->mounts[fs->mount_count].path = reducedPathCopy(to);
-    fs->mounts[fs->mount_count].data = reducedPathCopy(from);
+    fs->mounts[fs->mount_count].path = stringClone(to);
+    fs->mounts[fs->mount_count].data = stringClone(from);
     fs->mount_count++;
     unlockSpinLock(&fs->lock);
     return simpleError(SUCCESS);
@@ -162,7 +162,7 @@ static FilesystemMount* findMountHandling(VirtualFilesystem* fs, char* path) {
 
 void vfsOpen(VirtualFilesystem* fs, Uid uid, Gid gid, const char* path, VfsOpenFlags flags, VfsMode mode, VfsFunctionCallbackFile callback, void* udata) {
     lockSpinLock(&fs->lock);
-    FilesystemMount* mount = findMountHandling(fs, reducedPathCopy(path));
+    FilesystemMount* mount = findMountHandling(fs, stringClone(path));
     if (mount != NULL) {
         switch (mount->type) {
             case MOUNT_TYPE_FILE: {
@@ -197,7 +197,7 @@ void vfsOpen(VirtualFilesystem* fs, Uid uid, Gid gid, const char* path, VfsOpenF
 
 void vfsUnlink(VirtualFilesystem* fs, Uid uid, Gid gid, const char* path, VfsFunctionCallbackVoid callback, void* udata) {
     lockSpinLock(&fs->lock);
-    FilesystemMount* mount = findMountHandling(fs, reducedPathCopy(path));
+    FilesystemMount* mount = findMountHandling(fs, stringClone(path));
     if (mount != NULL) {
         switch (mount->type) {
             case MOUNT_TYPE_FILE: {
@@ -221,8 +221,8 @@ void vfsUnlink(VirtualFilesystem* fs, Uid uid, Gid gid, const char* path, VfsFun
 
 void vfsLink(VirtualFilesystem* fs, Uid uid, Gid gid, const char* old, const char* new, VfsFunctionCallbackVoid callback, void* udata) {
     lockSpinLock(&fs->lock);
-    FilesystemMount* mount_old = findMountHandling(fs, reducedPathCopy(old));
-    FilesystemMount* mount_new = findMountHandling(fs, reducedPathCopy(new));
+    FilesystemMount* mount_old = findMountHandling(fs, stringClone(old));
+    FilesystemMount* mount_new = findMountHandling(fs, stringClone(new));
     if (mount_old != NULL && mount_new != NULL) {
         if (mount_new == mount_old && mount_new->type == MOUNT_TYPE_FS) {
             // Linking across filesystem boundaries is impossible
@@ -242,8 +242,8 @@ void vfsLink(VirtualFilesystem* fs, Uid uid, Gid gid, const char* old, const cha
 void vfsRename(VirtualFilesystem* fs, Uid uid, Gid gid, const char* old, const char* new, VfsFunctionCallbackVoid callback, void* udata) {
     // Could just be a link and unlink.
     lockSpinLock(&fs->lock);
-    FilesystemMount* mount_old = findMountHandling(fs, reducedPathCopy(old));
-    FilesystemMount* mount_new = findMountHandling(fs, reducedPathCopy(new));
+    FilesystemMount* mount_old = findMountHandling(fs, stringClone(old));
+    FilesystemMount* mount_new = findMountHandling(fs, stringClone(new));
     if (mount_old != NULL && mount_new != NULL) {
         if (mount_new == mount_old && mount_new->type == MOUNT_TYPE_FS) {
             // Moving across filesystem boundaries requires copying

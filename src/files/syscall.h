@@ -33,4 +33,6 @@ void mountSyscall(bool is_kernel, TrapFrame* frame, SyscallArgs args);
 
 void umountSyscall(bool is_kernel, TrapFrame* frame, SyscallArgs args);
 
+char* copyPathFromSyscallArgs(Process* process, uintptr_t ptr);
+
 #endif

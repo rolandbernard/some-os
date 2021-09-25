@@ -55,12 +55,12 @@ void kernelInit() {
 
 char buff[2000000];
 
-#define isOK(TEST) assert(TEST >= 0);
+#define isOK(TEST) assert((int)(TEST) >= 0);
 
 void kernelMain() {
     // Just some testing code
-    isOK(syscall(SYSCALL_MOUNT, "/dev/blk0", "/", "minix", NULL));
-    int fd = syscall(SYSCALL_OPEN, "/test/test.txt", 0, 0);
+    isOK(syscall(SYSCALL_MOUNT, "dev/blk0", "", "minix", NULL));
+    int fd = syscall(SYSCALL_OPEN, "test/test.txt", 0, 0);
     isOK(fd);
     long read = syscall(SYSCALL_READ, fd, buff, 100);
     isOK(read);
@@ -69,7 +69,7 @@ void kernelMain() {
     syscall(SYSCALL_PRINT, buff);
     syscall(SYSCALL_PRINT, "'\n");
     syscall(SYSCALL_CLOSE, fd);
-    fd = syscall(SYSCALL_OPEN, "/test/test2.txt", VFS_OPEN_CREATE, 600);
+    fd = syscall(SYSCALL_OPEN, "test/test2.txt", VFS_OPEN_CREATE, 600);
     isOK(fd);
     long written = syscall(SYSCALL_WRITE, fd, buff, read);
     isOK(written);

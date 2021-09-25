@@ -180,7 +180,7 @@ static void minixFindINodeForPath(MinixFilesystem* fs, Uid uid, Gid gid, const c
     request->fs = fs;
     request->uid = uid;
     request->gid = gid;
-    request->path_copy = reducedPathCopy(path);
+    request->path_copy = stringClone(path);
     request->path = request->path_copy + (request->path_copy[0] == '/' ? 1 : 0); // all paths start with /, skip it
     request->callback = callback;
     request->udata = udata;
@@ -387,7 +387,7 @@ static void minixOpenParentINodeCallback(Error error, VfsFile* file, MinixOpenRe
 static void minixOpenINodeCallback(Error error, uint32_t inode, MinixOpenRequest* request) {
     if (request->path[1] != 0 && error.kind == NO_SUCH_FILE && (request->flags & VFS_OPEN_CREATE) != 0) {
         // If we don't find the node itself, try opening the parent
-        char* path = reducedPathCopy(request->path);
+        char* path = stringClone(request->path);
         size_t len = strlen(path) - 1;
         while (len > 0 && path[len] != '/') {
             len--;
@@ -428,7 +428,7 @@ static void minixOpenFunction(
     request->fs = fs;
     request->uid = uid;
     request->gid = gid;
-    request->path = reducedPathCopy(path);
+    request->path = stringClone(path);
     request->flags = flags;
     request->mode = mode;
     request->callback = callback;
@@ -656,11 +656,11 @@ static void minixUnlinkFunction(MinixFilesystem* fs, Uid uid, Gid gid, const cha
     request->fs = fs;
     request->uid = uid;
     request->gid = gid;
-    request->path = reducedPathCopy(path);
+    request->path = stringClone(path);
     request->callback = callback;
     request->udata = udata;
     // Try opening the parent
-    char* path_copy = reducedPathCopy(request->path);
+    char* path_copy = stringClone(request->path);
     size_t len = strlen(path_copy) - 1;
     while (len > 0 && path_copy[len] != '/') {
         len--;
@@ -793,7 +793,7 @@ static void minixLinkFindINodeCallback(Error error, uint32_t inode, MinixLinkReq
     } else {
         request->inodenum = inode;
         // Try opening the parent
-        char* path = reducedPathCopy(request->path);
+        char* path = stringClone(request->path);
         size_t len = strlen(path) - 1;
         while (len > 0 && path[len] != '/') {
             len--;
@@ -837,8 +837,8 @@ static void minixLinkFunction(MinixFilesystem* fs, Uid uid, Gid gid, const char*
     request->fs = fs;
     request->uid = uid;
     request->gid = gid;
-    request->old = reducedPathCopy(old);
-    request->path = reducedPathCopy(new);
+    request->old = stringClone(old);
+    request->path = stringClone(new);
     request->callback = callback;
     request->udata = udata;
     minixFindINodeForPath(fs, uid, gid, new, (MinixINodeCallback)minixLinkFindNewINodeCallback, request);

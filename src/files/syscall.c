@@ -4,6 +4,7 @@
 
 #include "files/syscall.h"
 #include "files/vfs.h"
+#include "files/path.h"
 #include "memory/kalloc.h"
 #include "process/schedule.h"
 
@@ -73,7 +74,7 @@ static void openCallback(Error error, VfsFile* file, void* udata) {
 void openSyscall(bool is_kernel, TrapFrame* frame, SyscallArgs args) {
     assert(frame->hart != NULL);
     Process* process = (Process*)frame;
-    char* string = copyStringFromSyscallArgs(process, args[0]);
+    char* string = copyPathFromSyscallArgs(process, args[0]);
     if (string != NULL) {
         moveToSchedState(process, WAITING);
         vfsOpen(
@@ -96,7 +97,7 @@ static void voidSyscallCallback(Error error, void* udata) {
 void unlinkSyscall(bool is_kernel, TrapFrame* frame, SyscallArgs args) {
     assert(frame->hart != NULL);
     Process* process = (Process*)frame;
-    char* string = copyStringFromSyscallArgs(process, args[0]);
+    char* string = copyPathFromSyscallArgs(process, args[0]);
     if (string != NULL) {
         moveToSchedState(process, WAITING);
         vfsUnlink(
@@ -111,9 +112,9 @@ void unlinkSyscall(bool is_kernel, TrapFrame* frame, SyscallArgs args) {
 void linkSyscall(bool is_kernel, TrapFrame* frame, SyscallArgs args) {
     assert(frame->hart != NULL);
     Process* process = (Process*)frame;
-    char* old = copyStringFromSyscallArgs(process, args[0]);
+    char* old = copyPathFromSyscallArgs(process, args[0]);
     if (old != NULL) {
-        char* new = copyStringFromSyscallArgs(process, args[1]);
+        char* new = copyPathFromSyscallArgs(process, args[1]);
         if (new != NULL) {
             moveToSchedState(process, WAITING);
             vfsLink(
@@ -133,9 +134,9 @@ void linkSyscall(bool is_kernel, TrapFrame* frame, SyscallArgs args) {
 void renameSyscall(bool is_kernel, TrapFrame* frame, SyscallArgs args) {
     assert(frame->hart != NULL);
     Process* process = (Process*)frame;
-    char* old = copyStringFromSyscallArgs(process, args[0]);
+    char* old = copyPathFromSyscallArgs(process, args[0]);
     if (old != NULL) {
-        char* new = copyStringFromSyscallArgs(process, args[1]);
+        char* new = copyPathFromSyscallArgs(process, args[1]);
         if (new != NULL) {
             moveToSchedState(process, WAITING);
             vfsRename(
@@ -301,7 +302,7 @@ static void mountCreateFsCallback(Error error, VfsFilesystem* fs, void* udata) {
     if (isError(error)) {
         process->frame.regs[REG_ARGUMENT_0] = -error.kind;
     } else {
-        char* target = copyStringFromSyscallArgs(process, process->frame.regs[REG_ARGUMENT_2]);
+        char* target = copyPathFromSyscallArgs(process, process->frame.regs[REG_ARGUMENT_2]);
         if (target != NULL) {
             error = mountFilesystem(&global_file_system, fs, target);
             dealloc(target);
@@ -321,7 +322,7 @@ static void mountCreateFsCallback(Error error, VfsFilesystem* fs, void* udata) {
 void mountSyscall(bool is_kernel, TrapFrame* frame, SyscallArgs args) {
     assert(frame->hart != NULL);
     Process* process = (Process*)frame;
-    char* source = copyStringFromSyscallArgs(process, args[0]);
+    char* source = copyPathFromSyscallArgs(process, args[0]);
     if (source != NULL) {
         char* type = copyStringFromSyscallArgs(process, args[2]);
         if (type != NULL) {
@@ -346,13 +347,39 @@ void umountSyscall(bool is_kernel, TrapFrame* frame, SyscallArgs args) {
     if (process->resources.uid != 0 && process->resources.gid != 0) { // Only root can mount
         process->frame.regs[REG_ARGUMENT_0] = -FORBIDDEN;
     } else {
-        char* path = copyStringFromSyscallArgs(process, args[0]);
+        char* path = copyPathFromSyscallArgs(process, args[0]);
         if (path != NULL) {
             process->frame.regs[REG_ARGUMENT_0] = -umount(&global_file_system, path).kind;
             dealloc(path);
         } else {
             process->frame.regs[REG_ARGUMENT_0] = -ILLEGAL_ARGUMENTS;
         }
+    }
+}
+
+char* copyPathFromSyscallArgs(Process* process, uintptr_t ptr) {
+    VirtPtr str = virtPtrFor(ptr, process->memory.table);
+    bool relative = true;
+    size_t length = strlenVirtPtr(str);
+    if (readInt(str, 8) == '/') {
+        relative = false;
+    }
+    char* string = kalloc(length + 1 + (relative ? 1 : 0));
+    if (string != NULL) {
+        if (relative) {
+            // TODO: add working directory
+            string[0] = '/';
+            memcpyBetweenVirtPtr(virtPtrForKernel(string + 1), str, length);
+            string[length + 1] = 0;
+        } else {
+            memcpyBetweenVirtPtr(virtPtrForKernel(string), str, length);
+            string[length] = 0;
+        }
+        // All paths to the functions have to be normalized and absolute
+        inlineReducePath(string);
+        return string;
+    } else {
+        return NULL;
     }
 }
 
