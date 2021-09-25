@@ -22,6 +22,6 @@ Error logKernelMessage(const char* fmt, ...);
 }
 #endif
 
-uintptr_t printSyscall(bool is_kernel, TrapFrame* frame, SyscallArgs args);
+void printSyscall(bool is_kernel, TrapFrame* frame, SyscallArgs args);
 
 #endif

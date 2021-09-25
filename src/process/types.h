@@ -87,8 +87,7 @@ typedef enum {
     FREED, // Resources have been freed
 } ProcessState;
 
-typedef uint64_t Tid;
-typedef uint64_t Pid;
+typedef int Pid;
 typedef uint8_t Priority;
 
 typedef struct {
@@ -107,7 +106,9 @@ typedef struct {
 typedef struct {
     Uid uid;
     Gid gid;
+    int next_fd;
     size_t fd_count;
+    int* fds;
     VfsFile** files;
 } ProcessResources;
 

@@ -69,8 +69,8 @@ typedef enum {
 #define TYPE_MODE(type) (type << 12)
 
 typedef uint16_t VfsMode;
-typedef uint64_t Uid;
-typedef uint64_t Gid;
+typedef int Uid;
+typedef int Gid;
 
 typedef struct {
     size_t id;
@@ -94,11 +94,13 @@ typedef struct {
 } VfsDirectoryEntry;
 
 struct VfsFile_s;
+struct VfsFilesystem_s;
 
 typedef void (*VfsFunctionCallbackVoid)(Error error, void* udata);
 typedef void (*VfsFunctionCallbackSizeT)(Error error, size_t size, void* udata);
 typedef void (*VfsFunctionCallbackStat)(Error error, VfsStat stat, void* udata);
 typedef void (*VfsFunctionCallbackFile)(Error error, struct VfsFile_s* entry, void* udata);
+typedef void (*VfsFunctionCallbackFilesystem)(Error error, struct VfsFilesystem_s* entry, void* udata);
 
 typedef void (*SeekFunction)(struct VfsFile_s* file, Uid uid, Gid gid, size_t offset, VfsSeekWhence whence, VfsFunctionCallbackSizeT callback, void* udata);
 typedef void (*ReadFunction)(struct VfsFile_s* file, Uid uid, Gid gid, VirtPtr buffer, size_t size, VfsFunctionCallbackSizeT callback, void* udata);
@@ -125,8 +127,6 @@ typedef struct {
 typedef struct VfsFile_s {
     const VfsFileVtable* functions;
 } VfsFile;
-
-struct VfsFilesystem_s;
 
 typedef void (*OpenFunction)(struct VfsFilesystem_s* fs, Uid uid, Gid gid, const char* path, VfsOpenFlags flags, VfsMode mode, VfsFunctionCallbackFile callback, void* udata);
 typedef void (*UnlinkFunction)(struct VfsFilesystem_s* fs, Uid uid, Gid gid, const char* path, VfsFunctionCallbackVoid callback, void* udata);
@@ -199,5 +199,7 @@ void vfsReadAt(VfsFile* file, Uid uid, Gid gid, VirtPtr ptr, size_t size, size_t
 void vfsWriteAt(VfsFile* file, Uid uid, Gid gid, VirtPtr ptr, size_t size, size_t offset, VfsFunctionCallbackSizeT callback, void* udata);
 
 bool canAccess(VfsMode mode, Uid file_uid, Gid file_gid, Uid uid, Gid gid, VfsAccessFlags flags);
+
+void createFilesystemFrom(VirtualFilesystem* fs,const char* path, const char* type, VirtPtr data, VfsFunctionCallbackFilesystem callback, void* udata);
 
 #endif

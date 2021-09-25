@@ -3,7 +3,9 @@
 #include <string.h>
 
 #include "error/error.h"
+#include "files/minix/minix.h"
 #include "files/vfs.h"
+#include "devices/devices.h"
 
 #include "files/path.h"
 #include "memory/kalloc.h"
@@ -11,6 +13,7 @@
 VirtualFilesystem global_file_system;
 
 Error initVirtualFileSystem() {
+    CHECKED(mountDeviceFiles());
     return simpleError(SUCCESS);
 }
 
@@ -18,8 +21,7 @@ VirtualFilesystem* createVirtualFilesystem() {
     return zalloc(sizeof(VirtualFilesystem));
 }
 
-static void freeFilesystem(Error error, void* to_free) {
-    dealloc(to_free);
+static void freeFilesystemCallback(Error error, void* to_free) {
 }
 
 static bool freeFilesystemMount(FilesystemMount* mount, bool force) {
@@ -27,7 +29,7 @@ static bool freeFilesystemMount(FilesystemMount* mount, bool force) {
     switch (mount->type) {
         case MOUNT_TYPE_FILE: {
             VfsFile* file = (VfsFile*)mount->data;
-            file->functions->close(file, 0, 0, freeFilesystem, file);
+            file->functions->close(file, 0, 0, freeFilesystemCallback, NULL);
             return true;
         }
         case MOUNT_TYPE_FS: {
@@ -35,7 +37,7 @@ static bool freeFilesystemMount(FilesystemMount* mount, bool force) {
             if (!force && filesystem->open_files != 0) {
                 return false;
             } else {
-                filesystem->functions->free(filesystem, 0, 0, freeFilesystem, filesystem);
+                filesystem->functions->free(filesystem, 0, 0, freeFilesystemCallback, NULL);
                 return true;
             }
         }
@@ -109,9 +111,12 @@ Error umount(VirtualFilesystem* fs, const char* from) {
     }
     if (fs->parent != NULL) {
         CHECKED(umount(fs->parent, from), unlockSpinLock(&fs->lock));
+        unlockSpinLock(&fs->lock);
+        return simpleError(SUCCESS);
+    } else {
+        unlockSpinLock(&fs->lock);
+        return simpleError(NO_SUCH_FILE);
     }
-    unlockSpinLock(&fs->lock);
-    return simpleError(SUCCESS);
 }
 
 static FilesystemMount* findMountHandling(VirtualFilesystem* fs, char* path) {
@@ -379,5 +384,55 @@ bool canAccess(VfsMode mode, Uid file_uid, Gid file_gid, Uid uid, Gid gid, VfsAc
     } else {
         return true;
     }
+}
+
+typedef struct {
+    char* type;
+    VirtPtr data;
+    VfsFunctionCallbackFilesystem callback;
+    void* udata;
+    VfsFilesystem* fs;
+} CreateFsRequest;
+
+static void createFsInitCallback(Error error, CreateFsRequest* request) {
+    if (isError(error)) {
+        request->fs->functions->free(request->fs, 0, 0, freeFilesystemCallback, NULL);
+        request->callback(error, NULL, request->udata);
+        dealloc(request);
+    } else {
+        request->callback(simpleError(SUCCESS), request->fs, request->udata);
+        dealloc(request);
+    }
+}
+
+static void createFsOpenCallback(Error error, VfsFile* file, CreateFsRequest* request) {
+    if (isError(error)) {
+        dealloc(request->type);
+        request->callback(error, NULL, request->udata);
+        dealloc(request);
+    } else {
+        if (strcmp(request->type, "minix") == 0) {
+            dealloc(request->type);
+            MinixFilesystem* fs = createMinixFilesystem(file, request->data);
+            request->fs = (VfsFilesystem*)fs;
+            fs->base.functions->init(
+                (VfsFilesystem*)fs, 0, 0, (VfsFunctionCallbackVoid)createFsInitCallback, request
+            );
+        } else {
+            file->functions->close(file, 0, 0, freeFilesystemCallback, NULL);
+            dealloc(request->type);
+            request->callback(simpleError(ILLEGAL_ARGUMENTS), NULL, request->udata);
+            dealloc(request);
+        }
+    }
+}
+
+void createFilesystemFrom(VirtualFilesystem* fs, const char* path, const char* type, VirtPtr data, VfsFunctionCallbackFilesystem callback, void* udata) {
+    CreateFsRequest* request = kalloc(sizeof(CreateFsRequest));
+    request->data = data;
+    request->type = stringClone(type);
+    request->callback = callback;
+    request->udata = udata;
+    vfsOpen(fs, 0, 0, path, 0, 0, (VfsFunctionCallbackFile)createFsOpenCallback, request);
 }
 

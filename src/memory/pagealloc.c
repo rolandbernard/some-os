@@ -28,8 +28,7 @@ Error initPageAllocator() {
         free_pages.first = NULL;
     }
     KERNEL_LOG("[>] Initialized page allocator");
-    zero_page = allocPage();
-    memset(zero_page, 0, PAGE_SIZE);
+    zero_page = zallocPage();
     KERNEL_LOG("[>] Initialized zero page");
     return simpleError(SUCCESS);
 }

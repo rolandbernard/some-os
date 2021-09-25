@@ -881,8 +881,8 @@ static void minixRenameFunction(MinixFilesystem* fs, Uid uid, Gid gid, const cha
 
 static void minixFreeFunction(MinixFilesystem* fs, Uid uid, Gid gid, VfsFunctionCallbackVoid callback, void* udata) {
     // We don't do any caching. Otherwise write it to disk here.
+    fs->block_device->functions->close(fs->block_device, 0, 0, callback, udata);
     dealloc(fs);
-    callback(simpleError(SUCCESS), udata);
 }
 
 typedef struct {
@@ -928,7 +928,7 @@ static const VfsFilesystemVtable functions = {
     .init = (InitFunction)minixInitFunction,
 };
 
-MinixFilesystem* createMinixFilesystem(VfsFile* block_device, void* data) {
+MinixFilesystem* createMinixFilesystem(VfsFile* block_device, VirtPtr data) {
     MinixFilesystem* file = zalloc(sizeof(MinixFilesystem));
     file->base.functions = &functions;
     file->block_device = block_device;

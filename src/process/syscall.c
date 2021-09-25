@@ -15,7 +15,7 @@
 #include "process/types.h"
 #include "util/util.h"
 
-uintptr_t forkSyscall(bool is_kernel, TrapFrame* frame, SyscallArgs args) {
+void forkSyscall(bool is_kernel, TrapFrame* frame, SyscallArgs args) {
     Process* process = (Process*)frame;
     if (frame->hart == NULL || process->pid == 0) {
         // This is for forking kernel processes and trap handlers
@@ -44,25 +44,23 @@ uintptr_t forkSyscall(bool is_kernel, TrapFrame* frame, SyscallArgs args) {
         }
         // Set the return value of the syscall to 1 for the new process
         new_process->frame.regs[REG_ARGUMENT_0] = 1;
+        frame->regs[REG_ARGUMENT_0] = 0;
         enqueueProcess(new_process);
     } else {
         // TODO: Implement forks of user processes
     }
-    return 0;
 }
 
-uintptr_t exitSyscall(bool is_kernel, TrapFrame* frame, SyscallArgs args) {
+void exitSyscall(bool is_kernel, TrapFrame* frame, SyscallArgs args) {
     assert(frame->hart != NULL);
     Process* process = (Process*)frame;
     process->status = (process->status & ~0xff) | (args[0] & 0xff);
     moveToSchedState(process, TERMINATED);
-    return 0;
 }
 
-uintptr_t yieldSyscall(bool is_kernel, TrapFrame* frame, SyscallArgs args) {
+void yieldSyscall(bool is_kernel, TrapFrame* frame, SyscallArgs args) {
     assert(frame->hart != NULL); // Only a process can be yielded
     // Do nothing, process will be enqueued
-    return 0;
 }
 
 // TODO: implement sleep differently
@@ -72,7 +70,7 @@ static void awakenFromSleep(Time time, void* udata) {
     enqueueProcess(process);
 }
 
-uintptr_t sleepSyscall(bool is_kernel, TrapFrame* frame, SyscallArgs args) {
+void sleepSyscall(bool is_kernel, TrapFrame* frame, SyscallArgs args) {
     Time delay = args[0] * CLOCKS_PER_SEC / 1000000000UL; // Argument is in nanoseconds
     if (frame->hart == NULL) {
         // If this is not a process. Just loop.
@@ -86,7 +84,6 @@ uintptr_t sleepSyscall(bool is_kernel, TrapFrame* frame, SyscallArgs args) {
         moveToSchedState(process, SLEEPING);
         setTimeout(delay, awakenFromSleep, process);
     }
-    return 0;
 }
 
 void exit() {

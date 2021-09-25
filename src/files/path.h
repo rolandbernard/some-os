@@ -5,4 +5,6 @@ void inlineReducePath(char* path);
 
 char* reducedPathCopy(const char* path);
 
+char* stringClone(const char* path);
+
 #endif

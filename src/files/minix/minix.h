@@ -4,6 +4,7 @@
 #include <stdint.h>
 
 #include "files/vfs.h"
+#include "memory/virtptr.h"
 #include "util/spinlock.h"
 
 #define MINIX3_MAGIC 0x4d5a
@@ -53,7 +54,7 @@ typedef struct {
     SpinLock maps_lock;
 } MinixFilesystem;
 
-MinixFilesystem* createMinixFilesystem(VfsFile* block_device, void* data);
+MinixFilesystem* createMinixFilesystem(VfsFile* block_device, VirtPtr data);
 
 size_t offsetForINode(const MinixFilesystem* fs, uint32_t inode);
 

@@ -25,7 +25,7 @@ static void* writeVirtPtrString(VirtPtrBufferPart part, void* udata) {
     return udata;
 }
 
-uintptr_t printSyscall(bool is_kernel, TrapFrame* frame, SyscallArgs args) {
+void printSyscall(bool is_kernel, TrapFrame* frame, SyscallArgs args) {
     VirtPtr str;
     if (frame->hart == NULL) {
         str = virtPtrForKernel((void*)args[0]);
@@ -35,6 +35,5 @@ uintptr_t printSyscall(bool is_kernel, TrapFrame* frame, SyscallArgs args) {
     }
     size_t length = strlenVirtPtr(str);
     virtPtrPartsDo(str, length, writeVirtPtrString, NULL);
-    return 0;
 }
 

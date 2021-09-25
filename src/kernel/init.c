@@ -11,17 +11,12 @@
 #include "process/harts.h"
 #include "process/syscall.h"
 
-Error initBasicSystems() {
+Error initAllSystems() {
     CHECKED(initPageAllocator());
     CHECKED(initKernelVirtualMemory());
     // kalloc is available from here on.
     initPrimaryHart();
-    return simpleError(SUCCESS);
-}
-
-Error initAllSystems() {
-    CHECKED(initPlic()); // Not required for running a process. Timer interrupts work already.
-    CHECKED(initVirtualFileSystem());
+    CHECKED(initPlic());
     return simpleError(SUCCESS);
 }
 

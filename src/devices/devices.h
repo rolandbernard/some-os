@@ -12,4 +12,6 @@ Error initDevices();
 // Get the serial device to be used for default input/output
 Serial getDefaultSerialDevice();
 
+Error mountDeviceFiles();
+
 #endif

@@ -3,9 +3,6 @@
 
 #include "error/error.h"
 
-// Initialize all systems needed to start a process
-Error initBasicSystems();
-
 // Initialize all the kernel systems that are not in the basic set
 Error initAllSystems();
 
