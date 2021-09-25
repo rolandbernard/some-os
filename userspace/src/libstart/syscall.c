@@ -23,3 +23,63 @@ void syscall_sleep(uint64_t nanoseconds) {
     SYSCALL(SYSCALL_FORK, nanoseconds);
 }
 
+int syscall_open(const char* path, SyscallOpenFlags flags, uint16_t mode) {
+    return SYSCALL(SYSCALL_OPEN, (uintptr_t)path, flags, mode);
+}
+
+int syscall_link(const char* old, const char* new) {
+    return SYSCALL(SYSCALL_LINK, (uintptr_t)old, (uintptr_t)new);
+}
+
+int syscall_unlink(const char* path) {
+    return SYSCALL(SYSCALL_UNLINK, (uintptr_t)path);
+}
+
+int syscall_rename(const char* old, const char* new) {
+    return SYSCALL(SYSCALL_RENAME, (uintptr_t)old, (uintptr_t)new);
+}
+
+int syscall_close(int fd) {
+    return SYSCALL(SYSCALL_CLOSE, fd);
+}
+
+size_t syscall_read(int fd, void* buff, size_t size) {
+    return SYSCALL(SYSCALL_READ, fd, (uintptr_t)buff, size);
+}
+
+size_t syscall_write(int fd, void* buff, size_t size) {
+    return SYSCALL(SYSCALL_WRITE, fd, (uintptr_t)buff, size);
+}
+
+size_t syscall_seek(int fd, size_t off, SyscallSeekWhence whence) {
+    return SYSCALL(SYSCALL_SEEK, fd, off, whence);
+}
+
+int syscall_stat(int fd, SyscallStat* buff) {
+    return SYSCALL(SYSCALL_STAT, fd, (uintptr_t)buff);
+}
+
+int syscall_dup(int fd, int newfd) {
+    return SYSCALL(SYSCALL_DUP, fd, newfd);
+}
+
+int syscall_trunc(int fd, size_t size) {
+    return SYSCALL(SYSCALL_TRUNC, fd, size);
+}
+
+int syscall_chmod(int fd, uint16_t mode) {
+    return SYSCALL(SYSCALL_CHMOD, fd, mode);
+}
+
+int syscall_chown(int fd, int uid, int gid) {
+    return SYSCALL(SYSCALL_CHOWN, fd, uid, gid);
+}
+
+int syscall_mount(const char* source, const char* target, const char* type, void* data) {
+    return SYSCALL(SYSCALL_MOUNT, (uintptr_t)source, (uintptr_t)target, (uintptr_t)type, (uintptr_t)data);
+}
+
+int syscall_umount(const char* path) {
+    return SYSCALL(SYSCALL_UMOUNT, (uintptr_t)path);
+}
+
