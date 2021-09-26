@@ -59,6 +59,6 @@ typedef struct {
 
 typedef void (*ElfFileLoadCallback)(Error error, void* udata);
 
-void loadProgramFromElfFile(Process* process, VfsFile* file, ElfFileLoadCallback callback, void* udata);
+void loadProgramFromElfFile(PageTable* table, VfsFile* file, ElfFileLoadCallback callback, void* udata);
 
 #endif
