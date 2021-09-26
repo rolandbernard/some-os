@@ -56,8 +56,9 @@ PageTable* createPageTable();
 // Free an allocated page table
 void freePageTable(PageTable* table);
 
-// Add a map to the given page table. This function should be idempotent.
-void mapPage(PageTable* root, uintptr_t vaddr, uintptr_t paddr, int bits, int level);
+// Add a map to the given page table. This function should be idempotent. Returns the changes table
+// entry.
+PageTableEntry* mapPage(PageTable* root, uintptr_t vaddr, uintptr_t paddr, int bits, int level);
 
 // Remove the map for a given virtual address. This function should be idempotent.
 void unmapPage(PageTable* root, uintptr_t vaddr);
@@ -82,7 +83,7 @@ void unmapPageRange(PageTable* root, uintptr_t from, uintptr_t to);
 // Use the given page table to map from virtual to physical address. Returns 0 if unmapped.
 uintptr_t virtToPhys(PageTable* root, uintptr_t vaddr);
 
-// Get the entry handling the given vaddr in the given page table
-PageTableEntry virtToEntry(PageTable* root, uintptr_t vaddr);
+// Get the entry handling the given vaddr in the given page table.
+PageTableEntry* virtToEntry(PageTable* root, uintptr_t vaddr);
 
 #endif

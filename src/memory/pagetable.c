@@ -19,7 +19,7 @@ void freePageTable(PageTable* table) {
     }
 }
 
-void mapPage(PageTable* root, uintptr_t vaddr, uintptr_t paddr, int bits, int level) {
+PageTableEntry* mapPage(PageTable* root, uintptr_t vaddr, uintptr_t paddr, int bits, int level) {
     // One of RWX bits must be set
     assert((bits & 0b1110) != 0);
     uintptr_t vpn[3] = {
@@ -45,6 +45,7 @@ void mapPage(PageTable* root, uintptr_t vaddr, uintptr_t paddr, int bits, int le
     entry->paddr = paddr >> 12;
     entry->bits = bits;
     entry->v = true;
+    return entry;
 }
 
 static bool tryToFreeTable(PageTable* table) {
@@ -92,10 +93,7 @@ void unmapPage(PageTable* root, uintptr_t vaddr) {
     }
 }
 
-PageTableEntry virtToEntry(PageTable* root, uintptr_t vaddr) {
-    const PageTableEntry zero_entry = {
-        .entry = 0,
-    };
+PageTableEntry* virtToEntry(PageTable* root, uintptr_t vaddr) {
     uintptr_t vpn[3] = {
         (vaddr >> 12) & 0x1ff,
         (vaddr >> 21) & 0x1ff,
@@ -109,14 +107,14 @@ PageTableEntry virtToEntry(PageTable* root, uintptr_t vaddr) {
                 assert(i != 0); // Level 0 can not contain branches
                 table = (PageTable*)(entry->paddr << 12);
             } else {
-                return *entry;
+                return entry;
             }
         } else {
             // The address is unmapped
-            return zero_entry;
+            return NULL;
         }
     }
-    return zero_entry;
+    return NULL;
 }
 
 uintptr_t virtToPhys(PageTable* root, uintptr_t vaddr) {
