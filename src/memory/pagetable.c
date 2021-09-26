@@ -92,6 +92,33 @@ void unmapPage(PageTable* root, uintptr_t vaddr) {
     }
 }
 
+PageTableEntry virtToEntry(PageTable* root, uintptr_t vaddr) {
+    const PageTableEntry zero_entry = {
+        .entry = 0,
+    };
+    uintptr_t vpn[3] = {
+        (vaddr >> 12) & 0x1ff,
+        (vaddr >> 21) & 0x1ff,
+        (vaddr >> 30) & 0x1ff,
+    };
+    PageTable* table = root;
+    for (int i = 2; i >= 0; i--) {
+        PageTableEntry* entry = &table->entries[vpn[i]];
+        if (entry->v) {
+            if ((entry->bits & 0b1110) == 0) {
+                assert(i != 0); // Level 0 can not contain branches
+                table = (PageTable*)(entry->paddr << 12);
+            } else {
+                return *entry;
+            }
+        } else {
+            // The address is unmapped
+            return zero_entry;
+        }
+    }
+    return zero_entry;
+}
+
 uintptr_t virtToPhys(PageTable* root, uintptr_t vaddr) {
     uintptr_t vpn[3] = {
         (vaddr >> 12) & 0x1ff,

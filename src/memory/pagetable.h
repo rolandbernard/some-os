@@ -82,4 +82,7 @@ void unmapPageRange(PageTable* root, uintptr_t from, uintptr_t to);
 // Use the given page table to map from virtual to physical address. Returns 0 if unmapped.
 uintptr_t virtToPhys(PageTable* root, uintptr_t vaddr);
 
+// Get the entry handling the given vaddr in the given page table
+PageTableEntry virtToEntry(PageTable* root, uintptr_t vaddr);
+
 #endif
