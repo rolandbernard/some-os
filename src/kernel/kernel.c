@@ -53,40 +53,18 @@ void kernelInit() {
     runNextProcess();
 }
 
-char buff[2000000];
-
-#define isOK(TEST) assert((int)(TEST) >= 0);
-
 void kernelMain() {
-    // Just some testing code
-    isOK(syscall(SYSCALL_MOUNT, "dev/blk0", "", "minix", NULL));
-    int fd = syscall(SYSCALL_OPEN, "test/test.txt", 0, 0);
-    isOK(fd);
-    long read = syscall(SYSCALL_READ, fd, buff, 100);
-    isOK(read);
-    buff[read] = 0;
-    syscall(SYSCALL_PRINT, "READ: '");
-    syscall(SYSCALL_PRINT, buff);
-    syscall(SYSCALL_PRINT, "'\n");
-    syscall(SYSCALL_CLOSE, fd);
-    fd = syscall(SYSCALL_OPEN, "test/test2.txt", VFS_OPEN_CREATE, 600);
-    isOK(fd);
-    long written = syscall(SYSCALL_WRITE, fd, buff, read);
-    isOK(written);
-    long pos = syscall(SYSCALL_SEEK, fd, 0, VFS_SEEK_SET);
-    isOK(pos);
-    read = syscall(SYSCALL_READ, fd, buff + 100, 100);
-    isOK(read);
-    buff[100 + read] = 0;
-    syscall(SYSCALL_PRINT, "READ: '");
-    syscall(SYSCALL_PRINT, buff + 100);
-    syscall(SYSCALL_PRINT, "'\n");
-    syscall(SYSCALL_CLOSE, fd);
-    // Just do some sleeping
-    for (;;) {
-        syscall(SYSCALL_PRINT, "Hello, sleeping...\n");
-        syscall(SYSCALL_SLEEP, 1000000000UL);
+    int res;
+    // Start the init process
+    res = syscall(SYSCALL_MOUNT, "/dev/blk0", "/", "minix", NULL); // Mount root filesystem
+    if (res < 0) {
+        KERNEL_LOG("[!] Failed to mount root filesystem: %s", getErrorKindMessage(-res));
+    } else {
+        res = syscall(SYSCALL_EXECVE, "/bin/init", NULL, NULL);
+        // If we continue, there must me an error
+        KERNEL_LOG("[!] Failed to start init process: %s", getErrorKindMessage(-res));
     }
+    panic();
     syscall(SYSCALL_EXIT);
 }
 

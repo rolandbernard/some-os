@@ -6,6 +6,7 @@
 #include "loader/elf.h"
 #include "memory/kalloc.h"
 #include "memory/pagetable.h"
+#include "memory/virtmem.h"
 #include "process/schedule.h"
 #include "util/util.h"
 #include <assert.h>
@@ -57,7 +58,6 @@ static uintptr_t pushStringArray(VirtPtr stack_pointer, VirtPtr array, size_t* s
         stack_pointer.address -= sizeof(uintptr_t);
         writeInt(stack_pointer, sizeof(uintptr_t) * 8, strings[i]);
     }
-    dealloc(strings);
     if (size != NULL) {
         *size = length;
     }
@@ -94,7 +94,10 @@ static void readElfFileCallback(Error error, uintptr_t entry, void* udata) {
             unmapAllPagesAndFreeUsers(request->process->memory.table);
             freePageTable(request->process->memory.table);
         }
-        initTrapFrame(&request->process->frame, args, 0, entry, request->process->pid, request->process->memory.table);
+        request->process->memory.stack = NULL;
+        request->process->memory.table = request->memory;
+        initTrapFrame(&request->process->frame, args, 0, entry, request->process->pid, request->memory);
+        addressTranslationFence(request->process->pid);
         // Set main function arguments
         request->process->frame.regs[REG_ARGUMENT_0] = argc;
         request->process->frame.regs[REG_ARGUMENT_1] = args;

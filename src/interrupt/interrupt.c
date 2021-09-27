@@ -82,8 +82,7 @@ void kernelTrap(uintptr_t cause, uintptr_t pc, uintptr_t val, TrapFrame* frame) 
                     handleExternalInterrupt();
                     break;
                 default:
-                    KERNEL_LOG("[!] Unhandled trap: %p %p %p %s", pc, val, frame, getCauseString(interrupt, code));
-                    panic();
+                    KERNEL_LOG("[!] Unhandled interrupt: %p %p %p %s", pc, val, frame, getCauseString(interrupt, code));
                     break;
             }
         } else {
@@ -97,8 +96,15 @@ void kernelTrap(uintptr_t cause, uintptr_t pc, uintptr_t val, TrapFrame* frame) 
                     runSyscall(frame, true);
                     break;
                 default:
-                    KERNEL_LOG("[!] Unhandled trap: %p %p %p %s", pc, val, frame, getCauseString(interrupt, code));
-                    panic();
+                    if (frame->hart == NULL || ((Process*)frame)->pid == 0) {
+                        KERNEL_LOG("[!] Unhandled exception: %p %p %p %s", pc, val, frame, getCauseString(interrupt, code));
+                        panic();
+                    } else {
+                        // TODO: segfault
+                        KERNEL_LOG("[!] Segmentation fault: %p %p %p %s", pc, val, frame, getCauseString(interrupt, code));
+                        Process* process = (Process*)frame;
+                        process->sched.state = TERMINATED;
+                    }
                     break;
             }
         }

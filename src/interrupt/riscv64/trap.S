@@ -106,7 +106,6 @@ indirectKernelTrapVector:
 .align 4
 # Called on supervisor tarps, call out to C code
 kernelTrapVector:
-    csrw satp, zero
     csrrw x31, sscratch, x31 # Swap scratch (with trap frame) with x31
     beqz x31, 1f
     # Restore integer registers

@@ -21,7 +21,7 @@ typedef struct {
 } LoadElfFileRequest;
 
 bool allocatePages(PageTable* table, uintptr_t addr, size_t length, uint32_t flags) {
-    int bits = PAGE_ENTRY_USER;
+    int bits = PAGE_ENTRY_USER | PAGE_ENTRY_AD;
     if ((flags & ELF_PROG_EXEC) != 0) {
         bits |= PAGE_ENTRY_EXEC;
     }

@@ -24,6 +24,7 @@ typedef enum {
     SYSCALL_CHOWN = 17,
     SYSCALL_MOUNT = 18,
     SYSCALL_UMOUNT = 19,
+    SYSCALL_EXECVE = 20,
 } Syscalls;
 
 // Simple wrapper around ecall

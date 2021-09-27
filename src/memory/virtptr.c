@@ -117,42 +117,52 @@ void memsetVirtPtr(VirtPtr dest, int byte, size_t n) {
 uint64_t readInt(VirtPtr addr, size_t size) {
     assert(size == 8 || size == 16 || size == 32 || size == 64);
     uintptr_t phys = virtToPhys(addr.table, addr.address);
-    if (size == 8) {
-        return *(uint8_t*)phys;
-    } else if (size == 16) {
-        return *(uint16_t*)phys;
-    } else if (size == 32) {
-        return *(uint32_t*)phys;
+    if (phys == 0) {
+        return 0;
     } else {
-        return *(uint64_t*)phys;
+        if (size == 8) {
+            return *(uint8_t*)phys;
+        } else if (size == 16) {
+            return *(uint16_t*)phys;
+        } else if (size == 32) {
+            return *(uint32_t*)phys;
+        } else {
+            return *(uint64_t*)phys;
+        }
     }
 }
 
 uint64_t readIntAt(VirtPtr addr, size_t i, size_t size) {
     assert(size == 8 || size == 16 || size == 32 || size == 64);
-    uintptr_t phys = virtToPhys(addr.table, addr.address);
-    if (size == 8) {
-        return *((uint8_t*)phys + i);
-    } else if (size == 16) {
-        return *((uint16_t*)phys + i);
-    } else if (size == 32) {
-        return *((uint32_t*)phys + i);
+    uintptr_t phys = virtToPhys(addr.table, addr.address + i * size / 8);
+    if (phys == 0) {
+        return 0;
     } else {
-        return *((uint64_t*)phys + i);
+        if (size == 8) {
+            return *(uint8_t*)phys;
+        } else if (size == 16) {
+            return *(uint16_t*)phys;
+        } else if (size == 32) {
+            return *(uint32_t*)phys;
+        } else {
+            return *(uint64_t*)phys;
+        }
     }
 }
 
 void writeInt(VirtPtr addr, size_t size, uint64_t value) {
     assert(size == 8 || size == 16 || size == 32 || size == 64);
     uintptr_t phys = virtToPhys(addr.table, addr.address);
-    if (size == 8) {
-        *(uint8_t*)phys = value;
-    } else if (size == 16) {
-        *(uint16_t*)phys = value;
-    } else if (size == 32) {
-        *(uint32_t*)phys = value;
-    } else {
-        *(uint64_t*)phys = value;
+    if (phys != 0) {
+        if (size == 8) {
+            *(uint8_t*)phys = value;
+        } else if (size == 16) {
+            *(uint16_t*)phys = value;
+        } else if (size == 32) {
+            *(uint32_t*)phys = value;
+        } else {
+            *(uint64_t*)phys = value;
+        }
     }
 }
 

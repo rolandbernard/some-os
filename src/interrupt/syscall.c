@@ -4,6 +4,7 @@
 
 #include "error/log.h"
 #include "interrupt/syscall.h"
+#include "loader/loader.h"
 #include "process/syscall.h"
 #include "files/syscall.h"
 #include "memory/kalloc.h"
@@ -31,6 +32,7 @@ SyscallFunction syscall_table[TABLE_SIZE] = {
     [SYSCALL_CHOWN] = chownSyscall,
     [SYSCALL_MOUNT] = mountSyscall,
     [SYSCALL_UMOUNT] = umountSyscall,
+    [SYSCALL_EXECVE] = execveSyscall,
 };
 
 void registerSyscall(int kind, SyscallFunction function) {

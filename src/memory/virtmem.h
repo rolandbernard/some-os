@@ -13,6 +13,8 @@ Error initKernelVirtualMemory();
 
 void setSatpCsr(uint64_t satp);
 
+uint64_t getSatpCsr();
+
 void addressTranslationFence(int asid);
 
 void addressTranslationFenceAt(int asid, uintptr_t virt_addr);
