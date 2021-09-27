@@ -11,4 +11,7 @@ int64_t smin(int64_t a, int64_t b);
 
 int64_t smax(int64_t a, int64_t b);
 
+// Does nothing
+void noop();
+
 #endif

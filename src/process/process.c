@@ -17,6 +17,7 @@
 #include "process/syscall.h"
 #include "process/types.h"
 #include "util/spinlock.h"
+#include "util/util.h"
 
 extern void kernelTrapVector;
 extern void kernelTrap;
@@ -89,9 +90,6 @@ Process* createEmptyUserProcess(uintptr_t sp, uintptr_t gp, uintptr_t pc, Proces
     return process;
 }
 
-static void freeFilesystemCallback(Error error, void* to_free) {
-}
-
 void freeProcess(Process* process) {
     if (process->sched.state != FREED) {
         process->sched.state = FREED;
@@ -103,7 +101,7 @@ void freeProcess(Process* process) {
         }
         for (size_t i = 0; i < process->resources.fd_count; i++) {
             process->resources.files[i]->functions->close(
-                process->resources.files[i], 0, 0, freeFilesystemCallback, NULL
+                process->resources.files[i], 0, 0, noop, NULL
             );
         }
         dealloc(process->resources.fds);

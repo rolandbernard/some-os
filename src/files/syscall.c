@@ -3,10 +3,12 @@
 #include <string.h>
 
 #include "files/syscall.h"
+
 #include "files/vfs.h"
 #include "files/path.h"
 #include "memory/kalloc.h"
 #include "process/schedule.h"
+#include "util/util.h"
 
 static int allocateNewFileDescriptor(Process* process) {
     int fd = process->resources.next_fd;
@@ -294,9 +296,6 @@ void chownSyscall(bool is_kernel, TrapFrame* frame, SyscallArgs args) {
     });
 }
 
-static void freeFilesystemCallback(Error error, void* to_free) {
-}
-
 static void mountCreateFsCallback(Error error, VfsFilesystem* fs, void* udata) {
     Process* process = (Process*)udata;
     if (isError(error)) {
@@ -307,11 +306,11 @@ static void mountCreateFsCallback(Error error, VfsFilesystem* fs, void* udata) {
             error = mountFilesystem(&global_file_system, fs, target);
             dealloc(target);
             if (isError(error)) {
-                fs->functions->free(fs, 0, 0, freeFilesystemCallback, NULL);
+                fs->functions->free(fs, 0, 0, noop, NULL);
             }
             process->frame.regs[REG_ARGUMENT_0] = -error.kind;
         } else {
-            fs->functions->free(fs, 0, 0, freeFilesystemCallback, NULL);
+            fs->functions->free(fs, 0, 0, noop, NULL);
             process->frame.regs[REG_ARGUMENT_0] = -ILLEGAL_ARGUMENTS;
         }
     }

@@ -17,3 +17,7 @@ int64_t smax(int64_t a, int64_t b) {
     return a > b ? a : b;
 }
 
+void noop() {
+    // Do nothing
+}
+

@@ -2,13 +2,14 @@
 #include <assert.h>
 #include <string.h>
 
-#include "error/error.h"
-#include "files/minix/minix.h"
 #include "files/vfs.h"
-#include "devices/devices.h"
 
 #include "files/path.h"
+#include "files/minix/minix.h"
+#include "devices/devices.h"
 #include "memory/kalloc.h"
+#include "error/error.h"
+#include "util/util.h"
 
 VirtualFilesystem global_file_system;
 
@@ -21,15 +22,12 @@ VirtualFilesystem* createVirtualFilesystem() {
     return zalloc(sizeof(VirtualFilesystem));
 }
 
-static void freeFilesystemCallback(Error error, void* to_free) {
-}
-
 static bool freeFilesystemMount(FilesystemMount* mount, bool force) {
     dealloc(mount->path);
     switch (mount->type) {
         case MOUNT_TYPE_FILE: {
             VfsFile* file = (VfsFile*)mount->data;
-            file->functions->close(file, 0, 0, freeFilesystemCallback, NULL);
+            file->functions->close(file, 0, 0, noop, NULL);
             return true;
         }
         case MOUNT_TYPE_FS: {
@@ -37,7 +35,7 @@ static bool freeFilesystemMount(FilesystemMount* mount, bool force) {
             if (!force && filesystem->open_files != 0) {
                 return false;
             } else {
-                filesystem->functions->free(filesystem, 0, 0, freeFilesystemCallback, NULL);
+                filesystem->functions->free(filesystem, 0, 0, noop, NULL);
                 return true;
             }
         }
@@ -395,7 +393,7 @@ typedef struct {
 
 static void createFsInitCallback(Error error, CreateFsRequest* request) {
     if (isError(error)) {
-        request->fs->functions->free(request->fs, 0, 0, freeFilesystemCallback, NULL);
+        request->fs->functions->free(request->fs, 0, 0, noop, NULL);
         request->callback(error, NULL, request->udata);
         dealloc(request);
     } else {
@@ -418,7 +416,7 @@ static void createFsOpenCallback(Error error, VfsFile* file, CreateFsRequest* re
                 (VfsFilesystem*)fs, 0, 0, (VfsFunctionCallbackVoid)createFsInitCallback, request
             );
         } else {
-            file->functions->close(file, 0, 0, freeFilesystemCallback, NULL);
+            file->functions->close(file, 0, 0, noop, NULL);
             dealloc(request->type);
             request->callback(simpleError(ILLEGAL_ARGUMENTS), NULL, request->udata);
             dealloc(request);
