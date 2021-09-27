@@ -60,13 +60,18 @@ Process* createKernelProcess(void* start, Priority priority, size_t stack_size) 
     return process;
 }
 
+Pid allocateNewPid() {
+    lockSpinLock(&process_lock); 
+    Pid pid = next_pid;
+    next_pid++;
+    unlockSpinLock(&process_lock); 
+    return pid;
+}
+
 Process* createEmptyUserProcess(uintptr_t sp, uintptr_t gp, uintptr_t pc, Process* parent, Priority priority) {
     Process* process = zalloc(sizeof(Process));
     assert(process != NULL);
-    lockSpinLock(&process_lock); 
-    process->pid = next_pid;
-    next_pid++;
-    unlockSpinLock(&process_lock); 
+    process->pid = allocateNewPid();
     process->memory.table = createPageTable();
     process->memory.stack = NULL;
     process->sched.priority = priority;

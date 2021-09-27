@@ -35,6 +35,8 @@ void memsetVirtPtr(VirtPtr dest, int byte, size_t n);
 
 uint64_t readInt(VirtPtr addr, size_t size);
 
+uint64_t readIntAt(VirtPtr addr, size_t i, size_t size);
+
 void writeInt(VirtPtr addr, size_t size, uint64_t value);
 
 uint64_t readMisaligned(VirtPtr addr, size_t size);

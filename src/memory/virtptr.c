@@ -128,6 +128,20 @@ uint64_t readInt(VirtPtr addr, size_t size) {
     }
 }
 
+uint64_t readIntAt(VirtPtr addr, size_t i, size_t size) {
+    assert(size == 8 || size == 16 || size == 32 || size == 64);
+    uintptr_t phys = virtToPhys(addr.table, addr.address);
+    if (size == 8) {
+        return *((uint8_t*)phys + i);
+    } else if (size == 16) {
+        return *((uint16_t*)phys + i);
+    } else if (size == 32) {
+        return *((uint32_t*)phys + i);
+    } else {
+        return *((uint64_t*)phys + i);
+    }
+}
+
 void writeInt(VirtPtr addr, size_t size, uint64_t value) {
     assert(size == 8 || size == 16 || size == 32 || size == 64);
     uintptr_t phys = virtToPhys(addr.table, addr.address);

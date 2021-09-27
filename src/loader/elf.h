@@ -57,7 +57,9 @@ typedef struct {
     uintptr_t align;
 } ElfProgramHeader;
 
-typedef void (*ElfFileLoadCallback)(Error error, void* udata);
+bool allocatePages(PageTable* table, uintptr_t addr, size_t length, uint32_t flags);
+
+typedef void (*ElfFileLoadCallback)(Error error, uintptr_t entry, void* udata);
 
 void loadProgramFromElfFile(PageTable* table, VfsFile* file, ElfFileLoadCallback callback, void* udata);
 

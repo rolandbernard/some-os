@@ -20,7 +20,7 @@ typedef struct {
     size_t size;
 } LoadElfFileRequest;
 
-static bool allocatePages(PageTable* table, uintptr_t addr, size_t length, uint32_t flags) {
+bool allocatePages(PageTable* table, uintptr_t addr, size_t length, uint32_t flags) {
     int bits = PAGE_ENTRY_USER;
     if ((flags & ELF_PROG_EXEC) != 0) {
         bits |= PAGE_ENTRY_EXEC;
@@ -55,11 +55,11 @@ static void readProgramSegmentCallback(Error error, size_t read, void* udata) {
     LoadElfFileRequest* request = (LoadElfFileRequest*)udata;
     if (isError(error)) {
         dealloc(request->prog_headers);
-        request->callback(error, request->udata);
+        request->callback(error, 0, request->udata);
         dealloc(request);
     } else if (read != request->size) {
         dealloc(request->prog_headers);
-        request->callback(simpleError(IO_ERROR), request->udata);
+        request->callback(simpleError(IO_ERROR), 0, request->udata);
         dealloc(request);
     } else {
         request->ph_index++;
@@ -83,14 +83,14 @@ static void loadProgramSegment(LoadElfFileRequest* request) {
             } else {
                 unmapAllPagesAndFreeUsers(request->table);
                 dealloc(request->prog_headers);
-                request->callback(simpleError(ALREADY_IN_USE), request->udata);
+                request->callback(simpleError(ALREADY_IN_USE), 0, request->udata);
                 dealloc(request);
             }
         }
     } else {
         // Finished loading all segments
         dealloc(request->prog_headers);
-        request->callback(simpleError(SUCCESS), request->udata);
+        request->callback(simpleError(SUCCESS), request->header.entry_addr, request->udata);
         dealloc(request);
     }
 }
@@ -99,11 +99,11 @@ static void readProgramHeadersCallback(Error error, size_t read, void* udata) {
     LoadElfFileRequest* request = (LoadElfFileRequest*)udata;
     if (isError(error)) {
         dealloc(request->prog_headers);
-        request->callback(error, request->udata);
+        request->callback(error, 0, request->udata);
         dealloc(request);
     } else if (read != sizeof(ElfProgramHeader) * request->header.phnum) {
         dealloc(request->prog_headers);
-        request->callback(simpleError(IO_ERROR), request->udata);
+        request->callback(simpleError(IO_ERROR), 0, request->udata);
         dealloc(request);
     } else {
         request->ph_index = 0;
@@ -114,10 +114,10 @@ static void readProgramHeadersCallback(Error error, size_t read, void* udata) {
 static void readHeaderCallback(Error error, size_t read, void* udata) {
     LoadElfFileRequest* request = (LoadElfFileRequest*)udata;
     if (isError(error)) {
-        request->callback(error, request->udata);
+        request->callback(error, 0, request->udata);
         dealloc(request);
     } else if (read != sizeof(ElfHeader)) {
-        request->callback(simpleError(IO_ERROR), request->udata);
+        request->callback(simpleError(IO_ERROR), 0, request->udata);
         dealloc(request);
     } else if (
         request->header.magic != ELF_MAGIC
@@ -126,7 +126,7 @@ static void readHeaderCallback(Error error, size_t read, void* udata) {
         || request->header.phnum > MAX_PHDRS
         || request->header.phentsize != sizeof(ElfProgramHeader)
     ) {
-        request->callback(simpleError(WRONG_FILE_TYPE), request->udata);
+        request->callback(simpleError(WRONG_FILE_TYPE), 0, request->udata);
         dealloc(request);
     } else {
         request->prog_headers = kalloc(request->header.phnum * sizeof(ElfProgramHeader));
