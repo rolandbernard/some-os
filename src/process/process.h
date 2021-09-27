@@ -15,8 +15,11 @@ Process* createKernelProcess(void* start, Priority priority, size_t stack_size);
 
 Process* createUserProcess(uintptr_t sp, uintptr_t gp, uintptr_t pc, Process* parent, Priority priority);
 
-// Free all data connected with the process
+// Free all data in the process, but keep the process itself
 void freeProcess(Process* process);
+
+// Free all data connected with the process. Also the process itself.
+void deallocProcess(Process* process);
 
 Pid freeKilledChild(Process* parent, uint64_t* status);
 

@@ -22,7 +22,7 @@ void enqueueProcess(Process* process) {
     ScheduleQueue* queue = &hart->queue;
     if (hart->idle_process != process) { // Ignore the idle process
         if (process->sched.state == TERMINATED) {
-            freeProcess(process);
+            deallocProcess(process);
         } else if (process->sched.state == ENQUEUEABLE) {
             moveToSchedState(process, READY);
             if (process->sched.runs % PRIORITY_DECREASE == 0) {

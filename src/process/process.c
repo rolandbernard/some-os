@@ -89,36 +89,55 @@ Process* createEmptyUserProcess(uintptr_t sp, uintptr_t gp, uintptr_t pc, Proces
     return process;
 }
 
+static void freeFilesystemCallback(Error error, void* to_free) {
+}
+
 void freeProcess(Process* process) {
     if (process->sched.state != FREED) {
         process->sched.state = FREED;
-        lockSpinLock(&process_lock); 
-        // Reparent children
-        Process* child = process->tree.children;
-        while (child != NULL) {
-            child->tree.parent = process->tree.parent;
-            if (process->tree.parent != NULL) {
-                child->tree.child_next = process->tree.parent->tree.children;
-                process->tree.parent->tree.children = child;
-            }
-        }
-        if (process->tree.global_prev == NULL) {
-            global_first = process->tree.global_next;
-        } else {
-            process->tree.global_prev->tree.global_next = process->tree.global_next;
-        }
-        if (process->tree.global_next != NULL) {
-            process->tree.global_next->tree.global_prev = process->tree.global_prev;
-        }
-        unlockSpinLock(&process_lock); 
         dealloc(process->memory.stack);
+        process->memory.stack = NULL;
         if (process->pid != 0) {
             // If this is not a kernel process, free its page table.
             unmapAllPagesAndFreeUsers(process->memory.table);
-            deallocPage(process->memory.table);
         }
-        dealloc(process);
+        for (size_t i = 0; i < process->resources.fd_count; i++) {
+            process->resources.files[i]->functions->close(
+                process->resources.files[i], 0, 0, freeFilesystemCallback, NULL
+            );
+        }
+        dealloc(process->resources.fds);
+        dealloc(process->resources.files);
+        process->resources.fd_count = 0;
+        process->resources.next_fd = 0;
     }
+}
+
+void deallocProcess(Process* process) {
+    freeProcess(process);
+    lockSpinLock(&process_lock); 
+    // Reparent children
+    Process* child = process->tree.children;
+    while (child != NULL) {
+        child->tree.parent = process->tree.parent;
+        if (process->tree.parent != NULL) {
+            child->tree.child_next = process->tree.parent->tree.children;
+            process->tree.parent->tree.children = child;
+        }
+    }
+    if (process->tree.global_prev == NULL) {
+        global_first = process->tree.global_next;
+    } else {
+        process->tree.global_prev->tree.global_next = process->tree.global_next;
+    }
+    if (process->tree.global_next != NULL) {
+        process->tree.global_next->tree.global_prev = process->tree.global_prev;
+    }
+    unlockSpinLock(&process_lock); 
+    if (process->pid != 0) {
+        deallocPage(process->memory.table);
+    }
+    dealloc(process);
 }
 
 void enterProcess(Process* process) {
