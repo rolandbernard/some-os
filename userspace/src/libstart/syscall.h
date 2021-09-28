@@ -42,6 +42,8 @@ typedef enum {
     SYSCALL_CHOWN = 17,
     SYSCALL_MOUNT = 18,
     SYSCALL_UMOUNT = 19,
+    SYSCALL_EXECVE = 20,
+    SYSCALL_READDIR = 21,
 } Syscalls;
 
 uintptr_t make_syscall(
@@ -59,13 +61,13 @@ int syscall_fork();
 void syscall_sleep(uint64_t nanoseconds);
 
 typedef enum {
-    VFS_OPEN_CREATE = (1 << 0),
-    VFS_OPEN_APPEND = (1 << 1),
-    VFS_OPEN_TRUNC = (1 << 2),
-    VFS_OPEN_DIRECTORY = (1 << 3),
-    VFS_OPEN_READ = (1 << 4),
-    VFS_OPEN_WRITE = (1 << 5),
-    VFS_OPEN_EXECUTE = (1 << 6),
+    FILE_OPEN_CREATE = (1 << 0),
+    FILE_OPEN_APPEND = (1 << 1),
+    FILE_OPEN_TRUNC = (1 << 2),
+    FILE_OPEN_DIRECTORY = (1 << 3),
+    FILE_OPEN_READ = (1 << 4),
+    FILE_OPEN_WRITE = (1 << 5),
+    FILE_OPEN_EXECUTE = (1 << 6),
 } SyscallOpenFlags;
 
 int syscall_open(const char* path, SyscallOpenFlags flags, uint16_t mode);
@@ -83,9 +85,9 @@ size_t syscall_read(int fd, void* buff, size_t size);
 size_t syscall_write(int fd, void* buff, size_t size);
 
 typedef enum {
-    VFS_SEEK_CUR = 0,
-    VFS_SEEK_SET = 1,
-    VFS_SEEK_END = 2,
+    FILE_SEEK_CUR = 0,
+    FILE_SEEK_SET = 1,
+    FILE_SEEK_END = 2,
 } SyscallSeekWhence;
 
 size_t syscall_seek(int fd, size_t off, SyscallSeekWhence whence);
@@ -113,8 +115,28 @@ int syscall_chmod(int fd, uint16_t mode);
 
 int syscall_chown(int fd, int uid, int gid);
 
+typedef enum {
+    FILE_TYPE_UNKNOWN = 0,
+    FILE_TYPE_REG = 8,
+    FILE_TYPE_DIR = 4,
+    FILE_TYPE_BLOCK = 2,
+    FILE_TYPE_CHAR = 3,
+} FileType;
+
+typedef struct {
+    size_t id;
+    size_t off;
+    size_t len;
+    FileType type;
+    char name[];
+} DirectoryEntry;
+
+size_t syscall_readdir(int fd, DirectoryEntry* dirent, size_t size);
+
 int syscall_mount(const char* source, const char* target, const char* type, void* data);
 
 int syscall_umount(const char* path);
+
+int syscall_execve(const char* path, char const* args[], char const* envs[]);
 
 #endif

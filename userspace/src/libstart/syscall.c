@@ -75,11 +75,19 @@ int syscall_chown(int fd, int uid, int gid) {
     return SYSCALL(SYSCALL_CHOWN, fd, uid, gid);
 }
 
+size_t syscall_readdir(int fd, DirectoryEntry* dirent, size_t size) {
+    return SYSCALL(SYSCALL_READDIR, fd, (uintptr_t)dirent, size);
+}
+
 int syscall_mount(const char* source, const char* target, const char* type, void* data) {
     return SYSCALL(SYSCALL_MOUNT, (uintptr_t)source, (uintptr_t)target, (uintptr_t)type, (uintptr_t)data);
 }
 
 int syscall_umount(const char* path) {
     return SYSCALL(SYSCALL_UMOUNT, (uintptr_t)path);
+}
+
+int syscall_execve(const char* path, char const* args[], char const* envs[]) {
+    return SYSCALL(SYSCALL_EXECVE, (uintptr_t)path, (uintptr_t)args, (uintptr_t)envs);
 }
 
