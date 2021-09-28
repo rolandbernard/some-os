@@ -296,6 +296,15 @@ void chownSyscall(bool is_kernel, TrapFrame* frame, SyscallArgs args) {
     });
 }
 
+void readdirSyscall(bool is_kernel, TrapFrame* frame, SyscallArgs args) {
+    FILE_SYSCALL_OP(readdir, {
+        file->functions->readdir(
+            file, process->resources.uid, process->resources.gid,
+            virtPtrFor(args[1], process->memory.table), args[2], sizeTSyscallCallback, process
+        );
+    });
+}
+
 static void mountCreateFsCallback(Error error, VfsFilesystem* fs, void* udata) {
     Process* process = (Process*)udata;
     if (isError(error)) {

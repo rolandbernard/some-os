@@ -154,7 +154,7 @@ static void minixFindINodeCloseCallback(Error error, MinixFindINodeRequest* requ
             *request->path = 0;
             request->path++;
         }
-        request->file = createMinixFileForINode(request->fs, request->inode);
+        request->file = createMinixFileForINode(request->fs, request->inode, true);
         minixFindINodeForNameIn(
             request->file, request->uid, request->gid, name,
             (MinixDirSearchCallback)minixFindINodeStepCallback, request
@@ -259,7 +259,7 @@ static void minixOpenReadCallback(Error error, size_t read, MinixOpenRequest* re
         request->callback(simpleError(FORBIDDEN), NULL, request->udata);
         dealloc(request);
     } else {
-        MinixFile* file = createMinixFileForINode(request->fs, request->inodenum);
+        MinixFile* file = createMinixFileForINode(request->fs, request->inodenum, (request->flags & VFS_OPEN_DIRECTORY) != 0);
         request->file = (VfsFile*)file;
         if ((request->flags & VFS_OPEN_APPEND) != 0) {
             file->base.functions->seek(
@@ -594,7 +594,7 @@ static void minixUnlinkGetINodeCallback(Error error, size_t read, MinixUnlinkReq
         );
     } else {
         if (request->inode.nlinks == 1) {
-            request->file = (VfsFile*)createMinixFileForINode(request->fs, request->inodenum);
+            request->file = (VfsFile*)createMinixFileForINode(request->fs, request->inodenum, true);
             request->file->functions->trunc(
                 request->file, 0, 0, 0, (VfsFunctionCallbackVoid)minixUnlinkTruncCallback, request
             );

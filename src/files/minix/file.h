@@ -11,6 +11,6 @@ typedef struct {
     uint32_t inodenum;
 } MinixFile;
 
-MinixFile* createMinixFileForINode(MinixFilesystem* fs, uint32_t inode);
+MinixFile* createMinixFileForINode(MinixFilesystem* fs, uint32_t inode, bool dir);
 
 #endif

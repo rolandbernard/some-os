@@ -606,7 +606,62 @@ static void minixChownFunction(MinixFile* file, Uid uid, Gid gid, Uid new_uid, G
     minixChFunction(file, uid, gid, 0, new_uid, new_gid, true, callback, udata);
 }
 
-static VfsFileVtable functions = {
+typedef struct {
+    MinixFile* file;
+    Uid uid;
+    Gid gid;
+    VirtPtr buff;
+    size_t size;
+    size_t position;
+    VfsFunctionCallbackSizeT callback;
+    void* udata;
+    MinixDirEntry entry;
+} MinixReaddirRequest;
+
+static void minixReaddirReadCallback(Error error, size_t read, void* udata) {
+    MinixReaddirRequest* request = (MinixReaddirRequest*)udata;
+    if (isError(error)) {
+        request->callback(error, 0, request->udata);
+        dealloc(request);
+    } else if (read != 0 && read != sizeof(MinixDirEntry)) {
+        request->callback(simpleError(IO_ERROR), 0, request->udata);
+        dealloc(request);
+    } else {
+        if (read == 0) {
+            request->callback(simpleError(SUCCESS), 0, request->udata); // Didn't read anything
+        } else {
+            size_t name_len = strlen((char*)request->entry.name);
+            size_t size = name_len + 1 + sizeof(VfsDirectoryEntry);
+            VfsDirectoryEntry* entry = kalloc(size);
+            entry->id = request->entry.inode;
+            entry->off = request->position;
+            entry->len = size;
+            entry->type = VFS_TYPE_UNKNOWN;
+            memcpy(entry->name, request->entry.name, name_len + 1);
+            memcpyBetweenVirtPtr(request->buff, virtPtrForKernel(entry), umin(request->size, size));
+            request->callback(simpleError(SUCCESS), umin(request->size, size), request->udata);
+        }
+        dealloc(request);
+    }
+}
+
+static void minixReaddirFunction(MinixFile* file, Uid uid, Gid gid, VirtPtr buff, size_t size, VfsFunctionCallbackSizeT callback, void* udata) {
+    MinixReaddirRequest* request = kalloc(sizeof(MinixReaddirRequest));
+    request->file = file;
+    request->uid = uid;
+    request->gid = gid;
+    request->buff = buff;
+    request->size = size;
+    request->callback = callback;
+    request->udata = udata;
+    request->position = file->position;
+    file->base.functions->read(
+        (VfsFile*)file, uid, gid, virtPtrForKernel(&request->entry), sizeof(MinixDirEntry),
+        minixReaddirReadCallback, request
+    );
+}
+
+static VfsFileVtable functions_file = {
     .seek = (SeekFunction)minixSeekFunction,
     .read = (ReadFunction)minixReadFunction,
     .write = (WriteFunction)minixWriteFunction,
@@ -618,10 +673,27 @@ static VfsFileVtable functions = {
     .chown = (ChownFunction)minixChownFunction,
 };
 
-MinixFile* createMinixFileForINode(MinixFilesystem* fs, uint32_t inode) {
+static VfsFileVtable functions_directory = {
+    .seek = (SeekFunction)minixSeekFunction,
+    .read = (ReadFunction)minixReadFunction,
+    .write = (WriteFunction)minixWriteFunction,
+    .stat = (StatFunction)minixStatFunction,
+    .close = (CloseFunction)minixCloseFunction,
+    .dup = (DupFunction)minixDupFunction,
+    .trunc = (TruncFunction)minixTruncFunction,
+    .chmod = (ChmodFunction)minixChmodFunction,
+    .chown = (ChownFunction)minixChownFunction,
+    .readdir = (ReaddirFunction)minixReaddirFunction,
+};
+
+MinixFile* createMinixFileForINode(MinixFilesystem* fs, uint32_t inode, bool dir) {
     fs->base.open_files++;
     MinixFile* file = zalloc(sizeof(MinixFile));
-    file->base.functions = &functions;
+    if (dir) {
+        file->base.functions = &functions_directory;
+    } else {
+        file->base.functions = &functions_file;
+    }
     file->fs = fs;
     file->inodenum = inode;
     file->position = 0;
