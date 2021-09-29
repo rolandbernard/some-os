@@ -21,7 +21,7 @@ void addressTranslationFence(int asid);
 
 void addressTranslationFenceAt(int asid, uintptr_t virt_addr);
 
-void setVirtualMemory(uint16_t asid, PageTable* page_table, bool fence);
+void setVirtualMemory(uint16_t asid, PageTable* page_table);
 
 uint64_t satpForMemory(uint16_t asid, PageTable* page_table);
 

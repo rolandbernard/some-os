@@ -97,7 +97,6 @@ static void readElfFileCallback(Error error, uintptr_t entry, void* udata) {
         request->process->memory.stack = NULL;
         request->process->memory.table = request->memory;
         initTrapFrame(&request->process->frame, args, 0, entry, request->process->pid, request->memory);
-        addressTranslationFence(request->process->pid);
         // Set main function arguments
         request->process->frame.regs[REG_ARGUMENT_0] = argc;
         request->process->frame.regs[REG_ARGUMENT_1] = args;

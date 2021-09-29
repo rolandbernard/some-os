@@ -35,17 +35,14 @@ Error initKernelVirtualMemory() {
     identityMapMapedMemory(VIRT_CLINT);
     identityMapMapedMemory(VIRT_PLIC);
     identityMapMapedMemory(VIRT_VIRTIO);
-    setVirtualMemory(0, kernel_page_table, true);
+    setVirtualMemory(0, kernel_page_table);
     unlockSpinLock(&kernel_page_table_lock);
     KERNEL_LOG("[>] Initialized kernel virtual memory");
     return simpleError(SUCCESS);
 }
 
-void setVirtualMemory(uint16_t asid, PageTable* page_table, bool fence) {
+void setVirtualMemory(uint16_t asid, PageTable* page_table) {
     setSatpCsr(satpForMemory(asid, page_table));
-    if (fence) {
-        addressTranslationFence(asid);
-    }
 }
 
 uint64_t satpForMemory(uint16_t asid, PageTable* page_table) {

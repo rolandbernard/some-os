@@ -165,15 +165,10 @@ void enterProcess(Process* process) {
     initTimerInterrupt();
     moveToSchedState(process, RUNNING);
     HartFrame* hart = getCurrentHartFrame();
-    if (hart != process->frame.hart && process->pid != 0) {
-        // If this process was moved between harts
-        addressTranslationFence(process->pid);
-    }
     process->frame.hart = hart;
     if (hart != NULL) {
         hart->frame.regs[REG_STACK_POINTER] = (uintptr_t)hart->stack_top;
     }
-    addressTranslationFence(process->pid); // TODO: This should not be required
     if (process->pid == 0) {
         enterKernelMode(&process->frame);
     } else {

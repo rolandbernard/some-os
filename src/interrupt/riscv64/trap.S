@@ -89,6 +89,8 @@ kernelTrapReturn:
     load_gp %i
     .set i, i+1
 .endr
+    # There is currently no good ASID support
+    sfence.vma zero, zero
     sret
 
 .align 4
