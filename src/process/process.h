@@ -27,4 +27,6 @@ Pid freeKilledChild(Process* parent, uint64_t* status);
 // Enter process into the user ot kernel mode depending on process.pid (pid == 0 -> kernel)
 void enterProcess(Process* process);
 
+void dumpProcessInfo(Process* process);
+
 #endif

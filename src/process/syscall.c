@@ -8,6 +8,7 @@
 #include "interrupt/syscall.h"
 #include "interrupt/timer.h"
 #include "memory/kalloc.h"
+#include "memory/virtmem.h"
 #include "memory/virtptr.h"
 #include "process/harts.h"
 #include "process/process.h"
@@ -85,9 +86,6 @@ void forkSyscall(bool is_kernel, TrapFrame* frame, SyscallArgs args) {
     } else {
         Process* new_process = createChildUserProcess(process);
         if (copyAllPagesAndAllocUsers(new_process->memory.table, process->memory.table)) {
-            uintptr_t sp = new_process->frame.regs[REG_STACK_POINTER];
-            KERNEL_LOG("%p -> %p %p", sp, virtToPhys(process->memory.table, sp), process->frame.satp);
-            KERNEL_LOG("%p -> %p %p", sp, virtToPhys(new_process->memory.table, sp), new_process->frame.satp);
             size_t fd_count = process->resources.fd_count;
             new_process->resources.uid = process->resources.uid;
             new_process->resources.gid = process->resources.gid;

@@ -2,7 +2,9 @@
 .section .text
 .global setSatpCsr
 .global getSatpCsr
+.global addressTranslationCompleteFence
 .global addressTranslationFence
+.global addressTranslationFenceAt
 .global memoryFence
 
 # fn (uint64_t satp);
@@ -12,6 +14,11 @@ setSatpCsr:
 
 getSatpCsr:
     csrr a0, satp
+    ret
+
+# fn (int asid);
+addressTranslationCompleteFence:
+    sfence.vma zero, zero
     ret
 
 # fn (int asid);

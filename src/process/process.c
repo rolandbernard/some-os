@@ -162,13 +162,6 @@ void deallocProcess(Process* process) {
 }
 
 void enterProcess(Process* process) {
-    if (process->sched.priority != LOWEST_PRIORITY) {
-        uintptr_t ret_addr = process->frame.regs[REG_RETURN_ADDRESS];
-        int ret_val = process->frame.regs[REG_ARGUMENT_0];
-        KERNEL_LOG(
-            "%i[%p] at %p (%p:%i)", process->pid, process, process->frame.pc, ret_addr, ret_val
-        );
-    }
     initTimerInterrupt();
     moveToSchedState(process, RUNNING);
     HartFrame* hart = getCurrentHartFrame();
@@ -180,10 +173,35 @@ void enterProcess(Process* process) {
     if (hart != NULL) {
         hart->frame.regs[REG_STACK_POINTER] = (uintptr_t)hart->stack_top;
     }
+    addressTranslationFence(process->pid); // TODO: This should not be required
     if (process->pid == 0) {
         enterKernelMode(&process->frame);
     } else {
         enterUserMode(&process->frame);
+    }
+}
+
+void dumpProcessInfo(Process* process) {
+    if (process->frame.hart->idle_process == process) {
+        KERNEL_LOG("[IDLE]");
+    } else {
+        KERNEL_LOG("pid %i", process->pid);
+        KERNEL_LOG("regs: ");
+        for (int i = 1; i < 32; i += 4) {
+            for (int j = i; j < i + 4 && j < 32; j++) {
+                logKernelMessage("\tx%-2i %14lx", j, process->frame.regs[j - 1]);
+            }
+            logKernelMessage("\n");
+        }
+        KERNEL_LOG("satp %p \tpc %p", process->frame.satp, process->frame.pc);
+        KERNEL_LOG("stack: ");
+        for (int i = 0; i < 128; i++) {
+            intptr_t vaddr = process->frame.regs[REG_STACK_POINTER] + i * 8;
+            uint64_t* maddr = (uint64_t*)virtToPhys(process->memory.table, vaddr);
+            if (maddr != NULL) {
+                KERNEL_LOG("\t*%p(%p) = %14lx", vaddr, maddr, *maddr);
+            }
+        }
     }
 }
 
