@@ -1,5 +1,6 @@
 
 #include <assert.h>
+#include <string.h>
 
 #include "memory/pagetable.h"
 
@@ -178,6 +179,37 @@ void unmapAllPagesAndFreeUsers(PageTable* root) {
         }
         entry->entry = 0;
     }
+}
+
+bool copyAllPagesAndAllocUsers(PageTable* dest, PageTable* src) {
+    for (int i = 0; i < PAGE_TABLE_SIZE; i++) {
+        PageTableEntry* entry = &src->entries[i];
+        dest->entries[i] = src->entries[i];
+        if (entry->v) {
+            if ((entry->bits & 0b1110) == 0) {
+                PageTable* src_table = (PageTable*)(entry->paddr << 12);
+                PageTable* dst_table = createPageTable();
+                if (dst_table == NULL) {
+                    return false;
+                }
+                if (!copyAllPagesAndAllocUsers(dst_table, src_table)) {
+                    return false;
+                }
+                dest->entries[i].paddr = (uintptr_t)dst_table >> 12;
+            } else {
+                if ((entry->bits & PAGE_ENTRY_USER) != 0) {
+                    void* src_page = (void*)(entry->paddr << 12);
+                    void* dst_page = allocPage();
+                    if (dst_page == NULL) {
+                        return false;
+                    }
+                    memcpy(dst_page, src_page, PAGE_SIZE);
+                    dest->entries[i].paddr = (uintptr_t)dst_page >> 12;
+                }
+            }
+        }
+    }
+    return true;
 }
 
 // from_vaddr and to_vaddr should be aligned to page boundaries.

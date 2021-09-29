@@ -66,7 +66,7 @@ void kernelTrap(uintptr_t cause, uintptr_t pc, uintptr_t val, TrapFrame* frame) 
     } else {
         if (frame->hart != NULL) {
             Process* process = (Process*)frame;
-            process->sched.state = ENQUEUEABLE;
+            moveToSchedState(process, ENQUEUEABLE);
         }
         if (interrupt) {
             frame->pc = pc;
@@ -103,7 +103,7 @@ void kernelTrap(uintptr_t cause, uintptr_t pc, uintptr_t val, TrapFrame* frame) 
                         // TODO: segfault
                         KERNEL_LOG("[!] Segmentation fault: %p %p %p %s", pc, val, frame, getCauseString(interrupt, code));
                         Process* process = (Process*)frame;
-                        process->sched.state = TERMINATED;
+                        moveToSchedState(process, TERMINATED);
                     }
                     break;
             }

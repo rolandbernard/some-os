@@ -17,8 +17,7 @@ Pid allocateNewPid();
 
 Process* createUserProcess(uintptr_t sp, uintptr_t gp, uintptr_t pc, Process* parent, Priority priority);
 
-// Free all data in the process, but keep the process itself
-void freeProcess(Process* process);
+Process* createChildUserProcess(Process* parent);
 
 // Free all data connected with the process. Also the process itself.
 void deallocProcess(Process* process);

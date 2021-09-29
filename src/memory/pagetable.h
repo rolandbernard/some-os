@@ -80,6 +80,11 @@ void mapPageRangeAtLevel(PageTable* root, uintptr_t from_vaddr, uintptr_t to_vad
 // Remove all maps between from and to.
 void unmapPageRange(PageTable* root, uintptr_t from, uintptr_t to);
 
+// Copy all page mappings from dest to src and allocate new pages (and copy).
+// Returns true if everything could be allocated, false otherwise.
+// The destination table must be empty.
+bool copyAllPagesAndAllocUsers(PageTable* dest, PageTable* src);
+
 // Use the given page table to map from virtual to physical address. Returns 0 if unmapped.
 uintptr_t virtToPhys(PageTable* root, uintptr_t vaddr);
 

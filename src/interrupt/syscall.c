@@ -44,6 +44,7 @@ void registerSyscall(int kind, SyscallFunction function) {
 
 void runSyscall(TrapFrame* frame, bool is_kernel) {
     uintptr_t kind = (uintptr_t)frame->regs[REG_ARGUMENT_0];
+    KERNEL_LOG("SYSCALL = %i", kind);
     if (kind < TABLE_SIZE && syscall_table[kind] != NULL) {
         syscall_table[kind](is_kernel, frame, &(frame->regs[REG_ARGUMENT_1]));
     }

@@ -4,6 +4,7 @@
 #include <stdbool.h>
 #include <string.h>
 
+#include "files/vfs.h"
 #include "interrupt/syscall.h"
 #include "interrupt/timer.h"
 #include "memory/kalloc.h"
@@ -15,10 +16,45 @@
 #include "process/types.h"
 #include "util/util.h"
 
+typedef struct {
+    Process* new_process;
+    Process* old_process;
+} ForkSyscallRequest;
+
+static void forkFileDupCallback(Error error, VfsFile* file, void* udata) {
+    ForkSyscallRequest* request = (ForkSyscallRequest*)udata;
+    if (isError(error)) {
+        deallocProcess(request->new_process);
+        request->old_process->frame.regs[REG_ARGUMENT_0] = -error.kind;
+        enqueueProcess(request->old_process);
+        dealloc(request);
+    } else {
+        ProcessResources* old_res = &request->old_process->resources;
+        ProcessResources* new_res = &request->new_process->resources;
+        new_res->fds[new_res->fd_count] = old_res->fds[new_res->fd_count];
+        new_res->files[new_res->fd_count] = file;
+        new_res->fd_count++;
+        if (new_res->fd_count < old_res->fd_count) {
+            VfsFile* old_file = old_res->files[new_res->fd_count];
+            old_file->functions->dup(old_file, 0, 0, forkFileDupCallback, request);
+        } else {
+            request->new_process->frame.regs[REG_ARGUMENT_0] = 0;
+            request->old_process->frame.regs[REG_ARGUMENT_0] = request->new_process->pid;
+            moveToSchedState(request->new_process, ENQUEUEABLE);
+            enqueueProcess(request->new_process);
+            moveToSchedState(request->old_process, ENQUEUEABLE);
+            enqueueProcess(request->old_process);
+            dealloc(request);
+        }
+    }
+}
+
 void forkSyscall(bool is_kernel, TrapFrame* frame, SyscallArgs args) {
     Process* process = (Process*)frame;
     if (frame->hart == NULL || process->pid == 0) {
         // This is for forking kernel processes and trap handlers
+        // Will not copy open file descriptors. And memory will remain the same.
+        // Only thing that is created is a new process and stack.
         Priority priority = DEFAULT_PRIORITY;
         size_t stack_size = HART_STACK_SIZE;
         void* old_stack_top;
@@ -47,7 +83,37 @@ void forkSyscall(bool is_kernel, TrapFrame* frame, SyscallArgs args) {
         frame->regs[REG_ARGUMENT_0] = 0;
         enqueueProcess(new_process);
     } else {
-        // TODO: Implement forks of user processes
+        Process* new_process = createChildUserProcess(process);
+        if (copyAllPagesAndAllocUsers(new_process->memory.table, process->memory.table)) {
+            uintptr_t sp = new_process->frame.regs[REG_STACK_POINTER];
+            KERNEL_LOG("%p -> %p %p", sp, virtToPhys(process->memory.table, sp), process->frame.satp);
+            KERNEL_LOG("%p -> %p %p", sp, virtToPhys(new_process->memory.table, sp), new_process->frame.satp);
+            size_t fd_count = process->resources.fd_count;
+            new_process->resources.uid = process->resources.uid;
+            new_process->resources.gid = process->resources.gid;
+            new_process->resources.next_fd = process->resources.next_fd;
+            new_process->resources.fd_count = 0;
+            if (fd_count != 0) {
+                moveToSchedState(process, WAITING);
+                moveToSchedState(new_process, WAITING);
+                new_process->resources.files = kalloc(fd_count * sizeof(VfsFile*));
+                new_process->resources.fds = kalloc(fd_count * sizeof(int));
+                ForkSyscallRequest* request = kalloc(sizeof(ForkSyscallRequest));
+                request->new_process = new_process;
+                request->old_process = process;
+                process->resources.files[0]->functions->dup(
+                    process->resources.files[0], 0, 0, forkFileDupCallback, request
+                );
+            } else {
+                // No files have to be duplicated
+                new_process->frame.regs[REG_ARGUMENT_0] = 0;
+                process->frame.regs[REG_ARGUMENT_0] = new_process->pid;
+                enqueueProcess(new_process);
+            }
+        } else {
+            deallocProcess(new_process);
+            process->frame.regs[REG_ARGUMENT_0] = -ALREADY_IN_USE;
+        }
     }
 }
 

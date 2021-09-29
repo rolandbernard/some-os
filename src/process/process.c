@@ -1,6 +1,7 @@
 
 #include <stddef.h>
 #include <assert.h>
+#include <string.h>
 
 #include "error/log.h"
 #include "error/panic.h"
@@ -38,6 +39,45 @@ void initTrapFrame(TrapFrame* frame, uintptr_t sp, uintptr_t gp, uintptr_t pc, u
     frame->satp = satpForMemory(asid, table);
 }
 
+static void registerProcess(Process* process) {
+    lockSpinLock(&process_lock); 
+    process->tree.global_next = global_first;
+    if (global_first != NULL) {
+        global_first->tree.global_prev = process;
+    }
+    global_first = process;
+    if (process->tree.parent != NULL) {
+        if (process->tree.parent->tree.children != NULL) {
+            process->tree.parent->tree.children->tree.child_prev = process;
+        }
+        process->tree.child_next = process->tree.parent->tree.children;
+        process->tree.parent->tree.children = process;
+    }
+    unlockSpinLock(&process_lock); 
+}
+
+static void unregisterProcess(Process* process) {
+    lockSpinLock(&process_lock); 
+    // Reparent children
+    Process* child = process->tree.children;
+    while (child != NULL) {
+        child->tree.parent = process->tree.parent;
+        if (process->tree.parent != NULL) {
+            child->tree.child_next = process->tree.parent->tree.children;
+            process->tree.parent->tree.children = child;
+        }
+    }
+    if (process->tree.global_prev == NULL) {
+        global_first = process->tree.global_next;
+    } else {
+        process->tree.global_prev->tree.global_next = process->tree.global_next;
+    }
+    if (process->tree.global_next != NULL) {
+        process->tree.global_next->tree.global_prev = process->tree.global_prev;
+    }
+    unlockSpinLock(&process_lock); 
+}
+
 Process* createKernelProcess(void* start, Priority priority, size_t stack_size) {
     Process* process = zalloc(sizeof(Process));
     assert(process != NULL);
@@ -50,13 +90,7 @@ Process* createKernelProcess(void* start, Priority priority, size_t stack_size) 
         &process->frame, (uintptr_t)process->memory.stack + stack_size,
         (uintptr_t)getKernelGlobalPointer(), (uintptr_t)start, 0, kernel_page_table
     );
-    lockSpinLock(&process_lock); 
-    process->tree.global_next = global_first;
-    if (global_first != NULL) {
-        global_first->tree.global_prev = process;
-    }
-    global_first = process;
-    unlockSpinLock(&process_lock); 
+    registerProcess(process);
     return process;
 }
 
@@ -68,7 +102,7 @@ Pid allocateNewPid() {
     return pid;
 }
 
-Process* createEmptyUserProcess(uintptr_t sp, uintptr_t gp, uintptr_t pc, Process* parent, Priority priority) {
+Process* createUserProcess(uintptr_t sp, uintptr_t gp, uintptr_t pc, Process* parent, Priority priority) {
     Process* process = zalloc(sizeof(Process));
     assert(process != NULL);
     process->pid = allocateNewPid();
@@ -76,26 +110,28 @@ Process* createEmptyUserProcess(uintptr_t sp, uintptr_t gp, uintptr_t pc, Proces
     process->memory.stack = NULL;
     process->sched.priority = priority;
     process->sched.state = ENQUEUEABLE;
+    process->tree.parent = parent;
     initTrapFrame(&process->frame, sp, gp, pc, process->pid, process->memory.table);
-    lockSpinLock(&process_lock); 
-    process->tree.global_next = global_first;
-    if (global_first != NULL) {
-        global_first->tree.global_prev = process;
-    }
-    global_first = process;
-    if (parent != NULL) {
-        process->tree.parent = parent;
-        if (parent->tree.children != NULL) {
-            parent->tree.children->tree.child_prev = process;
-        }
-        process->tree.child_next = parent->tree.children;
-        parent->tree.children = process;
-    }
-    unlockSpinLock(&process_lock); 
+    registerProcess(process);
     return process;
 }
 
-void freeProcess(Process* process) {
+Process* createChildUserProcess(Process* parent) {
+    Process* process = zalloc(sizeof(Process));
+    assert(process != NULL);
+    process->pid = allocateNewPid();
+    process->memory.table = createPageTable();
+    process->memory.stack = NULL;
+    process->sched.priority = parent->sched.priority;
+    process->sched.state = ENQUEUEABLE;
+    initTrapFrame(&process->frame, 0, 0, parent->frame.pc, process->pid, process->memory.table);
+    memcpy(&process->frame.fregs, &parent->frame.fregs, sizeof(parent->frame.fregs));
+    memcpy(&process->frame.regs, &parent->frame.regs, sizeof(parent->frame.regs));
+    registerProcess(process);
+    return process;
+}
+
+static void freeProcess(Process* process) {
     if (process->sched.state != FREED) {
         process->sched.state = FREED;
         dealloc(process->memory.stack);
@@ -117,26 +153,8 @@ void freeProcess(Process* process) {
 }
 
 void deallocProcess(Process* process) {
+    unregisterProcess(process);
     freeProcess(process);
-    lockSpinLock(&process_lock); 
-    // Reparent children
-    Process* child = process->tree.children;
-    while (child != NULL) {
-        child->tree.parent = process->tree.parent;
-        if (process->tree.parent != NULL) {
-            child->tree.child_next = process->tree.parent->tree.children;
-            process->tree.parent->tree.children = child;
-        }
-    }
-    if (process->tree.global_prev == NULL) {
-        global_first = process->tree.global_next;
-    } else {
-        process->tree.global_prev->tree.global_next = process->tree.global_next;
-    }
-    if (process->tree.global_next != NULL) {
-        process->tree.global_next->tree.global_prev = process->tree.global_prev;
-    }
-    unlockSpinLock(&process_lock); 
     if (process->pid != 0) {
         deallocPage(process->memory.table);
     }
@@ -144,6 +162,13 @@ void deallocProcess(Process* process) {
 }
 
 void enterProcess(Process* process) {
+    if (process->sched.priority != LOWEST_PRIORITY) {
+        uintptr_t ret_addr = process->frame.regs[REG_RETURN_ADDRESS];
+        int ret_val = process->frame.regs[REG_ARGUMENT_0];
+        KERNEL_LOG(
+            "%i[%p] at %p (%p:%i)", process->pid, process, process->frame.pc, ret_addr, ret_val
+        );
+    }
     initTimerInterrupt();
     moveToSchedState(process, RUNNING);
     HartFrame* hart = getCurrentHartFrame();
