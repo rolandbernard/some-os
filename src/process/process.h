@@ -29,4 +29,6 @@ void enterProcess(Process* process);
 
 void dumpProcessInfo(Process* process);
 
+void executeProcessWait(Process* process);
+
 #endif

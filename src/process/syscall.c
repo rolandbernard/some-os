@@ -159,6 +159,12 @@ void getppidSyscall(bool is_kernel, TrapFrame* frame, SyscallArgs args) {
     }
 }
 
+void waitSyscall(bool is_kernel, TrapFrame* frame, SyscallArgs args) {
+    assert(frame->hart != NULL);
+    Process* process = (Process*)frame;
+    executeProcessWait(process);
+}
+
 void exit() {
     syscall(SYSCALL_EXIT);
     panic(); // This will never return

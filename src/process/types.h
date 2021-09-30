@@ -82,6 +82,7 @@ typedef enum {
     RUNNING,
     READY,
     WAITING,
+    WAIT_CHLD,
     SLEEPING,
     TERMINATED, // Still has resources
     FREED, // Resources have been freed
@@ -114,6 +115,13 @@ typedef struct {
 } ProcessResources;
 
 typedef struct {
+    int pid;
+    int status;
+} ProcessWaitResult;
+
+typedef struct {
+    size_t wait_count;
+    ProcessWaitResult* waits;
     struct Process_s* parent;
     struct Process_s* children;
     struct Process_s* child_next;
@@ -125,7 +133,7 @@ typedef struct {
 typedef struct Process_s {
     TrapFrame frame;
     Pid pid;
-    uint64_t status; // This is the status returned from wait
+    int status; // This is the status returned from wait
     ProcessTree tree;
     ProcessScheduling sched;
     ProcessMemory memory;

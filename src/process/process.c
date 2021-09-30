@@ -12,6 +12,7 @@
 #include "memory/pagetable.h"
 #include "memory/pagealloc.h"
 #include "memory/virtmem.h"
+#include "memory/virtptr.h"
 #include "process/harts.h"
 #include "process/process.h"
 #include "process/schedule.h"
@@ -39,6 +40,25 @@ void initTrapFrame(TrapFrame* frame, uintptr_t sp, uintptr_t gp, uintptr_t pc, u
     frame->satp = satpForMemory(asid, table);
 }
 
+void executeProcessWait(Process* process) {
+    int wait_pid = process->frame.regs[REG_ARGUMENT_1];
+    for (size_t i = 0; i < process->tree.wait_count; i++) {
+        if (wait_pid == 0 || wait_pid == process->tree.waits[i].pid) {
+            writeInt(
+                virtPtrFor(process->frame.regs[REG_ARGUMENT_2], process->memory.table),
+                sizeof(int) * 8, process->tree.waits[i].status
+            );
+            process->frame.regs[REG_ARGUMENT_0] = process->tree.waits[i].pid;
+            process->tree.wait_count--;
+            memmove(process->tree.waits + i, process->tree.waits + i + 1, process->tree.wait_count - i);
+            moveToSchedState(process, ENQUEUEABLE);
+            enqueueProcess(process);
+            return;
+        }
+    }
+    moveToSchedState(process, WAIT_CHLD);
+}
+
 static void registerProcess(Process* process) {
     lockSpinLock(&process_lock); 
     process->tree.global_next = global_first;
@@ -58,6 +78,25 @@ static void registerProcess(Process* process) {
 
 static void unregisterProcess(Process* process) {
     lockSpinLock(&process_lock); 
+    // Add wait information to the parent
+    if (process->tree.parent != NULL) {
+        Process* parent = process->tree.parent;
+        size_t size = process->tree.wait_count + 1 + parent->tree.wait_count;
+        parent->tree.waits = krealloc(parent->tree.waits, size * sizeof(ProcessWaitResult));
+        memcpy(
+            parent->tree.waits + parent->tree.wait_count, process->tree.waits,
+            process->tree.wait_count * sizeof(ProcessWaitResult)
+        );
+        ProcessWaitResult new_entry = {
+            .pid = process->pid,
+            .status = process->status,
+        };
+        parent->tree.waits[parent->tree.wait_count + process->tree.wait_count] = new_entry;
+        parent->tree.wait_count = size;
+        if (parent->sched.state == WAIT_CHLD) {
+            executeProcessWait(parent);
+        }
+    }
     // Reparent children
     Process* child = process->tree.children;
     while (child != NULL) {

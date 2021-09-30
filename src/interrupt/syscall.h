@@ -28,6 +28,7 @@ typedef enum {
     SYSCALL_READDIR = 21,
     SYSCALL_GETPID = 22,
     SYSCALL_GETPPID = 23,
+    SYSCALL_WAIT = 24,
 } Syscalls;
 
 // Simple wrapper around ecall

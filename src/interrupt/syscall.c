@@ -36,6 +36,7 @@ SyscallFunction syscall_table[TABLE_SIZE] = {
     [SYSCALL_READDIR] = readdirSyscall,
     [SYSCALL_GETPID] = getpidSyscall,
     [SYSCALL_GETPPID] = getppidSyscall,
+    [SYSCALL_WAIT] = waitSyscall,
 };
 
 void registerSyscall(int kind, SyscallFunction function) {

@@ -99,3 +99,7 @@ int syscall_getppid() {
     return SYSCALL(SYSCALL_GETPPID);
 }
 
+int syscall_wait(int pid, int* status) {
+    return SYSCALL(SYSCALL_WAIT, pid, (uintptr_t)status);
+}
+

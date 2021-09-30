@@ -15,6 +15,8 @@ void getpidSyscall(bool is_kernel, TrapFrame* frame, SyscallArgs args);
 
 void getppidSyscall(bool is_kernel, TrapFrame* frame, SyscallArgs args);
 
+void waitSyscall(bool is_kernel, TrapFrame* frame, SyscallArgs args);
+
 void exit();
 
 #endif
