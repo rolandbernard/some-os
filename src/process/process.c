@@ -66,6 +66,7 @@ static void unregisterProcess(Process* process) {
             child->tree.child_next = process->tree.parent->tree.children;
             process->tree.parent->tree.children = child;
         }
+        child = child->tree.child_next;
     }
     if (process->tree.global_prev == NULL) {
         global_first = process->tree.global_next;
@@ -124,6 +125,7 @@ Process* createChildUserProcess(Process* parent) {
     process->memory.stack = NULL;
     process->sched.priority = parent->sched.priority;
     process->sched.state = ENQUEUEABLE;
+    process->tree.parent = parent;
     initTrapFrame(&process->frame, 0, 0, parent->frame.pc, process->pid, process->memory.table);
     memcpy(&process->frame.fregs, &parent->frame.fregs, sizeof(parent->frame.fregs));
     memcpy(&process->frame.regs, &parent->frame.regs, sizeof(parent->frame.regs));

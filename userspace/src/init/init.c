@@ -12,10 +12,10 @@ void itoa(char* dest, long num) {
         num = -num;
         neg = true;
     }
-    while (num != 0) {
+    do {
         dest[idx++] = '0' + (num % 10);
         num /= 10;
-    }
+    } while (num != 0);
     if (neg) {
         dest[idx++] = '-';
     }
@@ -32,7 +32,20 @@ int main(int argc, char* argv[], char* env[]) {
     int pid = syscall_fork();
     if (pid == 0) {
         syscall_print("CHILD\n");
+        syscall_print("PID  = ");
+        pid = syscall_getpid();
+        itoa((char*)data, pid);
+        syscall_print((char*)data);
+        syscall_print("\n");
+        syscall_print("PPID = ");
+        pid = syscall_getppid();
+        itoa((char*)data, pid);
+        syscall_print((char*)data);
+        syscall_print("\n");
     } else {
+        for (int i = 0; i < 100; i++) {
+            syscall_yield();
+        }
         syscall_print("PARENT of ");
         itoa((char*)data, pid);
         syscall_print((char*)data);

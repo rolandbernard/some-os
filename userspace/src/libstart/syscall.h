@@ -44,6 +44,8 @@ typedef enum {
     SYSCALL_UMOUNT = 19,
     SYSCALL_EXECVE = 20,
     SYSCALL_READDIR = 21,
+    SYSCALL_GETPID = 22,
+    SYSCALL_GETPPID = 23,
 } Syscalls;
 
 uintptr_t make_syscall(
@@ -138,5 +140,9 @@ int syscall_mount(const char* source, const char* target, const char* type, void
 int syscall_umount(const char* path);
 
 int syscall_execve(const char* path, char const* args[], char const* envs[]);
+
+int syscall_getpid();
+
+int syscall_getppid();
 
 #endif

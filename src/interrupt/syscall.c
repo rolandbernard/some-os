@@ -34,6 +34,8 @@ SyscallFunction syscall_table[TABLE_SIZE] = {
     [SYSCALL_UMOUNT] = umountSyscall,
     [SYSCALL_EXECVE] = execveSyscall,
     [SYSCALL_READDIR] = readdirSyscall,
+    [SYSCALL_GETPID] = getpidSyscall,
+    [SYSCALL_GETPPID] = getppidSyscall,
 };
 
 void registerSyscall(int kind, SyscallFunction function) {

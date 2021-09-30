@@ -91,3 +91,11 @@ int syscall_execve(const char* path, char const* args[], char const* envs[]) {
     return SYSCALL(SYSCALL_EXECVE, (uintptr_t)path, (uintptr_t)args, (uintptr_t)envs);
 }
 
+int syscall_getpid() {
+    return SYSCALL(SYSCALL_GETPID);
+}
+
+int syscall_getppid() {
+    return SYSCALL(SYSCALL_GETPPID);
+}
+

@@ -150,6 +150,22 @@ void sleepSyscall(bool is_kernel, TrapFrame* frame, SyscallArgs args) {
     }
 }
 
+void getpidSyscall(bool is_kernel, TrapFrame* frame, SyscallArgs args) {
+    assert(frame->hart != NULL);
+    Process* process = (Process*)frame;
+    process->frame.regs[REG_ARGUMENT_0] = process->pid;
+}
+
+void getppidSyscall(bool is_kernel, TrapFrame* frame, SyscallArgs args) {
+    assert(frame->hart != NULL);
+    Process* process = (Process*)frame;
+    if (process->tree.parent != NULL) {
+        process->frame.regs[REG_ARGUMENT_0] = process->tree.parent->pid;
+    } else {
+        process->frame.regs[REG_ARGUMENT_0] = 0;
+    }
+}
+
 void exit() {
     syscall(SYSCALL_EXIT);
     panic(); // This will never return
