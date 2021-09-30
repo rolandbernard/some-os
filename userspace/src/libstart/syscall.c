@@ -19,8 +19,8 @@ int syscall_fork() {
     return SYSCALL(SYSCALL_FORK);
 }
 
-void syscall_sleep(uint64_t nanoseconds) {
-    SYSCALL(SYSCALL_FORK, nanoseconds);
+uint64_t syscall_sleep(uint64_t nanoseconds) {
+    return SYSCALL(SYSCALL_SLEEP, nanoseconds);
 }
 
 int syscall_open(const char* path, SyscallOpenFlags flags, uint16_t mode) {

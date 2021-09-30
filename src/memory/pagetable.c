@@ -9,6 +9,7 @@
 PageTable* createPageTable() {
     static_assert(PAGE_SIZE == sizeof(PageTable));
     PageTable* page = zallocPage();
+    // TODO: handle alloc errors (Not here but in the users)
     assert(page != NULL);
     return page;
 }

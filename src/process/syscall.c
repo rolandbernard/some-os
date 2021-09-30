@@ -127,26 +127,19 @@ void yieldSyscall(bool is_kernel, TrapFrame* frame, SyscallArgs args) {
     // Do nothing, process will be enqueued
 }
 
-// TODO: implement sleep differently
-static void awakenFromSleep(Time time, void* udata) {
-    Process* process = (Process*)udata;
-    moveToSchedState(process, ENQUEUEABLE);
-    enqueueProcess(process);
-}
-
 void sleepSyscall(bool is_kernel, TrapFrame* frame, SyscallArgs args) {
-    Time delay = args[0] * CLOCKS_PER_SEC / 1000000000UL; // Argument is in nanoseconds
+    Time delay = args[0] / (1000000000UL / CLOCKS_PER_SEC); // Argument is in nanoseconds
+    Time end = getTime() + delay;
     if (frame->hart == NULL) {
         // If this is not a process. Just loop.
-        Time end = getTime() + delay;
         while (end > getTime()) {
             // Wait for the time to come
         }
     } else {
         // This is a process. We can put it into wait.
         Process* process = (Process*)frame;
+        process->sched.sleeping_until = end;
         moveToSchedState(process, SLEEPING);
-        setTimeout(delay, awakenFromSleep, process);
     }
 }
 

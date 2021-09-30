@@ -96,6 +96,7 @@ typedef struct {
     uint16_t runs;
     ProcessState state;
     struct Process_s* sched_next; // Used for ready and waiting lists
+    Time sleeping_until;
 } ProcessScheduling;
 
 typedef struct {

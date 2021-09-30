@@ -60,7 +60,7 @@ void syscall_yield();
 
 int syscall_fork();
 
-void syscall_sleep(uint64_t nanoseconds);
+uint64_t syscall_sleep(uint64_t nanoseconds);
 
 typedef enum {
     FILE_OPEN_CREATE = (1 << 0),

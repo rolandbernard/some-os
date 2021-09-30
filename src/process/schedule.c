@@ -8,9 +8,47 @@
 #include "interrupt/trap.h"
 #include "error/log.h"
 #include "process/process.h"
+#include "util/spinlock.h"
 #include "util/util.h"
 
 #define PRIORITY_DECREASE 64
+
+SpinLock sleeping_lock;
+Process* sleeping = NULL;
+
+static void addSleepingProcess(Process* process) {
+    lockSpinLock(&sleeping_lock);
+    process->sched.sched_next = sleeping;
+    sleeping = process;
+    unlockSpinLock(&sleeping_lock);
+}
+
+static void awakenProcess(Process* process) {
+    Time time = getTime();
+    if (time >= process->sched.sleeping_until) {
+        process->frame.regs[REG_ARGUMENT_0] = 0;
+    } else {
+        process->frame.regs[REG_ARGUMENT_0] = process->sched.sleeping_until - time;
+    }
+    moveToSchedState(process, ENQUEUEABLE);
+    enqueueProcess(process);
+}
+
+static void awakenProcesses() {
+    lockSpinLock(&sleeping_lock);
+    Time time = getTime();
+    Process** current = &sleeping;
+    while (*current != NULL) {
+        if ((*current)->sched.sleeping_until <= time) {
+            Process* process = *current;
+            *current = (*current)->sched.sched_next;
+            awakenProcess(process);
+        } else {
+            current = &(*current)->sched.sched_next;
+        }
+    }
+    unlockSpinLock(&sleeping_lock);
+}
 
 void enqueueProcess(Process* process) {
     HartFrame* hart = process->frame.hart;
@@ -23,6 +61,8 @@ void enqueueProcess(Process* process) {
     if (hart->idle_process != process) { // Ignore the idle process
         if (process->sched.state == TERMINATED) {
             deallocProcess(process);
+        } else if (process->sched.state == SLEEPING) {
+            addSleepingProcess(process);
         } else if (process->sched.state == ENQUEUEABLE) {
             moveToSchedState(process, READY);
             if (process->sched.runs % PRIORITY_DECREASE == 0) {
@@ -37,6 +77,7 @@ void enqueueProcess(Process* process) {
 }
 
 void runNextProcess() {
+    awakenProcesses();
     Process* current = getCurrentProcess();
     if (current != NULL) {
         // If this is called from inside a process. Call exit syscall.

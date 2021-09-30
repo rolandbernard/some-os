@@ -43,9 +43,7 @@ int main(int argc, char* argv[], char* env[]) {
         syscall_print((char*)data);
         syscall_print("\n");
     } else {
-        for (int i = 0; i < 100; i++) {
-            syscall_yield();
-        }
+        syscall_sleep(1000000000UL);
         syscall_print("PARENT of ");
         itoa((char*)data, pid);
         syscall_print((char*)data);
@@ -58,6 +56,13 @@ int main(int argc, char* argv[], char* env[]) {
         }
         syscall_print("Hello world!\n");
         syscall_close(fd);
+        for (int i = 0;; i++) {
+            syscall_sleep(1000000000UL);
+            syscall_print("Sleeping... ");
+            itoa((char*)data, i);
+            syscall_print((char*)data);
+            syscall_print("\n");
+        }
     }
     return 1;
 }
