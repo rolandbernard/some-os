@@ -145,6 +145,20 @@ uintptr_t virtToPhys(PageTable* root, uintptr_t vaddr) {
     return 0;
 }
 
+void allPagesDo(PageTable* root, AllPagesDoCallback callback, void* udata) {
+    for (int i = 0; i < PAGE_TABLE_SIZE; i++) {
+        PageTableEntry* entry = &root->entries[i];
+        if (entry->v) {
+            if ((entry->bits & 0b1110) == 0) {
+                PageTable* table = (PageTable*)(entry->paddr << 12);
+                allPagesDo(table, callback, udata);
+            } else {
+                callback(entry, udata);
+            }
+        }
+    }
+}
+
 void unmapAllPages(PageTable* root) {
     for (int i = 0; i < PAGE_TABLE_SIZE; i++) {
         PageTableEntry* entry_lv2 = &root->entries[i];

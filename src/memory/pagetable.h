@@ -91,4 +91,9 @@ uintptr_t virtToPhys(PageTable* root, uintptr_t vaddr);
 // Get the entry handling the given vaddr in the given page table.
 PageTableEntry* virtToEntry(PageTable* root, uintptr_t vaddr);
 
+typedef void (*AllPagesDoCallback)(PageTableEntry* entry, void* udata);
+
+// Call the callback once for each leaf page
+void allPagesDo(PageTable* root, AllPagesDoCallback callback, void* udata);
+
 #endif
