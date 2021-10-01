@@ -2,9 +2,11 @@
 #include <stdint.h>
 #include <stddef.h>
 
-#include "error/log.h"
 #include "interrupt/syscall.h"
+
+#include "error/log.h"
 #include "loader/loader.h"
+#include "memory/syscall.h"
 #include "process/syscall.h"
 #include "files/syscall.h"
 #include "memory/kalloc.h"
@@ -37,6 +39,7 @@ SyscallFunction syscall_table[TABLE_SIZE] = {
     [SYSCALL_GETPID] = getpidSyscall,
     [SYSCALL_GETPPID] = getppidSyscall,
     [SYSCALL_WAIT] = waitSyscall,
+    [SYSCALL_SBRK] = sbrkSyscall,
 };
 
 void registerSyscall(int kind, SyscallFunction function) {

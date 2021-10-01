@@ -6,6 +6,7 @@
 #include "loader/elf.h"
 #include "memory/kalloc.h"
 #include "memory/pagetable.h"
+#include "memory/pagealloc.h"
 #include "memory/virtmem.h"
 #include "process/schedule.h"
 #include "util/util.h"
@@ -64,6 +65,19 @@ static uintptr_t pushStringArray(VirtPtr stack_pointer, VirtPtr array, size_t* s
     return stack_pointer.address;
 }
 
+static void allPagesBrkCallback(PageTableEntry* entry, uintptr_t vaddr, void* udata) {
+    uintptr_t* last_page = (uintptr_t*)udata;
+    if (vaddr > *last_page) {
+        *last_page = vaddr;
+    }
+}
+
+static uintptr_t findStartBrk(PageTable* table) {
+    uintptr_t last_page = 0;
+    allPagesDo(table, allPagesBrkCallback, &last_page);
+    return last_page + PAGE_SIZE;
+}
+
 static void readElfFileCallback(Error error, uintptr_t entry, void* udata) {
     LoadProgramRequest* request = (LoadProgramRequest*)udata;
     request->file->functions->close(request->file, 0, 0, noop, NULL);
@@ -72,6 +86,8 @@ static void readElfFileCallback(Error error, uintptr_t entry, void* udata) {
         request->callback(error, request->udata);
         dealloc(request);
     } else {
+        // Find the start_brk in the memory
+        uintptr_t start_brk = findStartBrk(request->memory);
         // Allocate stack
         if (!allocatePages(request->memory, USER_STACK_TOP - USER_STACK_SIZE, USER_STACK_SIZE, ELF_PROG_READ | ELF_PROG_WRITE)) {
             unmapAllPagesAndFreeUsers(request->memory);
@@ -96,6 +112,8 @@ static void readElfFileCallback(Error error, uintptr_t entry, void* udata) {
         }
         request->process->memory.stack = NULL;
         request->process->memory.table = request->memory;
+        request->process->memory.start_brk = start_brk;
+        request->process->memory.brk = start_brk;
         initTrapFrame(&request->process->frame, args, 0, entry, request->process->pid, request->memory);
         // Set main function arguments
         request->process->frame.regs[REG_ARGUMENT_0] = argc;

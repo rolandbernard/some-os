@@ -103,6 +103,8 @@ typedef struct {
 typedef struct {
     PageTable* table;
     void* stack; // This is only used for a kernel process
+    uintptr_t start_brk;
+    uintptr_t brk;
 } ProcessMemory;
 
 typedef struct {
