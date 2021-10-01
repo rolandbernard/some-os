@@ -60,6 +60,26 @@ int main(int argc, char* argv[], char* env[]) {
         }
         syscall_print("Hello world!\n");
         syscall_close(fd);
+        void* brk1 = syscall_sbrk(128);
+        syscall_print("brk1: ");
+        itoa((char*)data, (uintptr_t)brk1);
+        syscall_print((char*)data);
+        syscall_print("\n");
+        void* brk2 = syscall_sbrk(100000);
+        syscall_print("brk2: ");
+        itoa((char*)brk1, (uintptr_t)brk2);
+        syscall_print((char*)brk1);
+        syscall_print("\n");
+        void* brk3 = syscall_sbrk(-200000);
+        syscall_print("brk3: ");
+        itoa((char*)data, (uintptr_t)brk3);
+        syscall_print((char*)data);
+        syscall_print("\n");
+        void* brk4 = syscall_sbrk(0);
+        syscall_print("brk4: ");
+        itoa((char*)data, (uintptr_t)brk4);
+        syscall_print((char*)data);
+        syscall_print("\n");
         for (int i = 0;; i++) {
             syscall_print("Sleeping... ");
             itoa((char*)data, i);

@@ -47,6 +47,7 @@ typedef enum {
     SYSCALL_GETPID = 22,
     SYSCALL_GETPPID = 23,
     SYSCALL_WAIT = 24,
+    SYSCALL_SBRK = 25,
 } Syscalls;
 
 uintptr_t make_syscall(
@@ -147,5 +148,7 @@ int syscall_getpid();
 int syscall_getppid();
 
 int syscall_wait(int pid, int* status);
+
+void* syscall_sbrk(intptr_t change);
 
 #endif

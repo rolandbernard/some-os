@@ -103,3 +103,7 @@ int syscall_wait(int pid, int* status) {
     return SYSCALL(SYSCALL_WAIT, pid, (uintptr_t)status);
 }
 
+void* syscall_sbrk(intptr_t change) {
+    return (void*)SYSCALL(SYSCALL_SBRK, change);
+}
+
