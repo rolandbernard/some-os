@@ -146,14 +146,31 @@ uintptr_t virtToPhys(PageTable* root, uintptr_t vaddr) {
 }
 
 void allPagesDo(PageTable* root, AllPagesDoCallback callback, void* udata) {
-    for (int i = 0; i < PAGE_TABLE_SIZE; i++) {
-        PageTableEntry* entry = &root->entries[i];
-        if (entry->v) {
-            if ((entry->bits & 0b1110) == 0) {
-                PageTable* table = (PageTable*)(entry->paddr << 12);
-                allPagesDo(table, callback, udata);
+    for (uintptr_t i = 0; i < PAGE_TABLE_SIZE; i++) {
+        PageTableEntry* entry_lv2 = &root->entries[i];
+        if (entry_lv2->v) {
+            if ((entry_lv2->bits & 0b1110) == 0) {
+                // This is a non leaf node
+                PageTable* table_lv1 = (PageTable*)(entry_lv2->paddr << 12);
+                for (uintptr_t j = 0; j < PAGE_TABLE_SIZE; j++) {
+                    PageTableEntry* entry_lv1 = &table_lv1->entries[j];
+                    if (entry_lv1->v) {
+                        if ((entry_lv1->bits & 0b1110) == 0) {
+                            PageTable* table_lv0 = (PageTable*)(entry_lv1->paddr << 12);
+                            // No more branches after level 0
+                            for (uintptr_t k = 0; k < PAGE_TABLE_SIZE; k++) {
+                                PageTableEntry* entry_lv0 = &table_lv0->entries[k];
+                                if (entry_lv0->v) {
+                                    callback(entry_lv0, (i << 30) | (j << 21) | (k << 12), udata);
+                                }
+                            }
+                        } else {
+                            callback(entry_lv1, (i << 30) | (j << 21), udata);
+                        }
+                    }
+                }
             } else {
-                callback(entry, udata);
+                callback(entry_lv2, i << 30, udata);
             }
         }
     }
