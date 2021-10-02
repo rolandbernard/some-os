@@ -54,3 +54,46 @@ void sbrkSyscall(bool is_kernel, TrapFrame* frame, SyscallArgs args) {
         changeProcessBreak(process, process->frame.regs[REG_ARGUMENT_1]);
 }
 
+typedef struct {
+    uintptr_t start;
+    uintptr_t end;
+    uintptr_t protect;
+} ProtectSyscallRequest;
+
+static void allPagesProtectCallback(PageTableEntry* entry, uintptr_t vaddr, void* udata) {
+    ProtectSyscallRequest* request = (ProtectSyscallRequest*)udata;
+    if (vaddr >= request->start && vaddr < request->end && (entry->bits & PAGE_ENTRY_USER) != 0) {
+        entry->bits &= ~PAGE_ENTRY_RWX;
+        if ((request->protect & PROT_READ) != 0) {
+            entry->bits |= PAGE_ENTRY_READ;
+        }
+        if ((request->protect & PROT_WRITE) != 0) {
+            entry->bits |= PAGE_ENTRY_WRITE;
+        }
+        if ((request->protect & PROT_EXEC) != 0) {
+            entry->bits |= PAGE_ENTRY_EXEC;
+        }
+    }
+}
+
+void protectSyscall(bool is_kernel, TrapFrame* frame, SyscallArgs args) {
+    assert(frame->hart != NULL);
+    Process* process = (Process*)frame;
+    uintptr_t addr = process->frame.regs[REG_ARGUMENT_1];
+    uintptr_t length = process->frame.regs[REG_ARGUMENT_2];
+    uintptr_t protect = process->frame.regs[REG_ARGUMENT_3];
+    if ((protect & PROT_READ_WRITE_EXEC) == 0) {
+        process->frame.regs[REG_ARGUMENT_0] = -UNSUPPORTED;
+    } else {
+        if (length != 0) {
+            ProtectSyscallRequest request = {
+                .start = addr & -PAGE_SIZE,
+                .end = (addr + length + PAGE_SIZE - 1) & -PAGE_SIZE,
+                .protect = protect,
+            };
+            allPagesDo(process->memory.table, allPagesProtectCallback, &request);
+        }
+        process->frame.regs[REG_ARGUMENT_0] = 0;
+    }
+}
+

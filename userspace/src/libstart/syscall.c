@@ -107,3 +107,7 @@ void* syscall_sbrk(intptr_t change) {
     return (void*)SYSCALL(SYSCALL_SBRK, change);
 }
 
+int syscall_protect(void* addr, size_t len, int prot) {
+    return SYSCALL(SYSCALL_PROTECT, (uintptr_t)addr, len, prot);
+}
+

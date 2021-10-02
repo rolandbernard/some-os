@@ -40,6 +40,7 @@ SyscallFunction syscall_table[TABLE_SIZE] = {
     [SYSCALL_GETPPID] = getppidSyscall,
     [SYSCALL_WAIT] = waitSyscall,
     [SYSCALL_SBRK] = sbrkSyscall,
+    [SYSCALL_PROTECT] = protectSyscall,
 };
 
 void registerSyscall(int kind, SyscallFunction function) {

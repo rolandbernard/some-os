@@ -31,6 +31,10 @@ bool allocatePages(PageTable* table, uintptr_t addr, size_t length, uint32_t fla
     if ((flags & ELF_PROG_WRITE) != 0) {
         bits |= PAGE_ENTRY_WRITE;
     }
+    if ((bits & 0b1110) == 0) {
+        // We need at least some permissions
+        bits |= PAGE_ENTRY_READ;
+    }
     for (uintptr_t position = addr & -PAGE_SIZE; position < addr + length; position += PAGE_SIZE) {
         PageTableEntry* entry = virtToEntry(table, position);
         if (entry != NULL) {

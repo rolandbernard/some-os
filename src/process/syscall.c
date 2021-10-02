@@ -91,6 +91,8 @@ void forkSyscall(bool is_kernel, TrapFrame* frame, SyscallArgs args) {
             new_process->resources.gid = process->resources.gid;
             new_process->resources.next_fd = process->resources.next_fd;
             new_process->resources.fd_count = 0;
+            new_process->memory.start_brk = process->memory.start_brk;
+            new_process->memory.brk = process->memory.brk;
             if (fd_count != 0) {
                 moveToSchedState(process, WAITING);
                 moveToSchedState(new_process, WAITING);

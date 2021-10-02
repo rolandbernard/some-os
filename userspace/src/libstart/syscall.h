@@ -48,6 +48,7 @@ typedef enum {
     SYSCALL_GETPPID = 23,
     SYSCALL_WAIT = 24,
     SYSCALL_SBRK = 25,
+    SYSCALL_PROTECT = 26,
 } Syscalls;
 
 uintptr_t make_syscall(
@@ -150,5 +151,12 @@ int syscall_getppid();
 int syscall_wait(int pid, int* status);
 
 void* syscall_sbrk(intptr_t change);
+
+#define PROT_NONE 0
+#define PROT_READ 4
+#define PROT_WRITE 2
+#define PROT_EXEC 1
+
+int syscall_protect(void* addr, size_t len, int prot);
 
 #endif

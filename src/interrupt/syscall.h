@@ -30,6 +30,7 @@ typedef enum {
     SYSCALL_GETPPID = 23,
     SYSCALL_WAIT = 24,
     SYSCALL_SBRK = 25,
+    SYSCALL_PROTECT = 26,
 } Syscalls;
 
 // Simple wrapper around ecall
