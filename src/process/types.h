@@ -108,12 +108,15 @@ typedef struct {
 } ProcessMemory;
 
 typedef struct {
+    VfsFile* file;
+} ProcessFileDescEntry;
+
+typedef struct {
     Uid uid;
     Gid gid;
     int next_fd;
     size_t fd_count;
-    int* fds;
-    VfsFile** files;
+    VfsFile** filedes;
 } ProcessResources;
 
 typedef struct {

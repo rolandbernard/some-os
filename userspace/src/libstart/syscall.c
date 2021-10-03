@@ -75,8 +75,8 @@ int syscall_stat(int fd, SyscallStat* buff) {
     return SYSCALL(SYSCALL_STAT, fd, (uintptr_t)buff);
 }
 
-int syscall_dup(int fd, int newfd) {
-    return SYSCALL(SYSCALL_DUP, fd, newfd);
+int syscall_dup(int fd, int newfd, int flags) {
+    return SYSCALL(SYSCALL_DUP, fd, newfd, flags);
 }
 
 int syscall_trunc(int fd, size_t size) {

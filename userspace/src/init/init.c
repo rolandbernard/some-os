@@ -27,7 +27,6 @@ void itoa(char* dest, long num) {
 
 int main(int argc, char* argv[], char* env[]) {
     void* data = syscall_sbrk(128);
-    syscall_protect(data, 128, PROT_EXEC);
     DirectoryEntry* entry = (DirectoryEntry*)data;
     int pid = syscall_fork();
     if (pid == 0) {

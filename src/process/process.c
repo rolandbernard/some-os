@@ -182,12 +182,11 @@ static void freeProcess(Process* process) {
             unmapAllPagesAndFreeUsers(process->memory.table);
         }
         for (size_t i = 0; i < process->resources.fd_count; i++) {
-            process->resources.files[i]->functions->close(
-                process->resources.files[i], 0, 0, noop, NULL
+            process->resources.filedes[i]->functions->close(
+                process->resources.filedes[i], 0, 0, noop, NULL
             );
         }
-        dealloc(process->resources.fds);
-        dealloc(process->resources.files);
+        dealloc(process->resources.filedes);
         process->resources.fd_count = 0;
         process->resources.next_fd = 0;
     }

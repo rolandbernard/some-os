@@ -32,11 +32,12 @@ static void forkFileDupCallback(Error error, VfsFile* file, void* udata) {
     } else {
         ProcessResources* old_res = &request->old_process->resources;
         ProcessResources* new_res = &request->new_process->resources;
-        new_res->fds[new_res->fd_count] = old_res->fds[new_res->fd_count];
-        new_res->files[new_res->fd_count] = file;
+        new_res->filedes[new_res->fd_count] = file;
+        new_res->filedes[new_res->fd_count]->fd = old_res->filedes[new_res->fd_count]->fd;
+        new_res->filedes[new_res->fd_count]->flags = old_res->filedes[new_res->fd_count]->flags;
         new_res->fd_count++;
         if (new_res->fd_count < old_res->fd_count) {
-            VfsFile* old_file = old_res->files[new_res->fd_count];
+            VfsFile* old_file = old_res->filedes[new_res->fd_count];
             old_file->functions->dup(old_file, 0, 0, forkFileDupCallback, request);
         } else {
             request->new_process->frame.regs[REG_ARGUMENT_0] = 0;
@@ -96,13 +97,12 @@ void forkSyscall(bool is_kernel, TrapFrame* frame, SyscallArgs args) {
             if (fd_count != 0) {
                 moveToSchedState(process, WAITING);
                 moveToSchedState(new_process, WAITING);
-                new_process->resources.files = kalloc(fd_count * sizeof(VfsFile*));
-                new_process->resources.fds = kalloc(fd_count * sizeof(int));
+                new_process->resources.filedes = kalloc(fd_count * sizeof(ProcessFileDescEntry));
                 ForkSyscallRequest* request = kalloc(sizeof(ForkSyscallRequest));
                 request->new_process = new_process;
                 request->old_process = process;
-                process->resources.files[0]->functions->dup(
-                    process->resources.files[0], 0, 0, forkFileDupCallback, request
+                process->resources.filedes[0]->functions->dup(
+                    process->resources.filedes[0], 0, 0, forkFileDupCallback, request
                 );
             } else {
                 // No files have to be duplicated

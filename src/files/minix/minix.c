@@ -408,6 +408,12 @@ static void minixOpenINodeCallback(Error error, uint32_t inode, MinixOpenRequest
         unlockSpinLock(&request->fs->lock);
         request->callback(error, NULL, request->udata);
         dealloc(request);
+    } else if ((request->flags & VFS_OPEN_EXCL) != 0) {
+        // The file should not exist
+        dealloc(request->path);
+        unlockSpinLock(&request->fs->lock);
+        request->callback(simpleError(ALREADY_IN_USE), NULL, request->udata);
+        dealloc(request);
     } else {
         dealloc(request->path);
         request->inodenum = inode;

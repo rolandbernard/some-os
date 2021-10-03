@@ -58,6 +58,8 @@ typedef enum {
     FILE_OPEN_WRITE = (1 << 5),
     FILE_OPEN_EXECUTE = (1 << 6),
     FILE_OPEN_REGULAR = (1 << 7),
+    FILE_OPEN_CLOEXEC = (1 << 8),
+    FILE_OPEN_EXCL = (1 << 9),
 } SyscallOpenFlags;
 
 int syscall_open(const char* path, SyscallOpenFlags flags, uint16_t mode);
@@ -97,7 +99,7 @@ typedef struct {
 
 int syscall_stat(int fd, SyscallStat* buff);
 
-int syscall_dup(int fd, int newfd);
+int syscall_dup(int fd, int newfd, int flags);
 
 int syscall_trunc(int fd, size_t size);
 

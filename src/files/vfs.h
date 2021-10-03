@@ -32,6 +32,8 @@ typedef enum {
     VFS_OPEN_WRITE = (1 << 5),
     VFS_OPEN_EXECUTE = (1 << 6),
     VFS_OPEN_REGULAR = (1 << 7),
+    VFS_OPEN_CLOEXEC = (1 << 8),
+    VFS_OPEN_EXCL = (1 << 9),
 } VfsOpenFlags;
 
 #define OPEN_ACCESS(open_flags) ((open_flags >> 4) & 0b111)
@@ -59,6 +61,10 @@ typedef enum {
     VFS_MODE_SETGID = (1 << 11),
     VFS_MODE_TYPE = (0xf << 12),
 } VfsModeFlags;
+
+typedef enum {
+    VFS_FILE_CLOEXEC = (1 << 0),
+} VfsFileFlags;
 
 #define VFS_MODE_A_RW (VFS_MODE_A_R | VFS_MODE_A_W)
 #define VFS_MODE_G_RW (VFS_MODE_G_R | VFS_MODE_G_W)
@@ -128,6 +134,8 @@ typedef struct {
 } VfsFileVtable;
 
 typedef struct VfsFile_s {
+    int fd;
+    int flags;
     const VfsFileVtable* functions;
 } VfsFile;
 

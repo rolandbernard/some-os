@@ -1,4 +1,6 @@
 
+#include <string.h>
+
 #include "loader/loader.h"
 
 #include "files/syscall.h"
@@ -119,6 +121,22 @@ static void readElfFileCallback(Error error, uintptr_t entry, void* udata) {
         request->process->frame.regs[REG_ARGUMENT_0] = argc;
         request->process->frame.regs[REG_ARGUMENT_1] = args;
         request->process->frame.regs[REG_ARGUMENT_2] = envs;
+        // Close files with CLOEXEC flag
+        for (size_t i = 0; i < request->process->resources.fd_count;) {
+            if ((request->process->resources.filedes[i]->flags & VFS_FILE_CLOEXEC) != 0) {
+                request->process->resources.filedes[i]->functions->close(
+                    request->process->resources.filedes[i], 0, 0, noop, NULL
+                );
+                memmove(
+                    request->process->resources.filedes + i,
+                    request->process->resources.filedes + i + 1,
+                    (request->process->resources.fd_count - i - 1) * sizeof(VfsFile*)
+                );
+                request->process->resources.fd_count--;
+            } else {
+                i++;
+            }
+        }
         // Return from loading
         request->callback(simpleError(SUCCESS), request->udata);
         dealloc(request);
