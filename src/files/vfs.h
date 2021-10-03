@@ -31,6 +31,7 @@ typedef enum {
     VFS_OPEN_READ = (1 << 4),
     VFS_OPEN_WRITE = (1 << 5),
     VFS_OPEN_EXECUTE = (1 << 6),
+    VFS_OPEN_REGULAR = (1 << 7),
 } VfsOpenFlags;
 
 #define OPEN_ACCESS(open_flags) ((open_flags >> 4) & 0b111)

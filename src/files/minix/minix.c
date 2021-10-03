@@ -250,7 +250,7 @@ static void minixOpenReadCallback(Error error, size_t read, MinixOpenRequest* re
         unlockSpinLock(&request->fs->lock);
         request->callback(simpleError(WRONG_FILE_TYPE), NULL, request->udata);
         dealloc(request);
-    } else if ((request->flags & VFS_OPEN_DIRECTORY) == 0 && MODE_TYPE(request->inode.mode) == VFS_TYPE_DIR) {
+    } else if ((request->flags & VFS_OPEN_REGULAR) != 0 && MODE_TYPE(request->inode.mode) != VFS_TYPE_REG) {
         unlockSpinLock(&request->fs->lock);
         request->callback(simpleError(WRONG_FILE_TYPE), NULL, request->udata);
         dealloc(request);

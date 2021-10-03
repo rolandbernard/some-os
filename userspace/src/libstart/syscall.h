@@ -57,6 +57,7 @@ typedef enum {
     FILE_OPEN_READ = (1 << 4),
     FILE_OPEN_WRITE = (1 << 5),
     FILE_OPEN_EXECUTE = (1 << 6),
+    FILE_OPEN_REGULAR = (1 << 7),
 } SyscallOpenFlags;
 
 int syscall_open(const char* path, SyscallOpenFlags flags, uint16_t mode);

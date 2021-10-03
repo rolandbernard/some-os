@@ -400,7 +400,7 @@ static void minixSeekFunction(MinixFile* file, Uid uid, Gid gid, size_t offset, 
         );
     } else {
         lockSpinLock(&file->lock);
-        size_t new_position;
+        size_t new_position = file->position;
         switch (whence) {
             case VFS_SEEK_CUR:
                 new_position = file->position + offset;
