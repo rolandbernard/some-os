@@ -5,10 +5,12 @@
 #include <stdint.h>
 
 #include "error/error.h"
+#include "util/spinlock.h"
 #include "devices/serial/serial.h"
 
 typedef struct {
     volatile uint8_t* base_address;
+    SpinLock lock;
     bool initialized;
 } Uart16550;
 

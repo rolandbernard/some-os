@@ -2,8 +2,10 @@
 #include "devices/serial/uart16550.h"
 
 #include "error/log.h"
+#include "util/spinlock.h"
 
 Error initUart16550(Uart16550* uart) {
+    lockSpinLock(&uart->lock);
     if (!uart->initialized) {
         // Set the word length to 8-bits by writing 1 into LCR[1:0]
         uart->base_address[3] = (1 << 0) | (1 << 1);
@@ -23,32 +25,42 @@ Error initUart16550(Uart16550* uart) {
 
         uart->initialized = true;
 
+        unlockSpinLock(&uart->lock);
         KERNEL_LOG("[>] Initialized UART device");
+    } else {
+        unlockSpinLock(&uart->lock);
     }
     return simpleError(SUCCESS);
 }
 
 Error writeUart16550(Uart16550* uart, char value) {
+    lockSpinLock(&uart->lock);
     if (uart->initialized) {
         // Write directly to MMIO
         uart->base_address[0] = value;
+        unlockSpinLock(&uart->lock);
         return simpleError(SUCCESS);
     } else {
+        unlockSpinLock(&uart->lock);
         return someError(NOT_INITIALIZED, "Uart16550 is not initialized");
     }
 }
 
 Error readUart16550(Uart16550* uart, char* value) {
+    lockSpinLock(&uart->lock);
     if (uart->initialized) {
         if ((uart->base_address[5] & 0x1) == 0) {
             // Data Ready == 0 => No data is available
+            unlockSpinLock(&uart->lock);
             return simpleError(NO_DATA);
         } else {
             // Data is available
             *value = uart->base_address[0];
+            unlockSpinLock(&uart->lock);
             return simpleError(SUCCESS);
         }
     } else {
+        unlockSpinLock(&uart->lock);
         return someError(NOT_INITIALIZED, "Uart16550 is not initialized");
     }
 }
