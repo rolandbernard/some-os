@@ -6,7 +6,9 @@
 
 #include "error/log.h"
 #include "devices/devices.h"
+#include "interrupt/com.h"
 #include "interrupt/syscall.h"
+#include "interrupt/trap.h"
 #include "process/harts.h"
 #include "process/process.h"
 #include "process/schedule.h"
@@ -48,9 +50,13 @@ void kernelInit() {
     } else {
         KERNEL_LOG("[+] Filesystem initialized");
     }
-
     enqueueProcess(createKernelProcess(kernelMain, DEFAULT_PRIORITY, HART_STACK_SIZE));
-    runNextProcess();
+
+    sendMachineSoftwareInterrupt(0);
+
+    for (;;) {
+        waitForInterrupt();
+    }
 }
 
 void kernelMain() {

@@ -7,7 +7,7 @@
 #define IDLE_STACK_SIZE 64
 
 // Create and set a hart frame for the executing hart
-HartFrame* setupHartFrame();
+HartFrame* setupHartFrame(int hartid);
 
 TrapFrame* readSscratch();
 

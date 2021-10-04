@@ -20,12 +20,12 @@ Error initAllSystems() {
     return simpleError(SUCCESS);
 }
 
-void initHart() {
+void initHart(int hartid) {
     initTraps();
 }
 
 void initPrimaryHart() {
-    setupHartFrame();
+    setupHartFrame(0);
 }
 
 void initHarts() {

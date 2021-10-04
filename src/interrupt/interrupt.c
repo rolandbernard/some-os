@@ -5,6 +5,7 @@
 #include "devices/devices.h"
 #include "error/log.h"
 #include "error/panic.h"
+#include "interrupt/com.h"
 #include "interrupt/plic.h"
 #include "interrupt/syscall.h"
 #include "interrupt/timer.h"
@@ -51,6 +52,7 @@ const char* getCauseString(bool interrupt, int code) {
 void machineTrap(uintptr_t cause, uintptr_t pc, uintptr_t val, uintptr_t scratch) {
     bool interrupt = (uintptr_t)cause >> (sizeof(uintptr_t) * 8 - 1);
     int code = (uintptr_t)cause & 0xff;
+    // TODO: Wakeup
     KERNEL_LOG("[!] Unhandled machine trap: %p %p %p %s", pc, val, scratch, getCauseString(interrupt, code));
     panic();
 }
@@ -70,6 +72,11 @@ void kernelTrap(uintptr_t cause, uintptr_t pc, uintptr_t val, TrapFrame* frame) 
         if (interrupt) {
             frame->pc = pc;
             switch (code) {
+                case 0: // Software interrupt U-mode
+                case 1: // Software interrupt S-mode
+                case 3: // Software interrupt M-mode
+                    handleMachineSoftwareInterrupt();
+                    break;
                 case 4: // Timer interrupt U-mode
                 case 5: // Timer interrupt S-mode
                 case 7: // Timer interrupt M-mode

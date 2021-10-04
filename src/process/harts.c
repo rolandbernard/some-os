@@ -11,7 +11,7 @@
 extern void __global_pointer;
 extern void __stack_top;
 
-static SpinLock hart_lock;
+static SpinLock hart_lock = 0;
 HartFrame* harts_head = NULL; // This will be a circular linked list
 HartFrame* harts_tail = NULL;
 
@@ -21,7 +21,7 @@ static void idle() {
     }
 }
 
-HartFrame* setupHartFrame() {
+HartFrame* setupHartFrame(int hartid) {
     HartFrame* existing = getCurrentHartFrame();
     if (existing == NULL) {
         HartFrame* hart = zalloc(sizeof(HartFrame));
@@ -33,13 +33,18 @@ HartFrame* setupHartFrame() {
         }
         harts_tail->next = hart;
         unlockSpinLock(&hart_lock); 
-        // Stack_top should be changed for all but the primary hart
-        hart->stack_top = &__stack_top;
-        initTrapFrame(&hart->frame, (uintptr_t)&__stack_top, (uintptr_t)&__global_pointer, 0, 0, kernel_page_table);
+        if (hartid == 0) {
+            hart->stack_top = &__stack_top;
+        } else {
+            hart->stack_top = kalloc(HART_STACK_SIZE);
+        }
+        initTrapFrame(&hart->frame, (uintptr_t)hart->stack_top, (uintptr_t)&__global_pointer, 0, 0, kernel_page_table);
         writeSscratch(&hart->frame);
         hart->idle_process = createKernelProcess(idle, LOWEST_PRIORITY, IDLE_STACK_SIZE); // Every hart needs an idle process
+        hart->hartid = hartid;
         return hart;
     } else {
+        existing->hartid = hartid;
         return existing;
     }
 }

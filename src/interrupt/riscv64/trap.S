@@ -35,7 +35,7 @@ initTraps:
 
 // Write to the supervisor interrupt enable register
 enableInterrupts:
-    csrrsi zero, sstatus, 1 << 1 # Directly enable interrupts
+    csrrsi zero, sstatus, 1 << 1 # Directly enable interrupts (SIE)
     ret
 
 # Enter as user using trap frame in a0
@@ -124,6 +124,9 @@ kernelTrapVector:
 .endr
     mv a3, x31
     ld t0, 0(x31)
+    bnez t0, 3f
+    mv t0, a3
+3:
     csrrw x31, sscratch, t0
     save_gp 31 a3
     csrr t1, sepc

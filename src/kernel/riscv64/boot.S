@@ -11,6 +11,7 @@ _start:
     la t0, machineTrapVector
     csrw mtvec, t0
     csrw mie, zero
+    csrw sscratch, zero
 
     # Go into infinite loop with all but one hart
     csrr t0, mhartid
@@ -36,8 +37,12 @@ _start:
     la ra, 1f 
     mret
 
-    # Infinite loop
 1:
+    # Enable only software interrupts
+    csrrsi zero, mie, 1 << 3
+    csrrsi zero, mstatus, 1 << 3
+    # Infinite loop
+2:
     wfi
     j 1b
 
