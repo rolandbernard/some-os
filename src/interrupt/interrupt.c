@@ -52,7 +52,9 @@ const char* getCauseString(bool interrupt, int code) {
 void machineTrap(uintptr_t cause, uintptr_t pc, uintptr_t val, uintptr_t scratch) {
     bool interrupt = (uintptr_t)cause >> (sizeof(uintptr_t) * 8 - 1);
     int code = (uintptr_t)cause & 0xff;
-    // TODO: Wakeup
+    if (interrupt && (code == 0 || code == 1 || code == 3)) {
+        handleMachineSoftwareInterrupt();
+    }
     KERNEL_LOG("[!] Unhandled machine trap: %p %p %p %s", pc, val, scratch, getCauseString(interrupt, code));
     panic();
 }

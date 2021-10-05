@@ -12,6 +12,8 @@ extern int hart_ids[];
 
 void registerHart(int hartid);
 
+int hartIdToIndex(int hartid);
+
 // Create and set a hart frame for the executing hart
 HartFrame* setupHartFrame(int hartid);
 
@@ -20,6 +22,10 @@ TrapFrame* readSscratch();
 void writeSscratch(TrapFrame* frame);
 
 HartFrame* getCurrentHartFrame();
+
+int readMhartid();
+
+int getCurrentHartId();
 
 void* getKernelGlobalPointer();
 

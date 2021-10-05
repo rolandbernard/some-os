@@ -21,6 +21,9 @@ Error initAllSystems() {
 }
 
 void initHart(int hartid) {
+    KERNEL_LOG("Init hart %i", hartid);
+    setupHartFrame(hartid);
+    KERNEL_LOG("Hart frame %p", getCurrentHartFrame());
     initTraps();
 }
 

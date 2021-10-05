@@ -202,7 +202,6 @@ void deallocProcess(Process* process) {
 }
 
 void enterProcess(Process* process) {
-    initTimerInterrupt();
     moveToSchedState(process, RUNNING);
     HartFrame* hart = getCurrentHartFrame();
     process->frame.hart = hart;

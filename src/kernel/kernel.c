@@ -53,13 +53,10 @@ void kernelInit() {
     enqueueProcess(createKernelProcess(kernelMain, DEFAULT_PRIORITY, HART_STACK_SIZE));
 
     // Wake up the remaining harts
-    for (int i = 1; i < hart_count; i++) {
-        sendMachineSoftwareInterrupt(hart_ids[i]);
-    }
+    sendMessageTo(1, INITIALIZE_HARTS, NULL);
 
-    for (;;) {
-        waitForInterrupt();
-    }
+    // Init the first timer interrupt
+    initTimerInterrupt();
 
     // Start running the main process
     runNextProcess();

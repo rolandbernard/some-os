@@ -26,6 +26,15 @@ static void idle() {
 int hart_count = 1;
 int hart_ids[MAX_HART_COUNT];
 
+int hartIdToIndex(int hartid) {
+    for (int i = 0; i < hart_count; i++) {
+        if (hart_ids[i] == hartid) {
+            return i;
+        }
+    }
+    return hart_count;
+}
+
 HartFrame* setupHartFrame(int hartid) {
     HartFrame* existing = getCurrentHartFrame();
     if (existing == NULL) {
@@ -69,6 +78,15 @@ Process* getCurrentProcess() {
         return (Process*)frame;
     } else {
         return NULL;
+    }
+}
+
+int getCurrentHartId() {
+    HartFrame* frame = getCurrentHartFrame();
+    if (frame != NULL) {
+        return frame->hartid;
+    } else {
+        return readMhartid();
     }
 }
 
