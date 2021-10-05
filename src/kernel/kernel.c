@@ -52,11 +52,17 @@ void kernelInit() {
     }
     enqueueProcess(createKernelProcess(kernelMain, DEFAULT_PRIORITY, HART_STACK_SIZE));
 
-    sendMachineSoftwareInterrupt(0);
+    // Wake up the remaining harts
+    for (int i = 1; i < hart_count; i++) {
+        sendMachineSoftwareInterrupt(hart_ids[i]);
+    }
 
     for (;;) {
         waitForInterrupt();
     }
+
+    // Start running the main process
+    runNextProcess();
 }
 
 void kernelMain() {
@@ -67,7 +73,7 @@ void kernelMain() {
         KERNEL_LOG("[!] Failed to mount root filesystem: %s", getErrorKindMessage(-res));
     } else {
         res = syscall(SYSCALL_EXECVE, "/bin/init", NULL, NULL);
-        // If we continue, there must me an error
+        // If we continue, there must be an error
         KERNEL_LOG("[!] Failed to start init process: %s", getErrorKindMessage(-res));
     }
     panic();

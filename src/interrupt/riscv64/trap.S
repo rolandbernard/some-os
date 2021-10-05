@@ -141,7 +141,8 @@ kernelTrapVector:
 1:
     mv a3, zero
     la gp, __global_pointer
-    la sp, __stack_top
+    jal getHartStack
+    mv sp, a0
 2:
     csrr a0, scause
     csrr a1, sepc
