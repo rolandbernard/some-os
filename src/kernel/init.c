@@ -21,17 +21,14 @@ Error initAllSystems() {
 }
 
 void initHart(int hartid) {
-    KERNEL_LOG("Init hart %i", hartid);
     setupHartFrame(hartid);
-    KERNEL_LOG("Hart frame %p", getCurrentHartFrame());
     initTraps();
+    initTimerInterrupt();
+    KERNEL_LOG("[+] Initialized hart %i", hartid);
 }
 
 void initPrimaryHart() {
     setupHartFrame(0);
-}
-
-void initHarts() {
-    // TODO:
+    KERNEL_LOG("[+] Initialized hart 0");
 }
 

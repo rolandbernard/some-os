@@ -18,7 +18,6 @@ waitForInterrupt:
 initTraps:
     la t0, kernelTrapVector
     csrw stvec, t0
-    csrw sscratch, zero
     # Delagate all exceptions and interrupts
     li t0, 0xffff
     # NOTE: Delegation disabled for now.

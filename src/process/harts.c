@@ -39,6 +39,10 @@ HartFrame* setupHartFrame(int hartid) {
     HartFrame* existing = getCurrentHartFrame();
     if (existing == NULL) {
         HartFrame* hart = zalloc(sizeof(HartFrame));
+        hart->stack_top = kalloc(HART_STACK_SIZE) + HART_STACK_SIZE;
+        initTrapFrame(&hart->frame, (uintptr_t)hart->stack_top, (uintptr_t)&__global_pointer, 0, 0, kernel_page_table);
+        hart->idle_process = createKernelProcess(idle, LOWEST_PRIORITY, IDLE_STACK_SIZE); // Every hart needs an idle process
+        hart->hartid = hartid;
         lockSpinLock(&hart_lock); 
         hart->next = harts_head;
         harts_head = hart;
@@ -46,12 +50,8 @@ HartFrame* setupHartFrame(int hartid) {
             harts_tail = hart;
         }
         harts_tail->next = hart;
-        unlockSpinLock(&hart_lock); 
-        hart->stack_top = kalloc(HART_STACK_SIZE) + HART_STACK_SIZE;
-        initTrapFrame(&hart->frame, (uintptr_t)hart->stack_top, (uintptr_t)&__global_pointer, 0, 0, kernel_page_table);
         writeSscratch(&hart->frame);
-        hart->idle_process = createKernelProcess(idle, LOWEST_PRIORITY, IDLE_STACK_SIZE); // Every hart needs an idle process
-        hart->hartid = hartid;
+        unlockSpinLock(&hart_lock); 
         return hart;
     } else {
         existing->hartid = hartid;

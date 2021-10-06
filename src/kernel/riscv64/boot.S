@@ -15,19 +15,19 @@ _start:
     csrw mie, zero
     csrw sscratch, zero
 
-    # Go into infinite loop with all but one hart
-    csrr t0, mhartid
-    bnez t0, 1f
-
-    # Init traps for the first hart
-    jal initTraps
-
     # Disable address translation
     csrw satp, zero
     # Give S and U mode access to memory
     csrw pmpcfg0, 0xF
     li t0, -1
     csrw pmpaddr0, t0
+
+    # Go into infinite loop with all but one hart
+    csrr t0, mhartid
+    bnez t0, 1f
+
+    # Init traps for the first hart
+    jal initTraps
 
     # Enter the kernel in S mode and enable FPU
     li t0, 0b11 << 11 | 0b11 << 13

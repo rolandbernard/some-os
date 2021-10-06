@@ -9,6 +9,7 @@
 #include "memory/kalloc.h"
 #include "memory/memmap.h"
 #include "util/spinlock.h"
+#include "process/harts.h"
 
 #define MIN_TIME (CLOCKS_PER_SEC / 100)
 
@@ -58,7 +59,7 @@ void clearTimeout(Timeout timeout) {
 }
 
 void setTimeCmp(Time time) {
-    *(volatile Time*)(memory_map[VIRT_CLINT].base + 0x4000) = time;
+    *(volatile Time*)(memory_map[VIRT_CLINT].base + 0x4000 + 8 * getCurrentHartId()) = time;
 }
 
 void initTimerInterrupt() {

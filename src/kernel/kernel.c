@@ -50,14 +50,13 @@ void kernelInit() {
     } else {
         KERNEL_LOG("[+] Filesystem initialized");
     }
+
+    // Enqueue main process to start the init process
     enqueueProcess(createKernelProcess(kernelMain, DEFAULT_PRIORITY, HART_STACK_SIZE));
-
     // Wake up the remaining harts
-    sendMessageTo(1, INITIALIZE_HARTS, NULL);
-
-    // Init the first timer interrupt
+    sendMessageToAll(INITIALIZE_HARTS, NULL);
+    // Init the timer interrupts
     initTimerInterrupt();
-
     // Start running the main process
     runNextProcess();
 }

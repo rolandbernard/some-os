@@ -54,8 +54,10 @@ void handleMessage(MessageType type, void* data) {
     } else if (type == NONE || type == YIELD_PROCESS) {
         unlockSpinLock(&message_read_lock);
         // Do nothing, the point was to preempt the running process
-    } else {
+    } else if (type == KERNEL_PANIC) {
         unlockSpinLock(&message_read_lock);
+        silentPanic();
+    } else {
         panic();
     }
 }

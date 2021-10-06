@@ -6,4 +6,6 @@
 // Terminate the kernel
 noreturn void panic();
 
+noreturn void silentPanic();
+
 #endif

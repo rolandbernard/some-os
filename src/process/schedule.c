@@ -102,7 +102,7 @@ Process* pullProcessForHart(HartFrame* hart) {
         if (process != NULL) {
             return process;
         } else {
-            current = hart->next;
+            current = current->next;
         }
     } while (current != hart);
     return hart->idle_process;

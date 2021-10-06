@@ -7,6 +7,10 @@
 noreturn void panic() {
     KERNEL_LOG("[!] Kernel panic!");
     sendMessageToAll(KERNEL_PANIC, NULL);
+    silentPanic();
+}
+
+noreturn void silentPanic() {
     for (;;) {
         // Infinite loop after panic
         waitForInterrupt();
