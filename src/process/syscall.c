@@ -14,6 +14,7 @@
 #include "process/process.h"
 #include "process/syscall.h"
 #include "process/schedule.h"
+#include "process/signals.h"
 #include "process/types.h"
 #include "util/util.h"
 
@@ -175,6 +176,43 @@ void waitSyscall(bool is_kernel, TrapFrame* frame, SyscallArgs args) {
     assert(frame->hart != NULL);
     Process* process = (Process*)frame;
     executeProcessWait(process);
+}
+
+typedef struct {
+    uintptr_t handler;
+    uintptr_t sigaction; // These three are unused currently
+    int mask;
+    int flags;
+    uintptr_t restorer;
+} SignalAction;
+
+void sigactionSyscall(bool is_kernel, TrapFrame* frame, SyscallArgs args) {
+    assert(frame->hart != NULL);
+    Process* process = (Process*)frame;
+    // TODO
+}
+
+void sigreturnSyscall(bool is_kernel, TrapFrame* frame, SyscallArgs args) {
+    assert(frame->hart != NULL);
+    Process* process = (Process*)frame;
+    // TODO
+}
+
+int killSyscallCallback(Process* process, void* udata) {
+    Process* proc = (Process*)udata;
+    if (proc->resources.uid == 0 || process->resources.uid == proc->resources.uid) {
+        addSignalToProcess(process, proc->frame.regs[REG_ARGUMENT_2]);
+        return 0;
+    } else {
+        return -FORBIDDEN;
+    }
+}
+
+void killSyscall(bool is_kernel, TrapFrame* frame, SyscallArgs args) {
+    assert(frame->hart != NULL);
+    Process* process = (Process*)frame;
+    int pid = args[0];
+    process->frame.regs[REG_ARGUMENT_0] = doForProcessWithPid(pid, killSyscallCallback, process);
 }
 
 void exit() {

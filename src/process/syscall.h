@@ -17,6 +17,12 @@ void getppidSyscall(bool is_kernel, TrapFrame* frame, SyscallArgs args);
 
 void waitSyscall(bool is_kernel, TrapFrame* frame, SyscallArgs args);
 
+void sigactionSyscall(bool is_kernel, TrapFrame* frame, SyscallArgs args);
+
+void sigreturnSyscall(bool is_kernel, TrapFrame* frame, SyscallArgs args);
+
+void killSyscall(bool is_kernel, TrapFrame* frame, SyscallArgs args);
+
 void exit();
 
 #endif

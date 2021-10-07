@@ -7,8 +7,6 @@
 #include "error/error.h"
 #include "process/types.h"
 
-extern SpinLock process_lock;
-
 void initTrapFrame(TrapFrame* frame, uintptr_t sp, uintptr_t gp, uintptr_t pc, uintptr_t asid, PageTable* table);
 
 Process* createKernelProcess(void* start, Priority priority, size_t stack_size);
@@ -30,5 +28,9 @@ void enterProcess(Process* process);
 void dumpProcessInfo(Process* process);
 
 void executeProcessWait(Process* process);
+
+typedef int (*ProcessFindCallback)(Process* process, void* udata);
+
+int doForProcessWithPid(int pid, ProcessFindCallback callback, void* udata);
 
 #endif

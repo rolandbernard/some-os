@@ -239,3 +239,16 @@ void dumpProcessInfo(Process* process) {
     }
 }
 
+int doForProcessWithPid(int pid, ProcessFindCallback callback, void* udata) {
+    lockSpinLock(&process_lock);
+    Process* current = global_first;
+    while (current != NULL) {
+        if (current->pid == pid) {
+            return callback(current, udata);
+        }
+        current = current->tree.global_next;
+    }
+    unlockSpinLock(&process_lock);
+    return -ILLEGAL_ARGUMENTS;
+}
+
