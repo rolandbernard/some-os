@@ -144,31 +144,31 @@ Pid allocateNewPid() {
 
 Process* createUserProcess(uintptr_t sp, uintptr_t gp, uintptr_t pc, Process* parent, Priority priority) {
     Process* process = zalloc(sizeof(Process));
-    assert(process != NULL);
-    process->pid = allocateNewPid();
-    process->memory.table = createPageTable();
-    process->memory.stack = NULL;
-    process->sched.priority = priority;
-    process->sched.state = ENQUEUEABLE;
-    process->tree.parent = parent;
-    initTrapFrame(&process->frame, sp, gp, pc, process->pid, process->memory.table);
-    registerProcess(process);
+    if (process != NULL) {
+        process->pid = allocateNewPid();
+        process->memory.table = createPageTable();
+        process->memory.stack = NULL;
+        process->sched.priority = priority;
+        process->sched.state = ENQUEUEABLE;
+        process->tree.parent = parent;
+        initTrapFrame(&process->frame, sp, gp, pc, process->pid, process->memory.table);
+        registerProcess(process);
+    }
     return process;
 }
 
 Process* createChildUserProcess(Process* parent) {
     Process* process = zalloc(sizeof(Process));
-    assert(process != NULL);
-    process->pid = allocateNewPid();
-    process->memory.table = createPageTable();
-    process->memory.stack = NULL;
-    process->sched.priority = parent->sched.priority;
-    process->sched.state = ENQUEUEABLE;
-    process->tree.parent = parent;
-    initTrapFrame(&process->frame, 0, 0, parent->frame.pc, process->pid, process->memory.table);
-    memcpy(&process->frame.fregs, &parent->frame.fregs, sizeof(parent->frame.fregs));
-    memcpy(&process->frame.regs, &parent->frame.regs, sizeof(parent->frame.regs));
-    registerProcess(process);
+    if (process != NULL) {
+        process->pid = allocateNewPid();
+        process->memory.table = createPageTable();
+        process->memory.stack = NULL;
+        process->sched.priority = parent->sched.priority;
+        process->sched.state = ENQUEUEABLE;
+        process->tree.parent = parent;
+        initTrapFrame(&process->frame, 0, 0, 0, process->pid, process->memory.table);
+        registerProcess(process);
+    }
     return process;
 }
 

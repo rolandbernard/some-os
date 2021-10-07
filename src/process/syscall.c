@@ -86,7 +86,17 @@ void forkSyscall(bool is_kernel, TrapFrame* frame, SyscallArgs args) {
         enqueueProcess(new_process);
     } else {
         Process* new_process = createChildUserProcess(process);
-        if (copyAllPagesAndAllocUsers(new_process->memory.table, process->memory.table)) {
+        if (new_process != NULL && copyAllPagesAndAllocUsers(new_process->memory.table, process->memory.table)) {
+            // Copy frame
+            new_process->frame.pc = process->frame.pc;
+            memcpy(&new_process->frame.regs, &process->frame.regs, sizeof(process->frame.regs));
+            memcpy(&new_process->frame.fregs, &process->frame.fregs, sizeof(process->frame.fregs));
+            // Copy signal data
+            memcpy(&new_process->signals, &process->signals, sizeof(ProcessSignals));
+            // Adjust the signals suspended frames satp
+            new_process->signals.suspended.satp = satpForMemory(new_process->pid, new_process->memory.table);
+            new_process->signals.lock = false;
+            // Copy files
             size_t fd_count = process->resources.fd_count;
             new_process->resources.uid = process->resources.uid;
             new_process->resources.gid = process->resources.gid;

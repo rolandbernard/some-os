@@ -176,18 +176,27 @@ typedef enum {
     SIGLOST,
     SIGSYS,
     SIGUNUSED = SIGSYS,
+    SIG_COUNT,
 } Signal;
 
 typedef struct {
+    uintptr_t handler;
+    uintptr_t restorer;
+} SignalHandler;
+
+typedef struct {
+    SpinLock lock; // Signals can be sent by other processes, so we need a lock
     size_t signal_count;
     Signal* signals;
     bool in_handler;
+    uintptr_t stack; // If null don't change the stack, otherwise indicate stack top
+    TrapFrame suspended;
+    SignalHandler handlers[SIG_COUNT];
 } ProcessSignals;
 
 typedef struct Process_s {
     TrapFrame frame;
     Pid pid;
-    SpinLock lock;
     int status; // This is the status returned from wait
     ProcessTree tree;
     ProcessScheduling sched;
