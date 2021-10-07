@@ -136,14 +136,64 @@ typedef struct {
     struct Process_s* global_prev;
 } ProcessTree;
 
+// Most of these are actually never used
+typedef enum {
+    SIGHUP = 1,
+    SIGINT,
+    SIGQUIT,
+    SIGILL,
+    SIGTRAP,
+    SIGABRT,
+    SIGIOT = SIGABRT,
+    SIGBUS,
+    SIGEMT,
+    SIGFPE,
+    SIGKILL,
+    SIGUSR1,
+    SIGSEGV,
+    SIGUSR2,
+    SIGPIPE,
+    SIGALRM,
+    SIGTERM,
+    SIGSTKFLT,
+    SIGCHLD,
+    SIGCLD = SIGCHLD,
+    SIGCONT,
+    SIGSTOP,
+    SIGTSTP,
+    SIGTTIN,
+    SIGTTOU,
+    SIGURG,
+    SIGXCPU,
+    SIGXFSZ,
+    SIGVTALRM,
+    SIGPROF,
+    SIGWINCH,
+    SIGIO,
+    SIGPOLL = SIGIO,
+    SIGPWR,
+    SIGINFO = SIGPWR,
+    SIGLOST,
+    SIGSYS,
+    SIGUNUSED = SIGSYS,
+} Signal;
+
+typedef struct {
+    size_t signal_count;
+    Signal* signals;
+    bool in_handler;
+} ProcessSignals;
+
 typedef struct Process_s {
     TrapFrame frame;
     Pid pid;
+    SpinLock lock;
     int status; // This is the status returned from wait
     ProcessTree tree;
     ProcessScheduling sched;
     ProcessMemory memory;
     ProcessResources resources;
+    ProcessSignals signals;
 } Process;
 
 #endif
