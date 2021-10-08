@@ -194,11 +194,11 @@ typedef enum {
 } Signal;
 
 typedef struct {
-    uintptr_t handler;
-    uintptr_t sigaction;
+    void (*handler)(int sig);
+    void* sigaction;
     int mask;
     int flags;
-    uintptr_t restorer;
+    void (*restorer)();
 } SigAction;
 
 int syscall_sigaction(int signal, const SigAction* new, SigAction* old);

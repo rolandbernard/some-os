@@ -108,6 +108,7 @@ void kernelTrap(uintptr_t cause, uintptr_t pc, uintptr_t val, TrapFrame* frame) 
                         KERNEL_LOG("[!] Unhandled exception: %p %p %p %s", pc, val, frame, getCauseString(interrupt, code));
                         panic();
                     } else {
+                        KERNEL_LOG("[!] Segmentation fault: %p %p %p %s", pc, val, frame, getCauseString(interrupt, code));
                         Process* process = (Process*)frame;
                         addSignalToProcess(process, SIGSEGV);
                     }

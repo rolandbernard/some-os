@@ -25,9 +25,34 @@ void itoa(char* dest, long num) {
     dest[idx] = 0;
 }
 
+volatile bool cont = false;
+
+void child() {
+    void* data = syscall_sbrk(128);
+    int status;
+    int pid = syscall_wait(0, &status);
+    syscall_print("PARENT of ");
+    itoa((char*)data, pid);
+    syscall_print((char*)data);
+    syscall_print(" state ");
+    itoa((char*)data, status);
+    syscall_print((char*)data);
+    syscall_print("\n");
+    cont = true;
+}
+
+void sigret() {
+    syscall_sigreturn();
+}
+
 int main(int argc, char* argv[], char* env[]) {
     void* data = syscall_sbrk(128);
     DirectoryEntry* entry = (DirectoryEntry*)data;
+    SigAction action = {
+        .handler = child,
+        .restorer = sigret,
+    };
+    syscall_sigaction(SIGCHLD, &action, NULL);
     int pid = syscall_fork();
     if (pid == 0) {
         syscall_print("CHILD\n");
@@ -41,17 +66,8 @@ int main(int argc, char* argv[], char* env[]) {
         itoa((char*)data, pid);
         syscall_print((char*)data);
         syscall_print("\n");
-        syscall_kill(syscall_getpid(), SIGKILL);
     } else {
-        int status;
-        pid = syscall_wait(0, &status);
-        syscall_print("PARENT of ");
-        itoa((char*)data, pid);
-        syscall_print((char*)data);
-        syscall_print(" state ");
-        itoa((char*)data, status);
-        syscall_print((char*)data);
-        syscall_print("\n");
+        while (!cont) {};
         int fd = syscall_open("/test", FILE_OPEN_DIRECTORY, 0);
         while ((int)syscall_readdir(fd, entry, 512) > 0) {
             syscall_print("Entry: ");

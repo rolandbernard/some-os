@@ -16,7 +16,7 @@ void addSignalToProcess(Process* process, Signal signal) {
     unlockSpinLock(&process->signals.lock);
 }
 
-static void handleActualSignal(Process* process, int signal) {
+static void handleActualSignal(Process* process, Signal signal) {
     if (signal == SIGKILL || signal == SIGSTOP) {
         // We don't actually have a stop at the moment
         process->status = (process->status & ~0xff00) | ((signal & 0xff) << 8);
@@ -53,6 +53,7 @@ static void handleActualSignal(Process* process, int signal) {
 void handlePendingSignals(Process* process) {
     lockSpinLock(&process->signals.lock);
     if (!process->signals.in_handler) {
+        // TODO: enable nested signal handler -> store on user stack?
         if (process->signals.signal_count != 0) {
             Signal sig = process->signals.signals[0];
             process->signals.signal_count--;

@@ -189,7 +189,7 @@ typedef struct {
 void sigactionSyscall(bool is_kernel, TrapFrame* frame, SyscallArgs args) {
     assert(frame->hart != NULL);
     Process* process = (Process*)frame;
-    int sig = args[0];
+    Signal sig = args[0];
     if (sig >= SIG_COUNT || sig == 0) {
         process->frame.regs[REG_ARGUMENT_0] = -ILLEGAL_ARGUMENTS;
     } else {
@@ -203,7 +203,9 @@ void sigactionSyscall(bool is_kernel, TrapFrame* frame, SyscallArgs args) {
         };
         VirtPtr new = virtPtrFor(args[1], process->memory.table);
         VirtPtr old = virtPtrFor(args[2], process->memory.table);
-        memcpyBetweenVirtPtr(old, virtPtrForKernel(&sigaction), sizeof(SignalAction));
+        if (old.address != 0) {
+            memcpyBetweenVirtPtr(old, virtPtrForKernel(&sigaction), sizeof(SignalAction));
+        }
         if (new.address != 0) {
             memcpyBetweenVirtPtr(virtPtrForKernel(&sigaction), new, sizeof(SignalAction));
             process->signals.handlers[sig].handler = sigaction.handler;
