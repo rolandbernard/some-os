@@ -41,6 +41,7 @@ int main(int argc, char* argv[], char* env[]) {
         itoa((char*)data, pid);
         syscall_print((char*)data);
         syscall_print("\n");
+        syscall_kill(syscall_getpid(), SIGKILL);
     } else {
         int status;
         pid = syscall_wait(0, &status);

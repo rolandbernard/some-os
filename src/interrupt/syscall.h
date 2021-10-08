@@ -31,6 +31,9 @@ typedef enum {
     SYSCALL_WAIT = 24,
     SYSCALL_SBRK = 25,
     SYSCALL_PROTECT = 26,
+    SYSCALL_SIGACTION = 27,
+    SYSCALL_SIGRETURN = 28,
+    SYSCALL_KILL = 29,
 } Syscalls;
 
 // Simple wrapper around ecall

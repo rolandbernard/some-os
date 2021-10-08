@@ -16,6 +16,7 @@
 #include "process/harts.h"
 #include "process/process.h"
 #include "process/schedule.h"
+#include "process/signals.h"
 #include "process/syscall.h"
 #include "process/types.h"
 #include "util/spinlock.h"
@@ -40,7 +41,7 @@ void initTrapFrame(TrapFrame* frame, uintptr_t sp, uintptr_t gp, uintptr_t pc, u
     frame->satp = satpForMemory(asid, table);
 }
 
-void executeProcessWait(Process* process) {
+static bool basicProcessWait(Process* process) {
     int wait_pid = process->frame.regs[REG_ARGUMENT_1];
     for (size_t i = 0; i < process->tree.wait_count; i++) {
         if (wait_pid == 0 || wait_pid == process->tree.waits[i].pid) {
@@ -51,12 +52,26 @@ void executeProcessWait(Process* process) {
             process->frame.regs[REG_ARGUMENT_0] = process->tree.waits[i].pid;
             process->tree.wait_count--;
             memmove(process->tree.waits + i, process->tree.waits + i + 1, process->tree.wait_count - i);
-            moveToSchedState(process, ENQUEUEABLE);
-            enqueueProcess(process);
-            return;
+            return true;
         }
     }
-    moveToSchedState(process, WAIT_CHLD);
+    return false;
+}
+
+void finalProcessWait(Process* process) {
+    // Called before waking up the process
+    if (!basicProcessWait(process)) {
+        process->frame.regs[REG_ARGUMENT_0] = -INTERRUPTED;;
+    }
+}
+
+void executeProcessWait(Process* process) {
+    if (basicProcessWait(process)) {
+        moveToSchedState(process, ENQUEUEABLE);
+        enqueueProcess(process);
+    } else {
+        moveToSchedState(process, WAIT_CHLD);
+    }
 }
 
 static void registerProcess(Process* process) {
@@ -93,9 +108,7 @@ static void unregisterProcess(Process* process) {
         };
         parent->tree.waits[parent->tree.wait_count + process->tree.wait_count] = new_entry;
         parent->tree.wait_count = size;
-        if (parent->sched.state == WAIT_CHLD) {
-            executeProcessWait(parent);
-        }
+        addSignalToProcess(parent, SIGCHLD);
     }
     // Reparent children
     Process* child = process->tree.children;
@@ -208,10 +221,16 @@ void enterProcess(Process* process) {
     if (hart != NULL) {
         hart->frame.regs[REG_STACK_POINTER] = (uintptr_t)hart->stack_top;
     }
-    if (process->pid == 0) {
-        enterKernelMode(&process->frame);
+    handlePendingSignals(process);
+    if (process->sched.state == RUNNING) {
+        if (process->pid == 0) {
+            enterKernelMode(&process->frame);
+        } else {
+            enterUserMode(&process->frame);
+        }
     } else {
-        enterUserMode(&process->frame);
+        enqueueProcess(process);
+        runNextProcess();
     }
 }
 
@@ -244,6 +263,7 @@ int doForProcessWithPid(int pid, ProcessFindCallback callback, void* udata) {
     Process* current = global_first;
     while (current != NULL) {
         if (current->pid == pid) {
+            unlockSpinLock(&process_lock);
             return callback(current, udata);
         }
         current = current->tree.global_next;

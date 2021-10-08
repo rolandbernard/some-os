@@ -3,7 +3,9 @@
 
 #include "process/signals.h"
 
+#include "error/log.h"
 #include "memory/kalloc.h"
+#include "process/schedule.h"
 
 void addSignalToProcess(Process* process, Signal signal) {
     lockSpinLock(&process->signals.lock);
@@ -15,12 +17,23 @@ void addSignalToProcess(Process* process, Signal signal) {
 }
 
 static void handleActualSignal(Process* process, int signal) {
+    if (signal == SIGKILL || signal == SIGSTOP) {
+        // We don't actually have a stop at the moment
+        process->status = (process->status & ~0xff00) | ((signal & 0xff) << 8);
+        moveToSchedState(process, TERMINATED);
+    }
     if (signal >= SIG_COUNT || signal == 0) {
         // This is an invalid signal, ignore for now
     } else if (process->signals.handlers[signal].handler == SIG_IGN) {
         // User wants this to be ignored
     } else if (process->signals.handlers[signal].handler == SIG_DFL) {
         // Execute default action
+        if (signal == SIGCHLD || signal == SIGURG || signal == SIGWINCH) {
+            // These are the only signals we ignore
+        } else {
+            process->status = (process->status & ~0xff00) | ((signal & 0xff) << 8);
+            moveToSchedState(process, TERMINATED);
+        }
     } else {
         // Otherwise enter the given signal handler
         // Copy the current trap frame (to be restored later)
@@ -54,7 +67,11 @@ void returnFromSignal(Process* process) {
     lockSpinLock(&process->signals.lock);
     if (process->signals.in_handler) {
         // Reload the original state
+        uintptr_t satp = process->frame.satp; // Keep satp and hart
+        HartFrame* hart = process->frame.hart;
         memcpy(&process->frame, &process->signals.suspended, sizeof(TrapFrame));
+        process->frame.satp = satp;
+        process->frame.hart = hart;
         process->signals.in_handler = false;
     } // If we are not in a handle do nothing
     unlockSpinLock(&process->signals.lock);

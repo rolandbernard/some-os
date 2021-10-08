@@ -41,6 +41,9 @@ SyscallFunction syscall_table[TABLE_SIZE] = {
     [SYSCALL_WAIT] = waitSyscall,
     [SYSCALL_SBRK] = sbrkSyscall,
     [SYSCALL_PROTECT] = protectSyscall,
+    [SYSCALL_SIGACTION] = sigactionSyscall,
+    [SYSCALL_SIGRETURN] = sigreturnSyscall,
+    [SYSCALL_KILL] = killSyscall,
 };
 
 void registerSyscall(int kind, SyscallFunction function) {
@@ -50,6 +53,7 @@ void registerSyscall(int kind, SyscallFunction function) {
 }
 
 void runSyscall(TrapFrame* frame, bool is_kernel) {
+    frame->pc += 4;
     uintptr_t kind = (uintptr_t)frame->regs[REG_ARGUMENT_0];
     if (kind < TABLE_SIZE && syscall_table[kind] != NULL) {
         syscall_table[kind](is_kernel, frame, &(frame->regs[REG_ARGUMENT_1]));

@@ -33,6 +33,9 @@ typedef enum {
     SYSCALL_WAIT = 24,
     SYSCALL_SBRK = 25,
     SYSCALL_PROTECT = 26,
+    SYSCALL_SIGACTION = 27,
+    SYSCALL_SIGRETURN = 28,
+    SYSCALL_KILL = 29,
 } Syscalls;
 
 uintptr_t make_syscall(
@@ -147,5 +150,61 @@ typedef enum {
 } SyscallProtect;
 
 int syscall_protect(void* addr, size_t len, SyscallProtect prot);
+
+typedef enum {
+    SIGHUP = 1,
+    SIGINT,
+    SIGQUIT,
+    SIGILL,
+    SIGTRAP,
+    SIGABRT,
+    SIGIOT = SIGABRT,
+    SIGBUS,
+    SIGEMT,
+    SIGFPE,
+    SIGKILL,
+    SIGUSR1,
+    SIGSEGV,
+    SIGUSR2,
+    SIGPIPE,
+    SIGALRM,
+    SIGTERM,
+    SIGSTKFLT,
+    SIGCHLD,
+    SIGCLD = SIGCHLD,
+    SIGCONT,
+    SIGSTOP,
+    SIGTSTP,
+    SIGTTIN,
+    SIGTTOU,
+    SIGURG,
+    SIGXCPU,
+    SIGXFSZ,
+    SIGVTALRM,
+    SIGPROF,
+    SIGWINCH,
+    SIGIO,
+    SIGPOLL = SIGIO,
+    SIGPWR,
+    SIGINFO = SIGPWR,
+    SIGLOST,
+    SIGSYS,
+    SIGUNUSED = SIGSYS,
+    SIG_COUNT,
+} Signal;
+
+typedef struct {
+    uintptr_t handler;
+    uintptr_t sigaction;
+    int mask;
+    int flags;
+    uintptr_t restorer;
+} SigAction;
+
+int syscall_sigaction(int signal, const SigAction* new, SigAction* old);
+
+int syscall_sigreturn();
+
+int syscall_kill(int pid, int signal);
 
 #endif

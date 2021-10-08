@@ -29,6 +29,8 @@ void dumpProcessInfo(Process* process);
 
 void executeProcessWait(Process* process);
 
+void finalProcessWait(Process* process);
+
 typedef int (*ProcessFindCallback)(Process* process, void* udata);
 
 int doForProcessWithPid(int pid, ProcessFindCallback callback, void* udata);

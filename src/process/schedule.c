@@ -24,11 +24,15 @@ static void addSleepingProcess(Process* process) {
 }
 
 static void awakenProcess(Process* process) {
-    Time time = getTime();
-    if (time >= process->sched.sleeping_until) {
-        process->frame.regs[REG_ARGUMENT_0] = 0;
-    } else {
-        process->frame.regs[REG_ARGUMENT_0] = process->sched.sleeping_until - time;
+    if (process->sched.state == SLEEPING) {
+        Time time = getTime();
+        if (time >= process->sched.sleeping_until) {
+            process->frame.regs[REG_ARGUMENT_0] = 0;
+        } else {
+            process->frame.regs[REG_ARGUMENT_0] = process->sched.sleeping_until - time;
+        }
+    } else if (process->sched.state == WAIT_CHLD) {
+        finalProcessWait(process);
     }
     moveToSchedState(process, ENQUEUEABLE);
     enqueueProcess(process);
@@ -39,7 +43,10 @@ static void awakenProcesses() {
     Time time = getTime();
     Process** current = &sleeping;
     while (*current != NULL) {
-        if ((*current)->sched.sleeping_until <= time) {
+        if (
+            (*current)->signals.signal_count > 0
+            || ((*current)->sched.state == SLEEPING && (*current)->sched.sleeping_until <= time)
+        ) {
             Process* process = *current;
             *current = (*current)->sched.sched_next;
             awakenProcess(process);
@@ -61,7 +68,7 @@ void enqueueProcess(Process* process) {
     if (hart->idle_process != process) { // Ignore the idle process
         if (process->sched.state == TERMINATED) {
             deallocProcess(process);
-        } else if (process->sched.state == SLEEPING) {
+        } else if (process->sched.state == SLEEPING || process->sched.state == WAIT_CHLD) {
             addSleepingProcess(process);
         } else if (process->sched.state == ENQUEUEABLE) {
             moveToSchedState(process, READY);

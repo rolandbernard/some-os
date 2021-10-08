@@ -18,6 +18,7 @@ typedef enum {
     UNSUPPORTED,
     WRONG_FILE_TYPE,
     FORBIDDEN,
+    INTERRUPTED,
 } ErrorKind;
 
 typedef struct {

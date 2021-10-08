@@ -127,3 +127,15 @@ int syscall_protect(void* addr, size_t len, SyscallProtect prot) {
     return SYSCALL(SYSCALL_PROTECT, (uintptr_t)addr, len, prot);
 }
 
+int syscall_sigaction(int signal, const SigAction* new, SigAction* old) {
+    return SYSCALL(SYSCALL_SIGACTION, signal, (uintptr_t)new, (uintptr_t)old);
+}
+
+int syscall_sigreturn() {
+    return SYSCALL(SYSCALL_SIGRETURN);
+}
+
+int syscall_kill(int pid, int signal) {
+    return SYSCALL(SYSCALL_KILL, pid, signal);
+}
+

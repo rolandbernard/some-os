@@ -13,6 +13,7 @@
 #include "memory/virtmem.h"
 #include "process/process.h"
 #include "process/schedule.h"
+#include "process/signals.h"
 
 const char* getCauseString(bool interrupt, int code) {
     if (interrupt) {
@@ -94,7 +95,6 @@ void kernelTrap(uintptr_t cause, uintptr_t pc, uintptr_t val, TrapFrame* frame) 
                     break;
             }
         } else {
-            frame->pc = pc + 4;
             switch (code) {
                 case 8: // Environment call from U-mode
                     runSyscall(frame, false);
@@ -108,10 +108,8 @@ void kernelTrap(uintptr_t cause, uintptr_t pc, uintptr_t val, TrapFrame* frame) 
                         KERNEL_LOG("[!] Unhandled exception: %p %p %p %s", pc, val, frame, getCauseString(interrupt, code));
                         panic();
                     } else {
-                        // TODO: segfault
-                        KERNEL_LOG("[!] Segmentation fault: %p %p %p %s", pc, val, frame, getCauseString(interrupt, code));
                         Process* process = (Process*)frame;
-                        moveToSchedState(process, TERMINATED);
+                        addSignalToProcess(process, SIGSEGV);
                     }
                     break;
             }

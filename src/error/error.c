@@ -32,6 +32,7 @@ const char* getErrorKindMessage(ErrorKind error) {
         case NO_SUCH_FILE: return "File not found";
         case WRONG_FILE_TYPE: return "Wrong file type";
         case FORBIDDEN: return "Permission denied";
+        case INTERRUPTED: return "Interrupted";
     }
     // Like default but we still get an warning for an incomplete switch
     return "Unknown?";

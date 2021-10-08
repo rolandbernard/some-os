@@ -180,7 +180,7 @@ void waitSyscall(bool is_kernel, TrapFrame* frame, SyscallArgs args) {
 
 typedef struct {
     uintptr_t handler;
-    uintptr_t sigaction; // These three are unused currently
+    uintptr_t sigaction; // sigaction, mask and flags are unused currently
     int mask;
     int flags;
     uintptr_t restorer;
@@ -189,13 +189,37 @@ typedef struct {
 void sigactionSyscall(bool is_kernel, TrapFrame* frame, SyscallArgs args) {
     assert(frame->hart != NULL);
     Process* process = (Process*)frame;
-    // TODO
+    int sig = args[0];
+    if (sig >= SIG_COUNT || sig == 0) {
+        process->frame.regs[REG_ARGUMENT_0] = -ILLEGAL_ARGUMENTS;
+    } else {
+        lockSpinLock(&process->signals.lock);
+        SignalAction sigaction = {
+            .handler = process->signals.handlers[sig].handler,
+            .sigaction = 0,
+            .mask = 0,
+            .flags = 0,
+            .restorer = process->signals.handlers[sig].restorer,
+        };
+        VirtPtr new = virtPtrFor(args[1], process->memory.table);
+        VirtPtr old = virtPtrFor(args[2], process->memory.table);
+        memcpyBetweenVirtPtr(old, virtPtrForKernel(&sigaction), sizeof(SignalAction));
+        if (new.address != 0) {
+            memcpyBetweenVirtPtr(virtPtrForKernel(&sigaction), new, sizeof(SignalAction));
+            process->signals.handlers[sig].handler = sigaction.handler;
+            process->signals.handlers[sig].restorer = sigaction.restorer;
+        }
+        unlockSpinLock(&process->signals.lock);
+        process->frame.regs[REG_ARGUMENT_0] = -SUCCESS;
+    }
 }
 
 void sigreturnSyscall(bool is_kernel, TrapFrame* frame, SyscallArgs args) {
     assert(frame->hart != NULL);
     Process* process = (Process*)frame;
-    // TODO
+    // If we are not in a handler, this is an error
+    process->frame.regs[REG_ARGUMENT_0] = -UNSUPPORTED;
+    returnFromSignal(process);
 }
 
 int killSyscallCallback(Process* process, void* udata) {
