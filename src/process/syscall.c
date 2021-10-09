@@ -92,11 +92,10 @@ void forkSyscall(bool is_kernel, TrapFrame* frame, SyscallArgs args) {
             new_process->frame.pc = process->frame.pc;
             memcpy(&new_process->frame.regs, &process->frame.regs, sizeof(process->frame.regs));
             memcpy(&new_process->frame.fregs, &process->frame.fregs, sizeof(process->frame.fregs));
-            // Copy signal data
-            memcpy(&new_process->signals, &process->signals, sizeof(ProcessSignals));
-            // Adjust the signals suspended frames satp
-            new_process->signals.suspended.satp = satpForMemory(new_process->pid, new_process->memory.table);
-            new_process->signals.lock = false;
+            // Copy signal handler data, but not pending signals
+            new_process->signals.current_signal = process->signals.current_signal;
+            new_process->signals.restore_frame = process->signals.restore_frame;
+            memcpy(new_process->signals.handlers, process->signals.handlers, sizeof(process->signals.handlers));
             // Copy files
             size_t fd_count = process->resources.fd_count;
             new_process->resources.uid = process->resources.uid;

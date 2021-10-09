@@ -194,3 +194,15 @@ void strcpyVirtPtr(VirtPtr dest, VirtPtr src) {
     memcpyBetweenVirtPtr(dest, src, length + 1);
 }
 
+VirtPtr pushToVirtPtrStack(VirtPtr sp, void* ptr, size_t size) {
+    sp.address -= size;
+    memcpyBetweenVirtPtr(sp, virtPtrForKernel(ptr), size);
+    return sp;
+}
+
+VirtPtr popFromVirtPtrStack(VirtPtr sp, void* ptr, size_t size) {
+    memcpyBetweenVirtPtr(virtPtrForKernel(ptr), sp, size);
+    sp.address += size;
+    return sp;
+}
+

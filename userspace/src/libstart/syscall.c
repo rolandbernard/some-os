@@ -131,8 +131,8 @@ int syscall_sigaction(int signal, const SigAction* new, SigAction* old) {
     return SYSCALL(SYSCALL_SIGACTION, signal, (uintptr_t)new, (uintptr_t)old);
 }
 
-int syscall_sigreturn() {
-    return SYSCALL(SYSCALL_SIGRETURN);
+void syscall_sigreturn() {
+    SYSCALL(SYSCALL_SIGRETURN);
 }
 
 int syscall_kill(int pid, int signal) {

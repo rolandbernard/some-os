@@ -54,7 +54,7 @@ void kernelInit() {
     // Enqueue main process to start the init process
     enqueueProcess(createKernelProcess(kernelMain, DEFAULT_PRIORITY, HART_STACK_SIZE));
     // Wake up the remaining harts
-    /* sendMessageToAll(INITIALIZE_HARTS, NULL); */
+    sendMessageToAll(INITIALIZE_HARTS, NULL);
     // Init the timer interrupts
     initTimerInterrupt();
     // Start running the main process

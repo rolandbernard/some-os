@@ -236,23 +236,23 @@ void enterProcess(Process* process) {
 
 void dumpProcessInfo(Process* process) {
     if (process->frame.hart->idle_process == process) {
-        KERNEL_LOG("[IDLE]");
+        logKernelMessage("[IDLE]\n");
     } else {
-        KERNEL_LOG("pid %i", process->pid);
-        KERNEL_LOG("regs: ");
+        logKernelMessage("pid %i\n", process->pid);
+        logKernelMessage("regs: \n");
         for (int i = 1; i < 32; i += 4) {
             for (int j = i; j < i + 4 && j < 32; j++) {
                 logKernelMessage("\tx%-2i %14lx", j, process->frame.regs[j - 1]);
             }
             logKernelMessage("\n");
         }
-        KERNEL_LOG("satp %p \tpc %p", process->frame.satp, process->frame.pc);
-        KERNEL_LOG("stack: ");
+        logKernelMessage("satp %p \tpc %p\n", process->frame.satp, process->frame.pc);
+        logKernelMessage("stack:\n");
         for (int i = 0; i < 128; i++) {
             intptr_t vaddr = process->frame.regs[REG_STACK_POINTER] + i * 8;
             uint64_t* maddr = (uint64_t*)virtToPhys(process->memory.table, vaddr);
             if (maddr != NULL) {
-                KERNEL_LOG("\t*%p(%p) = %14lx", vaddr, maddr, *maddr);
+                logKernelMessage("\t*%p(%p) = %14lx\n", vaddr, maddr, *maddr);
             }
         }
     }

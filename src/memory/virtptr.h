@@ -47,4 +47,12 @@ size_t strlenVirtPtr(VirtPtr str);
 
 void strcpyVirtPtr(VirtPtr dest, VirtPtr src);
 
+VirtPtr pushToVirtPtrStack(VirtPtr sp, void* ptr, size_t size);
+
+VirtPtr popFromVirtPtrStack(VirtPtr sp, void* ptr, size_t size);
+
+#define PUSH_TO_VIRTPTR(SP, OBJ) { SP = pushToVirtPtrStack(SP, &OBJ, sizeof(OBJ)); }
+
+#define POP_FROM_VIRTPTR(SP, OBJ) { SP = popFromVirtPtrStack(SP, &OBJ, sizeof(OBJ)); }
+
 #endif

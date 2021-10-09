@@ -138,6 +138,7 @@ typedef struct {
 
 // Most of these are actually never used
 typedef enum {
+    SIGNONE = 0,
     SIGHUP = 1,
     SIGINT,
     SIGQUIT,
@@ -188,10 +189,9 @@ typedef struct {
     SpinLock lock; // Signals can be sent by other processes, so we need a lock
     size_t signal_count;
     Signal* signals;
-    bool in_handler;
-    uintptr_t stack; // If null don't change the stack, otherwise indicate stack top
-    TrapFrame suspended;
     SignalHandler handlers[SIG_COUNT];
+    Signal current_signal;
+    uintptr_t restore_frame;
 } ProcessSignals;
 
 typedef struct Process_s {

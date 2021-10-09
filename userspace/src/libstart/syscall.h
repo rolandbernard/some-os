@@ -203,7 +203,7 @@ typedef struct {
 
 int syscall_sigaction(int signal, const SigAction* new, SigAction* old);
 
-int syscall_sigreturn();
+void syscall_sigreturn();
 
 int syscall_kill(int pid, int signal);
 
