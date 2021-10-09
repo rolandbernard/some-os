@@ -179,9 +179,6 @@ void waitSyscall(bool is_kernel, TrapFrame* frame, SyscallArgs args) {
 
 typedef struct {
     uintptr_t handler;
-    uintptr_t sigaction; // sigaction, mask and flags are unused currently
-    int mask;
-    int flags;
     uintptr_t restorer;
 } SignalAction;
 
@@ -195,9 +192,6 @@ void sigactionSyscall(bool is_kernel, TrapFrame* frame, SyscallArgs args) {
         lockSpinLock(&process->signals.lock);
         SignalAction sigaction = {
             .handler = process->signals.handlers[sig].handler,
-            .sigaction = 0,
-            .mask = 0,
-            .flags = 0,
             .restorer = process->signals.handlers[sig].restorer,
         };
         VirtPtr new = virtPtrFor(args[1], process->memory.table);

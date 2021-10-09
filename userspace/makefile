@@ -12,7 +12,6 @@ SOURCE_DIR := src
 BUILD_DIR  := build
 OBJECT_DIR := $(BUILD_DIR)/$(BUILD)/obj
 BINARY_DIR := $(BUILD_DIR)/$(BUILD)/bin
-DISK_DIR   := disk
 # ==
 
 # == Files
@@ -63,14 +62,6 @@ endif
 .SECONDARY:
 .SECONDEXPANSION:
 .PHONY: disk build clean
-
-disk: build
-	@$(ECHO) "Creating disk files"
-	rm -r $(DISK_DIR)/*
-	mkdir $(DISK_DIR)/test
-	mkdir $(DISK_DIR)/test2
-	echo "Hello world!" > $(DISK_DIR)/test/test.txt
-	cp -r $(BINARY_DIR) $(DISK_DIR)
 
 build: $(BINARYS)
 	@$(ECHO) "Build successful."

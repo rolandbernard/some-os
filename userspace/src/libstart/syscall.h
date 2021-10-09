@@ -195,9 +195,6 @@ typedef enum {
 
 typedef struct {
     void (*handler)(int sig);
-    void* sigaction;
-    int mask;
-    int flags;
     void (*restorer)();
 } SigAction;
 

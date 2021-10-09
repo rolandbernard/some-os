@@ -15,8 +15,9 @@ BUILD_DIR  := build
 OBJECT_DIR := $(BUILD_DIR)/$(BUILD)/obj
 BINARY_DIR := $(BUILD_DIR)/$(BUILD)/bin
 MOUNT_DIR  := mnt
-USERSPACE_DIR  := userspace
-USERSPACE_DISK_DIR  := $(USERSPACE_DIR)/disk
+DISK_DIR   := disk
+USERSPACE_DIR := userspace
+USERSPACE_BIN_DIR := $(USERSPACE_DIR)/build/$(BUILD)/bin
 # ==
 
 # == Files
@@ -89,9 +90,9 @@ endif
 .SILENT:
 .SECONDARY:
 .SECONDEXPANSION:
-.PHONY: build clean
+.PHONY: build clean qemu force
 
-# Building
+# Building kernel
 
 build: $(BINARYS)
 	@$(ECHO) "Build successful."
@@ -108,19 +109,34 @@ $(OBJECT_DIR)/%.o: $(SOURCE_DIR)/% $(MAKEFILE_LIST) | $$(dir $$@)
 	@$(ECHO) "Building $@"
 	mkdir -p $@
 
+# Building disk
+
+force:
+
+$(USERSPACE_BIN_DIR): force
+	$(MAKE) $(MFLAGS) -C $(USERSPACE_DIR)
+
+$(DISK_DIR): $(USERSPACE_BIN_DIR) $(MAKEFILE_LIST)
+	@$(ECHO) "Creating disk files"
+	mkdir -p $(DISK_DIR)
+	rm -f -r $(DISK_DIR)/*
+	mkdir $(DISK_DIR)/test
+	mkdir $(DISK_DIR)/test2
+	echo "Hello world!" > $(DISK_DIR)/test/test.txt
+	cp -r $(USERSPACE_BIN_DIR) $(DISK_DIR)
+
+$(DISK): $(DISK_DIR) $(MAKEFILE_LIST) | $(MOUNT_DIR)
+	@$(ECHO) "Building $@"
+	dd if=/dev/zero of=$@ bs=1M count=32 &> /dev/null
+	mkfs.minix -3 $@
+	sudo mount $@ $(MOUNT_DIR)
+	cp -r $(DISK_DIR)/* $(MOUNT_DIR)/
+	sudo umount $(MOUNT_DIR)
+
 # Running
 
 qemu: $(BINARY_DIR)/kernel $(DISK)
 	$(QEMU) $(QEMU_ARGS) -kernel $(BINARY_DIR)/kernel
-
-$(DISK): $(MAKEFILE_LIST) | $(MOUNT_DIR)
-	@$(ECHO) "Building $@"
-	make BUILD=$(BUILD) -C $(USERSPACE_DIR)
-	dd if=/dev/zero of=$@ bs=1M count=32 &> /dev/null
-	mkfs.minix -3 $@
-	sudo mount $@ $(MOUNT_DIR)
-	cp -r $(USERSPACE_DISK_DIR)/* $(MOUNT_DIR)/
-	sudo umount $(MOUNT_DIR)
 
 # Cleanup
 
