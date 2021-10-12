@@ -12,6 +12,7 @@ SOURCE_DIR := src
 BUILD_DIR  := build
 OBJECT_DIR := $(BUILD_DIR)/$(BUILD)/obj
 BINARY_DIR := $(BUILD_DIR)/$(BUILD)/bin
+DISK_DIR := ../disk
 # ==
 
 # == Files
@@ -40,9 +41,9 @@ LDFLAGS.debug   += -O0 -g
 CCFLAGS.release += -O3
 LDFLAGS.release += -O3
 
-CCFLAGS += $(CCFLAGS.$(BUILD)) $(WARNINGS) -MMD -MP -I$(SOURCE_DIR) -nostdlib -mno-relax -fpic -ffreestanding
+CCFLAGS += $(CCFLAGS.$(BUILD)) $(WARNINGS) -MMD -MP -I$(SOURCE_DIR) -nostdlib -mno-relax -fpic -fno-builtin -ffreestanding -I$(DISK_DIR)/include
 LDFLAGS += $(LDFLAGS.$(BUILD))
-LIBS    += -static
+LIBS    += -static -L$(DISK_DIR)/lib -lc -lg -lm
 # ==
 
 # == Progress
@@ -68,7 +69,7 @@ build: $(BINARYS)
 
 $(BINARYS): $(BINARY_DIR)/%: $(OBJECTS) $$(OBJECTS.$$*) $(SOURCE_DIR)/libstart/link.ld | $$(dir $$@)
 	@$(ECHO) "Building $@"
-	$(LINK) $(LDFLAGS) -o $@ $(OBJECTS) $(OBJECTS.$*) $(LIBS) -T$(SOURCE_DIR)/libstart/link.ld
+	$(LINK) $(LDFLAGS) -o $@ $(DISK_DIR)/lib/crt0.o $(OBJECTS) $(OBJECTS.$*) $(LIBS) -T$(SOURCE_DIR)/libstart/link.ld
 
 $(OBJECT_DIR)/%.o: $(SOURCE_DIR)/% $(MAKEFILE_LIST) | $$(dir $$@)
 	@$(ECHO) "Building $@"

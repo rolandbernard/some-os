@@ -1,0 +1,3 @@
+[submodule "toolchain/newlib"]
+	path = toolchain/newlib
+	url = https://github.com/rolandbernard/newlib

@@ -30,6 +30,6 @@ SECTIONS {
         PROVIDE(__bss_end = .);
     } :bss
 
-    PROVIDE(__global_pointer = __data_start);
+    PROVIDE(__global_pointer$ = __data_start);
 }
 
