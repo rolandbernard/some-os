@@ -6,6 +6,7 @@
 #include "memory/pagetable.h"
 #include "files/vfs.h"
 #include "util/util.h"
+#include "error/log.h"
 
 #define MAX_PHDRS 128
 

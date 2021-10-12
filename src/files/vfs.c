@@ -117,8 +117,7 @@ Error umount(VirtualFilesystem* fs, const char* from) {
 }
 
 static FilesystemMount* findMountHandling(VirtualFilesystem* fs, char* path) {
-    for (size_t i = fs->mount_count; i != 0;) {
-        i--;
+    for (size_t i = 0; i < fs->mount_count; i++) {
         const char* mount_path = fs->mounts[i].path;
         size_t mount_path_length = strlen(mount_path);
         if (

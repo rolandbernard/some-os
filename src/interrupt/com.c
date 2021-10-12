@@ -46,6 +46,10 @@ void sendMessageToAll(MessageType type, void* data) {
     }
 }
 
+void sendMessageToSelf(MessageType type, void* data) {
+    sendMessageTo(getCurrentHartId(), type, data);
+}
+
 void handleMessage(MessageType type, void* data) {
     if (type == INITIALIZE_HARTS) {
         unlockSpinLock(&message_read_lock);

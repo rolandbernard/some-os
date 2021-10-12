@@ -157,7 +157,7 @@ typedef struct {
 
 typedef struct VfsFilesystem_s {
     const VfsFilesystemVtable* functions;
-    size_t open_files; // TODO: set this field
+    size_t open_files;
 } VfsFilesystem;
 
 typedef enum {

@@ -6,6 +6,7 @@
 #include "devices/virtio/virtio.h"
 #include "memory/memmap.h"
 #include "files/blkfile.h"
+#include "files/chrfile.h"
 #include "files/vfs.h"
 #include "util/text.h"
 
@@ -44,14 +45,24 @@ static Error mountVirtIOBlockDeviceFiles() {
             (BlockOperationFunction)virtIOBlockDeviceOperation
         );
         FORMAT_STRINGX(name, "/dev/blk%li", i);
-        mountFile(&global_file_system, file, name);
+        CHECKED(mountFile(&global_file_system, file, name));
         KERNEL_LOG("[>] Mounted block device file %s", name);
     }
     return simpleError(SUCCESS);
 }
 
+static Error mountSerialDeviceFile() {
+    VfsFile* file = (VfsFile*)createSerialDeviceFile(getDefaultSerialDevice());
+    const char* name = "/dev/tty0";
+    CHECKED(mountFile(&global_file_system, file, name));
+    KERNEL_LOG("[>] Mounted serial device file %s", name);
+    return simpleError(SUCCESS);
+}
+
 Error mountDeviceFiles() {
+    // TODO: Maybe mount as a filesystem.
     CHECKED(mountVirtIOBlockDeviceFiles());
+    CHECKED(mountSerialDeviceFile());
     return simpleError(SUCCESS);
 }
 

@@ -133,21 +133,7 @@ uint64_t readInt(VirtPtr addr, size_t size) {
 }
 
 uint64_t readIntAt(VirtPtr addr, size_t i, size_t size) {
-    assert(size == 8 || size == 16 || size == 32 || size == 64);
-    uintptr_t phys = virtToPhys(addr.table, addr.address + i * size / 8);
-    if (phys == 0) {
-        return 0;
-    } else {
-        if (size == 8) {
-            return *(uint8_t*)phys;
-        } else if (size == 16) {
-            return *(uint16_t*)phys;
-        } else if (size == 32) {
-            return *(uint32_t*)phys;
-        } else {
-            return *(uint64_t*)phys;
-        }
-    }
+    return readInt(virtPtrFor(addr.address + i * (size / 8), addr.table), size);
 }
 
 void writeInt(VirtPtr addr, size_t size, uint64_t value) {
@@ -164,6 +150,10 @@ void writeInt(VirtPtr addr, size_t size, uint64_t value) {
             *(uint64_t*)phys = value;
         }
     }
+}
+
+void writeIntAt(VirtPtr addr, size_t size, size_t i, uint64_t value) {
+    return writeInt(virtPtrFor(addr.address + i * (size / 8), addr.table), size, value);
 }
 
 uint64_t readMisaligned(VirtPtr addr, size_t size) {

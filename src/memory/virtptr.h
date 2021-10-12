@@ -39,6 +39,8 @@ uint64_t readIntAt(VirtPtr addr, size_t i, size_t size);
 
 void writeInt(VirtPtr addr, size_t size, uint64_t value);
 
+void writeIntAt(VirtPtr addr, size_t size, size_t i, uint64_t value);
+
 uint64_t readMisaligned(VirtPtr addr, size_t size);
 
 void writeMisaligned(VirtPtr addr, size_t size, uint64_t value);

@@ -339,22 +339,26 @@ static void mountCreateFsCallback(Error error, VfsFilesystem* fs, void* udata) {
 void mountSyscall(bool is_kernel, TrapFrame* frame, SyscallArgs args) {
     assert(frame->hart != NULL);
     Process* process = (Process*)frame;
-    char* source = copyPathFromSyscallArgs(process, args[0]);
-    if (source != NULL) {
-        char* type = copyStringFromSyscallArgs(process, args[2]);
-        if (type != NULL) {
-            moveToSchedState(process, WAITING);
-            createFilesystemFrom(
-                &global_file_system, source, type, virtPtrFor(args[3], process->memory.table), mountCreateFsCallback, process
-            );
-            dealloc(type);
-            dealloc(source);
+    if (process->resources.uid != 0 && process->resources.gid != 0) { // Only root can mount
+        process->frame.regs[REG_ARGUMENT_0] = -FORBIDDEN;
+    } else {
+        char* source = copyPathFromSyscallArgs(process, args[0]);
+        if (source != NULL) {
+            char* type = copyStringFromSyscallArgs(process, args[2]);
+            if (type != NULL) {
+                moveToSchedState(process, WAITING);
+                createFilesystemFrom(
+                    &global_file_system, source, type, virtPtrFor(args[3], process->memory.table), mountCreateFsCallback, process
+                );
+                dealloc(type);
+                dealloc(source);
+            } else {
+                dealloc(source);
+                process->frame.regs[REG_ARGUMENT_0] = -ILLEGAL_ARGUMENTS;
+            }
         } else {
-            dealloc(source);
             process->frame.regs[REG_ARGUMENT_0] = -ILLEGAL_ARGUMENTS;
         }
-    } else {
-        process->frame.regs[REG_ARGUMENT_0] = -ILLEGAL_ARGUMENTS;
     }
 }
 

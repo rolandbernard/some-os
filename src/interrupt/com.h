@@ -16,6 +16,8 @@ void sendMessageTo(int hartid, MessageType type, void* data);
 
 void sendMessageToAll(MessageType type, void* data);
 
+void sendMessageToSelf(MessageType type, void* data);
+
 void handleMessage(MessageType type, void* data);
 
 void handleMachineSoftwareInterrupt();

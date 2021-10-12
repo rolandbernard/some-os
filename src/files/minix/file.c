@@ -493,6 +493,7 @@ static void minixCloseFunction(
 
 static void minixDupFunction(MinixFile* file, Uid uid, Gid gid, VfsFunctionCallbackFile callback, void* udata) {
     lockSpinLock(&file->lock);
+    file->fs->base.open_files++;
     MinixFile* copy = kalloc(sizeof(MinixFile));
     memcpy(copy, file, sizeof(MinixFile));
     unlockSpinLock(&file->lock);
