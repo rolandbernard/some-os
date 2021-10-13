@@ -116,12 +116,17 @@ Error umount(VirtualFilesystem* fs, const char* from) {
     }
 }
 
-static FilesystemMount* findMountHandling(VirtualFilesystem* fs, char* path) {
+static FilesystemMount* findLocalMountHandling(VirtualFilesystem* fs, const char* path) {
+    FilesystemMount* ret = NULL;
+    if (fs->parent != NULL) {
+        ret = findLocalMountHandling(fs->parent, path);
+    }
     for (size_t i = 0; i < fs->mount_count; i++) {
         const char* mount_path = fs->mounts[i].path;
         size_t mount_path_length = strlen(mount_path);
         if (
-            strncmp(mount_path, path, mount_path_length) == 0
+            (ret == NULL || strlen(ret->path) < mount_path_length) // Find the longest matching mount
+            && strncmp(mount_path, path, mount_path_length) == 0
             && (
                 path[mount_path_length] == 0 || path[mount_path_length] == '/'
                 || mount_path_length == 1
@@ -130,30 +135,40 @@ static FilesystemMount* findMountHandling(VirtualFilesystem* fs, char* path) {
             switch (fs->mounts[i].type) {
                 case MOUNT_TYPE_FILE:
                     if (path[mount_path_length] == 0) { // Only an exact match is possible here
-                        return &fs->mounts[i];
+                        ret = &fs->mounts[i];
                     }
                 case MOUNT_TYPE_FS:
-                    return &fs->mounts[i];
+                    ret = &fs->mounts[i];
                 case MOUNT_TYPE_BIND: {
-                    const char* new_path = (const char*)fs->mounts[i].data;
-                    size_t new_path_length = strlen(new_path);
-                    size_t path_length = strlen(path) - mount_path_length;
-                    char* compined = kalloc(new_path_length + path_length + 2);
-                    memcpy(compined, new_path, new_path_length);
-                    compined[new_path_length] = '/';
-                    memcpy(compined + new_path_length + 1, path + mount_path_length, path_length);
-                    compined[new_path_length + path_length + 1] = '/';
-                    dealloc(path);
-                    path = compined;
-                    inlineReducePath(path);
-                    // Continue searching for the complete path
-                    break;
+                    ret = &fs->mounts[i];
                 }
             }
         }
     }
+    return ret;
+}
+
+static FilesystemMount* findMountHandling(VirtualFilesystem* fs, char* path) {
+    FilesystemMount* mount = NULL;
+    do {
+        mount = findLocalMountHandling(fs, path);
+        if (mount != NULL && mount->type == MOUNT_TYPE_BIND) {
+            size_t mount_path_length = strlen(mount->path);
+            const char* new_path = (const char*)mount->data;
+            size_t new_path_length = strlen(new_path);
+            size_t path_length = strlen(path) - mount_path_length;
+            char* compined = kalloc(new_path_length + path_length + 2);
+            memcpy(compined, new_path, new_path_length);
+            compined[new_path_length] = '/';
+            memcpy(compined + new_path_length + 1, path + mount_path_length, path_length);
+            compined[new_path_length + path_length + 1] = '/';
+            dealloc(path);
+            path = compined;
+            inlineReducePath(path);
+        }
+    } while (mount != NULL && mount->type == MOUNT_TYPE_BIND);
     dealloc(path);
-    return NULL;
+    return mount;
 }
 
 void vfsOpen(VirtualFilesystem* fs, Uid uid, Gid gid, const char* path, VfsOpenFlags flags, VfsMode mode, VfsFunctionCallbackFile callback, void* udata) {
@@ -181,10 +196,6 @@ void vfsOpen(VirtualFilesystem* fs, Uid uid, Gid gid, const char* path, VfsOpenF
             }
             case MOUNT_TYPE_BIND: panic(); // Can't happen. Would return NULL.
         }
-    } else if (fs->parent != NULL) {
-        VirtualFilesystem* parent = fs->parent;
-        unlockSpinLock(&fs->lock);
-        vfsOpen(parent, uid, gid, path, flags, mode, callback, udata);
     } else {
         unlockSpinLock(&fs->lock);
         callback(simpleError(NO_SUCH_FILE), NULL, udata);
