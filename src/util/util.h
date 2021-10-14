@@ -14,4 +14,8 @@ int64_t smax(int64_t a, int64_t b);
 // Does nothing
 void noop();
 
+uint64_t hashInt64(uint64_t x);
+
+uint32_t hashInt32(uint32_t x);
+
 #endif
