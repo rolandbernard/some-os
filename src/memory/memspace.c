@@ -6,7 +6,11 @@
 
 #include "memory/pagealloc.h"
 #include "memory/pagetable.h"
+#include "memory/pageref.h"
 #include "util/spinlock.h"
+
+static SpinLock global_page_lock;
+static PageRefTable ref_count;
 
 MemorySpace* createMemorySpace() {
     return createPageTable();
@@ -15,21 +19,38 @@ MemorySpace* createMemorySpace() {
 bool handlePageFault(MemorySpace* mem, uintptr_t address) {
     PageTableEntry* entry = virtToEntry(mem, address);
     if (entry != NULL && entry->v && (entry->bits & PAGE_ENTRY_COPY) != 0) {
+        // This is a copy-on-write page
         void* phy = (void*)(entry->paddr << 12);
         if (phy == zero_page) {
             void* page = zallocPage(); // Zero page, so zallocPage
             if (page == NULL) {
                 return false;
             } else {
+                // We don't need to add references here, only if we have more than one reference
                 entry->bits |= PAGE_ENTRY_WRITE;
                 entry->bits &= ~PAGE_ENTRY_COPY;
                 entry->paddr = (uint64_t)page >> 12;
                 return true;
             }
         } else {
-            // TODO: Check ref count and copy
-            assert(false);
-            return false;
+            lockSpinLock(&global_page_lock);
+            if (hasOtherReferences(&ref_count, (uintptr_t)phy)) {
+                void* page = allocPage();
+                if (page == NULL) {
+                    // No more memory... Segfault!
+                    unlockSpinLock(&global_page_lock);
+                    return false;
+                } else {
+                    memcpy(page, phy, PAGE_SIZE);
+                    entry->paddr = (uint64_t)page >> 12;
+                }
+            } else {
+                // If we have no other reference, we can reuse the current page
+            }
+            entry->bits |= PAGE_ENTRY_WRITE;
+            entry->bits &= ~PAGE_ENTRY_COPY;
+            unlockSpinLock(&global_page_lock);
+            return true;
         }
     } else {
         return false;
@@ -66,8 +87,16 @@ static void freePageEntryData(PageTableEntry* entry) {
     if ((entry->bits  & PAGE_ENTRY_USER) != 0) {
         void* phy = (void*)(entry->paddr << 12);
         if (phy != zero_page) {
-            // TODO: check ref count table
-            deallocPage((void*)(entry->paddr << 12));
+            lockSpinLock(&global_page_lock);
+            // Remove reference to the page we are freeing
+            if (!hasOtherReferences(&ref_count, (uintptr_t)phy)) {
+                unlockSpinLock(&global_page_lock);
+                // If we have no other table using this page, deallocate it
+                deallocPage(phy);
+            } else {
+                removeReferenceFor(&ref_count, (uintptr_t)phy);
+                unlockSpinLock(&global_page_lock);
+            }
         }
     }
 }
@@ -111,13 +140,16 @@ static bool copyMemoryPageEntry(PageTableEntry* dst, PageTableEntry* src) {
     if ((src->bits & PAGE_ENTRY_USER) != 0) {
         void* phy = (void*)(src->paddr << 12);
         if (phy != zero_page) {
-            // TODO: check ref count table
-            void* page = allocPage();
-            if (page != NULL) {
-                memcpy(page, phy, PAGE_SIZE);
-                dst->paddr = (uintptr_t)page >> 12;
-            } else {
-                return false;
+            lockSpinLock(&global_page_lock);
+            // We have at least two references, the one we copy from and the one we copyied.
+            addReferenceFor(&ref_count, (uintptr_t)phy);
+            unlockSpinLock(&global_page_lock);
+            if ((src->bits & PAGE_ENTRY_WRITE) != 0) {
+                // If this page can be written, we also have to set the copy-on-write flag
+                src->bits |= PAGE_ENTRY_COPY;
+                src->bits &= ~PAGE_ENTRY_WRITE;
+                dst->bits |= PAGE_ENTRY_COPY;
+                dst->bits &= ~PAGE_ENTRY_WRITE;
             }
         }
     }
