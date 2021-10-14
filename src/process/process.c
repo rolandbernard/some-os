@@ -9,6 +9,7 @@
 #include "interrupt/timer.h"
 #include "interrupt/trap.h"
 #include "memory/kalloc.h"
+#include "memory/memspace.h"
 #include "memory/pagetable.h"
 #include "memory/pagealloc.h"
 #include "memory/virtmem.h"
@@ -46,7 +47,7 @@ static bool basicProcessWait(Process* process) {
     for (size_t i = 0; i < process->tree.wait_count; i++) {
         if (wait_pid == 0 || wait_pid == process->tree.waits[i].pid) {
             writeInt(
-                virtPtrFor(process->frame.regs[REG_ARGUMENT_2], process->memory.table),
+                virtPtrFor(process->frame.regs[REG_ARGUMENT_2], process->memory.mem),
                 sizeof(int) * 8, process->tree.waits[i].status
             );
             process->frame.regs[REG_ARGUMENT_0] = process->tree.waits[i].pid;
@@ -134,7 +135,7 @@ static void unregisterProcess(Process* process) {
 Process* createKernelProcess(void* start, Priority priority, size_t stack_size) {
     Process* process = zalloc(sizeof(Process));
     assert(process != NULL);
-    process->memory.table = kernel_page_table;
+    process->memory.mem = kernel_page_table;
     process->memory.stack = kalloc(stack_size);
     assert(process->memory.stack != NULL);
     process->sched.priority = priority;
@@ -159,12 +160,12 @@ Process* createUserProcess(uintptr_t sp, uintptr_t gp, uintptr_t pc, Process* pa
     Process* process = zalloc(sizeof(Process));
     if (process != NULL) {
         process->pid = allocateNewPid();
-        process->memory.table = createPageTable();
+        process->memory.mem = createMemorySpace();
         process->memory.stack = NULL;
         process->sched.priority = priority;
         process->sched.state = ENQUEUEABLE;
         process->tree.parent = parent;
-        initTrapFrame(&process->frame, sp, gp, pc, process->pid, process->memory.table);
+        initTrapFrame(&process->frame, sp, gp, pc, process->pid, process->memory.mem);
         registerProcess(process);
     }
     return process;
@@ -174,12 +175,12 @@ Process* createChildUserProcess(Process* parent) {
     Process* process = zalloc(sizeof(Process));
     if (process != NULL) {
         process->pid = allocateNewPid();
-        process->memory.table = createPageTable();
+        process->memory.mem = cloneMemorySpace(parent->memory.mem);
         process->memory.stack = NULL;
         process->sched.priority = parent->sched.priority;
         process->sched.state = ENQUEUEABLE;
         process->tree.parent = parent;
-        initTrapFrame(&process->frame, 0, 0, 0, process->pid, process->memory.table);
+        initTrapFrame(&process->frame, 0, 0, 0, process->pid, process->memory.mem);
         registerProcess(process);
     }
     return process;
@@ -192,7 +193,7 @@ static void freeProcess(Process* process) {
         process->memory.stack = NULL;
         if (process->pid != 0) {
             // If this is not a kernel process, free its page table.
-            unmapAllPagesAndFreeUsers(process->memory.table);
+            freeMemorySpace(process->memory.mem);
         }
         for (size_t i = 0; i < process->resources.fd_count; i++) {
             process->resources.filedes[i]->functions->close(
@@ -209,7 +210,7 @@ void deallocProcess(Process* process) {
     unregisterProcess(process);
     freeProcess(process);
     if (process->pid != 0) {
-        deallocPage(process->memory.table);
+        deallocMemorySpace(process->memory.mem);
     }
     dealloc(process);
 }
@@ -250,7 +251,7 @@ void dumpProcessInfo(Process* process) {
         logKernelMessage("stack:\n");
         for (int i = 0; i < 128; i++) {
             intptr_t vaddr = process->frame.regs[REG_STACK_POINTER] + i * 8;
-            uint64_t* maddr = (uint64_t*)virtToPhys(process->memory.table, vaddr);
+            uint64_t* maddr = (uint64_t*)virtToPhys(process->memory.mem, vaddr, false);
             if (maddr != NULL) {
                 logKernelMessage("\t*%p(%p) = %14lx\n", vaddr, maddr, *maddr);
             }

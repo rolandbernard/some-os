@@ -91,9 +91,8 @@ static void readElfFileCallback(Error error, uintptr_t entry, void* udata) {
         // Find the start_brk in the memory
         uintptr_t start_brk = findStartBrk(request->memory);
         // Allocate stack
-        if (!allocatePages(request->memory, USER_STACK_TOP - USER_STACK_SIZE, USER_STACK_SIZE, ELF_PROG_READ | ELF_PROG_WRITE)) {
-            unmapAllPagesAndFreeUsers(request->memory);
-            freePageTable(request->memory);
+        if (!allocatePages(request->memory, USER_STACK_TOP - USER_STACK_SIZE, 0, USER_STACK_SIZE, ELF_PROG_READ | ELF_PROG_WRITE)) {
+            deallocMemorySpace(request->memory);
             request->callback(simpleError(ALREADY_IN_USE), request->udata);
             dealloc(request);
             return;
@@ -109,11 +108,11 @@ static void readElfFileCallback(Error error, uintptr_t entry, void* udata) {
             request->process->pid = allocateNewPid();
             request->process->status = 0;
         } else {
-            unmapAllPagesAndFreeUsers(request->process->memory.table);
-            freePageTable(request->process->memory.table);
+            deallocMemorySpace(request->memory);
+            freePageTable(request->process->memory.mem);
         }
         request->process->memory.stack = NULL;
-        request->process->memory.table = request->memory;
+        request->process->memory.mem = request->memory;
         request->process->memory.start_brk = start_brk;
         request->process->memory.brk = start_brk;
         initTrapFrame(&request->process->frame, args, 0, entry, request->process->pid, request->memory);
@@ -181,8 +180,8 @@ void execveSyscall(bool is_kernel, TrapFrame* frame, SyscallArgs args) {
     if (string != NULL) {
         moveToSchedState(process, WAITING);
         loadProgramInto(
-            process, string, virtPtrFor(args[1], process->memory.table),
-            virtPtrFor(args[2], process->memory.table), loadProgramCallback, process
+            process, string, virtPtrFor(args[1], process->memory.mem),
+            virtPtrFor(args[2], process->memory.mem), loadProgramCallback, process
         );
         dealloc(string);
     } else {

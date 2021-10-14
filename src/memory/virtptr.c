@@ -23,17 +23,17 @@ VirtPtr virtPtrFor(uintptr_t addr, PageTable* table) {
 }
 
 // Parts are segments of the buffer in continuos physical pages
-size_t getVirtPtrParts(VirtPtr addr, size_t length, VirtPtrBufferPart* parts, size_t max_parts) {
+size_t getVirtPtrParts(VirtPtr addr, size_t length, VirtPtrBufferPart* parts, size_t max_parts, bool write) {
     size_t part_index = 0;
     uintptr_t part_position = addr.address;
     uintptr_t next_position = addr.address;
     while (part_position < addr.address + length) {
         next_position = (next_position + PAGE_SIZE) & -PAGE_SIZE;
-        uintptr_t phys_start = virtToPhys(addr.table, part_position);
+        uintptr_t phys_start = virtToPhys(addr.table, part_position, write);
         if (phys_start == 0) {
             return part_index;
         }
-        uintptr_t phys_end = virtToPhys(addr.table, next_position);
+        uintptr_t phys_end = virtToPhys(addr.table, next_position, write);
         if (phys_end - phys_start != next_position - part_position || next_position > addr.address + length) {
             if (part_index < max_parts) {
                 parts[part_index].address = (void*)phys_start;
@@ -51,16 +51,16 @@ size_t getVirtPtrParts(VirtPtr addr, size_t length, VirtPtrBufferPart* parts, si
     return part_index;
 }
 
-void* virtPtrPartsDo(VirtPtr addr, size_t length, VirtPtrPartsDoCallback callback, void* udata) {
+void* virtPtrPartsDo(VirtPtr addr, size_t length, VirtPtrPartsDoCallback callback, void* udata, bool write) {
     uintptr_t part_position = addr.address;
     uintptr_t next_position = addr.address;
     while (part_position < addr.address + length) {
         next_position = (next_position + PAGE_SIZE) & -PAGE_SIZE;
-        uintptr_t phys_start = virtToPhys(addr.table, part_position);
+        uintptr_t phys_start = virtToPhys(addr.table, part_position, write);
         if (phys_start == 0) {
             return udata;
         }
-        uintptr_t phys_end = virtToPhys(addr.table, next_position);
+        uintptr_t phys_end = virtToPhys(addr.table, next_position, write);
         if (phys_end - phys_start != next_position - part_position || next_position > addr.address + length) {
             VirtPtrBufferPart part;
             part.address = (void*)phys_start;
@@ -79,12 +79,12 @@ void* virtPtrPartsDo(VirtPtr addr, size_t length, VirtPtrPartsDoCallback callbac
 
 void memcpyBetweenVirtPtr(VirtPtr dest, VirtPtr src, size_t n) {
     // This does not support overlaps.
-    size_t dest_count = getVirtPtrParts(dest, n, NULL, 0);
-    size_t src_count = getVirtPtrParts(src, n, NULL, 0);
+    size_t dest_count = getVirtPtrParts(dest, n, NULL, 0, true);
+    size_t src_count = getVirtPtrParts(src, n, NULL, 0, false);
     VirtPtrBufferPart dest_parts[dest_count];
     VirtPtrBufferPart src_parts[src_count];
-    getVirtPtrParts(dest, n, dest_parts, dest_count);
-    getVirtPtrParts(src, n, src_parts, src_count);
+    getVirtPtrParts(dest, n, dest_parts, dest_count, true);
+    getVirtPtrParts(src, n, src_parts, src_count, false);
     size_t index = 0;
     size_t dest_index = 0;
     size_t src_index = 0;
@@ -106,9 +106,9 @@ void memcpyBetweenVirtPtr(VirtPtr dest, VirtPtr src, size_t n) {
 }
 
 void memsetVirtPtr(VirtPtr dest, int byte, size_t n) {
-    size_t count = getVirtPtrParts(dest, n, NULL, 0);
+    size_t count = getVirtPtrParts(dest, n, NULL, 0, true);
     VirtPtrBufferPart parts[count];
-    getVirtPtrParts(dest, n, parts, count);
+    getVirtPtrParts(dest, n, parts, count, true);
     for (size_t i = 0; i < count; i++) {
         memset(parts[i].address, byte, parts[i].length);
     }
@@ -116,7 +116,7 @@ void memsetVirtPtr(VirtPtr dest, int byte, size_t n) {
 
 uint64_t readInt(VirtPtr addr, size_t size) {
     assert(size == 8 || size == 16 || size == 32 || size == 64);
-    uintptr_t phys = virtToPhys(addr.table, addr.address);
+    uintptr_t phys = virtToPhys(addr.table, addr.address, false);
     if (phys == 0) {
         return 0;
     } else {
@@ -138,7 +138,7 @@ uint64_t readIntAt(VirtPtr addr, size_t i, size_t size) {
 
 void writeInt(VirtPtr addr, size_t size, uint64_t value) {
     assert(size == 8 || size == 16 || size == 32 || size == 64);
-    uintptr_t phys = virtToPhys(addr.table, addr.address);
+    uintptr_t phys = virtToPhys(addr.table, addr.address, true);
     if (phys != 0) {
         if (size == 8) {
             *(uint8_t*)phys = value;

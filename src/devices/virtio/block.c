@@ -63,9 +63,9 @@ void virtIOBlockDeviceOperation(
     request->header.blk_type = write ? VIRTIO_BLOCK_T_OUT : VIRTIO_BLOCK_T_IN;
     request->data.data = buffer;
     request->status.status = VIRTIO_BLOCK_S_UNKNOWN;
-    uint16_t head = addDescriptorsFor(&device->virtio, virtPtrForKernel(&request->header), sizeof(VirtIOBlockRequestHeader), VIRTIO_DESC_NEXT);
-    addDescriptorsFor(&device->virtio, buffer, size, VIRTIO_DESC_NEXT | (write ? 0 : VIRTIO_DESC_WRITE));
-    addDescriptorsFor(&device->virtio, virtPtrForKernel(&request->status), sizeof(VirtIOBlockRequestStatus), VIRTIO_DESC_WRITE);
+    uint16_t head = addDescriptorsFor(&device->virtio, virtPtrForKernel(&request->header), sizeof(VirtIOBlockRequestHeader), VIRTIO_DESC_NEXT, true);
+    addDescriptorsFor(&device->virtio, buffer, size, VIRTIO_DESC_NEXT | (write ? 0 : VIRTIO_DESC_WRITE), write);
+    addDescriptorsFor(&device->virtio, virtPtrForKernel(&request->status), sizeof(VirtIOBlockRequestStatus), VIRTIO_DESC_WRITE, true);
     sendRequestAt(&device->virtio, head);
     request->head = head;
     request->callback = callback;

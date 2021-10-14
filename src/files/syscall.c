@@ -199,7 +199,7 @@ void readSyscall(bool is_kernel, TrapFrame* frame, SyscallArgs args) {
     FILE_SYSCALL_OP(read, {
         file->functions->read(
             file, process->resources.uid, process->resources.gid,
-            virtPtrFor(args[1], process->memory.table), args[2], sizeTSyscallCallback, process
+            virtPtrFor(args[1], process->memory.mem), args[2], sizeTSyscallCallback, process
         );
     });
 }
@@ -208,7 +208,7 @@ void writeSyscall(bool is_kernel, TrapFrame* frame, SyscallArgs args) {
     FILE_SYSCALL_OP(write, {
         file->functions->write(
             file, process->resources.uid, process->resources.gid,
-            virtPtrFor(args[1], process->memory.table), args[2], sizeTSyscallCallback, process
+            virtPtrFor(args[1], process->memory.mem), args[2], sizeTSyscallCallback, process
         );
     });
 }
@@ -226,7 +226,7 @@ static void statSyscallCallback(Error error, VfsStat stat, void* udata) {
     Process* process = (Process*)udata;
     process->frame.regs[REG_ARGUMENT_0] = -error.kind;
     if (!isError(error)) {
-        VirtPtr ptr = virtPtrFor(process->frame.regs[REG_ARGUMENT_1], process->memory.table);
+        VirtPtr ptr = virtPtrFor(process->frame.regs[REG_ARGUMENT_1], process->memory.mem);
         memcpyBetweenVirtPtr(ptr, virtPtrForKernel(&stat), sizeof(VfsStat));
     }
     moveToSchedState(process, ENQUEUEABLE);
@@ -309,7 +309,7 @@ void readdirSyscall(bool is_kernel, TrapFrame* frame, SyscallArgs args) {
     FILE_SYSCALL_OP(readdir, {
         file->functions->readdir(
             file, process->resources.uid, process->resources.gid,
-            virtPtrFor(args[1], process->memory.table), args[2], sizeTSyscallCallback, process
+            virtPtrFor(args[1], process->memory.mem), args[2], sizeTSyscallCallback, process
         );
     });
 }
@@ -348,7 +348,7 @@ void mountSyscall(bool is_kernel, TrapFrame* frame, SyscallArgs args) {
             if (type != NULL) {
                 moveToSchedState(process, WAITING);
                 createFilesystemFrom(
-                    &global_file_system, source, type, virtPtrFor(args[3], process->memory.table), mountCreateFsCallback, process
+                    &global_file_system, source, type, virtPtrFor(args[3], process->memory.mem), mountCreateFsCallback, process
                 );
                 dealloc(type);
                 dealloc(source);
@@ -379,7 +379,7 @@ void umountSyscall(bool is_kernel, TrapFrame* frame, SyscallArgs args) {
 }
 
 char* copyPathFromSyscallArgs(Process* process, uintptr_t ptr) {
-    VirtPtr str = virtPtrFor(ptr, process->memory.table);
+    VirtPtr str = virtPtrFor(ptr, process->memory.mem);
     bool relative = true;
     size_t length = strlenVirtPtr(str);
     if (readInt(str, 8) == '/') {

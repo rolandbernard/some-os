@@ -12,6 +12,7 @@
 #define PAGE_ENTRY_GLOBAL   (1 << 5)
 #define PAGE_ENTRY_ACCESSED (1 << 6)
 #define PAGE_ENTRY_DIRTY    (1 << 7)
+#define PAGE_ENTRY_COPY     (1 << 8)
 
 #define PAGE_ENTRY_RW (PAGE_ENTRY_READ | PAGE_ENTRY_WRITE)
 #define PAGE_ENTRY_RX (PAGE_ENTRY_READ | PAGE_ENTRY_EXEC)
@@ -67,9 +68,6 @@ void unmapPage(PageTable* root, uintptr_t vaddr);
 // Remove all maps from the given page root.
 void unmapAllPages(PageTable* root);
 
-// Remove all maps from the given page root and free pages if they are for the user.
-void unmapAllPagesAndFreeUsers(PageTable* root);
-
 // Map all pages between from_vaddr (inc) and to_vaddr (exc) to continuos addresses starting at paddr. Use the
 // best fitting page level to do the mapping.
 void mapPageRange(PageTable* root, uintptr_t from_vaddr, uintptr_t to_vaddr, uintptr_t paddr, int bits);
@@ -81,16 +79,10 @@ void mapPageRangeAtLevel(PageTable* root, uintptr_t from_vaddr, uintptr_t to_vad
 // Remove all maps between from and to.
 void unmapPageRange(PageTable* root, uintptr_t from, uintptr_t to);
 
-// Copy all page mappings from dest to src and allocate new pages (and copy).
-// Returns true if everything could be allocated, false otherwise.
-// The destination table must be empty.
-bool copyAllPagesAndAllocUsers(PageTable* dest, PageTable* src);
-
-// Use the given page table to map from virtual to physical address. Returns 0 if unmapped.
-uintptr_t virtToPhys(PageTable* root, uintptr_t vaddr);
-
 // Get the entry handling the given vaddr in the given page table.
 PageTableEntry* virtToEntry(PageTable* root, uintptr_t vaddr);
+
+uintptr_t unsafeVirtToPhys(PageTable* root, uintptr_t vaddr);
 
 typedef void (*AllPagesDoCallback)(PageTableEntry* entry, uintptr_t vaddr, void* udata);
 

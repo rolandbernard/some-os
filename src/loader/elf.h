@@ -57,7 +57,7 @@ typedef struct {
     uintptr_t align;
 } ElfProgramHeader;
 
-bool allocatePages(PageTable* table, uintptr_t addr, size_t length, uint32_t flags);
+bool allocatePages(PageTable* table, uintptr_t addr, size_t filesz, size_t memsz, uint32_t flags);
 
 typedef void (*ElfFileLoadCallback)(Error error, uintptr_t entry, void* udata);
 

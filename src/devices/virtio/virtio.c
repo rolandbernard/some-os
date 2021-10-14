@@ -107,10 +107,10 @@ uint16_t fillNextDescriptor(VirtIODevice* device, VirtIODescriptor descriptor) {
     return device->index;
 }
 
-uint16_t addDescriptorsFor(VirtIODevice* device, VirtPtr buffer, size_t length, VirtIODescriptorFlags flags) {
-    size_t part_count = getVirtPtrParts(buffer, length, NULL, 0);
+uint16_t addDescriptorsFor(VirtIODevice* device, VirtPtr buffer, size_t length, VirtIODescriptorFlags flags, bool write) {
+    size_t part_count = getVirtPtrParts(buffer, length, NULL, 0, write);
     VirtPtrBufferPart parts[part_count];
-    getVirtPtrParts(buffer, length, parts, part_count);
+    getVirtPtrParts(buffer, length, parts, part_count, write);
     uint16_t ret = 0;
     for (size_t i = 0; i < part_count; i++) {
         VirtIODescriptor desc = {

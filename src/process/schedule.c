@@ -74,7 +74,8 @@ void enqueueProcess(Process* process) {
             moveToSchedState(process, READY);
             if (process->sched.runs % PRIORITY_DECREASE == 0) {
                 process->sched.queue_priority =
-                    process->sched.priority + (process->sched.runs / PRIORITY_DECREASE);
+                    process->sched.priority
+                    + ((process->sched.runs / PRIORITY_DECREASE) % MAX_PRIORITY);
             } else {
                 process->sched.queue_priority = process->sched.priority;
             }

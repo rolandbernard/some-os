@@ -36,9 +36,9 @@ void printSyscall(bool is_kernel, TrapFrame* frame, SyscallArgs args) {
         str = virtPtrForKernel((void*)args[0]);
     } else {
         Process* process = (Process*)frame;
-        str = virtPtrFor(args[0], process->memory.table);
+        str = virtPtrFor(args[0], process->memory.mem);
     }
     size_t length = strlenVirtPtr(str);
-    virtPtrPartsDo(str, length, writeVirtPtrString, NULL);
+    virtPtrPartsDo(str, length, writeVirtPtrString, NULL, false);
 }
 

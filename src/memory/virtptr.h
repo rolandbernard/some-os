@@ -4,12 +4,13 @@
 #include <stddef.h>
 
 #include "memory/pagetable.h"
+#include "memory/memspace.h"
 
 // This includes utility functions for handling pointers to other memory spaces
 
 typedef struct {
     uintptr_t address;
-    PageTable* table;
+    MemorySpace* table;
 } VirtPtr;
 
 typedef struct {
@@ -20,14 +21,14 @@ typedef struct {
 
 VirtPtr virtPtrForKernel(void* addr);
 
-VirtPtr virtPtrFor(uintptr_t addr, PageTable* table);
+VirtPtr virtPtrFor(uintptr_t addr, MemorySpace* mem);
 
 // Parts are segments of the buffer in the same page
-size_t getVirtPtrParts(VirtPtr addr, size_t length, VirtPtrBufferPart* parts, size_t max_parts);
+size_t getVirtPtrParts(VirtPtr addr, size_t length, VirtPtrBufferPart* parts, size_t max_parts, bool write);
 
 typedef void* (*VirtPtrPartsDoCallback)(VirtPtrBufferPart part, void* udata);
 
-void* virtPtrPartsDo(VirtPtr addr, size_t length, VirtPtrPartsDoCallback callback, void* udata);
+void* virtPtrPartsDo(VirtPtr addr, size_t length, VirtPtrPartsDoCallback callback, void* udata, bool write);
 
 void memcpyBetweenVirtPtr(VirtPtr dest, VirtPtr src, size_t n);
 

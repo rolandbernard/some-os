@@ -10,6 +10,7 @@
 #include "interrupt/syscall.h"
 #include "interrupt/timer.h"
 #include "interrupt/trap.h"
+#include "memory/memspace.h"
 #include "memory/virtmem.h"
 #include "process/process.h"
 #include "process/schedule.h"
@@ -103,13 +104,29 @@ void kernelTrap(uintptr_t cause, uintptr_t pc, uintptr_t val, TrapFrame* frame) 
                 case 11: // Environment call from M-mode
                     runSyscall(frame, true);
                     break;
+                case 12: // Instruction page fault
+                case 13: // Load page fault
+                case 15: // Store/AMO page fault
+                    if (frame->hart == NULL) {
+                        if (!handlePageFault(kernel_page_table, val)) {
+                            KERNEL_LOG("[!] Unhandled exception: %p %p %p %s", pc, val, frame, getCauseString(interrupt, code));
+                            panic();
+                        }
+                    } else {
+                        Process* process = (Process*)frame;
+                        if (!handlePageFault(process->memory.mem, val)) {
+                            KERNEL_LOG("[!] Segmentation fault: %i %p %p %p %s", process->pid, pc, val, frame, getCauseString(interrupt, code));
+                            addSignalToProcess(process, SIGSEGV);
+                        }
+                    }
+                    break;
                 default:
-                    if (frame->hart == NULL || ((Process*)frame)->pid == 0) {
+                    if (frame->hart == NULL) {
                         KERNEL_LOG("[!] Unhandled exception: %p %p %p %s", pc, val, frame, getCauseString(interrupt, code));
                         panic();
                     } else {
-                        KERNEL_LOG("[!] Segmentation fault: %p %p %p %s", pc, val, frame, getCauseString(interrupt, code));
                         Process* process = (Process*)frame;
+                        KERNEL_LOG("[!] Segmentation fault: %i %p %p %p %s", process->pid, pc, val, frame, getCauseString(interrupt, code));
                         addSignalToProcess(process, SIGSEGV);
                     }
                     break;

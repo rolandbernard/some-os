@@ -45,7 +45,7 @@ static void handleActualSignal(Process* process, Signal signal) {
     } else {
         // Otherwise enter the given signal handler
         // Copy the current trap frame (to be restored later)
-        VirtPtr stack_pointer = virtPtrFor(process->frame.regs[REG_STACK_POINTER], process->memory.table);
+        VirtPtr stack_pointer = virtPtrFor(process->frame.regs[REG_STACK_POINTER], process->memory.mem);
         PUSH_TO_VIRTPTR(stack_pointer, process->signals.restore_frame);
         PUSH_TO_VIRTPTR(stack_pointer, process->signals.current_signal);
         PUSH_TO_VIRTPTR(stack_pointer, process->frame.pc);
@@ -78,7 +78,7 @@ void handlePendingSignals(Process* process) {
 void returnFromSignal(Process* process) {
     lockSpinLock(&process->signals.lock);
     if (process->signals.current_signal != SIGNONE) {
-        VirtPtr stack_pointer = virtPtrFor(process->signals.restore_frame, process->memory.table);
+        VirtPtr stack_pointer = virtPtrFor(process->signals.restore_frame, process->memory.mem);
         POP_FROM_VIRTPTR(stack_pointer, process->frame.regs);
         POP_FROM_VIRTPTR(stack_pointer, process->frame.fregs);
         POP_FROM_VIRTPTR(stack_pointer, process->frame.pc);

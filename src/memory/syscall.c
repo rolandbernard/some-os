@@ -5,6 +5,7 @@
 
 #include "memory/pagealloc.h"
 #include "memory/pagetable.h"
+#include "memory/memspace.h"
 #include "util/util.h"
 
 static uintptr_t changeProcessBreak(Process* process, intptr_t change) {
@@ -19,28 +20,16 @@ static uintptr_t changeProcessBreak(Process* process, intptr_t change) {
         return old_brk;
     } else if (page_end > page_start) {
         for (uintptr_t i = page_start; i < page_end; i += PAGE_SIZE) {
-            void* page = allocPage();
-            if (page == NULL) {
-                // Can't allocate more space
-                // Free all new pages
-                for (uintptr_t j = i - PAGE_SIZE; j >= page_start; j -= PAGE_SIZE) {
-                    deallocPage((void*)virtToPhys(process->memory.table, j));
-                    unmapPage(process->memory.table, j);
-                }
-                return -1;
-            } else {
-                mapPage(
-                    process->memory.table, i, (uintptr_t)page,
-                    PAGE_ENTRY_USER | PAGE_ENTRY_RW | PAGE_ENTRY_AD, 0
-                );
-            }
+            mapPage(
+                process->memory.mem, i, (uintptr_t)zero_page,
+                PAGE_ENTRY_USER | PAGE_ENTRY_READ | PAGE_ENTRY_AD | PAGE_ENTRY_COPY, 0
+            );
         }
         process->memory.brk = end;
         return old_brk;
     } else {
         for (uintptr_t i = page_end; i < page_start; i += PAGE_SIZE) {
-            deallocPage((void*)virtToPhys(process->memory.table, i));
-            unmapPage(process->memory.table, i);
+            unmapAndFreePage(process->memory.mem, i);
         }
         process->memory.brk = end;
         return old_brk;
@@ -91,7 +80,7 @@ void protectSyscall(bool is_kernel, TrapFrame* frame, SyscallArgs args) {
                 .end = (addr + length + PAGE_SIZE - 1) & -PAGE_SIZE,
                 .protect = protect,
             };
-            allPagesDo(process->memory.table, allPagesProtectCallback, &request);
+            allPagesDo(process->memory.mem, allPagesProtectCallback, &request);
         }
         process->frame.regs[REG_ARGUMENT_0] = 0;
     }

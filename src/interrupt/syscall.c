@@ -61,7 +61,7 @@ void runSyscall(TrapFrame* frame, bool is_kernel) {
 }
 
 char* copyStringFromSyscallArgs(Process* process, uintptr_t ptr) {
-    VirtPtr str = virtPtrFor(ptr, process->memory.table);
+    VirtPtr str = virtPtrFor(ptr, process->memory.mem);
     size_t length = strlenVirtPtr(str);
     char* string = kalloc(length + 1);
     if (string != NULL) {

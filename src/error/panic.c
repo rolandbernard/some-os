@@ -7,7 +7,6 @@
 noreturn void panic() {
     KERNEL_LOG("[!] Kernel panic!");
     sendMessageToAll(KERNEL_PANIC, NULL);
-    sendMessageToSelf(KERNEL_PANIC, NULL);
     silentPanic();
 }
 

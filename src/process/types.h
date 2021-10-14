@@ -7,6 +7,7 @@
 #include <stddef.h>
 
 #include "memory/pagetable.h"
+#include "memory/memspace.h"
 #include "util/spinlock.h"
 #include "files/vfs.h"
 
@@ -102,7 +103,7 @@ typedef struct {
 } ProcessScheduling;
 
 typedef struct {
-    PageTable* table;
+    MemorySpace* mem;
     void* stack; // This is only used for a kernel process
     uintptr_t start_brk;
     uintptr_t brk;

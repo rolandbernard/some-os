@@ -87,7 +87,7 @@ void forkSyscall(bool is_kernel, TrapFrame* frame, SyscallArgs args) {
         enqueueProcess(new_process);
     } else {
         Process* new_process = createChildUserProcess(process);
-        if (new_process != NULL && copyAllPagesAndAllocUsers(new_process->memory.table, process->memory.table)) {
+        if (new_process != NULL && new_process->memory.mem != NULL) {
             // Copy frame
             new_process->frame.pc = process->frame.pc;
             memcpy(&new_process->frame.regs, &process->frame.regs, sizeof(process->frame.regs));
@@ -194,8 +194,8 @@ void sigactionSyscall(bool is_kernel, TrapFrame* frame, SyscallArgs args) {
             .handler = process->signals.handlers[sig].handler,
             .restorer = process->signals.handlers[sig].restorer,
         };
-        VirtPtr new = virtPtrFor(args[1], process->memory.table);
-        VirtPtr old = virtPtrFor(args[2], process->memory.table);
+        VirtPtr new = virtPtrFor(args[1], process->memory.mem);
+        VirtPtr old = virtPtrFor(args[2], process->memory.mem);
         if (old.address != 0) {
             memcpyBetweenVirtPtr(old, virtPtrForKernel(&sigaction), sizeof(SignalAction));
         }
