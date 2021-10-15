@@ -4,10 +4,6 @@
 #include <unistd.h>
 #include <stdio.h>
 
-void __trunctfdf2() {
-    // Just here to avoid linker error
-}
-
 int main(int argc, char* argv[], char* env[]) {
     int pid = fork();
     if (pid == 0) {
