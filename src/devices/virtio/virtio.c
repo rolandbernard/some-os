@@ -59,6 +59,19 @@ VirtIODevice* getAnyDeviceOfType(VirtIODeviceType type) {
     return NULL;
 }
 
+VirtIODevice* getDeviceOfType(VirtIODeviceType type, size_t n) {
+    for (int i = 0; i < VIRTIO_DEVICE_COUNT; i++) {
+        if (devices[i] != NULL && devices[i]->type == type) {
+            if (n == 0) {
+                return devices[i];
+            } else {
+                n--;
+            }
+        }
+    }
+    return NULL;
+}
+
 size_t getDeviceCountOfType(VirtIODeviceType type) {
     size_t count = 0;
     for (int i = 0; i < VIRTIO_DEVICE_COUNT; i++) {

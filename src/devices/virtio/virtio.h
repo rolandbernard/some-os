@@ -152,6 +152,8 @@ VirtIODevice* getDeviceWithId(int id);
 
 VirtIODevice* getAnyDeviceOfType(VirtIODeviceType type);
 
+VirtIODevice* getDeviceOfType(VirtIODeviceType type, size_t n);
+
 size_t getDeviceCountOfType(VirtIODeviceType type);
 
 void getDevicesOfType(VirtIODeviceType type, VirtIODevice** devices);

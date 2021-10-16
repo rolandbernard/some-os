@@ -184,14 +184,19 @@ void vfsOpen(VirtualFilesystem* fs, Uid uid, Gid gid, const char* path, VfsOpenF
             }
             case MOUNT_TYPE_FS: {
                 VfsFilesystem* filesystem = (VfsFilesystem*)mount->data;
-                const char* moved = path;
-                if (mount->path[1] != 0) {
-                    // If the mount is not to '/' remove the prefix.
-                    // e.g. if the mount is to '/mnt' remove '/mnt' from '/mnt/test'
-                    moved += strlen(mount->path);
+                if (filesystem->functions->open != NULL) {
+                    const char* moved = path;
+                    if (mount->path[1] != 0) {
+                        // If the mount is not to '/' remove the prefix.
+                        // e.g. if the mount is to '/mnt' remove '/mnt' from '/mnt/test'
+                        moved += strlen(mount->path);
+                    }
+                    unlockSpinLock(&fs->lock);
+                    filesystem->functions->open(filesystem, uid, gid, moved, flags, mode, callback, udata);
+                } else {
+                    unlockSpinLock(&fs->lock);
+                    callback(simpleError(UNSUPPORTED), NULL, udata);
                 }
-                unlockSpinLock(&fs->lock);
-                filesystem->functions->open(filesystem, uid, gid, moved, flags, mode, callback, udata);
                 return;
             }
             case MOUNT_TYPE_BIND: panic(); // Can't happen. Would return NULL.
@@ -215,7 +220,11 @@ void vfsUnlink(VirtualFilesystem* fs, Uid uid, Gid gid, const char* path, VfsFun
             case MOUNT_TYPE_FS: {
                 VfsFilesystem* filesystem = (VfsFilesystem*)mount->data;
                 unlockSpinLock(&fs->lock);
-                filesystem->functions->unlink(filesystem, uid, gid, path, callback, udata);
+                if (filesystem->functions->unlink != NULL) {
+                    filesystem->functions->unlink(filesystem, uid, gid, path, callback, udata);
+                } else {
+                    callback(simpleError(UNSUPPORTED), udata);
+                }
                 break;
             }
             case MOUNT_TYPE_BIND: panic(); // Can't happen. Would return NULL.
@@ -235,7 +244,11 @@ void vfsLink(VirtualFilesystem* fs, Uid uid, Gid gid, const char* old, const cha
             // Linking across filesystem boundaries is impossible
             VfsFilesystem* filesystem = (VfsFilesystem*)mount_old->data;
             unlockSpinLock(&fs->lock);
-            filesystem->functions->link(filesystem, uid, gid, old, new, callback, udata);
+            if (filesystem->functions->link != NULL) {
+                filesystem->functions->link(filesystem, uid, gid, old, new, callback, udata);
+            } else {
+                callback(simpleError(UNSUPPORTED), udata);
+            }
         } else {
             unlockSpinLock(&fs->lock);
             callback(simpleError(UNSUPPORTED), udata);
@@ -256,7 +269,11 @@ void vfsRename(VirtualFilesystem* fs, Uid uid, Gid gid, const char* old, const c
             // Moving across filesystem boundaries requires copying
             VfsFilesystem* filesystem = (VfsFilesystem*)mount_old->data;
             unlockSpinLock(&fs->lock);
-            filesystem->functions->rename(filesystem, uid, gid, old, new, callback, udata);
+            if (filesystem->functions->link != NULL) {
+                filesystem->functions->rename(filesystem, uid, gid, old, new, callback, udata);
+            } else {
+                callback(simpleError(UNSUPPORTED), udata);
+            }
         } else {
             unlockSpinLock(&fs->lock);
             callback(simpleError(UNSUPPORTED), udata);
