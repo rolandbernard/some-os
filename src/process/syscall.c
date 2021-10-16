@@ -234,6 +234,40 @@ void killSyscall(bool is_kernel, TrapFrame* frame, SyscallArgs args) {
     process->frame.regs[REG_ARGUMENT_0] = doForProcessWithPid(pid, killSyscallCallback, process);
 }
 
+void setUidSyscall(bool is_kernel, TrapFrame* frame, SyscallArgs args) {
+    assert(frame->hart != NULL);
+    Process* process = (Process*)frame;
+    if (process->resources.uid == 0 || process->resources.gid == 0) {
+        process->resources.uid = args[0];
+        process->frame.regs[REG_ARGUMENT_0] = -SUCCESS;
+    } else {
+        process->frame.regs[REG_ARGUMENT_0] = -FORBIDDEN;
+    }
+}
+
+void setGidSyscall(bool is_kernel, TrapFrame* frame, SyscallArgs args) {
+    assert(frame->hart != NULL);
+    Process* process = (Process*)frame;
+    if (process->resources.uid == 0 || process->resources.gid == 0) {
+        process->resources.gid = args[0];
+        process->frame.regs[REG_ARGUMENT_0] = -SUCCESS;
+    } else {
+        process->frame.regs[REG_ARGUMENT_0] = -FORBIDDEN;
+    }
+}
+
+void getUidSyscall(bool is_kernel, TrapFrame* frame, SyscallArgs args) {
+    assert(frame->hart != NULL);
+    Process* process = (Process*)frame;
+    process->frame.regs[REG_ARGUMENT_0] = process->resources.uid;
+}
+
+void getGidSyscall(bool is_kernel, TrapFrame* frame, SyscallArgs args) {
+    assert(frame->hart != NULL);
+    Process* process = (Process*)frame;
+    process->frame.regs[REG_ARGUMENT_0] = process->resources.gid;
+}
+
 void exit() {
     syscall(SYSCALL_EXIT);
     panic(); // This will never return

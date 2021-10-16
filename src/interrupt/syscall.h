@@ -34,6 +34,10 @@ typedef enum {
     SYSCALL_SIGACTION = 27,
     SYSCALL_SIGRETURN = 28,
     SYSCALL_KILL = 29,
+    SYSCALL_GETUID = 30,
+    SYSCALL_GETGID = 31,
+    SYSCALL_SETUID = 32,
+    SYSCALL_SETGID = 33,
 } Syscalls;
 
 // Simple wrapper around ecall

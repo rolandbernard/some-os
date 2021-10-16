@@ -23,6 +23,14 @@ void sigreturnSyscall(bool is_kernel, TrapFrame* frame, SyscallArgs args);
 
 void killSyscall(bool is_kernel, TrapFrame* frame, SyscallArgs args);
 
+void setUidSyscall(bool is_kernel, TrapFrame* frame, SyscallArgs args);
+
+void setGidSyscall(bool is_kernel, TrapFrame* frame, SyscallArgs args);
+
+void getUidSyscall(bool is_kernel, TrapFrame* frame, SyscallArgs args);
+
+void getGidSyscall(bool is_kernel, TrapFrame* frame, SyscallArgs args);
+
 void exit();
 
 #endif

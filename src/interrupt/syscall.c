@@ -44,6 +44,10 @@ SyscallFunction syscall_table[TABLE_SIZE] = {
     [SYSCALL_SIGACTION] = sigactionSyscall,
     [SYSCALL_SIGRETURN] = sigreturnSyscall,
     [SYSCALL_KILL] = killSyscall,
+    [SYSCALL_GETUID] = getUidSyscall,
+    [SYSCALL_GETGID] = getGidSyscall,
+    [SYSCALL_SETUID] = setUidSyscall,
+    [SYSCALL_SETGID] = setGidSyscall,
 };
 
 void registerSyscall(int kind, SyscallFunction function) {

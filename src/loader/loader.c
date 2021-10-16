@@ -25,6 +25,7 @@ typedef struct {
     void* udata;
     VfsFile* file;
     PageTable* memory;
+    VfsStat file_stat;
 } LoadProgramRequest;
 
 static size_t stringArrayLength(VirtPtr addr) {
@@ -111,6 +112,12 @@ static void readElfFileCallback(Error error, uintptr_t entry, void* udata) {
             deallocMemorySpace(request->memory);
             freePageTable(request->process->memory.mem);
         }
+        if (request->file_stat.mode & VFS_MODE_SETUID) {
+            request->process->resources.uid = request->file_stat.uid;
+        }
+        if (request->file_stat.mode & VFS_MODE_SETGID) {
+            request->process->resources.gid = request->file_stat.gid;
+        }
         request->process->memory.stack = NULL;
         request->process->memory.mem = request->memory;
         request->process->memory.start_brk = start_brk;
@@ -142,6 +149,19 @@ static void readElfFileCallback(Error error, uintptr_t entry, void* udata) {
     }
 }
 
+static void fileStatCallback(Error error, VfsStat stat, void* udata) {
+    LoadProgramRequest* request = (LoadProgramRequest*)udata;
+    if (isError(error)) {
+        request->file->functions->close(request->file, 0, 0, noop, NULL);
+        request->callback(error, request->udata);
+        dealloc(request);
+    } else {
+        request->file_stat = stat;
+        request->memory = createPageTable();
+        loadProgramFromElfFile(request->memory, request->file, readElfFileCallback, request);
+    }
+}
+
 static void openFileCallback(Error error, VfsFile* file, void* udata) {
     LoadProgramRequest* request = (LoadProgramRequest*)udata;
     if (isError(error)) {
@@ -149,8 +169,7 @@ static void openFileCallback(Error error, VfsFile* file, void* udata) {
         dealloc(request);
     } else {
         request->file = file;
-        request->memory = createPageTable();
-        loadProgramFromElfFile(request->memory, file, readElfFileCallback, request);
+        file->functions->stat(file, 0, 0, fileStatCallback, request);
     }
 }
 
