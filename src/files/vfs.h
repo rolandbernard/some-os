@@ -34,6 +34,8 @@ typedef enum {
     VFS_OPEN_REGULAR = (1 << 7),
     VFS_OPEN_CLOEXEC = (1 << 8),
     VFS_OPEN_EXCL = (1 << 9),
+    VFS_OPEN_RDONLY = (1 << 10),
+    VFS_OPEN_WRONLY = (1 << 11),
 } VfsOpenFlags;
 
 #define OPEN_ACCESS(open_flags) ((open_flags >> 4) & 0b111)
@@ -64,6 +66,8 @@ typedef enum {
 
 typedef enum {
     VFS_FILE_CLOEXEC = (1 << 0),
+    VFS_FILE_RDONLY = (1 << 1),
+    VFS_FILE_WRONLY = (1 << 2),
 } VfsFileFlags;
 
 #define VFS_MODE_A_RW (VFS_MODE_A_R | VFS_MODE_A_W)

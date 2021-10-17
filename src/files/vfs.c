@@ -185,14 +185,23 @@ void vfsOpen(VirtualFilesystem* fs, Uid uid, Gid gid, const char* path, VfsOpenF
             case MOUNT_TYPE_FS: {
                 VfsFilesystem* filesystem = (VfsFilesystem*)mount->data;
                 if (filesystem->functions->open != NULL) {
-                    const char* moved = path;
-                    if (mount->path[1] != 0) {
+                    size_t mount_length = strlen(mount->path);
+                    size_t path_length = strlen(path);
+                    char* path_copy = stringClone(path);
+                    if (mount_length != 1) {
                         // If the mount is not to '/' remove the prefix.
-                        // e.g. if the mount is to '/mnt' remove '/mnt' from '/mnt/test'
-                        moved += strlen(mount->path);
+                        if (mount_length == path_length) {
+                            // If the mount point is equal to the requested path,
+                            // the result is '/'
+                            memcpy(path_copy, "/", 2);
+                        } else {
+                            // e.g. if the mount is to '/mnt' remove '/mnt' from '/mnt/test'
+                            memmove(path_copy, path_copy + mount_length, path_length - mount_length + 1);
+                        }
                     }
                     unlockSpinLock(&fs->lock);
-                    filesystem->functions->open(filesystem, uid, gid, moved, flags, mode, callback, udata);
+                    filesystem->functions->open(filesystem, uid, gid, path_copy, flags, mode, callback, udata);
+                    dealloc(path_copy);
                 } else {
                     unlockSpinLock(&fs->lock);
                     callback(simpleError(UNSUPPORTED), NULL, udata);
@@ -457,6 +466,6 @@ void createFilesystemFrom(VirtualFilesystem* fs, const char* path, const char* t
     request->type = stringClone(type);
     request->callback = callback;
     request->udata = udata;
-    vfsOpen(fs, 0, 0, path, 0, 0, (VfsFunctionCallbackFile)createFsOpenCallback, request);
+    vfsOpen(fs, 0, 0, path, VFS_OPEN_READ, 0, (VfsFunctionCallbackFile)createFsOpenCallback, request);
 }
 

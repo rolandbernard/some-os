@@ -69,6 +69,12 @@ static void openCallback(Error error, VfsFile* file, void* udata) {
         if ((process->frame.regs[REG_ARGUMENT_2] & VFS_OPEN_CLOEXEC) != 0) {
             flags |= VFS_FILE_CLOEXEC;
         }
+        if ((process->frame.regs[REG_ARGUMENT_2] & VFS_OPEN_RDONLY) != 0) {
+            flags |= VFS_FILE_RDONLY;
+        }
+        if ((process->frame.regs[REG_ARGUMENT_2] & VFS_OPEN_WRONLY) != 0) {
+            flags |= VFS_FILE_WRONLY;
+        }
         putNewFileDescriptor(process, fd, flags, file);
         process->frame.regs[REG_ARGUMENT_0] = fd;
     }
@@ -158,13 +164,17 @@ void renameSyscall(bool is_kernel, TrapFrame* frame, SyscallArgs args) {
     }
 }
 
-#define FILE_SYSCALL_OP(NAME, DO) \
+#define FILE_SYSCALL_OP(READ, WRITE, NAME, DO) \
     assert(frame->hart != NULL); \
     Process* process = (Process*)frame; \
     size_t fd = args[0]; \
     VfsFile* file = getFileDescriptor(process, fd); \
     if (file != NULL) { \
-        if (file->functions->NAME != NULL) { \
+        if ((file->flags & VFS_FILE_RDONLY) != 0 && WRITE) { \
+            process->frame.regs[REG_ARGUMENT_0] = -UNSUPPORTED; \
+        } else if ((file->flags & VFS_FILE_WRONLY) != 0 && READ) { \
+            process->frame.regs[REG_ARGUMENT_0] = -UNSUPPORTED; \
+        } else if (file->functions->NAME != NULL) { \
             moveToSchedState(process, WAITING); \
             DO; \
         } else { \
@@ -176,7 +186,7 @@ void renameSyscall(bool is_kernel, TrapFrame* frame, SyscallArgs args) {
     
 
 void closeSyscall(bool is_kernel, TrapFrame* frame, SyscallArgs args) {
-    FILE_SYSCALL_OP(close, {
+    FILE_SYSCALL_OP(false, false, close, {
         removeFileDescriptor(process, fd);
         file->functions->close(
             file, process->resources.uid, process->resources.gid, voidSyscallCallback, process
@@ -196,7 +206,7 @@ static void sizeTSyscallCallback(Error error, size_t size, void* udata) {
 }
 
 void readSyscall(bool is_kernel, TrapFrame* frame, SyscallArgs args) {
-    FILE_SYSCALL_OP(read, {
+    FILE_SYSCALL_OP(true, false, read, {
         file->functions->read(
             file, process->resources.uid, process->resources.gid,
             virtPtrFor(args[1], process->memory.mem), args[2], sizeTSyscallCallback, process
@@ -205,7 +215,7 @@ void readSyscall(bool is_kernel, TrapFrame* frame, SyscallArgs args) {
 }
 
 void writeSyscall(bool is_kernel, TrapFrame* frame, SyscallArgs args) {
-    FILE_SYSCALL_OP(write, {
+    FILE_SYSCALL_OP(false, true, write, {
         file->functions->write(
             file, process->resources.uid, process->resources.gid,
             virtPtrFor(args[1], process->memory.mem), args[2], sizeTSyscallCallback, process
@@ -214,7 +224,7 @@ void writeSyscall(bool is_kernel, TrapFrame* frame, SyscallArgs args) {
 }
 
 void seekSyscall(bool is_kernel, TrapFrame* frame, SyscallArgs args) {
-    FILE_SYSCALL_OP(seek, {
+    FILE_SYSCALL_OP(false, false, seek, {
         file->functions->seek(
             file, process->resources.uid, process->resources.gid, args[1], args[2],
             sizeTSyscallCallback, process
@@ -234,7 +244,7 @@ static void statSyscallCallback(Error error, VfsStat stat, void* udata) {
 }
 
 void statSyscall(bool is_kernel, TrapFrame* frame, SyscallArgs args) {
-    FILE_SYSCALL_OP(stat, {
+    FILE_SYSCALL_OP(false, false, stat, {
         file->functions->stat(
             file, process->resources.uid, process->resources.gid, statSyscallCallback, process
         );
@@ -249,6 +259,12 @@ static void dupCallback(Error error, VfsFile* file, void* udata) {
         int flags = 0;
         if ((process->frame.regs[REG_ARGUMENT_3] & VFS_OPEN_CLOEXEC) != 0) {
             flags |= VFS_FILE_CLOEXEC;
+        }
+        if ((process->frame.regs[REG_ARGUMENT_2] & VFS_OPEN_RDONLY) != 0) {
+            flags |= VFS_FILE_RDONLY;
+        }
+        if ((process->frame.regs[REG_ARGUMENT_2] & VFS_OPEN_WRONLY) != 0) {
+            flags |= VFS_FILE_WRONLY;
         }
         if ((int)process->frame.regs[REG_ARGUMENT_2] < 0) {
             size_t fd = allocateNewFileDescriptor(process);
@@ -274,7 +290,7 @@ static void dupCallback(Error error, VfsFile* file, void* udata) {
 }
 
 void dupSyscall(bool is_kernel, TrapFrame* frame, SyscallArgs args) {
-    FILE_SYSCALL_OP(dup, {
+    FILE_SYSCALL_OP(false, false, dup, {
         file->functions->dup(
             file, process->resources.uid, process->resources.gid, dupCallback, process
         );
@@ -282,7 +298,7 @@ void dupSyscall(bool is_kernel, TrapFrame* frame, SyscallArgs args) {
 }
 
 void truncSyscall(bool is_kernel, TrapFrame* frame, SyscallArgs args) {
-    FILE_SYSCALL_OP(trunc, {
+    FILE_SYSCALL_OP(false, true, trunc, {
         file->functions->trunc(
             file, process->resources.uid, process->resources.gid, args[1], voidSyscallCallback, process
         );
@@ -290,7 +306,7 @@ void truncSyscall(bool is_kernel, TrapFrame* frame, SyscallArgs args) {
 }
 
 void chmodSyscall(bool is_kernel, TrapFrame* frame, SyscallArgs args) {
-    FILE_SYSCALL_OP(chmod, {
+    FILE_SYSCALL_OP(false, true, chmod, {
         file->functions->chmod(
             file, process->resources.uid, process->resources.gid, args[1], voidSyscallCallback, process
         );
@@ -298,7 +314,7 @@ void chmodSyscall(bool is_kernel, TrapFrame* frame, SyscallArgs args) {
 }
 
 void chownSyscall(bool is_kernel, TrapFrame* frame, SyscallArgs args) {
-    FILE_SYSCALL_OP(chown, {
+    FILE_SYSCALL_OP(false, true, chown, {
         file->functions->chown(
             file, process->resources.uid, process->resources.gid, args[1], args[2], voidSyscallCallback, process
         );
@@ -306,7 +322,7 @@ void chownSyscall(bool is_kernel, TrapFrame* frame, SyscallArgs args) {
 }
 
 void readdirSyscall(bool is_kernel, TrapFrame* frame, SyscallArgs args) {
-    FILE_SYSCALL_OP(readdir, {
+    FILE_SYSCALL_OP(true, false, readdir, {
         file->functions->readdir(
             file, process->resources.uid, process->resources.gid,
             virtPtrFor(args[1], process->memory.mem), args[2], sizeTSyscallCallback, process
