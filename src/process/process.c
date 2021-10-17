@@ -251,7 +251,7 @@ void dumpProcessInfo(Process* process) {
         logKernelMessage("stack:\n");
         for (int i = 0; i < 128; i++) {
             intptr_t vaddr = process->frame.regs[REG_STACK_POINTER] + i * 8;
-            uint64_t* maddr = (uint64_t*)virtToPhys(process->memory.mem, vaddr, false);
+            uint64_t* maddr = (uint64_t*)virtToPhys(process->memory.mem, vaddr, false, false);
             if (maddr != NULL) {
                 logKernelMessage("\t*%p(%p) = %14lx\n", vaddr, maddr, *maddr);
             }

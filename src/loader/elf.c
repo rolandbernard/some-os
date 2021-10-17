@@ -106,8 +106,9 @@ static void loadProgramSegment(LoadElfFileRequest* request) {
         } else {
             if (allocatePages(request->table, header->vaddr, header->filesz, header->memsz, header->flags)) {
                 request->size = umin(header->memsz, header->filesz);
+                // Using an unsafeVirtPtr here because we might not have write permissions
                 vfsReadAt(
-                    request->file, 0, 0, virtPtrFor(header->vaddr, request->table), request->size,
+                    request->file, 0, 0, unsafeVirtPtrFor(header->vaddr, request->table), request->size,
                     header->off, readProgramSegmentCallback, request
                 );
             } else {

@@ -13,7 +13,7 @@ MemorySpace* createMemorySpace();
 // Return true if handled successfully
 bool handlePageFault(MemorySpace* mem, uintptr_t address);
 
-uintptr_t virtToPhys(MemorySpace* mem, uintptr_t vaddr, bool write);
+uintptr_t virtToPhys(MemorySpace* mem, uintptr_t vaddr, bool write, bool allow_all);
 
 void unmapAndFreePage(MemorySpace* mem, uintptr_t vaddr);
 

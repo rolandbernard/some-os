@@ -11,6 +11,7 @@
 typedef struct {
     uintptr_t address;
     MemorySpace* table;
+    bool allow_all;
 } VirtPtr;
 
 typedef struct {
@@ -22,6 +23,8 @@ typedef struct {
 VirtPtr virtPtrForKernel(void* addr);
 
 VirtPtr virtPtrFor(uintptr_t addr, MemorySpace* mem);
+
+VirtPtr unsafeVirtPtrFor(uintptr_t addr, MemorySpace* mem);
 
 // Parts are segments of the buffer in the same page
 size_t getVirtPtrParts(VirtPtr addr, size_t length, VirtPtrBufferPart* parts, size_t max_parts, bool write);

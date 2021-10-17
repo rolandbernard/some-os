@@ -57,7 +57,7 @@ bool handlePageFault(MemorySpace* mem, uintptr_t address) {
     }
 }
 
-uintptr_t virtToPhys(MemorySpace* mem, uintptr_t vaddr, bool write) {
+uintptr_t virtToPhys(MemorySpace* mem, uintptr_t vaddr, bool write, bool allow_all) {
     PageTableEntry* entry = virtToEntry(mem, vaddr);
     if (entry == NULL) {
         return 0;
@@ -68,14 +68,19 @@ uintptr_t virtToPhys(MemorySpace* mem, uintptr_t vaddr, bool write) {
             if (handlePageFault(mem, vaddr)) {
                 return (entry->paddr << 12);
             } else {
+                // Don't allow writing copy-on-write pages, even if allow_all_write is true
                 // Page fault?
                 return 0;
             }
+        } else if (allow_all) {
+            // Even if this page does not normally allow writing, write it anyways.
+            // It is not a copy-on-write page, so everything should be ok.
+            return unsafeVirtToPhys(mem, vaddr);
         } else {
             return 0;
         }
     } else {
-        if ((entry->bits & PAGE_ENTRY_READ) != 0) {
+        if ((entry->bits & PAGE_ENTRY_READ) != 0 || allow_all) {
             return unsafeVirtToPhys(mem, vaddr);
         } else {
             return 0;
