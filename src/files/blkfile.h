@@ -21,7 +21,6 @@ typedef struct {
     size_t size;
     size_t block_size;
     BlockOperationFunction block_operation;
-    size_t ino;
 } BlockDeviceFile;
 
 BlockDeviceFile* createBlockDeviceFile(size_t ino, void* block_dev, size_t block_size, size_t size, BlockOperationFunction block_op);

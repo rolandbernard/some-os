@@ -3,10 +3,12 @@
 
 #include "error/error.h"
 #include "files/blkfile.h"
+#include "kernel/time.h"
 #include "memory/kalloc.h"
 #include "memory/virtptr.h"
 #include "error/log.h"
 #include "util/util.h"
+#include "devices/devfs.h"
 
 static void blockSeekFunction(BlockDeviceFile* file, Uid uid, Gid gid, size_t offset, VfsSeekWhence whence, VfsFunctionCallbackSizeT callback, void* udata) {
     lockSpinLock(&file->lock);
@@ -164,16 +166,17 @@ static void blockWriteFunction(BlockDeviceFile* file, Uid uid, Gid gid, VirtPtr 
 static void blockStatFunction(BlockDeviceFile* file, Uid uid, Gid gid, VfsFunctionCallbackStat callback, void* udata) {
     lockSpinLock(&file->lock);
     VfsStat ret = {
-        .id = file->ino,
+        .id = file->base.ino,
         .mode = TYPE_MODE(VFS_TYPE_BLOCK) | VFS_MODE_OG_RW,
         .nlinks = 0,
         .uid = 0,
         .gid = 0,
         .size = file->block_size,
         .block_size = file->block_size,
-        .st_atime = 0,
-        .st_mtime = 0,
-        .st_ctime = 0,
+        .st_atime = getNanoseconds(),
+        .st_mtime = getNanoseconds(),
+        .st_ctime = getNanoseconds(),
+        .dev = DEV_INO,
     };
     unlockSpinLock(&file->lock);
     callback(simpleError(SUCCESS), ret, udata);
@@ -206,11 +209,11 @@ static const VfsFileVtable functions = {
 BlockDeviceFile* createBlockDeviceFile(size_t ino, void* block_dev, size_t block_size, size_t size, BlockOperationFunction block_op) {
     BlockDeviceFile* file = zalloc(sizeof(BlockDeviceFile));
     file->base.functions = &functions;
+    file->base.ino = ino;
     file->device = block_dev;
     file->size = size;
     file->block_size = block_size;
     file->block_operation = block_op;
-    file->ino = ino;
     return file;
 }
 

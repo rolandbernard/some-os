@@ -11,7 +11,6 @@ typedef struct {
     VfsFile base;
     SpinLock lock;
     Serial serial;
-    size_t ino;
 } SerialDeviceFile;
 
 SerialDeviceFile* createSerialDeviceFile(size_t ino, Serial serial);

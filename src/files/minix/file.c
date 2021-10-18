@@ -459,9 +459,10 @@ static void minixStatINodeCallback(Error error, size_t read, MinixStatRequest* r
             .gid = request->inode.gid,
             .size = request->inode.size,
             .block_size = 1,
-            .st_atime = request->inode.atime,
-            .st_mtime = request->inode.mtime,
-            .st_ctime = request->inode.ctime,
+            .st_atime = request->inode.atime * 1000000000UL,
+            .st_mtime = request->inode.mtime * 1000000000UL,
+            .st_ctime = request->inode.ctime * 1000000000UL,
+            .dev = request->file->fs->block_device->ino,
         };
         request->callback(simpleError(SUCCESS), ret, request->udata);
     }

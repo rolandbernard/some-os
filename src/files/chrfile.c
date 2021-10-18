@@ -3,7 +3,9 @@
 
 #include "files/chrfile.h"
 
+#include "kernel/time.h"
 #include "memory/kalloc.h"
+#include "devices/devfs.h"
 
 static void serialReadFunction(SerialDeviceFile* file, Uid uid, Gid gid, VirtPtr buffer, size_t size, VfsFunctionCallbackSizeT callback, void* udata) {
     Error status;
@@ -38,16 +40,17 @@ static void serialWriteFunction(SerialDeviceFile* file, Uid uid, Gid gid, VirtPt
 static void serialStatFunction(SerialDeviceFile* file, Uid uid, Gid gid, VfsFunctionCallbackStat callback, void* udata) {
     lockSpinLock(&file->lock);
     VfsStat ret = {
-        .id = file->ino,
+        .id = file->base.ino,
         .mode = TYPE_MODE(VFS_TYPE_CHAR) | VFS_MODE_OG_RW,
         .nlinks = 0,
         .uid = 0,
         .gid = 0,
         .size = 0,
         .block_size = 0,
-        .st_atime = 0,
-        .st_mtime = 0,
-        .st_ctime = 0,
+        .st_atime = getNanoseconds(),
+        .st_mtime = getNanoseconds(),
+        .st_ctime = getNanoseconds(),
+        .dev = DEV_INO,
     };
     unlockSpinLock(&file->lock);
     callback(simpleError(SUCCESS), ret, udata);
@@ -79,8 +82,8 @@ static const VfsFileVtable functions = {
 SerialDeviceFile* createSerialDeviceFile(size_t ino, Serial serial) {
     SerialDeviceFile* file = zalloc(sizeof(SerialDeviceFile));
     file->base.functions = &functions;
+    file->base.ino = ino;
     file->serial = serial;
-    file->ino = ino;
     return file;
 }
 

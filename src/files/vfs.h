@@ -94,6 +94,7 @@ typedef struct {
     Time st_atime;
     Time st_mtime;
     Time st_ctime;
+    size_t dev;
 } VfsStat;
 
 typedef struct {
@@ -140,6 +141,7 @@ typedef struct {
 typedef struct VfsFile_s {
     int fd;
     int flags;
+    size_t ino;
     const VfsFileVtable* functions;
 } VfsFile;
 

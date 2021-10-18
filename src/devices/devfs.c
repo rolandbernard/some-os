@@ -9,6 +9,7 @@
 #include "files/blkfile.h"
 #include "files/chrfile.h"
 #include "files/vfs.h"
+#include "kernel/time.h"
 #include "memory/kalloc.h"
 #include "util/util.h"
 
@@ -48,9 +49,10 @@ static void deviceStatFunction(DeviceDirectoryFile* file, Uid uid, Gid gid, VfsF
         .gid = 0,
         .size = countAllDeviceFiles(),
         .block_size = 1,
-        .st_atime = 0,
-        .st_mtime = 0,
-        .st_ctime = 0,
+        .st_atime = getNanoseconds(),
+        .st_mtime = getNanoseconds(),
+        .st_ctime = getNanoseconds(),
+        .dev = DEV_INO,
     };
     unlockSpinLock(&file->lock);
     callback(simpleError(SUCCESS), ret, udata);
@@ -90,8 +92,20 @@ static void deviceReaddirFunction(DeviceDirectoryFile* file, Uid uid, Gid gid, V
     lockSpinLock(&file->lock);
     size_t written = 0;
     size_t position = file->entry;
-    size_t ino = 2;
+    size_t ino = 1;
     if (size != 0) {
+        if (written == 0 && position == 0) {
+            // inode 1
+            written = writeDirectoryEntryNamed(ino, ".", VFS_TYPE_DIR, file->entry, buff, size);
+        }
+        ino++;
+        position--;
+        if (written == 0 && position == 0) {
+            // inode 2
+            written = writeDirectoryEntryNamed(ino, "..", VFS_TYPE_DIR, file->entry, buff, size);
+        }
+        ino++;
+        position--;
         if (written == 0 && position == 0) {
             written = writeDirectoryEntryNamed(ino, "tty0", VFS_TYPE_CHAR, file->entry, buff, size);
         }
@@ -128,7 +142,7 @@ static void deviceOpenFunction(
     DeviceFilesystem* fs, Uid uid, Gid gid, const char* path, VfsOpenFlags flags, VfsMode mode,
     VfsFunctionCallbackFile callback, void* udata
 ) {
-    size_t ino = 1;
+    size_t ino = 2; // Reserved for . and ..
     if (strcmp(path, "/") == 0) {
         VfsFile* file = (VfsFile*)createDeviceDirectoryFile();
         callback(simpleError(SUCCESS), file, udata);

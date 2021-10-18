@@ -3,6 +3,8 @@
 
 #include "files/vfs.h"
 
+#define DEV_INO (size_t)(-1)
+
 // Filesystem mounted as /dev
 
 typedef struct {
