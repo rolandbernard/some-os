@@ -38,8 +38,7 @@ static void serialWriteFunction(SerialDeviceFile* file, Uid uid, Gid gid, VirtPt
 static void serialStatFunction(SerialDeviceFile* file, Uid uid, Gid gid, VfsFunctionCallbackStat callback, void* udata) {
     lockSpinLock(&file->lock);
     VfsStat ret = {
-        // TODO: use real values?
-        .id = 0,
+        .id = file->ino,
         .mode = TYPE_MODE(VFS_TYPE_CHAR) | VFS_MODE_OG_RW,
         .nlinks = 0,
         .uid = 0,
@@ -77,10 +76,11 @@ static const VfsFileVtable functions = {
     .dup = (DupFunction)serialDupFunction,
 };
 
-SerialDeviceFile* createSerialDeviceFile(Serial serial) {
+SerialDeviceFile* createSerialDeviceFile(size_t ino, Serial serial) {
     SerialDeviceFile* file = zalloc(sizeof(SerialDeviceFile));
     file->base.functions = &functions;
     file->serial = serial;
+    file->ino = ino;
     return file;
 }
 

@@ -41,8 +41,7 @@ static void deviceSeekFunction(DeviceDirectoryFile* file, Uid uid, Gid gid, size
 static void deviceStatFunction(DeviceDirectoryFile* file, Uid uid, Gid gid, VfsFunctionCallbackStat callback, void* udata) {
     lockSpinLock(&file->lock);
     VfsStat ret = {
-        // TODO: use real values
-        .id = 0,
+        .id = 1,
         .mode = TYPE_MODE(VFS_TYPE_DIR) | VFS_MODE_O_R | VFS_MODE_G_R | VFS_MODE_A_R,
         .nlinks = 0,
         .uid = 0,
@@ -74,11 +73,11 @@ static void deviceDupFunction(DeviceDirectoryFile* file, Uid uid, Gid gid, VfsFu
     callback(simpleError(SUCCESS), (VfsFile*)copy, udata);
 }
 
-static size_t writeDirectoryEntryNamed(char* name, VfsFileType type, size_t off, VirtPtr buff, size_t size) {
+static size_t writeDirectoryEntryNamed(size_t ino, char* name, VfsFileType type, size_t off, VirtPtr buff, size_t size) {
     size_t name_len = strlen(name);
     size_t entry_size = name_len + 1 + sizeof(VfsDirectoryEntry);
     VfsDirectoryEntry* entry = kalloc(entry_size);
-    entry->id = 0;
+    entry->id = ino;
     entry->off = off;
     entry->len = entry_size;
     entry->type = type;
@@ -91,16 +90,19 @@ static void deviceReaddirFunction(DeviceDirectoryFile* file, Uid uid, Gid gid, V
     lockSpinLock(&file->lock);
     size_t written = 0;
     size_t position = file->entry;
+    size_t ino = 2;
     if (size != 0) {
         if (written == 0 && position == 0) {
-            written = writeDirectoryEntryNamed("tty0", VFS_TYPE_CHAR, file->entry, buff, size);
+            written = writeDirectoryEntryNamed(ino, "tty0", VFS_TYPE_CHAR, file->entry, buff, size);
         }
+        ino++;
         position--;
         size_t num_block = getDeviceCountOfType(VIRTIO_BLOCK);
         if (written == 0 && position < num_block) {
             FORMAT_STRINGX(name, "blk%li", position);
-            written = writeDirectoryEntryNamed(name, VFS_TYPE_BLOCK, file->entry, buff, size);
+            written = writeDirectoryEntryNamed(ino + position, name, VFS_TYPE_BLOCK, file->entry, buff, size);
         }
+        ino += num_block;;
         position -= num_block;
     }
     file->entry++;
@@ -126,16 +128,19 @@ static void deviceOpenFunction(
     DeviceFilesystem* fs, Uid uid, Gid gid, const char* path, VfsOpenFlags flags, VfsMode mode,
     VfsFunctionCallbackFile callback, void* udata
 ) {
+    size_t ino = 1;
     if (strcmp(path, "/") == 0) {
         VfsFile* file = (VfsFile*)createDeviceDirectoryFile();
         callback(simpleError(SUCCESS), file, udata);
         return;
     }
+    ino++;
     if (strcmp(path, "/tty0") == 0) {
-        VfsFile* file = (VfsFile*)createSerialDeviceFile(getDefaultSerialDevice());
+        VfsFile* file = (VfsFile*)createSerialDeviceFile(ino, getDefaultSerialDevice());
         callback(simpleError(SUCCESS), file, udata);
         return;
     }
+    ino++;
     if (strncmp(path, "/blk", 4) == 0 && path[4] != 0) {
         size_t id = 0;
         for (int i = 4; path[i] != 0; i++) {
@@ -153,7 +158,8 @@ static void deviceOpenFunction(
                 if (device != NULL) {
                     VirtIOBlockDeviceLayout* info = (VirtIOBlockDeviceLayout*)device->virtio.mmio;
                     VfsFile* file = (VfsFile*)createBlockDeviceFile(
-                        device, info->config.blk_size, info->config.capacity * info->config.blk_size,
+                        ino + id, device, info->config.blk_size,
+                        info->config.capacity * info->config.blk_size,
                         (BlockOperationFunction)virtIOBlockDeviceOperation
                     );
                     callback(simpleError(SUCCESS), file, udata);
@@ -162,6 +168,7 @@ static void deviceOpenFunction(
             }
         }
     }
+    ino += getDeviceCountOfType(VIRTIO_BLOCK);
     callback(simpleError(NO_SUCH_FILE), NULL, udata);
 }
 

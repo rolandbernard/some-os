@@ -69,15 +69,23 @@ void inlineReducePath(char* path) {
 }
 
 char* reducedPathCopy(const char* path) {
-    char* new_path = stringClone(path);
-    inlineReducePath(new_path);
-    return new_path;
+    if (path != NULL) {
+        char* new_path = stringClone(path);
+        inlineReducePath(new_path);
+        return new_path;
+    } else {
+        return NULL;
+    }
 }
 
 char* stringClone(const char* path) {
-    size_t path_length = strlen(path);
-    char* new_path = kalloc(path_length + 1);
-    memcpy(new_path, path, path_length + 1);
-    return new_path;
+    if (path != NULL) {
+        size_t path_length = strlen(path);
+        char* new_path = kalloc(path_length + 1);
+        memcpy(new_path, path, path_length + 1);
+        return new_path;
+    } else {
+        return NULL;
+    }
 }
 

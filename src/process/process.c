@@ -3,8 +3,11 @@
 #include <assert.h>
 #include <string.h>
 
+#include "process/process.h"
+
 #include "error/log.h"
 #include "error/panic.h"
+#include "files/path.h"
 #include "interrupt/syscall.h"
 #include "interrupt/timer.h"
 #include "interrupt/trap.h"
@@ -15,7 +18,6 @@
 #include "memory/virtmem.h"
 #include "memory/virtptr.h"
 #include "process/harts.h"
-#include "process/process.h"
 #include "process/schedule.h"
 #include "process/signals.h"
 #include "process/syscall.h"
@@ -180,6 +182,7 @@ Process* createChildUserProcess(Process* parent) {
         process->sched.priority = parent->sched.priority;
         process->sched.state = ENQUEUEABLE;
         process->tree.parent = parent;
+        process->resources.cwd = stringClone(process->resources.cwd);
         initTrapFrame(&process->frame, 0, 0, 0, process->pid, process->memory.mem);
         registerProcess(process);
     }

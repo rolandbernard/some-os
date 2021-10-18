@@ -119,6 +119,7 @@ typedef struct {
     int next_fd;
     size_t fd_count;
     VfsFile** filedes;
+    char* cwd;
 } ProcessResources;
 
 typedef struct {

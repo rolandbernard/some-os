@@ -236,7 +236,7 @@ static void statSyscallCallback(Error error, VfsStat stat, void* udata) {
     Process* process = (Process*)udata;
     process->frame.regs[REG_ARGUMENT_0] = -error.kind;
     if (!isError(error)) {
-        VirtPtr ptr = virtPtrFor(process->frame.regs[REG_ARGUMENT_1], process->memory.mem);
+        VirtPtr ptr = virtPtrFor(process->frame.regs[REG_ARGUMENT_2], process->memory.mem);
         memcpyBetweenVirtPtr(ptr, virtPtrForKernel(&stat), sizeof(VfsStat));
     }
     moveToSchedState(process, ENQUEUEABLE);
@@ -394,20 +394,51 @@ void umountSyscall(bool is_kernel, TrapFrame* frame, SyscallArgs args) {
     }
 }
 
+void chdirSyscall(bool is_kernel, TrapFrame* frame, SyscallArgs args) {
+    assert(frame->hart != NULL);
+    Process* process = (Process*)frame;
+    char* path = copyPathFromSyscallArgs(process, args[0]);
+    if (path != NULL) {
+        dealloc(process->resources.cwd);
+        process->resources.cwd = path;
+        process->frame.regs[REG_ARGUMENT_0] = -SUCCESS;
+    } else {
+        process->frame.regs[REG_ARGUMENT_0] = -ILLEGAL_ARGUMENTS;
+    }
+}
+
+void getcwdSyscall(bool is_kernel, TrapFrame* frame, SyscallArgs args) {
+    assert(frame->hart != NULL);
+    Process* process = (Process*)frame;
+    VirtPtr buff = virtPtrFor(args[0], process->memory.mem);
+    size_t length = args[1];
+    size_t cwd_length = strlen(process->resources.cwd);
+    memcpyBetweenVirtPtr(
+        buff, virtPtrForKernel(process->resources.cwd), umin(length, cwd_length + 1)
+    );
+    process->frame.regs[REG_ARGUMENT_0] = args[0];
+}
+
 char* copyPathFromSyscallArgs(Process* process, uintptr_t ptr) {
     VirtPtr str = virtPtrFor(ptr, process->memory.mem);
     bool relative = true;
+    size_t cwd_length = 0;
+    if (process->resources.cwd != NULL) {
+        cwd_length = strlen(process->resources.cwd);
+    }
     size_t length = strlenVirtPtr(str);
     if (readInt(str, 8) == '/') {
         relative = false;
     }
-    char* string = kalloc(length + 1 + (relative ? 1 : 0));
+    char* string = kalloc(length + 1 + (relative ? cwd_length + 1 : 0));
     if (string != NULL) {
         if (relative) {
-            // TODO: add working directory
-            string[0] = '/';
-            memcpyBetweenVirtPtr(virtPtrForKernel(string + 1), str, length);
-            string[length + 1] = 0;
+            if (process->resources.cwd != NULL) {
+                memcpy(string, process->resources.cwd, cwd_length);
+            }
+            string[cwd_length] = '/';
+            memcpyBetweenVirtPtr(virtPtrForKernel(string + cwd_length + 1), str, length);
+            string[cwd_length + 1 + length] = 0;
         } else {
             memcpyBetweenVirtPtr(virtPtrForKernel(string), str, length);
             string[length] = 0;

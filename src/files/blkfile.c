@@ -164,8 +164,7 @@ static void blockWriteFunction(BlockDeviceFile* file, Uid uid, Gid gid, VirtPtr 
 static void blockStatFunction(BlockDeviceFile* file, Uid uid, Gid gid, VfsFunctionCallbackStat callback, void* udata) {
     lockSpinLock(&file->lock);
     VfsStat ret = {
-        // TODO: use real values
-        .id = 0,
+        .id = file->ino,
         .mode = TYPE_MODE(VFS_TYPE_BLOCK) | VFS_MODE_OG_RW,
         .nlinks = 0,
         .uid = 0,
@@ -204,13 +203,14 @@ static const VfsFileVtable functions = {
     .dup = (DupFunction)blockDupFunction,
 };
 
-BlockDeviceFile* createBlockDeviceFile(void* block_dev, size_t block_size, size_t size, BlockOperationFunction block_op) {
+BlockDeviceFile* createBlockDeviceFile(size_t ino, void* block_dev, size_t block_size, size_t size, BlockOperationFunction block_op) {
     BlockDeviceFile* file = zalloc(sizeof(BlockDeviceFile));
     file->base.functions = &functions;
     file->device = block_dev;
     file->size = size;
     file->block_size = block_size;
     file->block_operation = block_op;
+    file->ino = ino;
     return file;
 }
 
