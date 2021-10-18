@@ -17,6 +17,7 @@ static uintptr_t changeProcessBreak(Process* process, intptr_t change) {
     uintptr_t page_start = (old_brk + PAGE_SIZE - 1) & -PAGE_SIZE;
     uintptr_t page_end = (end + PAGE_SIZE - 1) & -PAGE_SIZE;
     if (page_start == page_end) {
+        process->memory.brk = end;
         return old_brk;
     } else if (page_end > page_start) {
         for (uintptr_t i = page_start; i < page_end; i += PAGE_SIZE) {
