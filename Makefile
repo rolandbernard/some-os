@@ -123,9 +123,7 @@ $(USERSPACE_BIN_DIR): $(DISK_DIR)/lib force
 $(DISK_DIR): $(USERSPACE_BIN_DIR) $(MAKEFILE_LIST)
 	@$(ECHO) "Creating disk files"
 	mkdir -p $(DISK_DIR)
-	mkdir -p $(DISK_DIR)/test
-	mkdir -p $(DISK_DIR)/test2
-	echo "Hello world!" > $(DISK_DIR)/test/test.txt
+	mkdir -p $(DISK_DIR)/dev
 	cp -r $(USERSPACE_BIN_DIR) $(DISK_DIR)
 
 $(DISK): $(DISK_DIR) $(MAKEFILE_LIST) | $(MOUNT_DIR)
