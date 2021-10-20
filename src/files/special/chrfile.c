@@ -1,7 +1,7 @@
 
 #include <string.h>
 
-#include "files/chrfile.h"
+#include "files/special/chrfile.h"
 
 #include "kernel/time.h"
 #include "memory/kalloc.h"
@@ -42,7 +42,7 @@ static void serialStatFunction(SerialDeviceFile* file, Uid uid, Gid gid, VfsFunc
     VfsStat ret = {
         .id = file->base.ino,
         .mode = TYPE_MODE(VFS_TYPE_CHAR) | VFS_MODE_OG_RW,
-        .nlinks = 0,
+        .nlinks = 1,
         .uid = 0,
         .gid = 0,
         .size = 0,

@@ -1,8 +1,9 @@
 
 #include <string.h>
 
+#include "files/special/blkfile.h"
+
 #include "error/error.h"
-#include "files/blkfile.h"
 #include "kernel/time.h"
 #include "memory/kalloc.h"
 #include "memory/virtptr.h"
@@ -168,7 +169,7 @@ static void blockStatFunction(BlockDeviceFile* file, Uid uid, Gid gid, VfsFuncti
     VfsStat ret = {
         .id = file->base.ino,
         .mode = TYPE_MODE(VFS_TYPE_BLOCK) | VFS_MODE_OG_RW,
-        .nlinks = 0,
+        .nlinks = 1,
         .uid = 0,
         .gid = 0,
         .size = file->block_size,
