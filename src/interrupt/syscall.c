@@ -50,6 +50,7 @@ SyscallFunction syscall_table[TABLE_SIZE] = {
     [SYSCALL_SETGID] = setGidSyscall,
     [SYSCALL_CHDIR] = chdirSyscall,
     [SYSCALL_GETCWD] = getcwdSyscall,
+    [SYSCALL_PIPE] = pipeSyscall,
 };
 
 void registerSyscall(int kind, SyscallFunction function) {

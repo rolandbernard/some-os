@@ -39,7 +39,7 @@ static void forkFileDupCallback(Error error, VfsFile* file, void* udata) {
         new_res->fd_count++;
         if (new_res->fd_count < old_res->fd_count) {
             VfsFile* old_file = old_res->filedes[new_res->fd_count];
-            old_file->functions->dup(old_file, 0, 0, forkFileDupCallback, request);
+            old_file->functions->dup(old_file, NULL, forkFileDupCallback, request);
         } else {
             request->new_process->frame.regs[REG_ARGUMENT_0] = 0;
             request->old_process->frame.regs[REG_ARGUMENT_0] = request->new_process->pid;
@@ -112,7 +112,7 @@ void forkSyscall(bool is_kernel, TrapFrame* frame, SyscallArgs args) {
                 request->new_process = new_process;
                 request->old_process = process;
                 process->resources.filedes[0]->functions->dup(
-                    process->resources.filedes[0], 0, 0, forkFileDupCallback, request
+                    process->resources.filedes[0], NULL, forkFileDupCallback, request
                 );
             } else {
                 // No files have to be duplicated

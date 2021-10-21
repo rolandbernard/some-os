@@ -52,7 +52,7 @@ static void readBlocksForRequest(MinixGetBitMapRequest* request) {
             request->data = kalloc(size);
         }
         vfsReadAt(
-            (VfsFile*)request->fs->block_device, 0, 0,
+            (VfsFile*)request->fs->block_device, NULL,
             virtPtrForKernel(request->data), size, request->offset,
             (VfsFunctionCallbackSizeT)minixFindFreeBitReadCallback, request
         );
@@ -78,7 +78,7 @@ static void minixFindFreeBitReadCallback(Error error, size_t read, MinixGetBitMa
                     // This bit is free
                     request->data[i] |= (1 << j);
                     vfsWriteAt(
-                        (VfsFile*)request->fs->block_device, 0, 0,
+                        (VfsFile*)request->fs->block_device, NULL,
                         virtPtrForKernel(&request->data[i]), 1, request->offset + i,
                         (VfsFunctionCallbackSizeT)minixFindFreeBitWriteCallback, request
                     );
@@ -122,8 +122,6 @@ void getFreeMinixZone(MinixFilesystem* fs, VfsFunctionCallbackSizeT callback, vo
 
 typedef struct {
     MinixFilesystem* fs;
-    Uid uid;
-    Gid gid;
     size_t offset;
     size_t position;
     char data;
@@ -159,7 +157,7 @@ static void genericMinixClearBitMapReadCallback(Error error, size_t read, MinixC
     } else {
         request->data &= ~(1 << (request->position % 8));
         vfsWriteAt(
-            (VfsFile*)request->fs->block_device, 0, 0,
+            (VfsFile*)request->fs->block_device, NULL,
             virtPtrForKernel(&request->data), 1, request->offset + request->position / 8,
             (VfsFunctionCallbackSizeT)genericMinixClearBitMapWriteCallback, request
         );
@@ -175,7 +173,7 @@ static void genericMinixClearBitMap(MinixFilesystem* fs, size_t offset, size_t p
     request->callback = callback;
     request->udata = udata;
     vfsReadAt(
-        (VfsFile*)request->fs->block_device, request->uid, request->gid,
+        (VfsFile*)request->fs->block_device, NULL,
         virtPtrForKernel(&request->data), 1, offset + position / 8,
         (VfsFunctionCallbackSizeT)genericMinixClearBitMapReadCallback, request
     );

@@ -20,7 +20,7 @@ static size_t countAllDeviceFiles() {
     return count;
 }
 
-static void deviceSeekFunction(DeviceDirectoryFile* file, Uid uid, Gid gid, size_t offset, VfsSeekWhence whence, VfsFunctionCallbackSizeT callback, void* udata) {
+static void deviceSeekFunction(DeviceDirectoryFile* file, Process* process, size_t offset, VfsSeekWhence whence, VfsFunctionCallbackSizeT callback, void* udata) {
     lockSpinLock(&file->lock);
     size_t new_position;
     switch (whence) {
@@ -39,7 +39,7 @@ static void deviceSeekFunction(DeviceDirectoryFile* file, Uid uid, Gid gid, size
     callback(simpleError(SUCCESS), file->entry, udata);
 }
 
-static void deviceStatFunction(DeviceDirectoryFile* file, Uid uid, Gid gid, VfsFunctionCallbackStat callback, void* udata) {
+static void deviceStatFunction(DeviceDirectoryFile* file, Process* process, VfsFunctionCallbackStat callback, void* udata) {
     lockSpinLock(&file->lock);
     VfsStat ret = {
         .id = 1,
@@ -59,14 +59,14 @@ static void deviceStatFunction(DeviceDirectoryFile* file, Uid uid, Gid gid, VfsF
 }
 
 static void deviceCloseFunction(
-    DeviceDirectoryFile* file, Uid uid, Gid gid, VfsFunctionCallbackVoid callback, void* udata
+    DeviceDirectoryFile* file, Process* process, VfsFunctionCallbackVoid callback, void* udata
 ) {
     lockSpinLock(&file->lock);
     dealloc(file);
     callback(simpleError(SUCCESS), udata);
 }
 
-static void deviceDupFunction(DeviceDirectoryFile* file, Uid uid, Gid gid, VfsFunctionCallbackFile callback, void* udata) {
+static void deviceDupFunction(DeviceDirectoryFile* file, Process* process, VfsFunctionCallbackFile callback, void* udata) {
     lockSpinLock(&file->lock);
     DeviceDirectoryFile* copy = kalloc(sizeof(DeviceDirectoryFile));
     memcpy(copy, file, sizeof(DeviceDirectoryFile));
@@ -88,7 +88,7 @@ static size_t writeDirectoryEntryNamed(size_t ino, char* name, VfsFileType type,
     return umin(entry_size, size);
 }
 
-static void deviceReaddirFunction(DeviceDirectoryFile* file, Uid uid, Gid gid, VirtPtr buff, size_t size, VfsFunctionCallbackSizeT callback, void* udata) {
+static void deviceReaddirFunction(DeviceDirectoryFile* file, Process* process, VirtPtr buff, size_t size, VfsFunctionCallbackSizeT callback, void* udata) {
     lockSpinLock(&file->lock);
     size_t written = 0;
     size_t position = file->entry;
@@ -139,7 +139,7 @@ DeviceDirectoryFile* createDeviceDirectoryFile() {
 }
 
 static void deviceOpenFunction(
-    DeviceFilesystem* fs, Uid uid, Gid gid, const char* path, VfsOpenFlags flags, VfsMode mode,
+    DeviceFilesystem* fs, Process* process, const char* path, VfsOpenFlags flags, VfsMode mode,
     VfsFunctionCallbackFile callback, void* udata
 ) {
     size_t ino = 2; // Reserved for . and ..
@@ -186,12 +186,12 @@ static void deviceOpenFunction(
     callback(simpleError(NO_SUCH_FILE), NULL, udata);
 }
 
-static void deviceFreeFunction(DeviceFilesystem* fs, Uid uid, Gid gid, VfsFunctionCallbackVoid callback, void* udata) {
+static void deviceFreeFunction(DeviceFilesystem* fs, Process* process, VfsFunctionCallbackVoid callback, void* udata) {
     dealloc(fs);
     callback(simpleError(SUCCESS), udata);
 }
 
-static void deviceInitFunction(DeviceFilesystem* fs, Uid uid, Gid gid, VfsFunctionCallbackVoid callback, void* udata) {
+static void deviceInitFunction(DeviceFilesystem* fs, Process* process, VfsFunctionCallbackVoid callback, void* udata) {
     // Nothing to initialize yet
     callback(simpleError(SUCCESS), udata);
 }

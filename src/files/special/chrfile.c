@@ -6,8 +6,9 @@
 #include "kernel/time.h"
 #include "memory/kalloc.h"
 #include "devices/devfs.h"
+#include "process/types.h"
 
-static void serialReadFunction(SerialDeviceFile* file, Uid uid, Gid gid, VirtPtr buffer, size_t size, VfsFunctionCallbackSizeT callback, void* udata) {
+static void serialReadFunction(SerialDeviceFile* file, Process* process, VirtPtr buffer, size_t size, VfsFunctionCallbackSizeT callback, void* udata) {
     Error status;
     size_t i;
     lockSpinLock(&file->lock);
@@ -28,7 +29,7 @@ static void serialReadFunction(SerialDeviceFile* file, Uid uid, Gid gid, VirtPtr
     }
 }
 
-static void serialWriteFunction(SerialDeviceFile* file, Uid uid, Gid gid, VirtPtr buffer, size_t size, VfsFunctionCallbackSizeT callback, void* udata) {
+static void serialWriteFunction(SerialDeviceFile* file, Process* process, VirtPtr buffer, size_t size, VfsFunctionCallbackSizeT callback, void* udata) {
     lockSpinLock(&file->lock);
     for (size_t i = 0; i < size; i++) {
         file->serial.write(file->serial.data, readIntAt(buffer, i, 8));
@@ -37,7 +38,7 @@ static void serialWriteFunction(SerialDeviceFile* file, Uid uid, Gid gid, VirtPt
     callback(simpleError(SUCCESS), size, udata);
 }
 
-static void serialStatFunction(SerialDeviceFile* file, Uid uid, Gid gid, VfsFunctionCallbackStat callback, void* udata) {
+static void serialStatFunction(SerialDeviceFile* file, Process* process, VfsFunctionCallbackStat callback, void* udata) {
     lockSpinLock(&file->lock);
     VfsStat ret = {
         .id = file->base.ino,
@@ -56,13 +57,13 @@ static void serialStatFunction(SerialDeviceFile* file, Uid uid, Gid gid, VfsFunc
     callback(simpleError(SUCCESS), ret, udata);
 }
 
-static void serialCloseFunction(SerialDeviceFile* file, Uid uid, Gid gid, VfsFunctionCallbackVoid callback, void* udata) {
+static void serialCloseFunction(SerialDeviceFile* file, Process* process, VfsFunctionCallbackVoid callback, void* udata) {
     lockSpinLock(&file->lock);
     dealloc(file);
     callback(simpleError(SUCCESS), udata);
 }
 
-static void serialDupFunction(SerialDeviceFile* file, Uid uid, Gid gid, VfsFunctionCallbackFile callback, void* udata) {
+static void serialDupFunction(SerialDeviceFile* file, Process* process, VfsFunctionCallbackFile callback, void* udata) {
     lockSpinLock(&file->lock);
     SerialDeviceFile* copy = kalloc(sizeof(SerialDeviceFile));
     memcpy(copy, file, sizeof(SerialDeviceFile));
@@ -81,9 +82,11 @@ static const VfsFileVtable functions = {
 
 SerialDeviceFile* createSerialDeviceFile(size_t ino, Serial serial) {
     SerialDeviceFile* file = zalloc(sizeof(SerialDeviceFile));
-    file->base.functions = &functions;
-    file->base.ino = ino;
-    file->serial = serial;
+    if (file != NULL) {
+        file->base.functions = &functions;
+        file->base.ino = ino;
+        file->serial = serial;
+    }
     return file;
 }
 

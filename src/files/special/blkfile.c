@@ -11,7 +11,7 @@
 #include "util/util.h"
 #include "devices/devfs.h"
 
-static void blockSeekFunction(BlockDeviceFile* file, Uid uid, Gid gid, size_t offset, VfsSeekWhence whence, VfsFunctionCallbackSizeT callback, void* udata) {
+static void blockSeekFunction(BlockDeviceFile* file, Process* process, size_t offset, VfsSeekWhence whence, VfsFunctionCallbackSizeT callback, void* udata) {
     lockSpinLock(&file->lock);
     size_t new_position;
     switch (whence) {
@@ -156,15 +156,15 @@ static void genericBlockFileFunction(BlockDeviceFile* file, bool write, VirtPtr 
     blockOperatonFileCallback(simpleError(SUCCESS), req);
 }
 
-static void blockReadFunction(BlockDeviceFile* file, Uid uid, Gid gid, VirtPtr buffer, size_t size, VfsFunctionCallbackSizeT callback, void* udata) {
+static void blockReadFunction(BlockDeviceFile* file, Process* process, VirtPtr buffer, size_t size, VfsFunctionCallbackSizeT callback, void* udata) {
     genericBlockFileFunction(file, false, buffer, size, callback, udata);
 }
 
-static void blockWriteFunction(BlockDeviceFile* file, Uid uid, Gid gid, VirtPtr buffer, size_t size, VfsFunctionCallbackSizeT callback, void* udata) {
+static void blockWriteFunction(BlockDeviceFile* file, Process* process, VirtPtr buffer, size_t size, VfsFunctionCallbackSizeT callback, void* udata) {
     genericBlockFileFunction(file, true, buffer, size, callback, udata);
 }
 
-static void blockStatFunction(BlockDeviceFile* file, Uid uid, Gid gid, VfsFunctionCallbackStat callback, void* udata) {
+static void blockStatFunction(BlockDeviceFile* file, Process* process, VfsFunctionCallbackStat callback, void* udata) {
     lockSpinLock(&file->lock);
     VfsStat ret = {
         .id = file->base.ino,
@@ -183,13 +183,13 @@ static void blockStatFunction(BlockDeviceFile* file, Uid uid, Gid gid, VfsFuncti
     callback(simpleError(SUCCESS), ret, udata);
 }
 
-static void blockCloseFunction(BlockDeviceFile* file, Uid uid, Gid gid, VfsFunctionCallbackVoid callback, void* udata) {
+static void blockCloseFunction(BlockDeviceFile* file, Process* process, VfsFunctionCallbackVoid callback, void* udata) {
     lockSpinLock(&file->lock);
     dealloc(file);
     callback(simpleError(SUCCESS), udata);
 }
 
-static void blockDupFunction(BlockDeviceFile* file, Uid uid, Gid gid, VfsFunctionCallbackFile callback, void* udata) {
+static void blockDupFunction(BlockDeviceFile* file, Process* process, VfsFunctionCallbackFile callback, void* udata) {
     lockSpinLock(&file->lock);
     BlockDeviceFile* copy = kalloc(sizeof(BlockDeviceFile));
     memcpy(copy, file, sizeof(BlockDeviceFile));
@@ -209,12 +209,14 @@ static const VfsFileVtable functions = {
 
 BlockDeviceFile* createBlockDeviceFile(size_t ino, void* block_dev, size_t block_size, size_t size, BlockOperationFunction block_op) {
     BlockDeviceFile* file = zalloc(sizeof(BlockDeviceFile));
-    file->base.functions = &functions;
-    file->base.ino = ino;
-    file->device = block_dev;
-    file->size = size;
-    file->block_size = block_size;
-    file->block_operation = block_op;
+    if (file != NULL) {
+        file->base.functions = &functions;
+        file->base.ino = ino;
+        file->device = block_dev;
+        file->size = size;
+        file->block_size = block_size;
+        file->block_operation = block_op;
+    }
     return file;
 }
 

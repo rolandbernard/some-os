@@ -200,7 +200,7 @@ static void freeProcess(Process* process) {
         }
         for (size_t i = 0; i < process->resources.fd_count; i++) {
             process->resources.filedes[i]->functions->close(
-                process->resources.filedes[i], 0, 0, noop, NULL
+                process->resources.filedes[i], NULL, noop, NULL
             );
         }
         dealloc(process->resources.filedes);

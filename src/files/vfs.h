@@ -107,6 +107,7 @@ typedef struct {
 
 struct VfsFile_s;
 struct VfsFilesystem_s;
+struct Process_s;
 
 typedef void (*VfsFunctionCallbackVoid)(Error error, void* udata);
 typedef void (*VfsFunctionCallbackSizeT)(Error error, size_t size, void* udata);
@@ -114,16 +115,16 @@ typedef void (*VfsFunctionCallbackStat)(Error error, VfsStat stat, void* udata);
 typedef void (*VfsFunctionCallbackFile)(Error error, struct VfsFile_s* entry, void* udata);
 typedef void (*VfsFunctionCallbackFilesystem)(Error error, struct VfsFilesystem_s* entry, void* udata);
 
-typedef void (*SeekFunction)(struct VfsFile_s* file, Uid uid, Gid gid, size_t offset, VfsSeekWhence whence, VfsFunctionCallbackSizeT callback, void* udata);
-typedef void (*ReadFunction)(struct VfsFile_s* file, Uid uid, Gid gid, VirtPtr buffer, size_t size, VfsFunctionCallbackSizeT callback, void* udata);
-typedef void (*WriteFunction)(struct VfsFile_s* file, Uid uid, Gid gid, VirtPtr buffer, size_t size, VfsFunctionCallbackSizeT callback, void* udata);
-typedef void (*StatFunction)(struct VfsFile_s* file, Uid uid, Gid gid, VfsFunctionCallbackStat callback, void* udata);
-typedef void (*CloseFunction)(struct VfsFile_s* file, Uid uid, Gid gid, VfsFunctionCallbackVoid callback, void* udata);
-typedef void (*DupFunction)(struct VfsFile_s* file, Uid uid, Gid gid, VfsFunctionCallbackFile callback, void* udata);
-typedef void (*TruncFunction)(struct VfsFile_s* file, Uid uid, Gid gid, size_t size, VfsFunctionCallbackVoid callback, void* udata);
-typedef void (*ChmodFunction)(struct VfsFile_s* file, Uid uid, Gid gid, VfsMode mode, VfsFunctionCallbackVoid callback, void* udata);
-typedef void (*ChownFunction)(struct VfsFile_s* file, Uid uid, Gid gid, Uid new_uid, Gid new_gid, VfsFunctionCallbackVoid callback, void* udata);
-typedef void (*ReaddirFunction)(struct VfsFile_s* file, Uid uid, Gid gid, VirtPtr buff, size_t size, VfsFunctionCallbackSizeT callback, void* udata);
+typedef void (*SeekFunction)(struct VfsFile_s* file, struct Process_s* process, size_t offset, VfsSeekWhence whence, VfsFunctionCallbackSizeT callback, void* udata);
+typedef void (*ReadFunction)(struct VfsFile_s* file, struct Process_s* process, VirtPtr buffer, size_t size, VfsFunctionCallbackSizeT callback, void* udata);
+typedef void (*WriteFunction)(struct VfsFile_s* file, struct Process_s* process, VirtPtr buffer, size_t size, VfsFunctionCallbackSizeT callback, void* udata);
+typedef void (*StatFunction)(struct VfsFile_s* file, struct Process_s* process, VfsFunctionCallbackStat callback, void* udata);
+typedef void (*CloseFunction)(struct VfsFile_s* file, struct Process_s* process, VfsFunctionCallbackVoid callback, void* udata);
+typedef void (*DupFunction)(struct VfsFile_s* file, struct Process_s* process, VfsFunctionCallbackFile callback, void* udata);
+typedef void (*TruncFunction)(struct VfsFile_s* file, struct Process_s* process, size_t size, VfsFunctionCallbackVoid callback, void* udata);
+typedef void (*ChmodFunction)(struct VfsFile_s* file, struct Process_s* process, VfsMode mode, VfsFunctionCallbackVoid callback, void* udata);
+typedef void (*ChownFunction)(struct VfsFile_s* file, struct Process_s* process, Uid new_uid, Gid new_gid, VfsFunctionCallbackVoid callback, void* udata);
+typedef void (*ReaddirFunction)(struct VfsFile_s* file, struct Process_s* process, VirtPtr buff, size_t size, VfsFunctionCallbackSizeT callback, void* udata);
 
 typedef struct {
     SeekFunction seek;
@@ -145,12 +146,12 @@ typedef struct VfsFile_s {
     const VfsFileVtable* functions;
 } VfsFile;
 
-typedef void (*OpenFunction)(struct VfsFilesystem_s* fs, Uid uid, Gid gid, const char* path, VfsOpenFlags flags, VfsMode mode, VfsFunctionCallbackFile callback, void* udata);
-typedef void (*UnlinkFunction)(struct VfsFilesystem_s* fs, Uid uid, Gid gid, const char* path, VfsFunctionCallbackVoid callback, void* udata);
-typedef void (*LinkFunction)(struct VfsFilesystem_s* fs, Uid uid, Gid gid, const char* old, const char* new, VfsFunctionCallbackVoid callback, void* udata);
-typedef void (*RenameFunction)(struct VfsFilesystem_s* fs, Uid uid, Gid gid, const char* old, const char* new, VfsFunctionCallbackVoid callback, void* udata);
-typedef void (*FreeFunction)(struct VfsFilesystem_s* fs, Uid uid, Gid gid, VfsFunctionCallbackVoid callback, void* udata);
-typedef void (*InitFunction)(struct VfsFilesystem_s* fs, Uid uid, Gid gid, VfsFunctionCallbackVoid callback, void* udata);
+typedef void (*OpenFunction)(struct VfsFilesystem_s* fs, struct Process_s* process, const char* path, VfsOpenFlags flags, VfsMode mode, VfsFunctionCallbackFile callback, void* udata);
+typedef void (*UnlinkFunction)(struct VfsFilesystem_s* fs, struct Process_s* process, const char* path, VfsFunctionCallbackVoid callback, void* udata);
+typedef void (*LinkFunction)(struct VfsFilesystem_s* fs, struct Process_s* process, const char* old, const char* new, VfsFunctionCallbackVoid callback, void* udata);
+typedef void (*RenameFunction)(struct VfsFilesystem_s* fs, struct Process_s* process, const char* old, const char* new, VfsFunctionCallbackVoid callback, void* udata);
+typedef void (*FreeFunction)(struct VfsFilesystem_s* fs, struct Process_s* process, VfsFunctionCallbackVoid callback, void* udata);
+typedef void (*InitFunction)(struct VfsFilesystem_s* fs, struct Process_s* process, VfsFunctionCallbackVoid callback, void* udata);
 
 typedef struct {
     OpenFunction open;
@@ -201,21 +202,21 @@ Error mountRedirect(VirtualFilesystem* fs, const char* from, const char* to);
 
 Error umount(VirtualFilesystem* fs, const char* from);
 
-void vfsOpen(VirtualFilesystem* fs, Uid uid, Gid gid, const char* path, VfsOpenFlags flags, VfsMode mode, VfsFunctionCallbackFile callback, void* udata);
+void vfsOpen(VirtualFilesystem* fs, struct Process_s* process, const char* path, VfsOpenFlags flags, VfsMode mode, VfsFunctionCallbackFile callback, void* udata);
 
-void vfsUnlink(VirtualFilesystem* fs, Uid uid, Gid gid, const char* path, VfsFunctionCallbackVoid callback, void* udata);
+void vfsUnlink(VirtualFilesystem* fs, struct Process_s* process, const char* path, VfsFunctionCallbackVoid callback, void* udata);
 
-void vfsLink(VirtualFilesystem* fs, Uid uid, Gid gid, const char* old, const char* new, VfsFunctionCallbackVoid callback, void* udata);
+void vfsLink(VirtualFilesystem* fs, struct Process_s* process, const char* old, const char* new, VfsFunctionCallbackVoid callback, void* udata);
 
-void vfsRename(VirtualFilesystem* fs, Uid uid, Gid gid, const char* old, const char* new, VfsFunctionCallbackVoid callback, void* udata);
+void vfsRename(VirtualFilesystem* fs, struct Process_s* process, const char* old, const char* new, VfsFunctionCallbackVoid callback, void* udata);
 
 // Utility function that calls seek and read on a file to read at a specific offset
-void vfsReadAt(VfsFile* file, Uid uid, Gid gid, VirtPtr ptr, size_t size, size_t offset, VfsFunctionCallbackSizeT callback, void* udata);
+void vfsReadAt(VfsFile* file, struct Process_s* process, VirtPtr ptr, size_t size, size_t offset, VfsFunctionCallbackSizeT callback, void* udata);
 
 // Utility function that calls seek and write on a file to write at a specific offset
-void vfsWriteAt(VfsFile* file, Uid uid, Gid gid, VirtPtr ptr, size_t size, size_t offset, VfsFunctionCallbackSizeT callback, void* udata);
+void vfsWriteAt(VfsFile* file, struct Process_s* process, VirtPtr ptr, size_t size, size_t offset, VfsFunctionCallbackSizeT callback, void* udata);
 
-bool canAccess(VfsMode mode, Uid file_uid, Gid file_gid, Uid uid, Gid gid, VfsAccessFlags flags);
+bool canAccess(VfsMode mode, Uid file_uid, Gid file_gid, struct Process_s* process, VfsAccessFlags flags);
 
 void createFilesystemFrom(VirtualFilesystem* fs,const char* path, const char* type, VirtPtr data, VfsFunctionCallbackFilesystem callback, void* udata);
 

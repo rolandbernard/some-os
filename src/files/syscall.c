@@ -7,8 +7,10 @@
 #include "files/vfs.h"
 #include "files/path.h"
 #include "memory/kalloc.h"
+#include "memory/virtptr.h"
 #include "process/schedule.h"
 #include "util/util.h"
+#include "files/special/pipe.h"
 
 static int allocateNewFileDescriptor(Process* process) {
     int fd = process->resources.next_fd;
@@ -88,10 +90,7 @@ void openSyscall(bool is_kernel, TrapFrame* frame, SyscallArgs args) {
     char* string = copyPathFromSyscallArgs(process, args[0]);
     if (string != NULL) {
         moveToSchedState(process, WAITING);
-        vfsOpen(
-            &global_file_system, process->resources.uid, process->resources.gid, string, args[1],
-            args[2], openCallback, process
-        );
+        vfsOpen(&global_file_system, process, string, args[1], args[2], openCallback, process);
         dealloc(string);
     } else {
         process->frame.regs[REG_ARGUMENT_0] = -ILLEGAL_ARGUMENTS;
@@ -111,9 +110,7 @@ void unlinkSyscall(bool is_kernel, TrapFrame* frame, SyscallArgs args) {
     char* string = copyPathFromSyscallArgs(process, args[0]);
     if (string != NULL) {
         moveToSchedState(process, WAITING);
-        vfsUnlink(
-            &global_file_system, process->resources.uid, process->resources.gid, string, voidSyscallCallback, process
-        );
+        vfsUnlink(&global_file_system, process, string, voidSyscallCallback, process);
         dealloc(string);
     } else {
         process->frame.regs[REG_ARGUMENT_0] = -ILLEGAL_ARGUMENTS;
@@ -128,9 +125,7 @@ void linkSyscall(bool is_kernel, TrapFrame* frame, SyscallArgs args) {
         char* new = copyPathFromSyscallArgs(process, args[1]);
         if (new != NULL) {
             moveToSchedState(process, WAITING);
-            vfsLink(
-                &global_file_system, process->resources.uid, process->resources.gid, old, new, voidSyscallCallback, process
-            );
+            vfsLink(&global_file_system, process, old, new, voidSyscallCallback, process);
             dealloc(new);
             dealloc(old);
         } else {
@@ -150,9 +145,7 @@ void renameSyscall(bool is_kernel, TrapFrame* frame, SyscallArgs args) {
         char* new = copyPathFromSyscallArgs(process, args[1]);
         if (new != NULL) {
             moveToSchedState(process, WAITING);
-            vfsRename(
-                &global_file_system, process->resources.uid, process->resources.gid, old, new, voidSyscallCallback, process
-            );
+            vfsRename(&global_file_system, process, old, new, voidSyscallCallback, process);
             dealloc(new);
             dealloc(old);
         } else {
@@ -188,9 +181,7 @@ void renameSyscall(bool is_kernel, TrapFrame* frame, SyscallArgs args) {
 void closeSyscall(bool is_kernel, TrapFrame* frame, SyscallArgs args) {
     FILE_SYSCALL_OP(false, false, close, {
         removeFileDescriptor(process, fd);
-        file->functions->close(
-            file, process->resources.uid, process->resources.gid, voidSyscallCallback, process
-        );
+        file->functions->close(file, process, voidSyscallCallback, process);
     });
 }
 
@@ -208,8 +199,8 @@ static void sizeTSyscallCallback(Error error, size_t size, void* udata) {
 void readSyscall(bool is_kernel, TrapFrame* frame, SyscallArgs args) {
     FILE_SYSCALL_OP(true, false, read, {
         file->functions->read(
-            file, process->resources.uid, process->resources.gid,
-            virtPtrFor(args[1], process->memory.mem), args[2], sizeTSyscallCallback, process
+            file, process, virtPtrFor(args[1], process->memory.mem),
+            args[2], sizeTSyscallCallback, process
         );
     });
 }
@@ -217,18 +208,15 @@ void readSyscall(bool is_kernel, TrapFrame* frame, SyscallArgs args) {
 void writeSyscall(bool is_kernel, TrapFrame* frame, SyscallArgs args) {
     FILE_SYSCALL_OP(false, true, write, {
         file->functions->write(
-            file, process->resources.uid, process->resources.gid,
-            virtPtrFor(args[1], process->memory.mem), args[2], sizeTSyscallCallback, process
+            file, process, virtPtrFor(args[1], process->memory.mem),
+            args[2], sizeTSyscallCallback, process
         );
     });
 }
 
 void seekSyscall(bool is_kernel, TrapFrame* frame, SyscallArgs args) {
     FILE_SYSCALL_OP(false, false, seek, {
-        file->functions->seek(
-            file, process->resources.uid, process->resources.gid, args[1], args[2],
-            sizeTSyscallCallback, process
-        );
+        file->functions->seek(file, process, args[1], args[2], sizeTSyscallCallback, process);
     });
 }
 
@@ -245,9 +233,7 @@ static void statSyscallCallback(Error error, VfsStat stat, void* udata) {
 
 void statSyscall(bool is_kernel, TrapFrame* frame, SyscallArgs args) {
     FILE_SYSCALL_OP(false, false, stat, {
-        file->functions->stat(
-            file, process->resources.uid, process->resources.gid, statSyscallCallback, process
-        );
+        file->functions->stat(file, process, statSyscallCallback, process);
     });
 }
 
@@ -279,9 +265,7 @@ static void dupCallback(Error error, VfsFile* file, void* udata) {
             } else {
                 putFileDescriptor(process, fd, flags, file);
                 process->frame.regs[REG_ARGUMENT_0] = fd;
-                file->functions->close(
-                    file, process->resources.uid, process->resources.gid, voidSyscallCallback, process
-                );
+                file->functions->close(file, process, voidSyscallCallback, process);
             }
         }
     }
@@ -291,41 +275,33 @@ static void dupCallback(Error error, VfsFile* file, void* udata) {
 
 void dupSyscall(bool is_kernel, TrapFrame* frame, SyscallArgs args) {
     FILE_SYSCALL_OP(false, false, dup, {
-        file->functions->dup(
-            file, process->resources.uid, process->resources.gid, dupCallback, process
-        );
+        file->functions->dup(file, process, dupCallback, process);
     });
 }
 
 void truncSyscall(bool is_kernel, TrapFrame* frame, SyscallArgs args) {
     FILE_SYSCALL_OP(false, true, trunc, {
-        file->functions->trunc(
-            file, process->resources.uid, process->resources.gid, args[1], voidSyscallCallback, process
-        );
+        file->functions->trunc(file, process, args[1], voidSyscallCallback, process);
     });
 }
 
 void chmodSyscall(bool is_kernel, TrapFrame* frame, SyscallArgs args) {
     FILE_SYSCALL_OP(false, true, chmod, {
-        file->functions->chmod(
-            file, process->resources.uid, process->resources.gid, args[1], voidSyscallCallback, process
-        );
+        file->functions->chmod(file, process, args[1], voidSyscallCallback, process);
     });
 }
 
 void chownSyscall(bool is_kernel, TrapFrame* frame, SyscallArgs args) {
     FILE_SYSCALL_OP(false, true, chown, {
-        file->functions->chown(
-            file, process->resources.uid, process->resources.gid, args[1], args[2], voidSyscallCallback, process
-        );
+        file->functions->chown(file, process, args[1], args[2], voidSyscallCallback, process);
     });
 }
 
 void readdirSyscall(bool is_kernel, TrapFrame* frame, SyscallArgs args) {
     FILE_SYSCALL_OP(true, false, readdir, {
         file->functions->readdir(
-            file, process->resources.uid, process->resources.gid,
-            virtPtrFor(args[1], process->memory.mem), args[2], sizeTSyscallCallback, process
+            file, process, virtPtrFor(args[1], process->memory.mem),
+            args[2], sizeTSyscallCallback, process
         );
     });
 }
@@ -340,11 +316,11 @@ static void mountCreateFsCallback(Error error, VfsFilesystem* fs, void* udata) {
             error = mountFilesystem(&global_file_system, fs, target);
             dealloc(target);
             if (isError(error)) {
-                fs->functions->free(fs, 0, 0, noop, NULL);
+                fs->functions->free(fs, NULL, noop, NULL);
             }
             process->frame.regs[REG_ARGUMENT_0] = -error.kind;
         } else {
-            fs->functions->free(fs, 0, 0, noop, NULL);
+            fs->functions->free(fs, NULL, noop, NULL);
             process->frame.regs[REG_ARGUMENT_0] = -ILLEGAL_ARGUMENTS;
         }
     }
@@ -448,6 +424,24 @@ char* copyPathFromSyscallArgs(Process* process, uintptr_t ptr) {
         return string;
     } else {
         return NULL;
+    }
+}
+
+void pipeSyscall(bool is_kernel, TrapFrame* frame, SyscallArgs args) {
+    assert(frame->hart != NULL);
+    Process* process = (Process*)frame;
+    VfsFile* pipe_file = (VfsFile*)createPipeFile();
+    if (pipe_file != NULL) {
+        int pipe_read = allocateNewFileDescriptor(process);
+        int pipe_write = allocateNewFileDescriptor(process);
+        putNewFileDescriptor(process, pipe_read, VFS_FILE_RDONLY, pipe_file);
+        putNewFileDescriptor(process, pipe_write, VFS_FILE_WRONLY, pipe_file);
+        VirtPtr arr = virtPtrFor(args[1], process->memory.mem);
+        writeIntAt(arr, sizeof(int) * 8, 0, pipe_read);
+        writeIntAt(arr, sizeof(int) * 8, 1, pipe_write);
+        process->frame.regs[REG_ARGUMENT_0] = -SUCCESS;
+    } else {
+        process->frame.regs[REG_ARGUMENT_0] = -ALREADY_IN_USE;
     }
 }
 

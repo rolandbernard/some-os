@@ -108,7 +108,7 @@ static void loadProgramSegment(LoadElfFileRequest* request) {
                 request->size = umin(header->memsz, header->filesz);
                 // Using an unsafeVirtPtr here because we might not have write permissions
                 vfsReadAt(
-                    request->file, 0, 0, unsafeVirtPtrFor(header->vaddr, request->table), request->size,
+                    request->file, NULL, unsafeVirtPtrFor(header->vaddr, request->table), request->size,
                     header->off, readProgramSegmentCallback, request
                 );
             } else {
@@ -162,7 +162,7 @@ static void readHeaderCallback(Error error, size_t read, void* udata) {
     } else {
         request->prog_headers = kalloc(request->header.phnum * sizeof(ElfProgramHeader));
         vfsReadAt(
-            request->file, 0, 0, virtPtrForKernel(request->prog_headers),
+            request->file, NULL, virtPtrForKernel(request->prog_headers),
             request->header.phnum * sizeof(ElfProgramHeader), request->header.phoff,
             readProgramHeadersCallback, request
         );
@@ -175,6 +175,6 @@ void loadProgramFromElfFile(PageTable* table, VfsFile* file, ElfFileLoadCallback
     request->file = file;
     request->callback = callback;
     request->udata = udata;
-    vfsReadAt(file, 0, 0, virtPtrForKernel(&request->header), sizeof(ElfHeader), 0, readHeaderCallback, request);
+    vfsReadAt(file, NULL, virtPtrForKernel(&request->header), sizeof(ElfHeader), 0, readHeaderCallback, request);
 }
 

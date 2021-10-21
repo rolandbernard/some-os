@@ -83,7 +83,7 @@ static uintptr_t findStartBrk(PageTable* table) {
 
 static void readElfFileCallback(Error error, uintptr_t entry, void* udata) {
     LoadProgramRequest* request = (LoadProgramRequest*)udata;
-    request->file->functions->close(request->file, 0, 0, noop, NULL);
+    request->file->functions->close(request->file, NULL, noop, NULL);
     if (isError(error)) {
         freePageTable(request->memory);
         request->callback(error, request->udata);
@@ -131,7 +131,7 @@ static void readElfFileCallback(Error error, uintptr_t entry, void* udata) {
         for (size_t i = 0; i < request->process->resources.fd_count;) {
             if ((request->process->resources.filedes[i]->flags & VFS_FILE_CLOEXEC) != 0) {
                 request->process->resources.filedes[i]->functions->close(
-                    request->process->resources.filedes[i], 0, 0, noop, NULL
+                    request->process->resources.filedes[i], NULL, noop, NULL
                 );
                 memmove(
                     request->process->resources.filedes + i,
@@ -152,7 +152,7 @@ static void readElfFileCallback(Error error, uintptr_t entry, void* udata) {
 static void fileStatCallback(Error error, VfsStat stat, void* udata) {
     LoadProgramRequest* request = (LoadProgramRequest*)udata;
     if (isError(error)) {
-        request->file->functions->close(request->file, 0, 0, noop, NULL);
+        request->file->functions->close(request->file, NULL, noop, NULL);
         request->callback(error, request->udata);
         dealloc(request);
     } else {
@@ -169,7 +169,7 @@ static void openFileCallback(Error error, VfsFile* file, void* udata) {
         dealloc(request);
     } else {
         request->file = file;
-        file->functions->stat(file, 0, 0, fileStatCallback, request);
+        file->functions->stat(file, NULL, fileStatCallback, request);
     }
 }
 
@@ -180,7 +180,7 @@ void loadProgramInto(Process* process, const char* path, VirtPtr args, VirtPtr e
     request->envs = envs;
     request->callback = callback;
     request->udata = udata;
-    vfsOpen(&global_file_system, process->resources.uid, process->resources.gid, path, VFS_OPEN_EXECUTE, 0, openFileCallback, request);
+    vfsOpen(&global_file_system, process, path, VFS_OPEN_EXECUTE, 0, openFileCallback, request);
 }
 
 static void loadProgramCallback(Error error, void* udata) {

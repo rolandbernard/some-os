@@ -81,6 +81,7 @@ void enqueueProcess(Process* process) {
             }
             pushProcessToQueue(queue, process);
         }
+        // WAITING processes are already handled somewhere else
     }
 }
 
