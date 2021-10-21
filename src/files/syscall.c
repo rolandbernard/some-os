@@ -430,16 +430,22 @@ char* copyPathFromSyscallArgs(Process* process, uintptr_t ptr) {
 void pipeSyscall(bool is_kernel, TrapFrame* frame, SyscallArgs args) {
     assert(frame->hart != NULL);
     Process* process = (Process*)frame;
-    VfsFile* pipe_file = (VfsFile*)createPipeFile();
-    if (pipe_file != NULL) {
-        int pipe_read = allocateNewFileDescriptor(process);
-        int pipe_write = allocateNewFileDescriptor(process);
-        putNewFileDescriptor(process, pipe_read, VFS_FILE_RDONLY, pipe_file);
-        putNewFileDescriptor(process, pipe_write, VFS_FILE_WRONLY, pipe_file);
-        VirtPtr arr = virtPtrFor(args[1], process->memory.mem);
-        writeIntAt(arr, sizeof(int) * 8, 0, pipe_read);
-        writeIntAt(arr, sizeof(int) * 8, 1, pipe_write);
-        process->frame.regs[REG_ARGUMENT_0] = -SUCCESS;
+    PipeFile* file_read = createPipeFile();
+    if (file_read != NULL) {
+        PipeFile* file_write = duplicatePipeFile(file_read);
+        if (file_write == NULL) {
+            file_read->base.functions->close((VfsFile*)file_read, NULL, noop, NULL);
+            process->frame.regs[REG_ARGUMENT_0] = -ALREADY_IN_USE;
+        } else {
+            int pipe_read = allocateNewFileDescriptor(process);
+            int pipe_write = allocateNewFileDescriptor(process);
+            putNewFileDescriptor(process, pipe_read, VFS_FILE_RDONLY, (VfsFile*)file_read);
+            putNewFileDescriptor(process, pipe_write, VFS_FILE_WRONLY, (VfsFile*)file_write);
+            VirtPtr arr = virtPtrFor(args[0], process->memory.mem);
+            writeIntAt(arr, sizeof(int) * 8, 0, pipe_read);
+            writeIntAt(arr, sizeof(int) * 8, 1, pipe_write);
+            process->frame.regs[REG_ARGUMENT_0] = -SUCCESS;
+        }
     } else {
         process->frame.regs[REG_ARGUMENT_0] = -ALREADY_IN_USE;
     }
