@@ -125,6 +125,8 @@ typedef struct {
 typedef struct {
     int pid;
     int status;
+    Time user_time;
+    Time system_time;
 } ProcessWaitResult;
 
 typedef struct {
@@ -196,6 +198,14 @@ typedef struct {
     uintptr_t restore_frame;
 } ProcessSignals;
 
+typedef struct {
+    Time entered;
+    Time user_time;
+    Time user_child_time;
+    Time system_time;
+    Time system_child_time;
+} ProcessTimes;
+
 typedef struct Process_s {
     TrapFrame frame;
     Pid pid;
@@ -205,6 +215,7 @@ typedef struct Process_s {
     ProcessMemory memory;
     ProcessResources resources;
     ProcessSignals signals;
+    ProcessTimes times;
 } Process;
 
 #endif

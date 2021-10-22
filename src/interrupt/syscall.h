@@ -41,6 +41,7 @@ typedef enum {
     SYSCALL_CHDIR = 34,
     SYSCALL_GETCWD = 35,
     SYSCALL_PIPE = 36,
+    SYSCALL_TIMES = 37,
 } Syscalls;
 
 // Simple wrapper around ecall

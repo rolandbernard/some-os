@@ -71,7 +71,9 @@ void kernelTrap(uintptr_t cause, uintptr_t pc, uintptr_t val, TrapFrame* frame) 
     } else {
         if (frame->hart != NULL) {
             Process* process = (Process*)frame;
+            process->times.user_time += getTime() - process->times.entered;
             moveToSchedState(process, ENQUEUEABLE);
+            process->times.entered = getTime();
         }
         if (interrupt) {
             frame->pc = pc;
@@ -133,7 +135,10 @@ void kernelTrap(uintptr_t cause, uintptr_t pc, uintptr_t val, TrapFrame* frame) 
             }
         }
         if (frame->hart != NULL) {
-            enqueueProcess((Process*)frame);
+            // TODO: system time is not actually correct
+            Process* process = (Process*)frame;
+            process->times.system_time += getTime() - process->times.entered;
+            enqueueProcess(process);
             runNextProcess();
         } else {
             // This is not called from a process, but from kernel init or interrupt handler

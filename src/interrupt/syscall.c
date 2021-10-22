@@ -10,6 +10,7 @@
 #include "process/syscall.h"
 #include "files/syscall.h"
 #include "memory/kalloc.h"
+#include "kernel/syscall.h"
 
 #define TABLE_SIZE 512
 
@@ -51,6 +52,7 @@ SyscallFunction syscall_table[TABLE_SIZE] = {
     [SYSCALL_CHDIR] = chdirSyscall,
     [SYSCALL_GETCWD] = getcwdSyscall,
     [SYSCALL_PIPE] = pipeSyscall,
+    [SYSCALL_TIMES] = timesSyscall,
 };
 
 void registerSyscall(int kind, SyscallFunction function) {

@@ -52,6 +52,8 @@ static bool basicProcessWait(Process* process) {
                 virtPtrFor(process->frame.regs[REG_ARGUMENT_2], process->memory.mem),
                 sizeof(int) * 8, process->tree.waits[i].status
             );
+            process->times.user_child_time += process->tree.waits[i].user_time;
+            process->times.system_child_time += process->tree.waits[i].system_time;
             process->frame.regs[REG_ARGUMENT_0] = process->tree.waits[i].pid;
             process->tree.wait_count--;
             memmove(process->tree.waits + i, process->tree.waits + i + 1, process->tree.wait_count - i);
@@ -108,6 +110,8 @@ static void unregisterProcess(Process* process) {
         ProcessWaitResult new_entry = {
             .pid = process->pid,
             .status = process->status,
+            .user_time = process->times.user_time + process->times.user_child_time,
+            .system_time = process->times.system_time + process->times.system_child_time,
         };
         parent->tree.waits[parent->tree.wait_count + process->tree.wait_count] = new_entry;
         parent->tree.wait_count = size;
@@ -226,6 +230,7 @@ void enterProcess(Process* process) {
         hart->frame.regs[REG_STACK_POINTER] = (uintptr_t)hart->stack_top;
     }
     handlePendingSignals(process);
+    process->times.entered = getTime();
     if (process->sched.state == RUNNING) {
         if (process->pid == 0) {
             enterKernelMode(&process->frame);
