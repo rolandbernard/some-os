@@ -89,7 +89,7 @@ static void readProgramSegmentCallback(Error error, size_t read, void* udata) {
         dealloc(request);
     } else if (read != request->size) {
         dealloc(request->prog_headers);
-        request->callback(simpleError(IO_ERROR), 0, request->udata);
+        request->callback(simpleError(EIO), 0, request->udata);
         dealloc(request);
     } else {
         request->ph_index++;
@@ -114,7 +114,7 @@ static void loadProgramSegment(LoadElfFileRequest* request) {
             } else {
                 freeMemorySpace(request->table);
                 dealloc(request->prog_headers);
-                request->callback(simpleError(ALREADY_IN_USE), 0, request->udata);
+                request->callback(simpleError(ENOMEM), 0, request->udata);
                 dealloc(request);
             }
         }
@@ -134,7 +134,7 @@ static void readProgramHeadersCallback(Error error, size_t read, void* udata) {
         dealloc(request);
     } else if (read != sizeof(ElfProgramHeader) * request->header.phnum) {
         dealloc(request->prog_headers);
-        request->callback(simpleError(IO_ERROR), 0, request->udata);
+        request->callback(simpleError(EIO), 0, request->udata);
         dealloc(request);
     } else {
         request->ph_index = 0;
@@ -148,7 +148,7 @@ static void readHeaderCallback(Error error, size_t read, void* udata) {
         request->callback(error, 0, request->udata);
         dealloc(request);
     } else if (read != sizeof(ElfHeader)) {
-        request->callback(simpleError(IO_ERROR), 0, request->udata);
+        request->callback(simpleError(EIO), 0, request->udata);
         dealloc(request);
     } else if (
         request->header.magic != ELF_MAGIC
@@ -157,7 +157,7 @@ static void readHeaderCallback(Error error, size_t read, void* udata) {
         || request->header.phnum > MAX_PHDRS
         || request->header.phentsize != sizeof(ElfProgramHeader)
     ) {
-        request->callback(simpleError(WRONG_FILE_TYPE), 0, request->udata);
+        request->callback(simpleError(ENOEXEC), 0, request->udata);
         dealloc(request);
     } else {
         request->prog_headers = kalloc(request->header.phnum * sizeof(ElfProgramHeader));

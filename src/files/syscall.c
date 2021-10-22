@@ -93,7 +93,7 @@ void openSyscall(bool is_kernel, TrapFrame* frame, SyscallArgs args) {
         vfsOpen(&global_file_system, process, string, args[1], args[2], openCallback, process);
         dealloc(string);
     } else {
-        process->frame.regs[REG_ARGUMENT_0] = -ILLEGAL_ARGUMENTS;
+        process->frame.regs[REG_ARGUMENT_0] = -EINVAL;
     }
 }
 
@@ -113,7 +113,7 @@ void unlinkSyscall(bool is_kernel, TrapFrame* frame, SyscallArgs args) {
         vfsUnlink(&global_file_system, process, string, voidSyscallCallback, process);
         dealloc(string);
     } else {
-        process->frame.regs[REG_ARGUMENT_0] = -ILLEGAL_ARGUMENTS;
+        process->frame.regs[REG_ARGUMENT_0] = -EINVAL;
     }
 }
 
@@ -130,10 +130,10 @@ void linkSyscall(bool is_kernel, TrapFrame* frame, SyscallArgs args) {
             dealloc(old);
         } else {
             dealloc(old);
-            process->frame.regs[REG_ARGUMENT_0] = -ILLEGAL_ARGUMENTS;
+            process->frame.regs[REG_ARGUMENT_0] = -EINVAL;
         }
     } else {
-        process->frame.regs[REG_ARGUMENT_0] = -ILLEGAL_ARGUMENTS;
+        process->frame.regs[REG_ARGUMENT_0] = -EINVAL;
     }
 }
 
@@ -150,10 +150,10 @@ void renameSyscall(bool is_kernel, TrapFrame* frame, SyscallArgs args) {
             dealloc(old);
         } else {
             dealloc(old);
-            process->frame.regs[REG_ARGUMENT_0] = -ILLEGAL_ARGUMENTS;
+            process->frame.regs[REG_ARGUMENT_0] = -EINVAL;
         }
     } else {
-        process->frame.regs[REG_ARGUMENT_0] = -ILLEGAL_ARGUMENTS;
+        process->frame.regs[REG_ARGUMENT_0] = -EINVAL;
     }
 }
 
@@ -164,17 +164,17 @@ void renameSyscall(bool is_kernel, TrapFrame* frame, SyscallArgs args) {
     VfsFile* file = getFileDescriptor(process, fd); \
     if (file != NULL) { \
         if ((file->flags & VFS_FILE_RDONLY) != 0 && WRITE) { \
-            process->frame.regs[REG_ARGUMENT_0] = -UNSUPPORTED; \
+            process->frame.regs[REG_ARGUMENT_0] = -EPERM; \
         } else if ((file->flags & VFS_FILE_WRONLY) != 0 && READ) { \
-            process->frame.regs[REG_ARGUMENT_0] = -UNSUPPORTED; \
+            process->frame.regs[REG_ARGUMENT_0] = -EPERM; \
         } else if (file->functions->NAME != NULL) { \
             moveToSchedState(process, WAITING); \
             DO; \
         } else { \
-            process->frame.regs[REG_ARGUMENT_0] = -UNSUPPORTED; \
+            process->frame.regs[REG_ARGUMENT_0] = -EINVAL; \
         } \
     } else { \
-        process->frame.regs[REG_ARGUMENT_0] = -ILLEGAL_ARGUMENTS; \
+        process->frame.regs[REG_ARGUMENT_0] = -EBADF; \
     }
     
 
@@ -321,7 +321,7 @@ static void mountCreateFsCallback(Error error, VfsFilesystem* fs, void* udata) {
             process->frame.regs[REG_ARGUMENT_0] = -error.kind;
         } else {
             fs->functions->free(fs, NULL, noop, NULL);
-            process->frame.regs[REG_ARGUMENT_0] = -ILLEGAL_ARGUMENTS;
+            process->frame.regs[REG_ARGUMENT_0] = -EINVAL;
         }
     }
     moveToSchedState(process, ENQUEUEABLE);
@@ -332,7 +332,7 @@ void mountSyscall(bool is_kernel, TrapFrame* frame, SyscallArgs args) {
     assert(frame->hart != NULL);
     Process* process = (Process*)frame;
     if (process->resources.uid != 0 && process->resources.gid != 0) { // Only root can mount
-        process->frame.regs[REG_ARGUMENT_0] = -FORBIDDEN;
+        process->frame.regs[REG_ARGUMENT_0] = -EACCES;
     } else {
         char* source = copyPathFromSyscallArgs(process, args[0]);
         if (source != NULL) {
@@ -346,10 +346,10 @@ void mountSyscall(bool is_kernel, TrapFrame* frame, SyscallArgs args) {
                 dealloc(source);
             } else {
                 dealloc(source);
-                process->frame.regs[REG_ARGUMENT_0] = -ILLEGAL_ARGUMENTS;
+                process->frame.regs[REG_ARGUMENT_0] = -EINVAL;
             }
         } else {
-            process->frame.regs[REG_ARGUMENT_0] = -ILLEGAL_ARGUMENTS;
+            process->frame.regs[REG_ARGUMENT_0] = -EINVAL;
         }
     }
 }
@@ -358,14 +358,14 @@ void umountSyscall(bool is_kernel, TrapFrame* frame, SyscallArgs args) {
     assert(frame->hart != NULL);
     Process* process = (Process*)frame;
     if (process->resources.uid != 0 && process->resources.gid != 0) { // Only root can mount
-        process->frame.regs[REG_ARGUMENT_0] = -FORBIDDEN;
+        process->frame.regs[REG_ARGUMENT_0] = -EACCES;
     } else {
         char* path = copyPathFromSyscallArgs(process, args[0]);
         if (path != NULL) {
             process->frame.regs[REG_ARGUMENT_0] = -umount(&global_file_system, path).kind;
             dealloc(path);
         } else {
-            process->frame.regs[REG_ARGUMENT_0] = -ILLEGAL_ARGUMENTS;
+            process->frame.regs[REG_ARGUMENT_0] = -EINVAL;
         }
     }
 }
@@ -379,7 +379,7 @@ void chdirSyscall(bool is_kernel, TrapFrame* frame, SyscallArgs args) {
         process->resources.cwd = path;
         process->frame.regs[REG_ARGUMENT_0] = -SUCCESS;
     } else {
-        process->frame.regs[REG_ARGUMENT_0] = -ILLEGAL_ARGUMENTS;
+        process->frame.regs[REG_ARGUMENT_0] = -EINVAL;
     }
 }
 
@@ -435,7 +435,7 @@ void pipeSyscall(bool is_kernel, TrapFrame* frame, SyscallArgs args) {
         PipeFile* file_write = duplicatePipeFile(file_read);
         if (file_write == NULL) {
             file_read->base.functions->close((VfsFile*)file_read, NULL, noop, NULL);
-            process->frame.regs[REG_ARGUMENT_0] = -ALREADY_IN_USE;
+            process->frame.regs[REG_ARGUMENT_0] = -ENOMEM;
         } else {
             int pipe_read = allocateNewFileDescriptor(process);
             int pipe_write = allocateNewFileDescriptor(process);
@@ -447,7 +447,7 @@ void pipeSyscall(bool is_kernel, TrapFrame* frame, SyscallArgs args) {
             process->frame.regs[REG_ARGUMENT_0] = -SUCCESS;
         }
     } else {
-        process->frame.regs[REG_ARGUMENT_0] = -ALREADY_IN_USE;
+        process->frame.regs[REG_ARGUMENT_0] = -ENOMEM;
     }
 }
 

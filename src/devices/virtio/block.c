@@ -27,7 +27,7 @@ Error initVirtIOBlockDevice(int id, volatile VirtIODeviceLayout* base, VirtIODev
     base->status = status;
     if (!(base->status & VIRTIO_FEATURES_OK)) {
         dealloc(device);
-        return someError(UNSUPPORTED, "Device does not support some features");
+        return someError(EUNSUP, "Device does not support some features");
     }
     CHECKED(setupVirtIOQueue(&device->virtio), dealloc(device));
     status |= VIRTIO_DRIVER_OK;
@@ -44,7 +44,7 @@ void virtIOBlockDeviceOperation(
 ) {
     assert(size % BLOCK_SECTOR_SIZE == 0);
     if (write && device->read_only) {
-        callback(someError(UNSUPPORTED, "Read-only device write attempt"), udata);
+        callback(someError(EINVAL, "Read-only device write attempt"), udata);
     }
     lockSpinLock(&device->lock);
     if (
@@ -52,7 +52,7 @@ void virtIOBlockDeviceOperation(
         || device->req_index - device->ack_index > BLOCK_MAX_REQUESTS
     ) {
         unlockSpinLock(&device->lock);
-        callback(someError(ALREADY_IN_USE, "Queue is full"), udata);
+        callback(someError(EBUSY, "Queue is full"), udata);
         return;
     }
     uint32_t sector = offset / BLOCK_SECTOR_SIZE;
@@ -112,13 +112,13 @@ void virtIOBlockFreePendingRequests(VirtIOBlockDevice* device) {
                 error = simpleError(SUCCESS);
                 break;
             case VIRTIO_BLOCK_S_IOERR:
-                error = simpleError(IO_ERROR);
+                error = simpleError(EIO);
                 break;
             case VIRTIO_BLOCK_S_UNSUPP:
-                error = simpleError(UNSUPPORTED);
+                error = simpleError(EUNSUP);
                 break;
             case VIRTIO_BLOCK_S_UNKNOWN:
-                error = simpleError(UNKNOWN);
+                error = simpleError(EIO);
                 break;
         }
         requests[i]->callback(error, requests[i]->udata);

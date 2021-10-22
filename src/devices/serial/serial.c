@@ -33,7 +33,7 @@ Error readLineFromSerial(Serial serial, char* string, size_t length, bool echo) 
         Error status;
         do {
             status = serial.read(serial.data, string);
-        } while (status.kind == NO_DATA);
+        } while (status.kind == EAGAIN);
         if (isError(status)) {
             *string = 0;
             return status;

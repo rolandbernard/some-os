@@ -94,7 +94,7 @@ static void readElfFileCallback(Error error, uintptr_t entry, void* udata) {
         // Allocate stack
         if (!allocatePages(request->memory, USER_STACK_TOP - USER_STACK_SIZE, 0, USER_STACK_SIZE, ELF_PROG_READ | ELF_PROG_WRITE)) {
             deallocMemorySpace(request->memory);
-            request->callback(simpleError(ALREADY_IN_USE), request->udata);
+            request->callback(simpleError(ENOMEM), request->udata);
             dealloc(request);
             return;
         }
@@ -204,7 +204,7 @@ void execveSyscall(bool is_kernel, TrapFrame* frame, SyscallArgs args) {
         );
         dealloc(string);
     } else {
-        process->frame.regs[REG_ARGUMENT_0] = -ILLEGAL_ARGUMENTS;
+        process->frame.regs[REG_ARGUMENT_0] = -EINVAL;
     }
 }
 

@@ -73,7 +73,7 @@ void protectSyscall(bool is_kernel, TrapFrame* frame, SyscallArgs args) {
     uintptr_t length = process->frame.regs[REG_ARGUMENT_2];
     uintptr_t protect = process->frame.regs[REG_ARGUMENT_3];
     if ((protect & PROT_READ_WRITE_EXEC) == 0) {
-        process->frame.regs[REG_ARGUMENT_0] = -UNSUPPORTED;
+        process->frame.regs[REG_ARGUMENT_0] = -EINVAL;
     } else {
         if (length != 0) {
             ProtectSyscallRequest request = {

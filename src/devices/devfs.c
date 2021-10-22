@@ -183,7 +183,7 @@ static void deviceOpenFunction(
         }
     }
     ino += getDeviceCountOfType(VIRTIO_BLOCK);
-    callback(simpleError(NO_SUCH_FILE), NULL, udata);
+    callback(simpleError(ENOENT), NULL, udata);
 }
 
 static void deviceFreeFunction(DeviceFilesystem* fs, Process* process, VfsFunctionCallbackVoid callback, void* udata) {

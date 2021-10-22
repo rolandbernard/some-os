@@ -66,6 +66,8 @@ void runSyscall(TrapFrame* frame, bool is_kernel) {
     Syscalls kind = (uintptr_t)frame->regs[REG_ARGUMENT_0];
     if (kind < TABLE_SIZE && syscall_table[kind] != NULL) {
         syscall_table[kind](is_kernel, frame, &(frame->regs[REG_ARGUMENT_1]));
+    } else {
+        frame->regs[REG_ARGUMENT_0] = -EINVAL;
     }
 }
 

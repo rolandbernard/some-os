@@ -25,7 +25,7 @@ static void minixFindFreeBitWriteCallback(Error error, size_t written, MinixGetB
     } else if (written == 0) {
         unlockSpinLock(&request->fs->maps_lock);
         dealloc(request->data);
-        request->callback(simpleError(IO_ERROR), request->position, request->udata);
+        request->callback(simpleError(EIO), request->position, request->udata);
         dealloc(request);
     } else {
         unlockSpinLock(&request->fs->maps_lock);
@@ -42,7 +42,7 @@ static void readBlocksForRequest(MinixGetBitMapRequest* request) {
     if (size == 0) {
         unlockSpinLock(&request->fs->maps_lock);
         dealloc(request->data);
-        request->callback(simpleError(IO_ERROR), 0, request->udata);
+        request->callback(simpleError(ENOSPC), 0, request->udata);
         dealloc(request);
     } else {
         if (size > MAX_SINGLE_READ_SIZE) {
@@ -68,7 +68,7 @@ static void minixFindFreeBitReadCallback(Error error, size_t read, MinixGetBitMa
     } else if (read == 0) {
         unlockSpinLock(&request->fs->maps_lock);
         dealloc(request->data);
-        request->callback(simpleError(IO_ERROR), 0, request->udata);
+        request->callback(simpleError(EIO), 0, request->udata);
         dealloc(request);
     } else {
         for (size_t i = 0; request->size > 0 && i < read; i++) {
@@ -136,7 +136,7 @@ static void genericMinixClearBitMapWriteCallback(Error error, size_t written, Mi
         dealloc(request);
     } else if (written == 0) {
         unlockSpinLock(&request->fs->maps_lock);
-        request->callback(simpleError(IO_ERROR), request->udata);
+        request->callback(simpleError(EIO), request->udata);
         dealloc(request);
     } else {
         unlockSpinLock(&request->fs->maps_lock);
@@ -152,7 +152,7 @@ static void genericMinixClearBitMapReadCallback(Error error, size_t read, MinixC
         dealloc(request);
     } else if (read == 0) {
         unlockSpinLock(&request->fs->maps_lock);
-        request->callback(simpleError(IO_ERROR), request->udata);
+        request->callback(simpleError(EIO), request->udata);
         dealloc(request);
     } else {
         request->data &= ~(1 << (request->position % 8));

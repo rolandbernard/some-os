@@ -122,7 +122,7 @@ void forkSyscall(bool is_kernel, TrapFrame* frame, SyscallArgs args) {
             }
         } else {
             deallocProcess(new_process);
-            process->frame.regs[REG_ARGUMENT_0] = -ALREADY_IN_USE;
+            process->frame.regs[REG_ARGUMENT_0] = -ENOMEM;
         }
     }
 }
@@ -187,7 +187,7 @@ void sigactionSyscall(bool is_kernel, TrapFrame* frame, SyscallArgs args) {
     Process* process = (Process*)frame;
     Signal sig = args[0];
     if (sig >= SIG_COUNT || sig == 0) {
-        process->frame.regs[REG_ARGUMENT_0] = -ILLEGAL_ARGUMENTS;
+        process->frame.regs[REG_ARGUMENT_0] = -EINVAL;
     } else {
         lockSpinLock(&process->signals.lock);
         SignalAction sigaction = {
@@ -213,7 +213,7 @@ void sigreturnSyscall(bool is_kernel, TrapFrame* frame, SyscallArgs args) {
     assert(frame->hart != NULL);
     Process* process = (Process*)frame;
     // If we are not in a handler, this is an error
-    process->frame.regs[REG_ARGUMENT_0] = -UNSUPPORTED;
+    process->frame.regs[REG_ARGUMENT_0] = -EINVAL;
     returnFromSignal(process);
 }
 
@@ -221,9 +221,9 @@ int killSyscallCallback(Process* process, void* udata) {
     Process* proc = (Process*)udata;
     if (proc->resources.uid == 0 || process->resources.uid == proc->resources.uid) {
         addSignalToProcess(process, proc->frame.regs[REG_ARGUMENT_2]);
-        return 0;
+        return -SUCCESS;
     } else {
-        return -FORBIDDEN;
+        return -EACCES;
     }
 }
 
@@ -241,7 +241,7 @@ void setUidSyscall(bool is_kernel, TrapFrame* frame, SyscallArgs args) {
         process->resources.uid = args[0];
         process->frame.regs[REG_ARGUMENT_0] = -SUCCESS;
     } else {
-        process->frame.regs[REG_ARGUMENT_0] = -FORBIDDEN;
+        process->frame.regs[REG_ARGUMENT_0] = -EACCES;
     }
 }
 
@@ -252,7 +252,7 @@ void setGidSyscall(bool is_kernel, TrapFrame* frame, SyscallArgs args) {
         process->resources.gid = args[0];
         process->frame.regs[REG_ARGUMENT_0] = -SUCCESS;
     } else {
-        process->frame.regs[REG_ARGUMENT_0] = -FORBIDDEN;
+        process->frame.regs[REG_ARGUMENT_0] = -EACCES;
     }
 }
 

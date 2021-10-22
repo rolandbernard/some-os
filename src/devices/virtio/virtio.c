@@ -96,7 +96,7 @@ Error setupVirtIOQueue(VirtIODevice* device) {
     if (device->queue == NULL) {
         uint32_t max_queues = device->mmio->queue_num_max;
         if (max_queues < VIRTIO_RING_SIZE) {
-            return someError(UNSUPPORTED, "Queue size maximum too low");
+            return someError(EUNSUP, "Queue size maximum too low");
         }
         device->mmio->queue_num = VIRTIO_RING_SIZE;
         device->mmio->queue_sel = 0;

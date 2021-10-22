@@ -66,16 +66,37 @@ static bool basicProcessWait(Process* process) {
 void finalProcessWait(Process* process) {
     // Called before waking up the process
     if (!basicProcessWait(process)) {
-        process->frame.regs[REG_ARGUMENT_0] = -INTERRUPTED;;
+        process->frame.regs[REG_ARGUMENT_0] = -EINTR;;
     }
 }
 
 void executeProcessWait(Process* process) {
+    lockSpinLock(&process_lock); 
     if (basicProcessWait(process)) {
+        unlockSpinLock(&process_lock); 
         moveToSchedState(process, ENQUEUEABLE);
         enqueueProcess(process);
     } else {
-        moveToSchedState(process, WAIT_CHLD);
+        bool has_child = false;
+        int wait_pid = process->frame.regs[REG_ARGUMENT_1];
+        if (wait_pid == 0) {
+            has_child = process->tree.children != NULL;
+        } else {
+            Process* child = process->tree.children;
+            while (child != NULL && !has_child) {
+                if (child->pid == wait_pid) {
+                    has_child = true;
+                }
+                child = child->tree.child_next;
+            }
+        }
+        unlockSpinLock(&process_lock); 
+        if (has_child) {
+            moveToSchedState(process, WAIT_CHLD);
+        } else {
+            process->frame.regs[REG_ARGUMENT_0] = -ECHILD;
+            moveToSchedState(process, ENQUEUEABLE);
+        }
     }
 }
 
@@ -278,6 +299,6 @@ int doForProcessWithPid(int pid, ProcessFindCallback callback, void* udata) {
         current = current->tree.global_next;
     }
     unlockSpinLock(&process_lock);
-    return -ILLEGAL_ARGUMENTS;
+    return -ESRCH;
 }
 

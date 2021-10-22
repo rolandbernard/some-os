@@ -21,7 +21,7 @@ static void serialReadFunction(SerialDeviceFile* file, Process* process, VirtPtr
         writeIntAt(buffer, 8, i, c);
     }
     unlockSpinLock(&file->lock);
-    if (status.kind == NO_DATA && i != 0) {
+    if (status.kind == EAGAIN && i != 0) {
         callback(simpleError(SUCCESS), i, udata);
     } else {
         // Success or any other error

@@ -42,7 +42,7 @@ Error writeUart16550(Uart16550* uart, char value) {
         return simpleError(SUCCESS);
     } else {
         unlockSpinLock(&uart->lock);
-        return someError(NOT_INITIALIZED, "Uart16550 is not initialized");
+        return someError(EIO, "Uart16550 is not initialized");
     }
 }
 
@@ -52,7 +52,7 @@ Error readUart16550(Uart16550* uart, char* value) {
         if ((uart->base_address[5] & 0x1) == 0) {
             // Data Ready == 0 => No data is available
             unlockSpinLock(&uart->lock);
-            return simpleError(NO_DATA);
+            return simpleError(EAGAIN);
         } else {
             // Data is available
             *value = uart->base_address[0];
@@ -61,7 +61,7 @@ Error readUart16550(Uart16550* uart, char* value) {
         }
     } else {
         unlockSpinLock(&uart->lock);
-        return someError(NOT_INITIALIZED, "Uart16550 is not initialized");
+        return someError(EIO, "Uart16550 is not initialized");
     }
 }
 

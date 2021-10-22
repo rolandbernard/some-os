@@ -305,7 +305,7 @@ static void minixGenericReadINodeCallback(Error error, size_t read, MinixOperati
         dealloc(request);
     } else if (read != sizeof(MinixInode)) {
         unlockSpinLock(&request->file->lock);
-        request->callback(simpleError(IO_ERROR), 0, request->udata);
+        request->callback(simpleError(EIO), 0, request->udata);
         dealloc(request);
     } else if (
         request->write
@@ -314,7 +314,7 @@ static void minixGenericReadINodeCallback(Error error, size_t read, MinixOperati
         )
     ) {
         unlockSpinLock(&request->file->lock);
-        request->callback(simpleError(FORBIDDEN), 0, request->udata);
+        request->callback(simpleError(EACCES), 0, request->udata);
         dealloc(request);
     } else if (
         !request->write
@@ -323,7 +323,7 @@ static void minixGenericReadINodeCallback(Error error, size_t read, MinixOperati
         )
     ) {
         unlockSpinLock(&request->file->lock);
-        request->callback(simpleError(FORBIDDEN), 0, request->udata);
+        request->callback(simpleError(EACCES), 0, request->udata);
         dealloc(request);
     } else {
         request->position[0] = 0;
@@ -382,7 +382,7 @@ static void minixSeekINodeCallback(Error error, size_t read, MinixSeekRequest* r
         dealloc(request);
     } else if (read != sizeof(MinixInode)) {
         unlockSpinLock(&request->file->lock);
-        request->callback(simpleError(IO_ERROR), 0, request->udata);
+        request->callback(simpleError(EIO), 0, request->udata);
         dealloc(request);
     } else {
         size_t new_position = request->inode.size + request->offset; // This is only used for SEEK_END
@@ -455,7 +455,7 @@ static void minixStatINodeCallback(Error error, size_t read, MinixStatRequest* r
     } else if (read != sizeof(MinixInode)) {
         unlockSpinLock(&request->file->lock);
         VfsStat ret = {};
-        request->callback(simpleError(IO_ERROR), ret, request->udata);
+        request->callback(simpleError(EIO), ret, request->udata);
         dealloc(request);
     } else {
         unlockSpinLock(&request->file->lock);
@@ -549,7 +549,7 @@ static void minixChWriteCallback(Error error, size_t read, MinixChRequest* reque
         dealloc(request);
     } else if (read != sizeof(MinixInode)) {
         unlockSpinLock(&request->file->lock);
-        request->callback(simpleError(IO_ERROR), request->udata);
+        request->callback(simpleError(EIO), request->udata);
         dealloc(request);
     } else {
         unlockSpinLock(&request->file->lock);
@@ -565,14 +565,14 @@ static void minixChReadCallback(Error error, size_t read, MinixChRequest* reques
         dealloc(request);
     } else if (read != sizeof(MinixInode)) {
         unlockSpinLock(&request->file->lock);
-        request->callback(simpleError(IO_ERROR), request->udata);
+        request->callback(simpleError(EIO), request->udata);
         dealloc(request);
     } else if (
         request->process != NULL && request->process->resources.uid != 0
         && request->process->resources.uid != request->inode.uid
     ) {
         unlockSpinLock(&request->file->lock);
-        request->callback(simpleError(FORBIDDEN), request->udata);
+        request->callback(simpleError(EACCES), request->udata);
         dealloc(request);
     } else {
         if (request->chown) {
@@ -636,7 +636,7 @@ static void minixReaddirReadCallback(Error error, size_t read, void* udata) {
         request->callback(error, 0, request->udata);
         dealloc(request);
     } else if (read != 0 && read != sizeof(MinixDirEntry)) {
-        request->callback(simpleError(IO_ERROR), 0, request->udata);
+        request->callback(simpleError(EACCES), 0, request->udata);
         dealloc(request);
     } else {
         if (read == 0) {
