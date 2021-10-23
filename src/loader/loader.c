@@ -128,19 +128,14 @@ static void readElfFileCallback(Error error, uintptr_t entry, void* udata) {
         request->process->frame.regs[REG_ARGUMENT_1] = args;
         request->process->frame.regs[REG_ARGUMENT_2] = envs;
         // Close files with CLOEXEC flag
-        for (size_t i = 0; i < request->process->resources.fd_count;) {
-            if ((request->process->resources.filedes[i]->flags & VFS_FILE_CLOEXEC) != 0) {
-                request->process->resources.filedes[i]->functions->close(
-                    request->process->resources.filedes[i], NULL, noop, NULL
-                );
-                memmove(
-                    request->process->resources.filedes + i,
-                    request->process->resources.filedes + i + 1,
-                    (request->process->resources.fd_count - i - 1) * sizeof(VfsFile*)
-                );
-                request->process->resources.fd_count--;
+        VfsFile** current = &request->process->resources.files;
+        while (*current != NULL) {
+            if (((*current)->flags & VFS_FILE_CLOEXEC) != 0) {
+                VfsFile* to_remove = *current;
+                *current = to_remove->next;
+                to_remove->functions->close(to_remove, NULL, noop, NULL);
             } else {
-                i++;
+                current = &(*current)->next;
             }
         }
         // Return from loading

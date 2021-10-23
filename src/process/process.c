@@ -46,18 +46,20 @@ void initTrapFrame(TrapFrame* frame, uintptr_t sp, uintptr_t gp, uintptr_t pc, u
 
 static bool basicProcessWait(Process* process) {
     int wait_pid = process->frame.regs[REG_ARGUMENT_1];
-    for (size_t i = 0; i < process->tree.wait_count; i++) {
-        if (wait_pid == 0 || wait_pid == process->tree.waits[i].pid) {
+    ProcessWaitResult** current = &process->tree.waits;
+    while (*current != NULL) {
+        if (wait_pid == 0 || wait_pid == (*current)->pid) {
             writeInt(
                 virtPtrFor(process->frame.regs[REG_ARGUMENT_2], process->memory.mem),
-                sizeof(int) * 8, process->tree.waits[i].status
+                sizeof(int) * 8, (*current)->status
             );
-            process->times.user_child_time += process->tree.waits[i].user_time;
-            process->times.system_child_time += process->tree.waits[i].system_time;
-            process->frame.regs[REG_ARGUMENT_0] = process->tree.waits[i].pid;
-            process->tree.wait_count--;
-            memmove(process->tree.waits + i, process->tree.waits + i + 1, process->tree.wait_count - i);
+            process->times.user_child_time += (*current)->user_time;
+            process->times.system_child_time += (*current)->system_time;
+            process->frame.regs[REG_ARGUMENT_0] = (*current)->pid;
+            *current = (*current)->next;
             return true;
+        } else {
+            current = &(*current)->next;
         }
     }
     return false;
@@ -122,20 +124,20 @@ static void unregisterProcess(Process* process) {
     // Add wait information to the parent
     if (process->tree.parent != NULL) {
         Process* parent = process->tree.parent;
-        size_t size = process->tree.wait_count + 1 + parent->tree.wait_count;
-        parent->tree.waits = krealloc(parent->tree.waits, size * sizeof(ProcessWaitResult));
-        memcpy(
-            parent->tree.waits + parent->tree.wait_count, process->tree.waits,
-            process->tree.wait_count * sizeof(ProcessWaitResult)
-        );
-        ProcessWaitResult new_entry = {
-            .pid = process->pid,
-            .status = process->status,
-            .user_time = process->times.user_time + process->times.user_child_time,
-            .system_time = process->times.system_time + process->times.system_child_time,
-        };
-        parent->tree.waits[parent->tree.wait_count + process->tree.wait_count] = new_entry;
-        parent->tree.wait_count = size;
+        ProcessWaitResult* current = process->tree.waits;
+        while (current != NULL) {
+            ProcessWaitResult* wait = current;
+            current = wait->next;
+            wait->next = parent->tree.waits;
+            parent->tree.waits = wait->next;
+        }
+        ProcessWaitResult* new_entry = kalloc(sizeof(ProcessWaitResult));
+        new_entry->pid = process->pid;
+        new_entry->status = process->status;
+        new_entry->user_time = process->times.user_time + process->times.user_child_time;
+        new_entry->system_time = process->times.system_time + process->times.system_child_time;
+        new_entry->next = parent->tree.waits;
+        parent->tree.waits = new_entry;
         addSignalToProcess(parent, SIGCHLD);
     }
     // Reparent children
@@ -223,13 +225,12 @@ static void freeProcess(Process* process) {
             // If this is not a kernel process, free its page table.
             freeMemorySpace(process->memory.mem);
         }
-        for (size_t i = 0; i < process->resources.fd_count; i++) {
-            process->resources.filedes[i]->functions->close(
-                process->resources.filedes[i], NULL, noop, NULL
-            );
+        VfsFile* current = process->resources.files;
+        while (current != NULL) {
+            VfsFile* to_remove = current;
+            current = current->next;
+            to_remove->functions->close(to_remove, NULL, noop, NULL);
         }
-        dealloc(process->resources.filedes);
-        process->resources.fd_count = 0;
         process->resources.next_fd = 0;
     }
 }

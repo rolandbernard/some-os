@@ -8,11 +8,17 @@
 #include "process/schedule.h"
 
 void addSignalToProcess(Process* process, Signal signal) {
+    PendingSignal* entry = kalloc(sizeof(PendingSignal));
+    entry->signal = signal;
+    entry->next = NULL;
     lockSpinLock(&process->signals.lock);
-    size_t size = process->signals.signal_count;
-    process->signals.signals = krealloc(process->signals.signals, (size + 1) * sizeof(Signal));
-    process->signals.signals[size] = signal;
-    process->signals.signal_count++;
+    if (process->signals.signals_tail == NULL) {
+        process->signals.signals_tail = entry;
+        process->signals.signals = entry;
+    } else {
+        process->signals.signals_tail->next = entry;
+        process->signals.signals_tail = entry;
+    }
     unlockSpinLock(&process->signals.lock);
 }
 
@@ -66,11 +72,14 @@ static void handleActualSignal(Process* process, Signal signal) {
 void handlePendingSignals(Process* process) {
     lockSpinLock(&process->signals.lock);
     // TODO: implement masking
-    if (process->signals.signal_count != 0) {
-        Signal sig = process->signals.signals[0];
-        process->signals.signal_count--;
-        memmove(process->signals.signals, process->signals.signals + 1, process->signals.signal_count);
-        handleActualSignal(process, sig);
+    if (process->signals.signals != NULL) {
+        PendingSignal* signal = process->signals.signals;
+        process->signals.signals = signal->next;
+        if (process->signals.signals == NULL) {
+            process->signals.signals_tail = NULL;
+        }
+        handleActualSignal(process, signal->signal);
+        dealloc(signal);
     }
     unlockSpinLock(&process->signals.lock);
 }

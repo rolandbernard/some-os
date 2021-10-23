@@ -140,6 +140,7 @@ typedef struct {
 } VfsFileVtable;
 
 typedef struct VfsFile_s {
+    struct VfsFile_s* next;
     int fd;
     int flags;
     size_t ino;

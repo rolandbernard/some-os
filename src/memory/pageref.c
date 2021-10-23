@@ -37,7 +37,10 @@ static void testForResize(PageRefTable* table) {
 }
 
 bool hasOtherReferences(PageRefTable* table, uintptr_t page) {
-    if (table->count == 0) {
+    if (page == (uintptr_t)zero_page) {
+        // zero page is always referenced
+        return true;
+    } else if (table->count == 0) {
         return false;
     } else {
         size_t idx = hashInt64(page) % table->capacity;

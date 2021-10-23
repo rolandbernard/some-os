@@ -89,21 +89,20 @@ typedef struct {
 
 typedef void (*VirtIOBlockCallback)(Error status, void* udata);
 
-typedef struct {
+typedef struct VirtIOBlockRequest_s {
     VirtIOBlockRequestHeader header;
     VirtIOBlockRequestData data;
     VirtIOBlockRequestStatus status;
     uint16_t head;
     VirtIOBlockCallback callback;
     void* udata;
+    struct VirtIOBlockRequest_s* next;
 } VirtIOBlockRequest;
 
 typedef struct {
     VirtIODevice virtio;
     SpinLock lock;
-    VirtIOBlockRequest* requests[BLOCK_MAX_REQUESTS];
-    uint16_t req_index;
-    uint16_t ack_index;
+    VirtIOBlockRequest* requests;
     bool read_only;
 } VirtIOBlockDevice;
 

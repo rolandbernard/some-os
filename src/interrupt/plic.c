@@ -10,7 +10,8 @@
 #include "memory/memmap.h"
 #include "memory/kalloc.h"
 
-typedef struct {
+typedef struct InterruptEntry_s {
+    struct InterruptEntry_s* next;
     ExternalInterrupt id;
     ExternalInterruptFunction function;
     void* udata;
@@ -18,30 +19,32 @@ typedef struct {
 
 static SpinLock plic_lock;
 static InterruptEntry* interrupts = NULL;
-static size_t capacity = 0;
-static size_t length = 0;
 
 void handleExternalInterrupt() {
     ExternalInterrupt interrupt = nextInterrupt();
     while (interrupt != 0) {
-        size_t interrupt_count = 0;
         lockSpinLock(&plic_lock);
-        for (size_t i = 0; i < length; i++) {
-            if (interrupts[i].id == interrupt) {
+        size_t interrupt_count = 0;
+        InterruptEntry* current = interrupts;
+        while (current != NULL) {
+            if (current->id == interrupt) {
                 interrupt_count++;
             }
+            current = current->next;
         }
-        InterruptEntry interrupts_to_run[interrupt_count];
+        InterruptEntry* interrupts_to_run[interrupt_count];
         interrupt_count = 0;
-        for (size_t i = 0; i < length; i++) {
-            if (interrupts[i].id == interrupt) {
-                interrupts_to_run[interrupt_count] = interrupts[i];
+        current = interrupts;
+        while (current != NULL) {
+            if (current->id == interrupt) {
+                interrupts_to_run[interrupt_count] = current;
                 interrupt_count++;
             }
+            current = current->next;
         }
         unlockSpinLock(&plic_lock);
         for (size_t i = 0; i < interrupt_count; i++) {
-            interrupts_to_run[i].function(interrupt, interrupts[i].udata);
+            interrupts_to_run[i]->function(interrupt, interrupts_to_run[i]->udata);
         }
         completeInterrupt(interrupt);
         interrupt = nextInterrupt();
@@ -49,16 +52,14 @@ void handleExternalInterrupt() {
 }
 
 void setInterruptFunction(ExternalInterrupt id, ExternalInterruptFunction function, void* udata) {
+    InterruptEntry* entry = kalloc(sizeof(InterruptEntry));
+    assert(entry != NULL);
+    entry->id = id;
+    entry->function = function;
+    entry->udata = udata;
     lockSpinLock(&plic_lock);
-    if (capacity <= length) {
-        capacity += 32;
-        interrupts = krealloc(interrupts, capacity * sizeof(InterruptEntry));
-        assert(interrupts != NULL);
-    }
-    interrupts[length].id = id;
-    interrupts[length].function = function;
-    interrupts[length].udata = udata;
-    length++;
+    entry->next = interrupts;
+    interrupts = entry; 
     unlockSpinLock(&plic_lock);
     enableInterrupt(id);
 }
@@ -66,15 +67,17 @@ void setInterruptFunction(ExternalInterrupt id, ExternalInterruptFunction functi
 void clearInterruptFunction(ExternalInterrupt id, ExternalInterruptFunction function, void* udata) {
     bool interrupt_used = false;
     lockSpinLock(&plic_lock);
-    for (size_t i = 0; i < length;) {
-        if (interrupts[i].id == id && interrupts[i].function == function && interrupts[i].udata == udata) {
-            memmove(interrupts + i, interrupts + i + 1, (length - i - 1) * sizeof(InterruptEntry));
-            length--;
+    InterruptEntry** current = &interrupts;
+    while (*current != NULL) {
+        if ((*current)->id == id && (*current)->function == function && (*current)->udata == udata) {
+            InterruptEntry* to_remove = *current;
+            *current = to_remove->next;
+            dealloc(to_remove);
         } else {
-            if (interrupts[i].id == id) {
+            if ((*current)->id == id) {
                 interrupt_used = true;
             }
-            i++;
+            current = &(*current)->next;
         }
     }
     unlockSpinLock(&plic_lock);

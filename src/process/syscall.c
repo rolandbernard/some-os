@@ -21,7 +21,24 @@
 typedef struct {
     Process* new_process;
     Process* old_process;
+    VfsFile* cur_file;
 } ForkSyscallRequest;
+
+static void forkFileDupCallback(Error error, VfsFile* file, void* udata);
+
+static void duplicateFilesStep(ForkSyscallRequest* request) {
+    if (request->cur_file == NULL) {
+        request->new_process->frame.regs[REG_ARGUMENT_0] = 0;
+        request->old_process->frame.regs[REG_ARGUMENT_0] = request->new_process->pid;
+        moveToSchedState(request->new_process, ENQUEUEABLE);
+        enqueueProcess(request->new_process);
+        moveToSchedState(request->old_process, ENQUEUEABLE);
+        enqueueProcess(request->old_process);
+        dealloc(request);
+    } else {
+        request->cur_file->functions->dup(request->cur_file, NULL, forkFileDupCallback, request);
+    }
+}
 
 static void forkFileDupCallback(Error error, VfsFile* file, void* udata) {
     ForkSyscallRequest* request = (ForkSyscallRequest*)udata;
@@ -31,24 +48,13 @@ static void forkFileDupCallback(Error error, VfsFile* file, void* udata) {
         enqueueProcess(request->old_process);
         dealloc(request);
     } else {
-        ProcessResources* old_res = &request->old_process->resources;
         ProcessResources* new_res = &request->new_process->resources;
-        new_res->filedes[new_res->fd_count] = file;
-        new_res->filedes[new_res->fd_count]->fd = old_res->filedes[new_res->fd_count]->fd;
-        new_res->filedes[new_res->fd_count]->flags = old_res->filedes[new_res->fd_count]->flags;
-        new_res->fd_count++;
-        if (new_res->fd_count < old_res->fd_count) {
-            VfsFile* old_file = old_res->filedes[new_res->fd_count];
-            old_file->functions->dup(old_file, NULL, forkFileDupCallback, request);
-        } else {
-            request->new_process->frame.regs[REG_ARGUMENT_0] = 0;
-            request->old_process->frame.regs[REG_ARGUMENT_0] = request->new_process->pid;
-            moveToSchedState(request->new_process, ENQUEUEABLE);
-            enqueueProcess(request->new_process);
-            moveToSchedState(request->old_process, ENQUEUEABLE);
-            enqueueProcess(request->old_process);
-            dealloc(request);
-        }
+        file->fd = request->cur_file->fd;
+        file->flags = request->cur_file->flags;
+        file->next = new_res->files;
+        new_res->files = file;
+        request->cur_file = request->cur_file->next;
+        duplicateFilesStep(request);
     }
 }
 
@@ -97,23 +103,19 @@ void forkSyscall(bool is_kernel, TrapFrame* frame, SyscallArgs args) {
             new_process->signals.restore_frame = process->signals.restore_frame;
             memcpy(new_process->signals.handlers, process->signals.handlers, sizeof(process->signals.handlers));
             // Copy files
-            size_t fd_count = process->resources.fd_count;
             new_process->resources.uid = process->resources.uid;
             new_process->resources.gid = process->resources.gid;
             new_process->resources.next_fd = process->resources.next_fd;
-            new_process->resources.fd_count = 0;
             new_process->memory.start_brk = process->memory.start_brk;
             new_process->memory.brk = process->memory.brk;
-            if (fd_count != 0) {
+            if (process->resources.files != NULL) {
                 moveToSchedState(process, WAITING);
                 moveToSchedState(new_process, WAITING);
-                new_process->resources.filedes = kalloc(fd_count * sizeof(ProcessFileDescEntry));
                 ForkSyscallRequest* request = kalloc(sizeof(ForkSyscallRequest));
                 request->new_process = new_process;
                 request->old_process = process;
-                process->resources.filedes[0]->functions->dup(
-                    process->resources.filedes[0], NULL, forkFileDupCallback, request
-                );
+                request->cur_file = process->resources.files;
+                duplicateFilesStep(request);
             } else {
                 // No files have to be duplicated
                 new_process->frame.regs[REG_ARGUMENT_0] = 0;

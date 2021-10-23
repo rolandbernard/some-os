@@ -19,46 +19,36 @@ static int allocateNewFileDescriptor(Process* process) {
 }
 
 static VfsFile* getFileDescriptor(Process* process, int fd) {
-    for (size_t i = 0; i < process->resources.fd_count; i++) {
-        if (process->resources.filedes[i]->fd == fd) {
-            return process->resources.filedes[i];
+    VfsFile* current = process->resources.files;
+    while (current != NULL) {
+        if (current->fd == fd) {
+            return current;
+        } else {
+            current = current->next;
         }
     }
     return NULL;
 }
 
 static void putNewFileDescriptor(Process* process, int fd, int flags, VfsFile* file) {
-    size_t size = process->resources.fd_count;
-    process->resources.filedes = krealloc(process->resources.filedes, (size + 1) * sizeof(VfsFile*));
-    process->resources.fd_count++;
-    process->resources.filedes[size] = file;
     file->fd = fd;
     file->flags = flags;
+    file->next = process->resources.files;
+    process->resources.files = file;
 }
 
-static void putFileDescriptor(Process* process, int fd, int flags, VfsFile* file) {
-    for (size_t i = 0; i < process->resources.fd_count; i++) {
-        if (process->resources.filedes[i]->fd == fd) {
-            process->resources.filedes[i] = file;
-            file->fd = fd;
-            file->flags = flags;
-            return;
+static VfsFile* removeFileDescriptor(Process* process, int fd) {
+    VfsFile** current = &process->resources.files;
+    while (*current != NULL) {
+        if ((*current)->fd == fd) {
+            VfsFile* to_remove = *current;
+            *current = to_remove->next;
+            return to_remove;
+        } else {
+            current = &(*current)->next;
         }
     }
-    putNewFileDescriptor(process, fd, flags, file);
-}
-
-static void removeFileDescriptor(Process* process, int fd) {
-    size_t size = process->resources.fd_count;
-    for (size_t i = 0; i < size; i++) {
-        if (process->resources.filedes[i]->fd == fd) {
-            memmove(
-                process->resources.filedes + i, process->resources.filedes + i + 1, (size - i - 1) * sizeof(VfsFile*)
-            );
-            process->resources.fd_count--;
-            return;
-        }
-    }
+    return NULL;
 }
 
 static void openCallback(Error error, VfsFile* file, void* udata) {
@@ -180,7 +170,7 @@ void renameSyscall(bool is_kernel, TrapFrame* frame, SyscallArgs args) {
 
 void closeSyscall(bool is_kernel, TrapFrame* frame, SyscallArgs args) {
     FILE_SYSCALL_OP(false, false, close, {
-        removeFileDescriptor(process, fd);
+        file = removeFileDescriptor(process, fd);
         file->functions->close(file, process, voidSyscallCallback, process);
     });
 }
@@ -258,15 +248,12 @@ static void dupCallback(Error error, VfsFile* file, void* udata) {
             process->frame.regs[REG_ARGUMENT_0] = fd;
         } else {
             size_t fd = process->frame.regs[REG_ARGUMENT_2];
-            VfsFile* existing = getFileDescriptor(process, fd);
-            if (existing == NULL) {
-                putNewFileDescriptor(process, fd, flags, file);
-                process->frame.regs[REG_ARGUMENT_0] = fd;
-            } else {
-                putFileDescriptor(process, fd, flags, file);
-                process->frame.regs[REG_ARGUMENT_0] = fd;
-                file->functions->close(file, process, voidSyscallCallback, process);
+            VfsFile* existing = removeFileDescriptor(process, fd);
+            if (existing != NULL) {
+                existing->functions->close(existing, process, voidSyscallCallback, process);
             }
+            putNewFileDescriptor(process, fd, flags, file);
+            process->frame.regs[REG_ARGUMENT_0] = fd;
         }
     }
     moveToSchedState(process, ENQUEUEABLE);

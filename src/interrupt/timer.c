@@ -13,7 +13,8 @@
 
 #define MIN_TIME (CLOCKS_PER_SEC / 100)
 
-typedef struct {
+typedef struct TimeoutEntry_s {
+    struct TimeoutEntry_s* next;
     Timeout id;
     Time time;
     TimeoutFunction function;
@@ -23,36 +24,34 @@ typedef struct {
 static Timeout next_id = 0;
 static SpinLock timeout_lock;
 static TimeoutEntry* timeouts = NULL;
-static size_t capacity = 0;
-static size_t length = 0;
 
 Timeout setTimeout(Time delay, TimeoutFunction function, void* udata) {
     lockSpinLock(&timeout_lock);
-    if (capacity <= length) {
-        capacity += 32;
-        timeouts = krealloc(timeouts, capacity * sizeof(TimeoutEntry));
-        assert(timeouts != NULL);
-    }
     Timeout id = next_id;
     next_id++;
-    size_t index = length;
-    length++;
-    timeouts[index].id = id;
-    timeouts[index].time = getTime() + delay;
-    timeouts[index].function = function;
-    timeouts[index].udata = udata;
+    unlockSpinLock(&timeout_lock);
+    TimeoutEntry* entry = kalloc(sizeof(TimeoutEntry));
+    entry->id = id;
+    entry->time = getTime() + delay;
+    entry->function = function;
+    entry->udata = udata;
+    lockSpinLock(&timeout_lock);
+    entry->next = timeouts;
+    timeouts = entry;
     unlockSpinLock(&timeout_lock);
     return id;
 }
 
 void clearTimeout(Timeout timeout) {
     lockSpinLock(&timeout_lock);
-    for (size_t i = 0; i < length;) {
-        if (timeouts[i].id == timeout) {
-            memmove(timeouts + timeout, timeouts + timeout + 1, (length - timeout - 1) * sizeof(TimeoutEntry));
-            length--;
+    TimeoutEntry** current = &timeouts;
+    while (*current != NULL) {
+        if ((*current)->id == timeout) {
+            TimeoutEntry* to_remove = *current;
+            *current = to_remove->next;
+            dealloc(to_remove);
         } else {
-            i++;
+            current = &(*current)->next;
         }
     }
     unlockSpinLock(&timeout_lock);
@@ -68,35 +67,32 @@ void initTimerInterrupt() {
 
 void handleTimerInterrupt() {
     Time time = getTime();
-    Time min = 0;
-    size_t timeout_count = 0;
+    Time min = UINT64_MAX;
+    TimeoutEntry* to_call = NULL;
     lockSpinLock(&timeout_lock);
-    for (size_t i = 0; i < length; i++) {
-        if (timeouts[i].time < time) {
-            timeout_count++;
-        }
-    }
-    TimeoutEntry timeouts_to_run[timeout_count];
-    timeout_count = 0;
-    for (size_t i = 0; i < length;) {
-        if (timeouts[i].time < time) {
-            timeouts_to_run[timeout_count] = timeouts[i];
-            timeout_count++;
-            memmove(timeouts + i, timeouts + i + 1, (length - i - 1) * sizeof(TimeoutEntry));
-            length--;
+    TimeoutEntry** current = &timeouts;
+    while (*current != NULL) {
+        if ((*current)->time <= time) {
+            TimeoutEntry* to_remove = *current;
+            *current = to_remove->next;
+            to_remove->next = to_call;
+            to_call = to_remove;
         } else {
-            if (timeouts[i].time < timeouts[min].time) {
-                min = i;
+            if ((*current)->time < min) {
+                min = (*current)->time;
             }
-            i++;
+            current = &(*current)->next;
         }
     }
     unlockSpinLock(&timeout_lock);
-    for (size_t i = 0; i < timeout_count; i++) {
-        timeouts_to_run[i].function(time, timeouts[i].udata);
+    while (to_call != NULL) {
+        TimeoutEntry* entry = to_call;
+        to_call = entry->next;
+        to_call->function(time, to_call->udata);
+        dealloc(to_call);
     }
-    if (length != 0 && timeouts[min].time < time + MIN_TIME) {
-        setTimeCmp(timeouts[min].time);
+    if (min < time + MIN_TIME) {
+        setTimeCmp(min);
     } else {
         setTimeCmp(time + MIN_TIME);
     }

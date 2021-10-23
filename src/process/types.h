@@ -117,24 +117,23 @@ typedef struct {
     Uid uid;
     Gid gid;
     int next_fd;
-    size_t fd_count;
-    VfsFile** filedes;
+    VfsFile* files;
     char* cwd;
 } ProcessResources;
 
-typedef struct {
+typedef struct ProcessWaitResult_s {
     int pid;
     int status;
     Time user_time;
     Time system_time;
+    struct ProcessWaitResult_s* next;
 } ProcessWaitResult;
 
 typedef struct {
-    size_t wait_count;
     ProcessWaitResult* waits;
     struct Process_s* parent;
     struct Process_s* children;
-    struct Process_s* child_next;
+    struct Process_s* child_next; // Next and prev to be able to remove only knowing the process we want to remove
     struct Process_s* child_prev;
     struct Process_s* global_next; // Used for list off every process
     struct Process_s* global_prev;
@@ -189,10 +188,15 @@ typedef struct {
     uintptr_t restorer;
 } SignalHandler;
 
+typedef struct PendingSignal_s {
+    struct PendingSignal_s* next;
+    Signal signal;
+} PendingSignal;
+
 typedef struct {
     SpinLock lock; // Signals can be sent by other processes, so we need a lock
-    size_t signal_count;
-    Signal* signals;
+    PendingSignal* signals;
+    PendingSignal* signals_tail;
     SignalHandler handlers[SIG_COUNT];
     Signal current_signal;
     uintptr_t restore_frame;

@@ -44,7 +44,7 @@ static void awakenProcesses() {
     Process** current = &sleeping;
     while (*current != NULL) {
         if (
-            (*current)->signals.signal_count > 0
+            (*current)->signals.signals != NULL
             || ((*current)->sched.state == SLEEPING && (*current)->sched.sleeping_until <= time)
         ) {
             Process* process = *current;
