@@ -1,6 +1,7 @@
 
 disk/
 build/
+bin/
 mnt/
 tmp/
 .vscode

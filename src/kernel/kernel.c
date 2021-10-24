@@ -35,6 +35,8 @@ void kernelInit() {
     } else {
         KERNEL_LOG("[+] Kernel initialized");
     }
+    // Wake up the remaining harts
+    sendMessageToAll(INITIALIZE_HARTS, NULL);
     // Initialize devices
     status = initDevices();
     if (isError(status)) {
@@ -50,11 +52,8 @@ void kernelInit() {
     } else {
         KERNEL_LOG("[+] Filesystem initialized");
     }
-
     // Enqueue main process to start the init process
     enqueueProcess(createKernelProcess(kernelMain, DEFAULT_PRIORITY, HART_STACK_SIZE));
-    // Wake up the remaining harts
-    // sendMessageToAll(INITIALIZE_HARTS, NULL);
     // Init the timer interrupts
     initTimerInterrupt();
     // Start running the main process
