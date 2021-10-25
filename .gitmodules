@@ -1,3 +1,9 @@
 [submodule "toolchain/newlib"]
 	path = toolchain/newlib
 	url = https://github.com/rolandbernard/newlib
+[submodule "toolchain/binutils"]
+	path = toolchain/binutils
+	url = https://github.com/rolandbernard/binutils
+[submodule "toolchain/gcc"]
+	path = toolchain/gcc
+	url = https://github.com/rolandbernard/gcc
