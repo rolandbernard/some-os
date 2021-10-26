@@ -5,7 +5,7 @@
 .global getHartStack
 
 _start:
-    # Set global and stack pointer
+    # Set global and stack pointe
     la gp, __global_pointer
     la sp, __stack_top
 

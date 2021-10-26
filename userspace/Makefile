@@ -1,87 +1,20 @@
 
-# == Build type
-BUILD := debug
-# ==
+include ../config.mk
 
-# == Targets
-TARGETS := init
-# ==
-
-# == Directories
-SOURCE_DIR := src
-BUILD_DIR  := build
-OBJECT_DIR := $(BUILD_DIR)/$(BUILD)/obj
-BINARY_DIR := $(BUILD_DIR)/$(BUILD)/bin
-DISK_DIR := ../disk
-# ==
-
-# == Files
-$(foreach TARGET, $(TARGETS), \
-	$(eval SOURCES.$(TARGET) := \
-		$(shell find $(SOURCE_DIR)/$(TARGET) -type f -name '*.[cS]' 2> /dev/null)) \
-	$(eval OBJECTS.$(TARGET) := $(patsubst $(SOURCE_DIR)/%, $(OBJECT_DIR)/%.o, $(SOURCES.$(TARGET)))))
-SOURCES        := $(shell find $(SOURCE_DIR) -type f -name '*.[cS]')
-ALL_OBJECTS    := $(patsubst $(SOURCE_DIR)/%, $(OBJECT_DIR)/%.o, $(SOURCES))
-TARGET_OBJECTS := $(foreach TARGET, $(TARGETS), $(OBJECTS.$(TARGET)))
-OBJECTS        := $(filter-out $(TARGET_OBJECTS), $(ALL_OBJECTS))
-DEPENDENCIES   := $(ALL_OBJECTS:.o=.d)
-BINARYS        := $(patsubst %, $(BINARY_DIR)/%, $(TARGETS))
+# == Config
+TARGETS      := init
+SWITCHES     :=
+ALL_SWITCHES :=
 # ==
 
 # == Tools
-LINK := ld.lld
-CC   := clang -target riscv64 -march=rv64gc
-# ==
+LD := $(ARCH)-someos-gcc
+CC := $(ARCH)-someos-gcc
+#==
 
 # == Flags
-WARNINGS := -Wall -Wextra -Wno-unused-parameter
-
-CCFLAGS.debug   += -O0 -g -DDEBUG
-LDFLAGS.debug   += -O0 -g
-CCFLAGS.release += -O3
-LDFLAGS.release += -O3
-
-CCFLAGS += $(CCFLAGS.$(BUILD)) $(WARNINGS) -MMD -MP -I$(SOURCE_DIR) -nostdlib -mno-relax -fpic -fno-builtin -ffreestanding -I$(DISK_DIR)/include
-LDFLAGS += $(LDFLAGS.$(BUILD))
-LIBS    += -static -L$(DISK_DIR)/lib -lc -lg -lm
+CCFLAGS += -I$(SYSROOT_DIR)/include -v
 # ==
 
-# == Progress
-ifndef ECHO
-TOTAL   := \
-	$(shell $(MAKE) $(MAKECMDGOALS) --no-print-directory -nrRf $(firstword $(MAKEFILE_LIST)) \
-		ECHO="__HIT_MARKER__" BUILD=$(BUILD) | grep -c "__HIT_MARKER__")
-TLENGTH := $(shell expr length $(TOTAL))
-COUNTER  = $(words $(HIDDEN_COUNT))
-COUNTINC = $(eval HIDDEN_COUNT := x $(HIDDEN_COUNT))
-PERCENT  = $(shell expr $(COUNTER) '*' 100 / $(TOTAL))
-ECHO     = $(COUNTINC)printf "[%*i/%i](%3i%%) %s\n" $(TLENGTH) $(COUNTER) $(TOTAL) $(PERCENT)
-endif
-# ==
-
-.SILENT:
-.SECONDARY:
-.SECONDEXPANSION:
-.PHONY: disk build clean
-
-build: $(BINARYS)
-	@$(ECHO) "Build successful."
-
-$(BINARYS): $(BINARY_DIR)/%: $(OBJECTS) $$(OBJECTS.$$*) $(SOURCE_DIR)/libstart/link.ld | $$(dir $$@)
-	@$(ECHO) "Building $@"
-	$(LINK) $(LDFLAGS) -o $@ $(DISK_DIR)/lib/crt0.o $(OBJECTS) $(OBJECTS.$*) $(LIBS) -T$(SOURCE_DIR)/libstart/link.ld
-
-$(OBJECT_DIR)/%.o: $(SOURCE_DIR)/% $(MAKEFILE_LIST) | $$(dir $$@)
-	@$(ECHO) "Building $@"
-	$(CC) $(CCFLAGS) -c -o $@ $<
-
-%/:
-	@$(ECHO) "Building $@"
-	mkdir -p $@
-
-clean:
-	@$(ECHO) "Cleaning local files"
-	$(RM) -rf $(BUILD_DIR)/*
-
--include $(DEPENDENCIES)
+include ../build.mk
 

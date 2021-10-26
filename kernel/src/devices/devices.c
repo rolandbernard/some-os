@@ -11,24 +11,18 @@
 static Uart16550 serial_mmio;
 static bool initialized;
 
+extern Error initBoardBaselineDevices();
+extern Error initBoardDevices();
+
 Error initBaselineDevices() {
-    // Initialize the uart device to enable logging
-    serial_mmio.base_address = (void*)memory_map[VIRT_UART0].base;
-    CHECKED(initUart16550(&serial_mmio));
-    initialized = true;
+    CHECKED(initBoardBaselineDevices());
     return simpleError(SUCCESS);
 }
 
 Error initDevices() {
+    CHECKED(initBoardDevices());
     CHECKED(initVirtIODevices());
     return simpleError(SUCCESS);
-}
-
-Serial getDefaultSerialDevice() {
-    if (!initialized) {
-        initBaselineDevices();
-    }
-    return serialUart16550(&serial_mmio);
 }
 
 Error mountDeviceFiles() {
