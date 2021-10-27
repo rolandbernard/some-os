@@ -3,6 +3,10 @@ include ./config.mk
 
 # == General
 ECHO := echo
+SUBS := toolchain kernel userspace
+
+$(foreach SUB, $(SUBS), $(eval TARGET.$(SUB) := $(BUILD_DIR)/$(SUB).flag))
+TARGET.sysroot := $(BUILD_DIR)/sysroot.flag
 # ==
 
 # == Qemu
@@ -20,26 +24,25 @@ QEMU_ARGS += -drive if=none,format=raw,file=$(DISK),id=disk0
 QEMU_ARGS += -device virtio-blk-device,scsi=off,drive=disk0
 # ==
 
-.PHONY: build kernel userspace toolchain clean qemu
+.PHONY: build clean qemu
 
-build: kernel userspace toolchain
+build: $(TARGET.kernel) $(TARGET.userspace)
 
-kernel: toolchain
-	$(MAKE) -C $(KERNEL_DIR)
+$(TARGET.userspace): $(TARGET.toolchain) FORCE
+$(TARGET.kernel): $(TARGET.toolchain) FORCE
 
-userspace: toolchain
-	$(MAKE) -C $(USERSPACE_DIR)
+$(BUILD_DIR)/%.flag:
+	@$(ECHO) "Building $*"
+	$(MAKE) -C $(ROOT_DIR)/$* FLAG=$(BUILD_DIR)/$*.flag
+
+$(TARGET.sysroot): $(TARGET.userspace)
+	@$(ECHO) "Building sysroot"
 	mkdir -p $(SYSROOT_DIR)/dev
 	mkdir -p $(SYSROOT_DIR)/bin
 	cp -r $(USERSPACE_DIR)/build/$(BUILD)/bin/* $(SYSROOT_DIR)/bin
-
-toolchain: $(BUILD_DIR)/toolchain.flag
-
-$(BUILD_DIR)/%.flag:
-	$(MAKE) -C $(ROOT_DIR)/$*
 	touch $@
 
-$(DISK): userspace toolchain | $(MOUNT_DIR)/
+$(DISK): $(TARGET.sysroot) | $(MOUNT_DIR)/
 	@$(ECHO) "Building $@"
 	dd if=/dev/zero of=$@ bs=1M count=128 &> /dev/null
 	mkfs.minix -3 $@
@@ -47,8 +50,13 @@ $(DISK): userspace toolchain | $(MOUNT_DIR)/
 	cp -r $(SYSROOT_DIR)/* $(MOUNT_DIR)/
 	sudo umount $(MOUNT_DIR)
 
-qemu: kernel $(DISK)
+qemu: $(TARGET.kernel) $(DISK)
 	$(QEMU) $(QEMU_ARGS) -kernel $(KERNEL_DIR)/build/$(BUILD)/bin/kernel
+
+sysroot: $(TARGET.sysroot)
+
+$(foreach SUB, $(SUBS), clean-$(SUB)): clean-%:
+	$(MAKE) -C $(ROOT_DIR)/$* clean
 
 clean:
 	$(MAKE) -C $(KERNEL_DIR) clean
@@ -56,4 +64,6 @@ clean:
 	$(MAKE) -C $(TOOLCHAIN_DIR) clean
 	$(RM) -rf $(BUILD_DIR)
 	@$(ECHO) "Cleaned build directory."
+
+FORCE:
 

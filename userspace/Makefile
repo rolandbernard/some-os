@@ -13,7 +13,7 @@ CC := $(ARCH)-someos-gcc
 #==
 
 # == Flags
-CCFLAGS += -I$(SYSROOT_DIR)/include -v
+CCFLAGS += -I$(SYSROOT_DIR)/include
 # ==
 
 include ../build.mk

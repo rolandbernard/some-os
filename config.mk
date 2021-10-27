@@ -22,17 +22,19 @@ BASE_DIR      ?= $(abspath .)
 BUILD_DIR     ?= $(BASE_DIR)/build
 # ==
 
+# == Changed
+CHANGED  = touch $(FLAG)
+FINISHED = true
+# ==
+
 # == Common config
 export PATH := $(TOOLS_DIR)/bin:$(PATH)
 
 .SILENT:
-.SECONDARY:
 .SECONDEXPANSION:
 # ==
 
 # == Common rules
-
-.PHONY: clean
 
 %/:
 	mkdir -p $@

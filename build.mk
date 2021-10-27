@@ -60,20 +60,24 @@ BINARYS          := $(foreach TARGET, $(TARGETS), $(BINARY_DIR)/$(TARGET))
 
 .PHONY: build clean
 
-build: $(BINARYS)
+build: $(TARGETS)
+	@$(FINISHED)
 	@$(ECHO) "Build successful."
 
-clean:
-	$(RM) -rf $(BUILD_DIR)
-	@$(ECHO) "Cleaned build directory."
+$(TARGETS): $(BINARY_DIR)/$$@
 
 $(BINARYS): $(BINARY_DIR)/%: $(OBJECTS) $$(TARGET_OBJECTS.$$*) $(LINK_SCRIPT) | $$(dir $$@)
 	@$(ECHO) "Building $@"
 	$(LD) $(LDFLAGS) -o $@ $(OBJECTS) $(TARGET_OBJECTS.$*) $(if $(LINK_SCRIPT), -T$(LINK_SCRIPT))
+	@$(CHANGED)
 
 $(OBJECT_DIR)/%.o: $(SOURCE_DIR)/% $(MAKEFILE_LIST) | $$(dir $$@)
 	@$(ECHO) "Building $@"
 	$(CC) $(CCFLAGS) -c -o $@ $<
+
+clean:
+	$(RM) -rf $(BUILD_DIR)
+	@$(ECHO) "Cleaned build directory."
 
 -include $(DEPENDENCIES)
 

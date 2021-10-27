@@ -53,7 +53,9 @@ POST_BUILD.newlib := cp -ar $(SYSROOT_DIR)/$(TARGET)/* $(SYSROOT_DIR)/ && rm -rf
 
 .PHONY: $(TARGETS)
 
+# Assume we always changed
 all: $(TARGETS)
+	@$(CHANGED)
 
 $(TARGETS): $$(BUILD_REQ.$$@) | $(SYSROOT_DIR)/ $(TOOLS_DIR)/ $(BUILD_DIR)/$$@/
 	@$(ECHO) "Building $@"
