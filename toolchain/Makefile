@@ -58,8 +58,8 @@ all: $(TARGETS)
 $(TARGETS): $$(BUILD_REQ.$$@) | $(SYSROOT_DIR)/ $(TOOLS_DIR)/ $(BUILD_DIR)/$$@/
 	@$(ECHO) "Building $@"
 	cd $(BUILD_DIR)/$@ && $(BASE_DIR)/$(PROJ_NAME.$@)/configure --target=$(TARGET) $(CONF_ARGS.$@)
-	cd $(BUILD_DIR)/$@ && $(MAKE) $(MAKE_ARGS.$@)
-	cd $(BUILD_DIR)/$@ && $(MAKE) $(INST_ARGS.$@)
+	$(MAKE) -C $(BUILD_DIR)/$@ $(MAKE_ARGS.$@)
+	$(MAKE) -C $(BUILD_DIR)/$@ $(INST_ARGS.$@)
 	true ; $(POST_BUILD.$@)
 
 clean:

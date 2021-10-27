@@ -24,7 +24,6 @@ BUILD_DIR     ?= $(BASE_DIR)/build
 
 # == Common config
 export PATH := $(TOOLS_DIR)/bin:$(PATH)
-MAKEFLAGS += --no-builtin-rules
 
 .SILENT:
 .SECONDARY:
