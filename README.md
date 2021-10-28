@@ -7,6 +7,45 @@ used.
 
 ## Development
 
-Compile the project using the `make` command, and execute the resulting binary with qemu using the
-`make qemu` command. You will need to install a version of Clang that includes riscv64 support.
+### Requirements
+
+The build will compile a version of `gcc` and `binutils` for the `riscv64-someos` target, if your
+system is able to compile both of them you should be fine.
+
+To run the kernel in a virtual machine you will need to have [QEMU](https://www.qemu.org/) with
+riscv64 support installed.
+
+### Getting the source
+
+Because this repository uses submodules to include all ported software, you will have to recursively
+clone this repository. You can do this using the following command:
+
+```
+git clone --recursive https://github.com/rolandbernard/some-os
+```
+
+Or if you have already cloned the repository:
+
+```
+git submodule update --init --recursive
+```
+
+### Building
+
+Compile the project using the `make` command. This will build the toolchain, the kernel and all
+userspace components.
+
+### Running
+
+To start the operating system in QEMU run `make qemu`. This will also build a minix3 formatted disk
+in `build/hdd.dsk` from the `sysroot` directory.
+
+### File structure
+
+This repository has four important subdirectories:
+
+* `kernel` This directory includes all the code for the kernel
+* `userspace` This directory includes some custom userspace programs
+* `toolchain` This directory includes ported software that belongs to the toolchain
+* `programs` This directory includes all ported programs that don't belong to the toolchain
 
