@@ -14,7 +14,8 @@ DISK := $(BUILD_DIR)/hdd.dsk
 QEMU := qemu-system-$(ARCH)
 
 # Qemu system
-QEMU_ARGS := -M virt -smp 4 -m 128M -s $(QEMU_ADD_ARGS)
+QEMU_SMP  ?= 4
+QEMU_ARGS := -M virt -smp $(QEMU_SMP) -m 128M -s $(QEMU_ADD_ARGS)
 QEMU_ARGS += -cpu rv64 -bios none -snapshot
 
 # Qemu devices

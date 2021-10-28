@@ -13,7 +13,7 @@ CC := $(ARCH)-someos-gcc
 #==
 
 # == Flags
-CCFLAGS += -nostdlib -mno-relax -fpic -ffreestanding
+CCFLAGS += -nostdlib -mno-relax -fpic -fpie -ffreestanding
 CCFLAGS += -I$(SOURCE_DIR)/libc/include
 LINK_SCRIPT = $(SOURCE_DIR)/bsp/$(BOARD)/link.ld
 # ==

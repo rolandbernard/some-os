@@ -8,19 +8,21 @@ MEMORY {
 PHDRS {
     text PT_LOAD;
     data PT_LOAD;
+    bss PT_LOAD;
 }
 
 SECTIONS {
     . = ORIGIN(ram);
 
-    .text ALIGN(4k): {
+    .text : {
         PROVIDE(__text_start = .);
         *(.text.boot)
         *(.text .text*)
         PROVIDE(__text_end = .);
     } >ram AT>ram :text
 
-    .data ALIGN(4k): {
+    .data : {
+        . = ALIGN(4096);
         PROVIDE(__data_start = .);
         *(.got .got*)
         *(.rodata .rodata*)
@@ -29,14 +31,15 @@ SECTIONS {
         PROVIDE(__data_end = .);
     } >ram AT>ram :data
 
-    .bss ALIGN(4k) (NOLOAD): {
+    .bss : {
+        . = ALIGN(8);
         PROVIDE(__bss_start = .);
         *(.sbss .sbss*)
         *(.bss .bss*)
         . += 8;
         . = ALIGN(8);
         PROVIDE(__bss_end = .);
-    } >ram AT>ram
+    } >ram AT>ram :bss
 
     PROVIDE(__global_pointer = __data_start);
 
