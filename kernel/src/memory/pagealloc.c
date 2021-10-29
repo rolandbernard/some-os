@@ -6,8 +6,8 @@
 #include "memory/pagealloc.h"
 #include "util/spinlock.h"
 
-extern void __heap_start;
-extern void __heap_end;
+extern const void __heap_start;
+extern const void __heap_end;
 
 static SpinLock alloc_lock;
 static FreePages free_pages;

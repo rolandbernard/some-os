@@ -26,7 +26,7 @@ typedef union {
     uint64_t entry;
     struct {
         uint64_t bits : 10;
-        uint64_t paddr : 44;
+        uintptr_t paddr : 44;
         uint64_t reserved0 : 10;
     };
     struct {

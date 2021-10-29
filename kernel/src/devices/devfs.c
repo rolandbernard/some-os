@@ -156,7 +156,7 @@ static void deviceOpenFunction(
     }
     ino++;
     if (strncmp(path, "/blk", 4) == 0 && path[4] != 0) {
-        size_t id = 0;
+        int id = 0;
         for (int i = 4; path[i] != 0; i++) {
             if (path[i] >= '0' && path[i] <= '9') {
                 id *= 10;
@@ -167,7 +167,7 @@ static void deviceOpenFunction(
             }
         }
         if (id >= 0) {
-            if (id < getDeviceCountOfType(VIRTIO_BLOCK)) {
+            if (id < (int)getDeviceCountOfType(VIRTIO_BLOCK)) {
                 VirtIOBlockDevice* device = (VirtIOBlockDevice*)getDeviceOfType(VIRTIO_BLOCK, id);
                 if (device != NULL) {
                     VirtIOBlockDeviceLayout* info = (VirtIOBlockDeviceLayout*)device->virtio.mmio;

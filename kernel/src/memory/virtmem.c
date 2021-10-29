@@ -4,11 +4,11 @@
 #include "memory/memmap.h"
 #include "error/log.h"
 
-extern void __text_start;
-extern void __text_end;
+extern const void __text_start;
+extern const void __text_end;
 
-extern void __data_start;
-extern void __stack_top;
+extern const void __data_start;
+extern const void __stack_top;
 
 PageTable* kernel_page_table;
 SpinLock kernel_page_table_lock;

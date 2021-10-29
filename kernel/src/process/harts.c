@@ -8,8 +8,8 @@
 #include "memory/kalloc.h"
 #include "memory/virtmem.h"
 
-extern void __global_pointer;
-extern void __stack_top;
+extern char __global_pointer;
+extern const void __stack_top;
 
 SpinLock hart_lock = 0;
 HartFrame* harts_head = NULL; // This will be a circular linked list

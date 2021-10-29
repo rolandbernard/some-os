@@ -25,7 +25,7 @@ QEMU_ARGS += -drive if=none,format=raw,file=$(DISK),id=disk0
 QEMU_ARGS += -device virtio-blk-device,scsi=off,drive=disk0
 # ==
 
-.PHONY: build clean qemu
+.PHONY: build clean qemu $(SUBS)
 
 build: $(TARGET.kernel) $(TARGET.userspace)
 
@@ -55,6 +55,11 @@ qemu: $(TARGET.kernel) $(DISK)
 	$(QEMU) $(QEMU_ARGS) -kernel $(KERNEL_DIR)/build/$(BUILD)/bin/kernel
 
 sysroot: $(TARGET.sysroot)
+
+$(SUBS): $$(TARGET.$$@)
+
+$(foreach SUB, $(SUBS), only-$(SUB)): only-%:
+	$(MAKE) -C $(ROOT_DIR)/$*
 
 $(foreach SUB, $(SUBS), clean-$(SUB)): clean-%:
 	$(MAKE) -C $(ROOT_DIR)/$* clean

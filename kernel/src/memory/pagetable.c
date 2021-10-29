@@ -39,7 +39,7 @@ PageTableEntry* mapPage(PageTable* root, uintptr_t vaddr, uintptr_t paddr, int b
         }
         // This must not be a leaf node
         assert((entry->bits & 0b1110) == 0);
-        PageTable* next_level = (PageTable*)(entry->paddr << 12);
+        PageTable* next_level = (PageTable*)((uintptr_t)entry->paddr << 12);
         entry = &next_level->entries[vpn[i]];
     }
     // This must be a leaf node or invalid
@@ -76,7 +76,7 @@ void unmapPage(PageTable* root, uintptr_t vaddr) {
         if (entry[i]->v) {
             if ((entry[i]->bits & 0b1110) == 0) {
                 assert(i != 0); // Level 0 can not contain branches
-                table[i - 1] = (PageTable*)(entry[i]->paddr << 12);
+                table[i - 1] = (PageTable*)((uintptr_t)entry[i]->paddr << 12);
             } else {
                 entry[i]->entry = 0;
                 for (int j = i; j < 2; j++) {
@@ -107,7 +107,7 @@ PageTableEntry* virtToEntry(PageTable* root, uintptr_t vaddr) {
         if (entry->v) {
             if ((entry->bits & 0b1110) == 0) {
                 assert(i != 0); // Level 0 can not contain branches
-                table = (PageTable*)(entry->paddr << 12);
+                table = (PageTable*)((uintptr_t)entry->paddr << 12);
             } else {
                 return entry;
             }
@@ -131,7 +131,7 @@ uintptr_t unsafeVirtToPhys(PageTable* root, uintptr_t vaddr) {
         if (entry->v) {
             if ((entry->bits & 0b1110) == 0) {
                 assert(i != 0); // Level 0 can not contain branches
-                table = (PageTable*)(entry->paddr << 12);
+                table = (PageTable*)((uintptr_t)entry->paddr << 12);
             } else {
                 uintptr_t mask = ((PAGE_SIZE << (9 * i)) - 1);
                 uintptr_t offset = vaddr & mask;
@@ -151,12 +151,12 @@ void allPagesDo(PageTable* root, AllPagesDoCallback callback, void* udata) {
         if (entry_lv2->v) {
             if ((entry_lv2->bits & 0b1110) == 0) {
                 // This is a non leaf node
-                PageTable* table_lv1 = (PageTable*)(entry_lv2->paddr << 12);
+                PageTable* table_lv1 = (PageTable*)((uintptr_t)entry_lv2->paddr << 12);
                 for (uintptr_t j = 0; j < PAGE_TABLE_SIZE; j++) {
                     PageTableEntry* entry_lv1 = &table_lv1->entries[j];
                     if (entry_lv1->v) {
                         if ((entry_lv1->bits & 0b1110) == 0) {
-                            PageTable* table_lv0 = (PageTable*)(entry_lv1->paddr << 12);
+                            PageTable* table_lv0 = (PageTable*)((uintptr_t)entry_lv1->paddr << 12);
                             // No more branches after level 0
                             for (uintptr_t k = 0; k < PAGE_TABLE_SIZE; k++) {
                                 PageTableEntry* entry_lv0 = &table_lv0->entries[k];
@@ -181,11 +181,11 @@ void unmapAllPages(PageTable* root) {
         PageTableEntry* entry_lv2 = &root->entries[i];
         if (entry_lv2->v && (entry_lv2->bits & 0b1110) == 0) {
             // This is a non leaf node
-            PageTable* table_lv1 = (PageTable*)(entry_lv2->paddr << 12);
+            PageTable* table_lv1 = (PageTable*)((uintptr_t)entry_lv2->paddr << 12);
             for (int i = 0; i < PAGE_TABLE_SIZE; i++) {
                 PageTableEntry* entry_lv1 = &table_lv1->entries[i];
                 if (entry_lv1->v && (entry_lv1->bits & 0b1110) == 0) {
-                    PageTable* table_lv0 = (PageTable*)(entry_lv1->paddr << 12);
+                    PageTable* table_lv0 = (PageTable*)((uintptr_t)entry_lv1->paddr << 12);
                     // No more branches after level 0
                     deallocPage(table_lv0);
                 }

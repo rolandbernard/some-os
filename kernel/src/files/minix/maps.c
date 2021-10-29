@@ -9,28 +9,37 @@ typedef struct {
     size_t offset;
     size_t size;
     size_t position;
-    VfsFunctionCallbackSizeT callback;
+    bool inode;
+    void* callback;
     void* udata;
     uint8_t* data;
 } MinixGetBitMapRequest;
 
 #define MAX_SINGLE_READ_SIZE (1 << 16)
 
+static void callCallback(MinixGetBitMapRequest* request, Error error, size_t i) {
+    if (request->inode) {
+        ((MinixINodeCallback)request->callback)(error, i, request->data);
+    } else {
+        ((VfsFunctionCallbackSizeT)request->callback)(error, i, request->data);
+    }
+}
+
 static void minixFindFreeBitWriteCallback(Error error, size_t written, MinixGetBitMapRequest* request) {
     if (isError(error)) {
         unlockSpinLock(&request->fs->maps_lock);
         dealloc(request->data);
-        request->callback(error, 0, request->udata);
+        callCallback(request, error, 0);
         dealloc(request);
     } else if (written == 0) {
         unlockSpinLock(&request->fs->maps_lock);
         dealloc(request->data);
-        request->callback(simpleError(EIO), request->position, request->udata);
+        callCallback(request, simpleError(EIO), request->position);
         dealloc(request);
     } else {
         unlockSpinLock(&request->fs->maps_lock);
         dealloc(request->data);
-        request->callback(simpleError(SUCCESS), request->position, request->udata);
+        callCallback(request, simpleError(SUCCESS), request->position);
         dealloc(request);
     }
 }
@@ -42,7 +51,7 @@ static void readBlocksForRequest(MinixGetBitMapRequest* request) {
     if (size == 0) {
         unlockSpinLock(&request->fs->maps_lock);
         dealloc(request->data);
-        request->callback(simpleError(ENOSPC), 0, request->udata);
+        callCallback(request, simpleError(ENOSPC), 0);
         dealloc(request);
     } else {
         if (size > MAX_SINGLE_READ_SIZE) {
@@ -63,12 +72,12 @@ static void minixFindFreeBitReadCallback(Error error, size_t read, MinixGetBitMa
     if (isError(error)) {
         unlockSpinLock(&request->fs->maps_lock);
         dealloc(request->data);
-        request->callback(error, 0, request->udata);
+        callCallback(request, error, 0);
         dealloc(request);
     } else if (read == 0) {
         unlockSpinLock(&request->fs->maps_lock);
         dealloc(request->data);
-        request->callback(simpleError(EIO), 0, request->udata);
+        callCallback(request, simpleError(EIO), 0);
         dealloc(request);
     } else {
         for (size_t i = 0; request->size > 0 && i < read; i++) {
@@ -93,13 +102,14 @@ static void minixFindFreeBitReadCallback(Error error, size_t read, MinixGetBitMa
     }
 }
 
-static void genericMinixGetBitMap(MinixFilesystem* fs, size_t offset, size_t size, VfsFunctionCallbackSizeT callback, void* udata) {
+static void genericMinixGetBitMap(MinixFilesystem* fs, size_t offset, size_t size, bool inode, void* callback, void* udata) {
     MinixGetBitMapRequest* request = kalloc(sizeof(MinixGetBitMapRequest));
     lockSpinLock(&fs->maps_lock);
     request->fs = fs;
     request->offset = offset;
     request->size = size;
     request->position = 0;
+    request->inode = inode;
     request->callback = callback;
     request->udata = udata;
     request->data = NULL;
@@ -108,15 +118,13 @@ static void genericMinixGetBitMap(MinixFilesystem* fs, size_t offset, size_t siz
 
 void getFreeMinixInode(MinixFilesystem* fs, MinixINodeCallback callback, void* udata) {
     genericMinixGetBitMap(
-        fs, 2 * MINIX_BLOCK_SIZE, fs->superblock.ninodes,
-        (VfsFunctionCallbackSizeT)callback, udata
+        fs, 2 * MINIX_BLOCK_SIZE, fs->superblock.ninodes, true, callback, udata
     );
 }
 
 void getFreeMinixZone(MinixFilesystem* fs, VfsFunctionCallbackSizeT callback, void* udata) {
     genericMinixGetBitMap(
-        fs, (2 + fs->superblock.imap_blocks) * MINIX_BLOCK_SIZE, fs->superblock.zones,
-        (VfsFunctionCallbackSizeT)callback, udata
+        fs, (2 + fs->superblock.imap_blocks) * MINIX_BLOCK_SIZE, fs->superblock.zones, false, callback, udata
     );
 }
 

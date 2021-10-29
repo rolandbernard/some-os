@@ -42,6 +42,9 @@ static bool freeFilesystemMount(FilesystemMount* mount, bool force) {
         case MOUNT_TYPE_BIND:
             dealloc(mount->data);
             return true;
+        default: 
+            panic();
+            return false;
     }
 }
 
@@ -137,10 +140,11 @@ static FilesystemMount* findLocalMountHandling(VirtualFilesystem* fs, const char
                     if (path[mount_path_length] == 0) { // Only an exact match is possible here
                         ret = &fs->mounts[i];
                     }
+                    break;
                 case MOUNT_TYPE_FS:
-                    ret = &fs->mounts[i];
                 case MOUNT_TYPE_BIND: {
                     ret = &fs->mounts[i];
+                    break;
                 }
             }
         }

@@ -20,7 +20,7 @@ bool handlePageFault(MemorySpace* mem, uintptr_t address) {
     PageTableEntry* entry = virtToEntry(mem, address);
     if (entry != NULL && entry->v && (entry->bits & PAGE_ENTRY_COPY) != 0) {
         // This is a copy-on-write page
-        void* phy = (void*)(entry->paddr << 12);
+        void* phy = (void*)((uintptr_t)entry->paddr << 12);
         if (phy == zero_page) {
             void* page = zallocPage(); // Zero page, so zallocPage
             if (page == NULL) {
@@ -29,7 +29,7 @@ bool handlePageFault(MemorySpace* mem, uintptr_t address) {
                 // We don't need to add references here, only if we have more than one reference
                 entry->bits |= PAGE_ENTRY_WRITE;
                 entry->bits &= ~PAGE_ENTRY_COPY;
-                entry->paddr = (uint64_t)page >> 12;
+                entry->paddr = (uintptr_t)page >> 12;
                 return true;
             }
         } else {
@@ -42,7 +42,7 @@ bool handlePageFault(MemorySpace* mem, uintptr_t address) {
                     return false;
                 } else {
                     memcpy(page, phy, PAGE_SIZE);
-                    entry->paddr = (uint64_t)page >> 12;
+                    entry->paddr = (uintptr_t)page >> 12;
                 }
             } else {
                 // If we have no other reference, we can reuse the current page
@@ -90,7 +90,7 @@ uintptr_t virtToPhys(MemorySpace* mem, uintptr_t vaddr, bool write, bool allow_a
 
 static void freePageEntryData(PageTableEntry* entry) {
     if ((entry->bits  & PAGE_ENTRY_USER) != 0) {
-        void* phy = (void*)(entry->paddr << 12);
+        void* phy = (void*)((uintptr_t)entry->paddr << 12);
         if (phy != zero_page) {
             lockSpinLock(&global_page_lock);
             // Remove reference to the page we are freeing
@@ -120,7 +120,7 @@ static void freePagesInTable(PageTable* table, int level) {
             PageTableEntry* entry = &table->entries[i];
             if (entry->v) {
                 if ((entry->bits & 0b1110) == 0) {
-                    PageTable* table = (PageTable*)(entry->paddr << 12);
+                    PageTable* table = (PageTable*)((uintptr_t)entry->paddr << 12);
                     freePagesInTable(table, level - 1);
                     deallocPage(table);
                 } else {
@@ -143,7 +143,7 @@ void deallocMemorySpace(MemorySpace* mem) {
 
 static bool copyMemoryPageEntry(PageTableEntry* dst, PageTableEntry* src) {
     if ((src->bits & PAGE_ENTRY_USER) != 0) {
-        void* phy = (void*)(src->paddr << 12);
+        void* phy = (void*)((uintptr_t)src->paddr << 12);
         if (phy != zero_page) {
             lockSpinLock(&global_page_lock);
             // We have at least two references, the one we copy from and the one we copyied.
@@ -167,7 +167,7 @@ static bool copyAllPagesAndAllocUsers(PageTable* dest, PageTable* src) {
         dest->entries[i] = src->entries[i];
         if (entry->v) {
             if ((entry->bits & 0b1110) == 0) {
-                PageTable* src_table = (PageTable*)(entry->paddr << 12);
+                PageTable* src_table = (PageTable*)((uintptr_t)entry->paddr << 12);
                 PageTable* dst_table = createPageTable();
                 if (dst_table == NULL) {
                     return false;

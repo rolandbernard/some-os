@@ -8,9 +8,6 @@
 #include "memory/memmap.h"
 #include "util/text.h"
 
-static Uart16550 serial_mmio;
-static bool initialized;
-
 extern Error initBoardBaselineDevices();
 extern Error initBoardDevices();
 
