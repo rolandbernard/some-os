@@ -2,9 +2,7 @@
 include ../config.mk
 
 # == Config
-TARGETS      := init
-SWITCHES     :=
-ALL_SWITCHES :=
+TARGETS      := init hello
 # ==
 
 # == Tools
