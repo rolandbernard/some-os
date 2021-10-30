@@ -109,8 +109,7 @@ static void readElfFileCallback(Error error, uintptr_t entry, void* udata) {
             request->process->pid = allocateNewPid();
             request->process->status = 0;
         } else {
-            deallocMemorySpace(request->memory);
-            freePageTable(request->process->memory.mem);
+            deallocMemorySpace(request->process->memory.mem);
         }
         if (request->file_stat.mode & VFS_MODE_SETUID) {
             request->process->resources.uid = request->file_stat.uid;
