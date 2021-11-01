@@ -236,10 +236,10 @@ static void dupCallback(Error error, VfsFile* file, void* udata) {
         if ((process->frame.regs[REG_ARGUMENT_3] & VFS_OPEN_CLOEXEC) != 0) {
             flags |= VFS_FILE_CLOEXEC;
         }
-        if ((process->frame.regs[REG_ARGUMENT_2] & VFS_OPEN_RDONLY) != 0) {
+        if ((process->frame.regs[REG_ARGUMENT_3] & VFS_OPEN_RDONLY) != 0) {
             flags |= VFS_FILE_RDONLY;
         }
-        if ((process->frame.regs[REG_ARGUMENT_2] & VFS_OPEN_WRONLY) != 0) {
+        if ((process->frame.regs[REG_ARGUMENT_3] & VFS_OPEN_WRONLY) != 0) {
             flags |= VFS_FILE_WRONLY;
         }
         if ((int)process->frame.regs[REG_ARGUMENT_2] < 0) {
@@ -250,7 +250,7 @@ static void dupCallback(Error error, VfsFile* file, void* udata) {
             size_t fd = process->frame.regs[REG_ARGUMENT_2];
             VfsFile* existing = removeFileDescriptor(process, fd);
             if (existing != NULL) {
-                existing->functions->close(existing, process, voidSyscallCallback, process);
+                existing->functions->close(existing, NULL, noop, NULL);
             }
             putNewFileDescriptor(process, fd, flags, file);
             process->frame.regs[REG_ARGUMENT_0] = fd;
