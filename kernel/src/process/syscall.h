@@ -11,6 +11,10 @@ void yieldSyscall(bool is_kernel, TrapFrame* frame, SyscallArgs args);
 
 void sleepSyscall(bool is_kernel, TrapFrame* frame, SyscallArgs args);
 
+void pauseSyscall(bool is_kernel, TrapFrame* frame, SyscallArgs args);
+
+void alarmSyscall(bool is_kernel, TrapFrame* frame, SyscallArgs args);
+
 void getpidSyscall(bool is_kernel, TrapFrame* frame, SyscallArgs args);
 
 void getppidSyscall(bool is_kernel, TrapFrame* frame, SyscallArgs args);

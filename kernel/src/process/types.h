@@ -86,6 +86,7 @@ typedef enum {
     WAITING,
     WAIT_CHLD,
     SLEEPING,
+    PAUSED,
     TERMINATED, // Still has resources
     FREED, // Resources have been freed
 } ProcessState;
@@ -200,6 +201,7 @@ typedef struct {
     SignalHandler handlers[SIG_COUNT];
     Signal current_signal;
     uintptr_t restore_frame;
+    Time alarm_at;
 } ProcessSignals;
 
 typedef struct {

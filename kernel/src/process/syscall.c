@@ -157,6 +157,34 @@ void sleepSyscall(bool is_kernel, TrapFrame* frame, SyscallArgs args) {
     }
 }
 
+void pauseSyscall(bool is_kernel, TrapFrame* frame, SyscallArgs args) {
+    assert(frame->hart != NULL);
+    Process* process = (Process*)frame;
+    moveToSchedState(process, PAUSED);
+}
+
+void alarmSyscall(bool is_kernel, TrapFrame* frame, SyscallArgs args) {
+    assert(frame->hart != NULL);
+    Process* process = (Process*)frame;
+    if (process->signals.alarm_at == 0) {
+        process->frame.regs[REG_ARGUMENT_0] = 0;
+    } else {
+        Time time = getTime();
+        if (time >= process->signals.alarm_at) {
+            process->frame.regs[REG_ARGUMENT_0] = 1;
+        } else {
+            process->frame.regs[REG_ARGUMENT_0] = umax(1, (process->signals.alarm_at - time) / CLOCKS_PER_SEC);
+        }
+    }
+    if (args[0] == 0) {
+        process->signals.alarm_at = 0;
+    } else {
+        Time delay = args[0] * CLOCKS_PER_SEC; // Argument is in seconds
+        Time end = getTime() + delay;
+        process->signals.alarm_at = end;
+    }
+}
+
 void getpidSyscall(bool is_kernel, TrapFrame* frame, SyscallArgs args) {
     assert(frame->hart != NULL);
     Process* process = (Process*)frame;

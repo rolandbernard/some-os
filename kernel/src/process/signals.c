@@ -1,6 +1,7 @@
 
 #include <string.h>
 
+#include "interrupt/timer.h"
 #include "process/signals.h"
 
 #include "error/log.h"
@@ -71,8 +72,8 @@ static void handleActualSignal(Process* process, Signal signal) {
 
 void handlePendingSignals(Process* process) {
     lockSpinLock(&process->signals.lock);
-    // TODO: implement masking
     if (process->signals.signals != NULL) {
+        // TODO: implement masking
         PendingSignal* signal = process->signals.signals;
         process->signals.signals = signal->next;
         if (process->signals.signals == NULL) {
@@ -80,6 +81,9 @@ void handlePendingSignals(Process* process) {
         }
         handleActualSignal(process, signal->signal);
         dealloc(signal);
+    } else if (process->signals.alarm_at != 0 && getTime() >= process->signals.alarm_at) {
+        handleActualSignal(process, SIGALRM);
+        process->signals.alarm_at = 0;
     }
     unlockSpinLock(&process->signals.lock);
 }

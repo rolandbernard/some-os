@@ -53,6 +53,8 @@ SyscallFunction syscall_table[TABLE_SIZE] = {
     [SYSCALL_GETCWD] = getcwdSyscall,
     [SYSCALL_PIPE] = pipeSyscall,
     [SYSCALL_TIMES] = timesSyscall,
+    [SYSCALL_PAUSE] = pauseSyscall,
+    [SYSCALL_ALARM] = alarmSyscall,
 };
 
 void registerSyscall(int kind, SyscallFunction function) {

@@ -33,6 +33,8 @@ static void awakenProcess(Process* process) {
         }
     } else if (process->sched.state == WAIT_CHLD) {
         finalProcessWait(process);
+    } else if (process->sched.state == PAUSED) {
+        process->frame.regs[REG_ARGUMENT_0] = -EINTR;
     }
     moveToSchedState(process, ENQUEUEABLE);
     enqueueProcess(process);
@@ -68,7 +70,11 @@ void enqueueProcess(Process* process) {
     if (hart->idle_process != process) { // Ignore the idle process
         if (process->sched.state == TERMINATED) {
             deallocProcess(process);
-        } else if (process->sched.state == SLEEPING || process->sched.state == WAIT_CHLD) {
+        } else if (
+            process->sched.state == SLEEPING
+            || process->sched.state == WAIT_CHLD
+            || process->sched.state == PAUSED
+        ) {
             addSleepingProcess(process);
         } else if (process->sched.state == ENQUEUEABLE) {
             moveToSchedState(process, READY);
