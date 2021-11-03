@@ -220,21 +220,22 @@ void sigactionSyscall(bool is_kernel, TrapFrame* frame, SyscallArgs args) {
         process->frame.regs[REG_ARGUMENT_0] = -EINVAL;
     } else {
         lockSpinLock(&process->signals.lock);
-        SignalAction sigaction = {
+        SignalAction oldaction = {
             .handler = process->signals.handlers[sig].handler,
             .restorer = process->signals.handlers[sig].restorer,
         };
+        SignalAction newaction;
         VirtPtr new = virtPtrFor(args[1], process->memory.mem);
         VirtPtr old = virtPtrFor(args[2], process->memory.mem);
-        if (old.address != 0) {
-            memcpyBetweenVirtPtr(old, virtPtrForKernel(&sigaction), sizeof(SignalAction));
-        }
         if (new.address != 0) {
-            memcpyBetweenVirtPtr(virtPtrForKernel(&sigaction), new, sizeof(SignalAction));
-            process->signals.handlers[sig].handler = sigaction.handler;
-            process->signals.handlers[sig].restorer = sigaction.restorer;
+            memcpyBetweenVirtPtr(virtPtrForKernel(&newaction), new, sizeof(SignalAction));
+            process->signals.handlers[sig].handler = newaction.handler;
+            process->signals.handlers[sig].restorer = newaction.restorer;
         }
         unlockSpinLock(&process->signals.lock);
+        if (old.address != 0) {
+            memcpyBetweenVirtPtr(old, virtPtrForKernel(&oldaction), sizeof(SignalAction));
+        }
         process->frame.regs[REG_ARGUMENT_0] = -SUCCESS;
     }
 }
