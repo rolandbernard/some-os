@@ -260,6 +260,40 @@ void sigreturnSyscall(bool is_kernel, TrapFrame* frame, SyscallArgs args) {
     returnFromSignal(process);
 }
 
+void sigpendingSyscall(bool is_kernel, TrapFrame* frame, SyscallArgs args) {
+    assert(frame->hart != NULL);
+    Process* process = (Process*)frame;
+    SignalSet set = 0;
+    PendingSignal* current = process->signals.signals;
+    while (current != NULL) {
+        set |= (1UL << (current->signal - 1));
+        current = current->next;
+    }
+    process->frame.regs[REG_ARGUMENT_0] = set & process->signals.mask;
+}
+
+typedef enum {
+    SIG_SETMASK = 0,
+    SIG_BLOCK,
+    SIG_UNBLOCK,
+} SigProcHow;
+
+void sigprocmaskSyscall(bool is_kernel, TrapFrame* frame, SyscallArgs args) {
+    assert(frame->hart != NULL);
+    Process* process = (Process*)frame;
+    SignalSet old = process->signals.mask;
+    SigProcHow how = args[0];
+    SignalSet new = args[1];
+    if (how == SIG_SETMASK) {
+        process->signals.mask = new;
+    } else if (how == SIG_BLOCK) {
+        process->signals.mask |= new;
+    } else if (how == SIG_UNBLOCK) {
+        process->signals.mask &= ~new;
+    }
+    process->frame.regs[REG_ARGUMENT_0] = old;
+}
+
 int killSyscallCallback(Process* process, void* udata) {
     Process* proc = (Process*)udata;
     if (proc->resources.uid == 0 || process->resources.uid == proc->resources.uid) {

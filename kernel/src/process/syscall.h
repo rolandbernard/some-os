@@ -25,6 +25,10 @@ void sigactionSyscall(bool is_kernel, TrapFrame* frame, SyscallArgs args);
 
 void sigreturnSyscall(bool is_kernel, TrapFrame* frame, SyscallArgs args);
 
+void sigpendingSyscall(bool is_kernel, TrapFrame* frame, SyscallArgs args);
+
+void sigprocmaskSyscall(bool is_kernel, TrapFrame* frame, SyscallArgs args);
+
 void killSyscall(bool is_kernel, TrapFrame* frame, SyscallArgs args);
 
 void setUidSyscall(bool is_kernel, TrapFrame* frame, SyscallArgs args);

@@ -55,6 +55,8 @@ SyscallFunction syscall_table[TABLE_SIZE] = {
     [SYSCALL_TIMES] = timesSyscall,
     [SYSCALL_PAUSE] = pauseSyscall,
     [SYSCALL_ALARM] = alarmSyscall,
+    [SYSCALL_SIGPENDING] = sigpendingSyscall,
+    [SYSCALL_SIGPROCMASK] = sigprocmaskSyscall,
 };
 
 void registerSyscall(int kind, SyscallFunction function) {
