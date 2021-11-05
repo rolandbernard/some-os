@@ -207,10 +207,7 @@ void waitSyscall(bool is_kernel, TrapFrame* frame, SyscallArgs args) {
     executeProcessWait(process);
 }
 
-typedef struct {
-    uintptr_t handler;
-    uintptr_t restorer;
-} SignalAction;
+typedef SignalHandler SignalAction;
 
 void sigactionSyscall(bool is_kernel, TrapFrame* frame, SyscallArgs args) {
     assert(frame->hart != NULL);
@@ -221,16 +218,31 @@ void sigactionSyscall(bool is_kernel, TrapFrame* frame, SyscallArgs args) {
     } else {
         lockSpinLock(&process->signals.lock);
         SignalAction oldaction = {
-            .handler = process->signals.handlers[sig].handler,
-            .restorer = process->signals.handlers[sig].restorer,
+            .handler = 0,
+            .mask = 0,
+            .flags = 0,
+            .sigaction = 0,
+            .restorer = 0,
         };
+        if (process->signals.handlers[sig] != SIG_DFL && process->signals.handlers[sig] != SIG_IGN) {
+            oldaction = *process->signals.handlers[sig];
+        }
         SignalAction newaction;
         VirtPtr new = virtPtrFor(args[1], process->memory.mem);
         VirtPtr old = virtPtrFor(args[2], process->memory.mem);
         if (new.address != 0) {
             memcpyBetweenVirtPtr(virtPtrForKernel(&newaction), new, sizeof(SignalAction));
-            process->signals.handlers[sig].handler = newaction.handler;
-            process->signals.handlers[sig].restorer = newaction.restorer;
+            if (newaction.handler == (uintptr_t)SIG_DFL || newaction.handler == (uintptr_t)SIG_IGN) {
+                if (process->signals.handlers[sig] != SIG_DFL && process->signals.handlers[sig] != SIG_IGN) {
+                    dealloc(process->signals.handlers[sig]);
+                }
+                process->signals.handlers[sig] = (SignalHandler*)newaction.handler;
+            } else {
+                if (process->signals.handlers[sig] == SIG_DFL || process->signals.handlers[sig] == SIG_IGN) {
+                    process->signals.handlers[sig] = kalloc(sizeof(SignalHandler));
+                }
+                *process->signals.handlers[sig] = newaction;
+            }
         }
         unlockSpinLock(&process->signals.lock);
         if (old.address != 0) {

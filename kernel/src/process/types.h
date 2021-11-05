@@ -184,8 +184,24 @@ typedef enum {
     SIG_COUNT,
 } Signal;
 
+typedef uint64_t SignalSet;
+
+// Most of these are not supported
+typedef enum {
+    SA_NOCLDSTOP = (1 << 0),
+    SA_ONSTACK = (1 << 1),
+    SA_RESETHAND = (1 << 2),
+    SA_RESTART = (1 << 3),
+    SA_SIGINFO = (1 << 4),
+    SA_NOCLDWAIT = (1 << 5),
+    SA_NODEFER = (1 << 6),
+} SigActionFlags;
+
 typedef struct {
     uintptr_t handler;
+    SignalSet mask;
+    int flags;
+    uintptr_t sigaction;
     uintptr_t restorer;
 } SignalHandler;
 
@@ -198,10 +214,12 @@ typedef struct {
     SpinLock lock; // Signals can be sent by other processes, so we need a lock
     PendingSignal* signals;
     PendingSignal* signals_tail;
-    SignalHandler handlers[SIG_COUNT];
+    SignalHandler* handlers[SIG_COUNT];
     Signal current_signal;
     uintptr_t restore_frame;
     Time alarm_at;
+    uintptr_t altstack;
+    SignalSet mask;
 } ProcessSignals;
 
 typedef struct {
