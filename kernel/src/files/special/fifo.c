@@ -19,6 +19,10 @@ static PipeSharedData* getDataForName(const char* name, const char** unique_name
         if (ret != NULL) {
             putToStringMap(&named_data, name, ret);
         }
+    } else {
+        lockSpinLock(&ret->lock);
+        ret->ref_count++;
+        unlockSpinLock(&ret->lock);
     }
     *unique_name = getKeyFromStringMap(&named_data, name);
     unlockSpinLock(&fifo_name_lock);

@@ -37,21 +37,6 @@ void kernelInit() {
     }
     // Wake up the remaining harts
     sendMessageToAll(INITIALIZE_HARTS, NULL);
-    // Initialize devices
-    status = initDevices();
-    if (isError(status)) {
-        KERNEL_LOG("[!] Failed to initialize devices: %s", getErrorMessage(status));
-        panic();
-    } else {
-        KERNEL_LOG("[+] Devices initialized");
-    }
-    status = initVirtualFileSystem();
-    if (isError(status)) {
-        KERNEL_LOG("[!] Failed to initialize filesystem: %s", getErrorMessage(status));
-        panic();
-    } else {
-        KERNEL_LOG("[+] Filesystem initialized");
-    }
     // Enqueue main process to start the init process
     enqueueProcess(createKernelProcess(kernelMain, DEFAULT_PRIORITY, HART_STACK_SIZE));
     // Init the timer interrupts
@@ -61,6 +46,23 @@ void kernelInit() {
 }
 
 void kernelMain() {
+    Error status;
+    // Initialize devices
+    status = initDevices();
+    if (isError(status)) {
+        KERNEL_LOG("[!] Failed to initialize devices: %s", getErrorMessage(status));
+        panic();
+    } else {
+        KERNEL_LOG("[+] Devices initialized");
+    }
+    // Initialize virtual filesystem
+    status = initVirtualFileSystem();
+    if (isError(status)) {
+        KERNEL_LOG("[!] Failed to initialize filesystem: %s", getErrorMessage(status));
+        panic();
+    } else {
+        KERNEL_LOG("[+] Filesystem initialized");
+    }
     int res;
     // Mount filesystem
     res = syscall(SYSCALL_MOUNT, "/dev/blk0", "/", "minix", NULL); // Mount root filesystem

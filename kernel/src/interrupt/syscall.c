@@ -12,7 +12,7 @@
 #include "memory/kalloc.h"
 #include "kernel/syscall.h"
 
-#define TABLE_SIZE 512
+#define TABLE_SIZE 128
 
 SyscallFunction syscall_table[TABLE_SIZE] = {
     [SYSCALL_PRINT] = printSyscall,

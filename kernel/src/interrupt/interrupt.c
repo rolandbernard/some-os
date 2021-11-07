@@ -2,17 +2,12 @@
 #include <stdint.h>
 #include <stdbool.h>
 
-#include "devices/devices.h"
 #include "error/log.h"
 #include "error/panic.h"
 #include "interrupt/com.h"
 #include "interrupt/plic.h"
-#include "interrupt/syscall.h"
-#include "interrupt/timer.h"
 #include "interrupt/trap.h"
-#include "memory/memspace.h"
 #include "memory/virtmem.h"
-#include "process/process.h"
 #include "process/schedule.h"
 #include "process/signals.h"
 
