@@ -255,6 +255,8 @@ static void minixOpenReadCallback(Error error, size_t read, MinixOpenRequest* re
     } else {
         MinixFile* file = createMinixFileForINode(request->fs, request->inodenum, (request->flags & VFS_OPEN_DIRECTORY) != 0);
         file->base.mode = request->inode.mode;
+        file->base.uid = request->inode.uid;
+        file->base.gid = request->inode.gid;
         request->file = (VfsFile*)file;
         if ((request->flags & VFS_OPEN_APPEND) != 0) {
             file->base.functions->seek(

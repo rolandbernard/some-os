@@ -150,6 +150,8 @@ typedef struct VfsFile_s {
     int flags;
     size_t ino;
     VfsMode mode;
+    Uid uid;
+    Gid gid;
     char* path;
 } VfsFile;
 

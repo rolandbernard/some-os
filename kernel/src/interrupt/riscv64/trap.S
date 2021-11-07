@@ -109,7 +109,7 @@ indirectKernelTrapVector:
 kernelTrapVector:
     csrrw x31, sscratch, x31 # Swap scratch (with trap frame) with x31
     beqz x31, 1f
-    # Restore integer registers
+    # Save integer registers
 .set i, 1
 .rept 30
     save_gp %i

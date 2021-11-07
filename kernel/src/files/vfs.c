@@ -4,11 +4,12 @@
 
 #include "files/vfs.h"
 
-#include "files/path.h"
+#include "files/special/fifo.h"
 #include "files/minix/minix.h"
 #include "devices/devices.h"
 #include "memory/kalloc.h"
 #include "error/error.h"
+#include "files/path.h"
 #include "util/util.h"
 
 VirtualFilesystem global_file_system;
@@ -193,6 +194,42 @@ static char* toMountPath(FilesystemMount* mount, const char* path) {
     return path_copy;
 }
 
+typedef struct {
+    char* path;
+    VfsFunctionCallbackFile callback;
+    void* udata;
+} VfsOpenRequest;
+
+static void postOpenOperations(Error error, VfsFile* file, void* udata) {
+    VfsOpenRequest* request = (VfsOpenRequest*)udata;
+    if (isError(error)) {
+        request->callback(error, file, request->udata);
+    } else {
+        if (MODE_TYPE(file->mode) == VFS_TYPE_FIFO) {
+            // This is a fifo, we have to create one
+            FifoFile* fifo = createFifoFile(request->path, file->mode, file->uid, file->gid);
+            file->functions->close(file, NULL, noop, NULL);
+            if (fifo != NULL) {
+                request->callback(simpleError(SUCCESS), (VfsFile*)fifo, request->udata);
+            } else {
+                request->callback(simpleError(ENOMEM), NULL, request->udata);
+            }
+        } else {
+            request->callback(simpleError(SUCCESS), file, request->udata);
+        }
+    }
+    dealloc(request->path);
+    dealloc(request);
+}
+
+static VfsOpenRequest* createOpenRequest(const char* path, VfsFunctionCallbackFile callback, void* udata) {
+    VfsOpenRequest* ret = kalloc(sizeof(VfsOpenRequest));
+    ret->path = stringClone(path);
+    ret->callback = callback;
+    ret->udata = udata;
+    return ret;
+}
+
 void vfsOpen(VirtualFilesystem* fs, struct Process_s* process, const char* path, VfsOpenFlags flags, VfsMode mode, VfsFunctionCallbackFile callback, void* udata) {
     lockSpinLock(&fs->lock);
     FilesystemMount* mount = findMountHandling(fs, stringClone(path));
@@ -201,7 +238,7 @@ void vfsOpen(VirtualFilesystem* fs, struct Process_s* process, const char* path,
             case MOUNT_TYPE_FILE: {
                 VfsFile* file = (VfsFile*)mount->data;
                 unlockSpinLock(&fs->lock);
-                file->functions->dup(file, process, callback, udata);
+                file->functions->dup(file, process, postOpenOperations, createOpenRequest(path, callback, udata));
                 return;
             }
             case MOUNT_TYPE_FS: {
@@ -209,7 +246,7 @@ void vfsOpen(VirtualFilesystem* fs, struct Process_s* process, const char* path,
                 if (filesystem->functions->open != NULL) {
                     unlockSpinLock(&fs->lock);
                     char* path_copy = toMountPath(mount, path);
-                    filesystem->functions->open(filesystem, process, path_copy, flags, mode, callback, udata);
+                    filesystem->functions->open(filesystem, process, path_copy, flags, mode, postOpenOperations, createOpenRequest(path, callback, udata));
                     dealloc(path_copy);
                 } else {
                     unlockSpinLock(&fs->lock);

@@ -1,6 +1,7 @@
 
 .section .text
 .global lockSpinLock
+.global tryLockingSpinLock
 .global unlockSpinLock
 
 lockSpinLock:
