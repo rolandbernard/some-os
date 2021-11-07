@@ -1,12 +1,12 @@
 
 #include <string.h>
 
-#include "error/error.h"
 #include "files/special/pipe.h"
 
 #include "kernel/time.h"
 #include "memory/kalloc.h"
 #include "util/util.h"
+#include "error/error.h"
 
 // Shared data should be locked before calling this
 static void doOperationOnPipe(PipeSharedData* pipe) {
@@ -73,8 +73,8 @@ static void doOperationOnPipe(PipeSharedData* pipe) {
     }
 }
 
-static void pipeReadFunction(PipeFile* file, Process* process, VirtPtr buffer, size_t size, VfsFunctionCallbackSizeT callback, void* udata) {
-    lockSpinLock(&file->data->lock);
+void executePipeOperation(PipeSharedData* data, Process* process, VirtPtr buffer, size_t size, bool write, VfsFunctionCallbackSizeT callback, void* udata) {
+    lockSpinLock(&data->lock);
     WaitingPipeOperation* op = kalloc(sizeof(WaitingPipeOperation));
     op->buffer = buffer;
     op->size = size;
@@ -82,43 +82,41 @@ static void pipeReadFunction(PipeFile* file, Process* process, VirtPtr buffer, s
     op->callback = callback;
     op->udata = udata;
     op->next = NULL;
-    if (file->data->waiting_reads == NULL) {
-        file->data->waiting_reads = op;
-        file->data->waiting_reads_tail = op;
+    if (write) {
+        if (data->waiting_writes == NULL) {
+            data->waiting_writes = op;
+            data->waiting_writes_tail = op;
+        } else {
+            data->waiting_writes_tail->next = op;
+        }
     } else {
-        file->data->waiting_reads_tail->next = op;
+        if (data->waiting_reads == NULL) {
+            data->waiting_reads = op;
+            data->waiting_reads_tail = op;
+        } else {
+            data->waiting_reads_tail->next = op;
+        }
     }
-    doOperationOnPipe(file->data);
-    unlockSpinLock(&file->data->lock);
+    doOperationOnPipe(data);
+    unlockSpinLock(&data->lock);
+}
+
+static void pipeReadFunction(PipeFile* file, Process* process, VirtPtr buffer, size_t size, VfsFunctionCallbackSizeT callback, void* udata) {
+    executePipeOperation(file->data, process, buffer, size, false, callback, udata);
 }
 
 static void pipeWriteFunction(PipeFile* file, Process* process, VirtPtr buffer, size_t size, VfsFunctionCallbackSizeT callback, void* udata) {
-    lockSpinLock(&file->data->lock);
-    WaitingPipeOperation* op = kalloc(sizeof(WaitingPipeOperation));
-    op->buffer = buffer;
-    op->size = size;
-    op->written = 0;
-    op->callback = callback;
-    op->udata = udata;
-    op->next = NULL;
-    if (file->data->waiting_writes == NULL) {
-        file->data->waiting_writes = op;
-        file->data->waiting_writes_tail = op;
-    } else {
-        file->data->waiting_writes_tail->next = op;
-    }
-    doOperationOnPipe(file->data);
-    unlockSpinLock(&file->data->lock);
+    executePipeOperation(file->data, process, buffer, size, true, callback, udata);
 }
 
 static void pipeStatFunction(PipeFile* file, Process* process, VfsFunctionCallbackStat callback, void* udata) {
     VfsStat ret = {
         .id = file->base.ino,
         .mode = TYPE_MODE(VFS_TYPE_CHAR) | VFS_MODE_OGA_RW,
-        .nlinks = 1,
-        .uid = 0,
-        .gid = 0,
-        .size = 0,
+        .nlinks = file->data->ref_count,
+        .uid = process->resources.uid,
+        .gid = process->resources.gid,
+        .size = file->data->count,
         .block_size = 0,
         .st_atime = getNanoseconds(),
         .st_mtime = getNanoseconds(),
@@ -166,14 +164,23 @@ static const VfsFileVtable functions = {
     .dup = (DupFunction)pipeDupFunction,
 };
 
+PipeSharedData* createPipeSharedData() {
+    PipeSharedData* data = zalloc(sizeof(PipeSharedData));
+    data->ref_count = 1;
+    data->buffer = kalloc(PIPE_BUFFER_CAPACITY);
+    return data;
+}
+
 PipeFile* createPipeFile() {
     PipeFile* file = zalloc(sizeof(PipeFile));
     if (file != NULL) {
         file->base.functions = &functions;
         file->base.ino = 0;
-        file->data = zalloc(sizeof(PipeSharedData));
-        file->data->ref_count = 1;
-        file->data->buffer = kalloc(PIPE_BUFFER_CAPACITY);
+        file->data = createPipeSharedData();
+        if (file->data == NULL) {
+            dealloc(file);
+            file = NULL;
+        }
     }
     return file;
 }

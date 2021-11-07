@@ -11,10 +11,14 @@
 
 typedef enum {
     VFS_TYPE_UNKNOWN = 0,
-    VFS_TYPE_REG = 8,
+    VFS_TYPE_FIFO = 1,
+    VFS_TYPE_CHAR = 2,
     VFS_TYPE_DIR = 4,
-    VFS_TYPE_BLOCK = 2,
-    VFS_TYPE_CHAR = 3,
+    VFS_TYPE_BLOCK = 6,
+    VFS_TYPE_REG = 8,
+    VFS_TYPE_LNK = 10,
+    VFS_TYPE_SOCK = 12,
+    VFS_TYPE_MT = 15,
 } VfsFileType;
 
 typedef enum {
@@ -141,10 +145,12 @@ typedef struct {
 
 typedef struct VfsFile_s {
     struct VfsFile_s* next;
+    const VfsFileVtable* functions;
     int fd;
     int flags;
     size_t ino;
-    const VfsFileVtable* functions;
+    VfsMode mode;
+    char* path;
 } VfsFile;
 
 typedef void (*OpenFunction)(struct VfsFilesystem_s* fs, struct Process_s* process, const char* path, VfsOpenFlags flags, VfsMode mode, VfsFunctionCallbackFile callback, void* udata);

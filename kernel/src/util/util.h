@@ -18,4 +18,6 @@ uint64_t hashInt64(uint64_t x);
 
 uint32_t hashInt32(uint32_t x);
 
+uint64_t hashString(const char* s);
+
 #endif

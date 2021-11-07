@@ -39,4 +39,8 @@ PipeFile* createPipeFile();
 
 PipeFile* duplicatePipeFile(PipeFile* file);
 
+void executePipeOperation(PipeSharedData* data, Process* process, VirtPtr buffer, size_t size, bool write, VfsFunctionCallbackSizeT callback, void* udata);
+
+PipeSharedData* createPipeSharedData();
+
 #endif

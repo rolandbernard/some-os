@@ -35,3 +35,13 @@ uint32_t hashInt32(uint32_t x) {
     return x;
 }
 
+uint64_t hashString(const char* s) {
+    uint64_t hash = 7919;
+    while (*s != 0) {
+        hash *= 293;
+        hash += *s;
+        s++;
+    }
+    return hashInt64(hash);
+}
+
