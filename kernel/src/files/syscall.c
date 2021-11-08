@@ -438,3 +438,16 @@ void pipeSyscall(bool is_kernel, TrapFrame* frame, SyscallArgs args) {
     }
 }
 
+void mknodSyscall(bool is_kernel, TrapFrame* frame, SyscallArgs args) {
+    assert(frame->hart != NULL);
+    Process* process = (Process*)frame;
+    char* string = copyPathFromSyscallArgs(process, args[0]);
+    if (string != NULL) {
+        moveToSchedState(process, WAITING);
+        vfsMknod(&global_file_system, process, string, args[1], args[2], voidSyscallCallback, process);
+        dealloc(string);
+    } else {
+        process->frame.regs[REG_ARGUMENT_0] = -EINVAL;
+    }
+}
+

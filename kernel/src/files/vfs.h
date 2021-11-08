@@ -155,7 +155,10 @@ typedef struct VfsFile_s {
     char* path;
 } VfsFile;
 
+typedef uint64_t DeviceId;
+
 typedef void (*OpenFunction)(struct VfsFilesystem_s* fs, struct Process_s* process, const char* path, VfsOpenFlags flags, VfsMode mode, VfsFunctionCallbackFile callback, void* udata);
+typedef void (*MknodFunction)(struct VfsFilesystem_s* fs, struct Process_s* process, const char* path, VfsMode mode, DeviceId dev, VfsFunctionCallbackVoid callback, void* udata);
 typedef void (*UnlinkFunction)(struct VfsFilesystem_s* fs, struct Process_s* process, const char* path, VfsFunctionCallbackVoid callback, void* udata);
 typedef void (*LinkFunction)(struct VfsFilesystem_s* fs, struct Process_s* process, const char* old, const char* new, VfsFunctionCallbackVoid callback, void* udata);
 typedef void (*RenameFunction)(struct VfsFilesystem_s* fs, struct Process_s* process, const char* old, const char* new, VfsFunctionCallbackVoid callback, void* udata);
@@ -164,6 +167,7 @@ typedef void (*InitFunction)(struct VfsFilesystem_s* fs, struct Process_s* proce
 
 typedef struct {
     OpenFunction open;
+    MknodFunction mknod;
     UnlinkFunction unlink;
     LinkFunction link;
     RenameFunction rename;
@@ -212,6 +216,8 @@ Error mountRedirect(VirtualFilesystem* fs, const char* from, const char* to);
 Error umount(VirtualFilesystem* fs, const char* from);
 
 void vfsOpen(VirtualFilesystem* fs, struct Process_s* process, const char* path, VfsOpenFlags flags, VfsMode mode, VfsFunctionCallbackFile callback, void* udata);
+
+void vfsMknod(VirtualFilesystem* fs, struct Process_s* process, const char* path, VfsMode mode, DeviceId dev, VfsFunctionCallbackVoid callback, void* udata);
 
 void vfsUnlink(VirtualFilesystem* fs, struct Process_s* process, const char* path, VfsFunctionCallbackVoid callback, void* udata);
 

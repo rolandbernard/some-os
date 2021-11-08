@@ -19,9 +19,9 @@ typedef struct {
 
 static void callCallback(MinixGetBitMapRequest* request, Error error, size_t i) {
     if (request->inode) {
-        ((MinixINodeCallback)request->callback)(error, i, request->data);
+        ((MinixINodeCallback)request->callback)(error, i, request->udata);
     } else {
-        ((VfsFunctionCallbackSizeT)request->callback)(error, i, request->data);
+        ((VfsFunctionCallbackSizeT)request->callback)(error, i, request->udata);
     }
 }
 

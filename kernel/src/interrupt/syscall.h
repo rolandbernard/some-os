@@ -46,6 +46,7 @@ typedef enum {
     SYSCALL_ALARM = 39,
     SYSCALL_SIGPENDING = 40,
     SYSCALL_SIGPROCMASK = 41,
+    SYSCALL_MKNOD = 42,
 } Syscalls;
 
 // Simple wrapper around ecall

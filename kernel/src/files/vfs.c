@@ -262,6 +262,37 @@ void vfsOpen(VirtualFilesystem* fs, struct Process_s* process, const char* path,
     }
 }
 
+void vfsMknod(VirtualFilesystem* fs, struct Process_s* process, const char* path, VfsMode mode, DeviceId dev, VfsFunctionCallbackVoid callback, void* udata) {
+    lockSpinLock(&fs->lock);
+    FilesystemMount* mount = findMountHandling(fs, stringClone(path));
+    if (mount != NULL) {
+        switch (mount->type) {
+            case MOUNT_TYPE_FILE: {
+                unlockSpinLock(&fs->lock);
+                callback(simpleError(ENOENT), udata);
+                return;
+            }
+            case MOUNT_TYPE_FS: {
+                VfsFilesystem* filesystem = (VfsFilesystem*)mount->data;
+                if (filesystem->functions->mknod != NULL) {
+                    unlockSpinLock(&fs->lock);
+                    char* path_copy = toMountPath(mount, path);
+                    filesystem->functions->mknod(filesystem, process, path_copy, mode, dev, callback, udata);
+                    dealloc(path_copy);
+                } else {
+                    unlockSpinLock(&fs->lock);
+                    callback(simpleError(EPERM), udata);
+                }
+                return;
+            }
+            case MOUNT_TYPE_BIND: panic(); // Can't happen. Would return NULL.
+        }
+    } else {
+        unlockSpinLock(&fs->lock);
+        callback(simpleError(ENOENT), udata);
+    }
+}
+
 void vfsUnlink(VirtualFilesystem* fs, struct Process_s* process, const char* path, VfsFunctionCallbackVoid callback, void* udata) {
     lockSpinLock(&fs->lock);
     FilesystemMount* mount = findMountHandling(fs, stringClone(path));

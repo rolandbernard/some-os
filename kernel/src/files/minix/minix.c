@@ -12,6 +12,7 @@
 #include "kernel/time.h"
 #include "memory/kalloc.h"
 #include "memory/virtptr.h"
+#include "util/util.h"
 
 size_t offsetForINode(const MinixFilesystem* fs, uint32_t inode) {
     return (2 + fs->superblock.imap_blocks + fs->superblock.zmap_blocks) * MINIX_BLOCK_SIZE
@@ -371,7 +372,6 @@ static void minixOpenGetINodeCallback(Error error, uint32_t inode, MinixOpenRequ
 static void minixOpenParentINodeCallback(Error error, VfsFile* file, MinixOpenRequest* request) {
     if (isError(error)) {
         dealloc(request->path);
-        unlockSpinLock(&request->fs->lock);
         request->callback(error, NULL, request->udata);
         dealloc(request);
     } else {
@@ -436,6 +436,153 @@ static void minixOpenFunction(
     request->callback = callback;
     request->udata = udata;
     minixFindINodeForPath(fs, process, path, (MinixINodeCallback)minixOpenINodeCallback, request);
+}
+
+typedef struct {
+    MinixFilesystem* fs;
+    Process* process;
+    char* path;
+    VfsMode mode;
+    VfsFunctionCallbackVoid callback;
+    void* udata;
+    uint32_t inodenum;
+    MinixInode inode;
+    MinixDirEntry entry;
+    VfsFile* dir;
+} MinixMknodRequest;
+
+static void minixMknodCreateWriteDirCallback(Error error, size_t read, void* udata) {
+    MinixMknodRequest* request = (MinixMknodRequest*)udata;
+    if (isError(error)) {
+        unlockSpinLock(&request->fs->lock);
+        request->dir->functions->close(request->dir, NULL, noop, NULL);
+        request->callback(error, request->udata);
+        dealloc(request);
+    } else {
+        unlockSpinLock(&request->fs->lock);
+        request->dir->functions->close(request->dir, NULL, noop, NULL);
+        request->callback(simpleError(SUCCESS), request->udata);
+        dealloc(request);
+    }
+}
+
+static void minixMknodWriteCallback(Error error, size_t read, void* udata) {
+    MinixMknodRequest* request = (MinixMknodRequest*)udata;
+    if (isError(error)) {
+        dealloc(request->path);
+        unlockSpinLock(&request->fs->lock);
+        request->dir->functions->close(request->dir, NULL, noop, NULL);
+        request->callback(error, request->udata);
+        dealloc(request);
+    } else if (read != sizeof(MinixInode)) {
+        dealloc(request->path);
+        unlockSpinLock(&request->fs->lock);
+        request->dir->functions->close(request->dir, NULL, noop, NULL);
+        request->callback(simpleError(EIO), request->udata);
+        dealloc(request);
+    } else {
+        request->entry.inode = request->inodenum;
+        size_t len = strlen(request->path) - 1;
+        while (len > 0 && request->path[len] != '/') {
+            len--;
+        }
+        size_t name_len = strlen(request->path + len + 1) + 1;
+        if (name_len > sizeof(request->entry.name)) {
+            name_len = sizeof(request->entry.name);
+        }
+        memcpy(request->entry.name, request->path + len + 1, name_len);
+        dealloc(request->path);
+        request->dir->functions->write(
+            request->dir, request->process, virtPtrForKernel(&request->entry), sizeof(MinixDirEntry),
+            (VfsFunctionCallbackSizeT)minixMknodCreateWriteDirCallback, request
+        );
+    }
+}
+
+static void minixMknodGetINodeCallback(Error error, uint32_t inode, void* udata) {
+    MinixMknodRequest* request = (MinixMknodRequest*)udata;
+    if (isError(error)) {
+        dealloc(request->path);
+        unlockSpinLock(&request->fs->lock);
+        request->dir->functions->close(request->dir, NULL, noop, NULL);
+        request->callback(error, request->udata);
+        dealloc(request);
+    } else {
+        request->inodenum = inode;
+        request->inode.atime = getUnixTime();
+        request->inode.ctime = getUnixTime();
+        request->inode.mtime = getUnixTime();
+        request->inode.gid = request->process != NULL ? request->process->resources.gid : 0;
+        request->inode.mode = request->mode;
+        request->inode.nlinks = 1;
+        request->inode.size = 0;
+        request->inode.uid = request->process != NULL ? request->process->resources.uid : 0;
+        memset(request->inode.zones, 0, sizeof(request->inode.zones));
+        vfsWriteAt(
+            request->fs->block_device, NULL, virtPtrForKernel(&request->inode), sizeof(MinixInode),
+            offsetForINode(request->fs, inode), (VfsFunctionCallbackSizeT)minixMknodWriteCallback, request
+        );
+    }
+}
+
+static void minixMknodParentINodeCallback(Error error, VfsFile* file, void* udata) {
+    MinixMknodRequest* request = (MinixMknodRequest*)udata;
+    if (isError(error)) {
+        dealloc(request->path);
+        request->callback(error, request->udata);
+        dealloc(request);
+    } else {
+        lockSpinLock(&request->fs->lock);
+        request->dir = file;
+        getFreeMinixInode(request->fs, (MinixINodeCallback)minixMknodGetINodeCallback, request);
+    }
+}
+
+static void minixMknodINodeCallback(Error error, uint32_t inode, void* udata) {
+    MinixMknodRequest* request = (MinixMknodRequest*)udata;
+    if (error.kind == ENOENT) {
+        // If we don't find the node itself, try opening the parent
+        char* path = stringClone(request->path);
+        size_t len = strlen(path) - 1;
+        while (len > 0 && path[len] != '/') {
+            len--;
+        }
+        if (len == 0) {
+            len++;
+        }
+        path[len] = 0;
+        unlockSpinLock(&request->fs->lock);
+        request->fs->base.functions->open(
+            (VfsFilesystem*)request->fs, request->process, path,
+            VFS_OPEN_APPEND | VFS_OPEN_DIRECTORY | VFS_OPEN_WRITE, 0,
+            (VfsFunctionCallbackFile)minixMknodParentINodeCallback, request
+        );
+        dealloc(path);
+    } else if (isError(error)) {
+        dealloc(request->path);
+        unlockSpinLock(&request->fs->lock);
+        request->callback(error, request->udata);
+        dealloc(request);
+    } else {
+        dealloc(request->path);
+        unlockSpinLock(&request->fs->lock);
+        request->callback(simpleError(EEXIST), request->udata);
+        dealloc(request);
+    }
+}
+
+static void minixMknodFunction(
+    MinixFilesystem* fs, Process* process, const char* path, VfsMode mode, DeviceId dev, VfsFunctionCallbackVoid callback, void* udata
+) {
+    MinixMknodRequest* request = kalloc(sizeof(MinixMknodRequest));
+    lockSpinLock(&fs->lock);
+    request->fs = fs;
+    request->process = process;
+    request->path = stringClone(path);
+    request->mode = mode;
+    request->callback = callback;
+    request->udata = udata;
+    minixFindINodeForPath(fs, process, path, minixMknodINodeCallback, request);
 }
 
 typedef struct {
@@ -917,6 +1064,7 @@ static void minixInitFunction(MinixFilesystem* fs, Process* process, VfsFunction
 
 static const VfsFilesystemVtable functions = {
     .open = (OpenFunction)minixOpenFunction,
+    .mknod = (MknodFunction)minixMknodFunction,
     .unlink = (UnlinkFunction)minixUnlinkFunction,
     .link = (LinkFunction)minixLinkFunction,
     .rename = (RenameFunction)minixRenameFunction,

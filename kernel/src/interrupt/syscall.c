@@ -57,6 +57,7 @@ SyscallFunction syscall_table[TABLE_SIZE] = {
     [SYSCALL_ALARM] = alarmSyscall,
     [SYSCALL_SIGPENDING] = sigpendingSyscall,
     [SYSCALL_SIGPROCMASK] = sigprocmaskSyscall,
+    [SYSCALL_MKNOD] = mknodSyscall,
 };
 
 void registerSyscall(int kind, SyscallFunction function) {
