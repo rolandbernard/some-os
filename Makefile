@@ -36,7 +36,7 @@ $(BUILD_DIR)/%.flag:
 	@$(ECHO) "Building $*"
 	$(MAKE) -C $(ROOT_DIR)/$* FLAG=$(BUILD_DIR)/$*.flag
 
-$(TARGET.sysroot): $(TARGET.userspace)
+$(TARGET.sysroot): $(TARGET.userspace) $(MAKEFILE_LIST)
 	@$(ECHO) "Building sysroot"
 	mkdir -p $(SYSROOT_DIR)/dev
 	mkdir -p $(SYSROOT_DIR)/bin

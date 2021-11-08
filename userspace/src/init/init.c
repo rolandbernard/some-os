@@ -6,6 +6,8 @@
 #include <string.h>
 #include <errno.h>
 #include <signal.h>
+#include <fcntl.h>
+#include <unistd.h>
 
 void signalHandler(int signal) {
     fprintf(stderr, "[?] Signal handler\n");
@@ -41,6 +43,10 @@ void idleLoop() {
 int main(int argc, char* argv[], char* env[]) {
     fprintf(stderr, "[+] Started init process\n");
     setupSystem();
+    sleep(1); // This is here just now for testing
+    int fd = open("/fifo", O_RDWR);
+    const char* msg = "Test message";
+    write(fd, msg, strlen(msg));
     idleLoop();
     // We should not return
     fprintf(stderr, "[!] Init process exited\n");
