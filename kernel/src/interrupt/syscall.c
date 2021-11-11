@@ -8,6 +8,7 @@
 #include "loader/loader.h"
 #include "memory/syscall.h"
 #include "process/syscall.h"
+#include "task/syscall.h"
 #include "files/syscall.h"
 #include "memory/kalloc.h"
 #include "kernel/syscall.h"
@@ -76,8 +77,8 @@ void runSyscall(TrapFrame* frame, bool is_kernel) {
     }
 }
 
-char* copyStringFromSyscallArgs(Process* process, uintptr_t ptr) {
-    VirtPtr str = virtPtrFor(ptr, process->memory.mem);
+char* copyStringFromSyscallArgs(Task* task, uintptr_t ptr) {
+    VirtPtr str = virtPtrForTask(ptr, task);
     size_t length = strlenVirtPtr(str);
     char* string = kalloc(length + 1);
     if (string != NULL) {

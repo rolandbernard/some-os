@@ -1,10 +1,9 @@
 
 #include <stddef.h>
 
-#include "error/log.h"
 #include "interrupt/trap.h"
-#include "process/harts.h"
-#include "process/process.h"
+#include "task/harts.h"
+#include "task/task.h"
 #include "memory/kalloc.h"
 #include "memory/virtmem.h"
 
@@ -41,7 +40,7 @@ HartFrame* setupHartFrame(int hartid) {
         HartFrame* hart = zalloc(sizeof(HartFrame));
         hart->stack_top = kalloc(HART_STACK_SIZE) + HART_STACK_SIZE;
         initTrapFrame(&hart->frame, (uintptr_t)hart->stack_top, (uintptr_t)&__global_pointer, 0, 0, kernel_page_table);
-        hart->idle_process = createKernelProcess(idle, LOWEST_PRIORITY, IDLE_STACK_SIZE); // Every hart needs an idle process
+        hart->idle_task = createKernelTask(idle, IDLE_STACK_SIZE, LOWEST_PRIORITY); // Every hart needs an idle process
         hart->hartid = hartid;
         lockSpinLock(&hart_lock); 
         hart->next = harts_head;
@@ -70,15 +69,6 @@ HartFrame* getCurrentHartFrame() {
 
 void* getKernelGlobalPointer() {
     return &__global_pointer;
-}
-
-Process* getCurrentProcess() {
-    TrapFrame* frame = readSscratch();
-    if (frame != NULL && frame->hart != NULL) {
-        return (Process*)frame;
-    } else {
-        return NULL;
-    }
 }
 
 int getCurrentHartId() {

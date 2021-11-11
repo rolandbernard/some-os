@@ -8,7 +8,7 @@
 #include "interrupt/plic.h"
 #include "interrupt/trap.h"
 #include "memory/virtmem.h"
-#include "process/schedule.h"
+#include "task/schedule.h"
 #include "process/signals.h"
 
 const char* getCauseString(bool interrupt, int code) {
@@ -65,10 +65,10 @@ void kernelTrap(uintptr_t cause, uintptr_t pc, uintptr_t val, TrapFrame* frame) 
         panic();
     } else {
         if (frame->hart != NULL) {
-            Process* process = (Process*)frame;
-            process->times.user_time += getTime() - process->times.entered;
-            moveToSchedState(process, ENQUEUEABLE);
-            process->times.entered = getTime();
+            Task* task = (Task*)frame;
+            task->times.user_time += getTime() - task->times.entered;
+            task->sched.state = READY;
+            task->times.entered = getTime();
         }
         if (interrupt) {
             frame->pc = pc;
@@ -130,11 +130,10 @@ void kernelTrap(uintptr_t cause, uintptr_t pc, uintptr_t val, TrapFrame* frame) 
             }
         }
         if (frame->hart != NULL) {
-            // TODO: system time is not actually correct
-            Process* process = (Process*)frame;
-            process->times.system_time += getTime() - process->times.entered;
-            enqueueProcess(process);
-            runNextProcess();
+            Task* task = (Task*)frame;
+            task->times.system_time += getTime() - task->times.entered;
+            enqueueTask(task);
+            runNextTask();
         } else {
             // This is not called from a process, but from kernel init or interrupt handler
             enterKernelMode(frame);

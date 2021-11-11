@@ -1,6 +1,7 @@
 #ifndef _SYSCALL_H_
 #define _SYSCALL_H_
 
+#include "task/task.h"
 #include "process/process.h"
 
 typedef enum {
@@ -61,6 +62,6 @@ void registerSyscall(int kind, SyscallFunction function);
 // Run a syscall for the given process. Return and extract arguments from the process registers.
 void runSyscall(TrapFrame* frame, bool is_kernel);
 
-char* copyStringFromSyscallArgs(Process* process, uintptr_t ptr);
+char* copyStringFromSyscallArgs(Task* task, uintptr_t ptr);
 
 #endif

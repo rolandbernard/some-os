@@ -9,9 +9,9 @@
 #include "interrupt/com.h"
 #include "interrupt/syscall.h"
 #include "interrupt/trap.h"
-#include "process/harts.h"
-#include "process/process.h"
-#include "process/schedule.h"
+#include "task/harts.h"
+#include "task/task.h"
+#include "task/schedule.h"
 #include "kernel/init.h"
 
 void kernelMain();
@@ -38,11 +38,11 @@ void kernelInit() {
     // Wake up the remaining harts
     sendMessageToAll(INITIALIZE_HARTS, NULL);
     // Enqueue main process to start the init process
-    enqueueProcess(createKernelProcess(kernelMain, DEFAULT_PRIORITY, HART_STACK_SIZE));
+    enqueueTask(createKernelTask(kernelMain, HART_STACK_SIZE, DEFAULT_PRIORITY));
     // Init the timer interrupts
     initTimerInterrupt();
     // Start running the main process
-    runNextProcess();
+    runNextTask();
 }
 
 void kernelMain() {

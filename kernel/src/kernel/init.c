@@ -8,8 +8,7 @@
 #include "memory/pagealloc.h"
 #include "memory/virtmem.h"
 #include "interrupt/trap.h"
-#include "process/harts.h"
-#include "process/syscall.h"
+#include "task/harts.h"
 
 Error initAllSystems() {
     CHECKED(initPageAllocator());

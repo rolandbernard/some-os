@@ -9,8 +9,8 @@
 
 void addSignalToProcess(Process* process, Signal signal);
 
-void handlePendingSignals(Process* process);
+void handlePendingSignals(Task* task);
 
-void returnFromSignal(Process* process);
+void returnFromSignal(Task* process);
 
 #endif

@@ -1,7 +1,7 @@
 #ifndef _HARTS_H_
 #define _HARTS_H_
 
-#include "process/types.h"
+#include "task/types.h"
 
 #define HART_STACK_SIZE (1 << 16)
 #define IDLE_STACK_SIZE 64
@@ -28,7 +28,5 @@ int readMhartid();
 int getCurrentHartId();
 
 void* getKernelGlobalPointer();
-
-Process* getCurrentProcess();
 
 #endif

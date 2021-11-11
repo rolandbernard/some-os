@@ -9,7 +9,7 @@
 #include "memory/kalloc.h"
 #include "memory/memmap.h"
 #include "util/spinlock.h"
-#include "process/harts.h"
+#include "task/harts.h"
 
 #define MIN_TIME (CLOCKS_PER_SEC / 100)
 

@@ -1,5 +1,6 @@
 
 #include <string.h>
+#include <assert.h>
 
 #include "loader/loader.h"
 
@@ -10,9 +11,9 @@
 #include "memory/pagetable.h"
 #include "memory/pagealloc.h"
 #include "memory/virtmem.h"
-#include "process/schedule.h"
+#include "process/process.h"
+#include "task/schedule.h"
 #include "util/util.h"
-#include <assert.h>
 
 #define USER_STACK_TOP (1UL << 38)
 #define USER_STACK_SIZE (1UL << 19)
@@ -86,7 +87,7 @@ static void readElfFileCallback(Error error, uintptr_t entry, void* udata) {
     request->file->functions->close(request->file, NULL, noop, NULL);
     if (isError(error)) {
         freePageTable(request->memory);
-        request->callback(error, request->udata);
+        request->callback(error, NULL, NULL, request->udata);
         dealloc(request);
     } else {
         // Find the start_brk in the memory
@@ -94,7 +95,7 @@ static void readElfFileCallback(Error error, uintptr_t entry, void* udata) {
         // Allocate stack
         if (!allocatePages(request->memory, USER_STACK_TOP - USER_STACK_SIZE, 0, USER_STACK_SIZE, ELF_PROG_READ | ELF_PROG_WRITE)) {
             deallocMemorySpace(request->memory);
-            request->callback(simpleError(ENOMEM), request->udata);
+            request->callback(simpleError(ENOMEM), NULL, NULL, request->udata);
             dealloc(request);
             return;
         }
@@ -103,29 +104,22 @@ static void readElfFileCallback(Error error, uintptr_t entry, void* udata) {
         size_t argc = 0;
         uintptr_t args = pushStringArray(virtPtrFor(envs, request->memory), request->args, &argc);
         // If everything went well, replace the original process
-        if (request->process->pid == 0) {
-            // Kernel process transforming into a user process
-            dealloc(request->process->memory.stack);
-            request->process->pid = allocateNewPid();
-            request->process->status = 0;
-        } else {
-            deallocMemorySpace(request->process->memory.mem);
-        }
+        terminateAllProcessTasks(request->process);
+        deallocMemorySpace(request->process->memory.mem);
         if (request->file_stat.mode & VFS_MODE_SETUID) {
             request->process->resources.uid = request->file_stat.uid;
         }
         if (request->file_stat.mode & VFS_MODE_SETGID) {
             request->process->resources.gid = request->file_stat.gid;
         }
-        request->process->memory.stack = NULL;
         request->process->memory.mem = request->memory;
         request->process->memory.start_brk = start_brk;
         request->process->memory.brk = start_brk;
-        initTrapFrame(&request->process->frame, args, 0, entry, request->process->pid, request->memory);
+        Task* task = createTaskInProcess(request->process, args, 0, entry, DEFAULT_PRIORITY);
         // Set main function arguments
-        request->process->frame.regs[REG_ARGUMENT_0] = argc;
-        request->process->frame.regs[REG_ARGUMENT_1] = args;
-        request->process->frame.regs[REG_ARGUMENT_2] = envs;
+        task->frame.regs[REG_ARGUMENT_0] = argc;
+        task->frame.regs[REG_ARGUMENT_1] = args;
+        task->frame.regs[REG_ARGUMENT_2] = envs;
         // Close files with CLOEXEC flag
         VfsFile** current = &request->process->resources.files;
         while (*current != NULL) {
@@ -138,7 +132,7 @@ static void readElfFileCallback(Error error, uintptr_t entry, void* udata) {
             }
         }
         // Return from loading
-        request->callback(simpleError(SUCCESS), request->udata);
+        request->callback(simpleError(SUCCESS), request->process, task, request->udata);
         dealloc(request);
     }
 }
@@ -147,7 +141,7 @@ static void fileStatCallback(Error error, VfsStat stat, void* udata) {
     LoadProgramRequest* request = (LoadProgramRequest*)udata;
     if (isError(error)) {
         request->file->functions->close(request->file, NULL, noop, NULL);
-        request->callback(error, request->udata);
+        request->callback(error, NULL, NULL, request->udata);
         dealloc(request);
     } else {
         request->file_stat = stat;
@@ -159,7 +153,7 @@ static void fileStatCallback(Error error, VfsStat stat, void* udata) {
 static void openFileCallback(Error error, VfsFile* file, void* udata) {
     LoadProgramRequest* request = (LoadProgramRequest*)udata;
     if (isError(error)) {
-        request->callback(error, request->udata);
+        request->callback(error, NULL, NULL, request->udata);
         dealloc(request);
     } else {
         request->file = file;
@@ -177,28 +171,39 @@ void loadProgramInto(Process* process, const char* path, VirtPtr args, VirtPtr e
     vfsOpen(&global_file_system, process, path, VFS_OPEN_EXECUTE, 0, openFileCallback, request);
 }
 
-static void loadProgramCallback(Error error, void* udata) {
-    Process* process = (Process*)udata;
+static void loadProgramCallback(Error error, Process* process, Task* new_task, void* udata) {
+    Task* task = (Task*)udata;
     if (isError(error)) {
-        process->frame.regs[REG_ARGUMENT_0] = -error.kind;
-    } // Otherwise the arguments have been set already
-    moveToSchedState(process, ENQUEUEABLE);
-    enqueueProcess(process);
+        task->frame.regs[REG_ARGUMENT_0] = -error.kind;
+    } else {
+        if (task->process != NULL) {
+            terminateAllProcessTasks(task->process);
+            deallocProcess(task->process);
+        } else {
+            deallocTask(task);
+        }
+        new_task->sched.state = READY;
+        enqueueTask(new_task);
+    }
 }
 
 void execveSyscall(bool is_kernel, TrapFrame* frame, SyscallArgs args) {
     assert(frame->hart != NULL);
-    Process* process = (Process*)frame;
-    char* string = copyPathFromSyscallArgs(process, args[0]);
+    Task* task = (Task*)frame;
+    char* string = copyPathFromSyscallArgs(task, args[0]);
     if (string != NULL) {
-        moveToSchedState(process, WAITING);
+        task->sched.state = WAITING;
+        Process* process = task->process;
+        if (process == NULL) {
+            process = createUserProcess(NULL);
+        }
         loadProgramInto(
-            process, string, virtPtrFor(args[1], process->memory.mem),
-            virtPtrFor(args[2], process->memory.mem), loadProgramCallback, process
+            process, string, virtPtrForTask(args[1], task), virtPtrForTask(args[2], task),
+            loadProgramCallback, task
         );
         dealloc(string);
     } else {
-        process->frame.regs[REG_ARGUMENT_0] = -EINVAL;
+        task->frame.regs[REG_ARGUMENT_0] = -EINVAL;
     }
 }
 
