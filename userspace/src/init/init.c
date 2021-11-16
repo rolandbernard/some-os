@@ -1,4 +1,5 @@
 
+#include <assert.h>
 #include <sys/wait.h>
 #include <unistd.h>
 #include <stdio.h>
@@ -16,6 +17,24 @@ void signalHandler(int signal) {
         int status = 0;
         wait(&status);
         fprintf(stderr, "[?] Child exited with %i\n", WEXITSTATUS(status));
+    }
+}
+
+void setupTty() {
+    // Open file descriptors 0, 1 and 2
+    for (int i = 0; i < 3; i++) {
+        // 0 -> stdin, 1 -> stdout, 2 -> stderr
+        int fd = open("/dev/tty0", i == 0 ? O_RDONLY : O_WRONLY);
+        if (fd != i) {
+            fprintf(
+                stderr, "[!] Failed to open %s file: %s",
+                i == 0   ? "stdin"
+                : i == 1 ? "stdout"
+                         : "stderr",
+                strerror(errno)
+            );
+            exit(1);
+        }
     }
 }
 
@@ -41,6 +60,7 @@ void idleLoop() {
 }
 
 int main(int argc, char* argv[], char* env[]) {
+    setupTty();
     fprintf(stderr, "[+] Started init process\n");
     setupSystem();
     sleep(1); // This is here just now for testing

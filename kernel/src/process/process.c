@@ -23,6 +23,7 @@
 #include "process/signals.h"
 #include "process/syscall.h"
 #include "process/types.h"
+#include "task/types.h"
 #include "util/spinlock.h"
 #include "util/util.h"
 
@@ -68,7 +69,7 @@ void executeProcessWait(Task* task) {
     lockSpinLock(&process_lock); 
     if (basicProcessWait(task)) {
         unlockSpinLock(&process_lock); 
-        task->sched.state = READY;
+        task->sched.state = ENQUABLE;
     } else {
         bool has_child = false;
         int wait_pid = task->frame.regs[REG_ARGUMENT_1];
@@ -88,7 +89,7 @@ void executeProcessWait(Task* task) {
             task->sched.state = WAIT_CHLD;
         } else {
             task->frame.regs[REG_ARGUMENT_0] = -ECHILD;
-            task->sched.state = READY;
+            task->sched.state = ENQUABLE;
         }
     }
 }
@@ -176,7 +177,7 @@ Task* createTaskInProcess(Process* process, uintptr_t sp, uintptr_t gp, uintptr_
     if (task != NULL) {
         task->process = process;
         task->sched.priority = priority;
-        task->sched.state = READY;
+        task->sched.state = ENQUABLE;
         initTrapFrame(&task->frame, sp, gp, pc, process->pid, process->memory.mem);
         addTaskToProcess(process, task);
     }

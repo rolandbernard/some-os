@@ -13,6 +13,7 @@
 #include "memory/virtmem.h"
 #include "process/process.h"
 #include "task/schedule.h"
+#include "task/types.h"
 #include "util/util.h"
 
 #define USER_STACK_TOP (1UL << 38)
@@ -182,7 +183,7 @@ static void loadProgramCallback(Error error, Process* process, Task* new_task, v
         } else {
             deallocTask(task);
         }
-        new_task->sched.state = READY;
+        new_task->sched.state = ENQUABLE;
         enqueueTask(new_task);
     }
 }

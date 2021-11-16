@@ -8,6 +8,7 @@
 #include "task/harts.h"
 #include "interrupt/trap.h"
 #include "task/schedule.h"
+#include "task/types.h"
 
 void initTrapFrame(TrapFrame* frame, uintptr_t sp, uintptr_t gp, uintptr_t pc, uintptr_t asid, PageTable* table) {
     frame->hart = NULL; // Set to NULL for now. Will be set when enqueuing
@@ -33,6 +34,7 @@ Task* createKernelTask(void* enter, size_t stack_size, Priority priority) {
         (uintptr_t)enter, 0, kernel_page_table
     );
     task->sched.priority = priority;
+    task->sched.state = ENQUABLE;
     return task;
 }
 

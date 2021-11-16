@@ -4,8 +4,7 @@
 #include "interrupt/trap.h"
 #include "interrupt/com.h"
 
-noreturn void panic() {
-    KERNEL_LOG("[!] Kernel panic!");
+noreturn void _panic() {
     sendMessageToAll(KERNEL_PANIC, NULL);
     silentPanic();
 }

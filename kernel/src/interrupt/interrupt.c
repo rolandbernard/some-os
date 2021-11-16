@@ -10,6 +10,7 @@
 #include "memory/virtmem.h"
 #include "task/schedule.h"
 #include "process/signals.h"
+#include "task/types.h"
 
 const char* getCauseString(bool interrupt, int code) {
     if (interrupt) {
@@ -67,7 +68,7 @@ void kernelTrap(uintptr_t cause, uintptr_t pc, uintptr_t val, TrapFrame* frame) 
         if (frame->hart != NULL) {
             Task* task = (Task*)frame;
             task->times.user_time += getTime() - task->times.entered;
-            task->sched.state = READY;
+            task->sched.state = ENQUABLE;
             task->times.entered = getTime();
         }
         if (interrupt) {

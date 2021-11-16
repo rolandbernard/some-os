@@ -71,25 +71,6 @@ void kernelMain() {
         panic();
         syscall(SYSCALL_EXIT);
     }
-    // Open file descriptors 0, 1 and 2
-    for (int i = 0; i < 3; i++) {
-        // 0 -> stdin, 1 -> stdout, 2 -> stderr
-        res = syscall(
-            SYSCALL_OPEN, "/dev/tty0",
-            i == 0 ? VFS_OPEN_READ | VFS_OPEN_RDONLY : VFS_OPEN_WRITE | VFS_OPEN_WRONLY
-        );
-        if (res < 0) {
-            KERNEL_LOG(
-                "[!] Failed to open %s file: %s",
-                i == 0   ? "stdin"
-                : i == 1 ? "stdout"
-                         : "stderr",
-                getErrorKindMessage(-res)
-            );
-            panic();
-            syscall(SYSCALL_EXIT);
-        }
-    }
     // Start the init process
     res = syscall(SYSCALL_EXECVE, "/bin/init", NULL, NULL);
     // If we continue, there must be an error

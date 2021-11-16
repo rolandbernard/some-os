@@ -9,6 +9,7 @@
 #include "memory/kalloc.h"
 #include "memory/virtptr.h"
 #include "task/schedule.h"
+#include "task/types.h"
 #include "util/util.h"
 #include "files/special/pipe.h"
 
@@ -70,7 +71,7 @@ static void openCallback(Error error, VfsFile* file, void* udata) {
         putNewFileDescriptor(task->process, fd, flags, file);
         task->frame.regs[REG_ARGUMENT_0] = fd;
     }
-    task->sched.state = READY;
+    task->sched.state = ENQUABLE;
     enqueueTask(task);
 }
 
@@ -90,7 +91,7 @@ void openSyscall(bool is_kernel, TrapFrame* frame, SyscallArgs args) {
 static void voidSyscallCallback(Error error, void* udata) {
     Task* task = (Task*)udata;
     task->frame.regs[REG_ARGUMENT_0] = -error.kind;
-    task->sched.state = READY;
+    task->sched.state = ENQUABLE;
     enqueueTask(task);
 }
 
@@ -182,7 +183,7 @@ static void sizeTSyscallCallback(Error error, size_t size, void* udata) {
     } else {
         task->frame.regs[REG_ARGUMENT_0] = size;
     }
-    task->sched.state = READY;
+    task->sched.state = ENQUABLE;
     enqueueTask(task);
 }
 
@@ -215,7 +216,7 @@ static void statSyscallCallback(Error error, VfsStat stat, void* udata) {
         VirtPtr ptr = virtPtrForTask(task->frame.regs[REG_ARGUMENT_2], task);
         memcpyBetweenVirtPtr(ptr, virtPtrForKernel(&stat), sizeof(VfsStat));
     }
-    task->sched.state = READY;
+    task->sched.state = ENQUABLE;
     enqueueTask(task);
 }
 
@@ -254,7 +255,7 @@ static void dupCallback(Error error, VfsFile* file, void* udata) {
             task->frame.regs[REG_ARGUMENT_0] = fd;
         }
     }
-    task->sched.state = READY;
+    task->sched.state = ENQUABLE;
     enqueueTask(task);
 }
 
@@ -308,14 +309,17 @@ static void mountCreateFsCallback(Error error, VfsFilesystem* fs, void* udata) {
             task->frame.regs[REG_ARGUMENT_0] = -EINVAL;
         }
     }
-    task->sched.state = READY;
+    task->sched.state = ENQUABLE;
     enqueueTask(task);
 }
 
 void mountSyscall(bool is_kernel, TrapFrame* frame, SyscallArgs args) {
     assert(frame->hart != NULL);
     Task* task = (Task*)frame;
-    if (task->process->resources.uid != 0 && task->process->resources.gid != 0) { // Only root can mount
+    if (
+        task->process != NULL && task->process->resources.uid != 0
+        && task->process->resources.gid != 0
+    ) { // Only root can mount
         task->frame.regs[REG_ARGUMENT_0] = -EACCES;
     } else {
         char* source = copyPathFromSyscallArgs(task, args[0]);

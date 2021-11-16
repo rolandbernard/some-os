@@ -39,7 +39,7 @@ static void awakenTask(Task* task) {
             task->frame.regs[REG_ARGUMENT_0] = -EINTR;
         }
     }
-    task->sched.state = READY;
+    task->sched.state = ENQUABLE;
     enqueueTask(task);
 }
 
@@ -77,7 +77,8 @@ void enqueueTask(Task* task) {
             case WAIT_CHLD:
                 addSleepingTask(task);
                 break;
-            case READY:
+            case ENQUABLE:
+                task->sched.state = READY;
                 if (task->sched.runs % PRIORITY_DECREASE == 0) {
                     // Lower priority to not starve other processes
                     task->sched.queue_priority =
@@ -88,10 +89,12 @@ void enqueueTask(Task* task) {
                 }
                 pushTaskToQueue(queue, task);
                 break;
-            case UNKNOWN: // We don't know what to do
+            case READY: // Task has already be enqueued
             case RUNNING: // It is currently running
-            case TERMINATED: // Task can not be enqueue, it is only waiting to be freed
             case WAITING: // Task is already handled somewhere else
+                break;
+            case UNKNOWN: // We don't know what to do
+            case TERMINATED: // Task can not be enqueue, it is only waiting to be freed
                 panic(); // These should not happen
                 break;
         }

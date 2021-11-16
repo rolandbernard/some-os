@@ -16,6 +16,7 @@
 #include "process/syscall.h"
 #include "process/signals.h"
 #include "process/types.h"
+#include "task/types.h"
 #include "util/util.h"
 
 typedef struct {
@@ -30,9 +31,9 @@ static void duplicateFilesStep(ForkSyscallRequest* request) {
     if (request->cur_file == NULL) {
         request->new_task->frame.regs[REG_ARGUMENT_0] = 0;
         request->old_task->frame.regs[REG_ARGUMENT_0] = request->new_task->process->pid;
-        request->new_task->sched.state = READY;
+        request->new_task->sched.state = ENQUABLE;
         enqueueTask(request->new_task);
-        request->old_task->sched.state = READY;
+        request->old_task->sched.state = ENQUABLE;
         enqueueTask(request->old_task);
         dealloc(request);
     } else {
@@ -124,6 +125,8 @@ void forkSyscall(bool is_kernel, TrapFrame* frame, SyscallArgs args) {
                 request->cur_file = task->process->resources.files;
                 duplicateFilesStep(request);
             } else {
+                task->sched.state = ENQUABLE;
+                new_task->sched.state = ENQUABLE;
                 // No files have to be duplicated
                 new_task->frame.regs[REG_ARGUMENT_0] = 0;
                 task->frame.regs[REG_ARGUMENT_0] = new_process->pid;

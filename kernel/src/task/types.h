@@ -78,6 +78,7 @@ typedef struct HartFrame_s {
 typedef enum {
     UNKNOWN = 0,
     RUNNING,
+    ENQUABLE,
     READY,
     WAITING,
     SLEEPING,
