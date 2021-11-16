@@ -43,7 +43,7 @@ static bool basicProcessWait(Task* task) {
     while (*current != NULL) {
         if (wait_pid == 0 || wait_pid == (*current)->pid) {
             writeInt(
-                virtPtrFor(task->frame.regs[REG_ARGUMENT_2], task->process->memory.mem),
+                virtPtrForTask(task->frame.regs[REG_ARGUMENT_2], task),
                 sizeof(int) * 8, (*current)->status
             );
             task->times.user_child_time += (*current)->user_time;

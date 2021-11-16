@@ -103,6 +103,7 @@ PageTableEntry* virtToEntry(PageTable* root, uintptr_t vaddr) {
     };
     PageTable* table = root;
     for (int i = 2; i >= 0; i--) {
+        assert(table != NULL);
         PageTableEntry* entry = &table->entries[vpn[i]];
         if (entry->v) {
             if ((entry->bits & 0b1110) == 0) {

@@ -54,8 +54,7 @@ void enterTask(Task* task) {
     if (task->process == NULL) {
         enterKernelMode(&task->frame);
     } else {
-        handlePendingSignals(task);
-        if (task->sched.state == RUNNING) {
+        if (handlePendingSignals(task)) {
             enterUserMode(&task->frame);
         } else {
             runNextTask();

@@ -9,7 +9,7 @@
 
 void addSignalToProcess(Process* process, Signal signal);
 
-void handlePendingSignals(Task* task);
+bool handlePendingSignals(Task* task);
 
 void returnFromSignal(Task* process);
 

@@ -34,29 +34,34 @@ typedef struct {
     uintptr_t restorer_frame;
 } SignalRestoreFrame;
 
-static void handleActualSignal(Task* task, Signal signal) {
+static bool handleActualSignal(Task* task, Signal signal) {
     if (signal == SIGKILL || signal == SIGSTOP) {
         // We don't actually have a stop at the moment
         task->process->status = (task->process->status & ~0xff00) | ((signal & 0xff) << 8);
         terminateAllProcessTasks(task->process);
         deallocProcess(task->process);
+        return false;
     } else if (signal >= SIG_COUNT || signal == 0) {
         // This is an invalid signal, ignore for now
+        return true;
     } else if (task->process->signals.handlers[signal] == SIG_DFL) {
         // Execute default action
         if (signal == SIGCHLD || signal == SIGURG || signal == SIGWINCH || signal == SIGUSR1 || signal == SIGUSR2) {
             // These are the only signals we ignore
+            return true;
         } else {
             task->process->status = (task->process->status & ~0xff00) | ((signal & 0xff) << 8);
             terminateAllProcessTasks(task->process);
             deallocProcess(task->process);
+            return false;
         }
     } else if (task->process->signals.handlers[signal] == SIG_IGN) {
         // User wants this to be ignored
+        return true;
     } else {
         // Otherwise enter the given signal handler
         // Copy the current trap frame (to be restored later)
-        VirtPtr stack_pointer = virtPtrFor(task->frame.regs[REG_STACK_POINTER], task->process->memory.mem);
+        VirtPtr stack_pointer = virtPtrForTask(task->frame.regs[REG_STACK_POINTER], task);
         PUSH_TO_VIRTPTR(stack_pointer, task->process->signals.mask);
         PUSH_TO_VIRTPTR(stack_pointer, task->process->signals.restore_frame);
         PUSH_TO_VIRTPTR(stack_pointer, task->process->signals.current_signal);
@@ -76,6 +81,7 @@ static void handleActualSignal(Task* task, Signal signal) {
         task->frame.regs[REG_STACK_POINTER] = stack_pointer.address;
         // Set return address to the restorer to be called after handler completion
         task->frame.regs[REG_RETURN_ADDRESS] = task->process->signals.handlers[signal]->restorer;
+        return true;
     }
 }
 
@@ -103,22 +109,24 @@ static Signal getSignalToHandle(Task* task) {
     return SIGNONE;
 }
 
-void handlePendingSignals(Task* task) {
+bool handlePendingSignals(Task* task) {
+    bool ret = true;
     lockSpinLock(&task->process->lock);
     Signal signal = getSignalToHandle(task);
     if (signal != SIGNONE) {
-        handleActualSignal(task, signal);
+        ret = handleActualSignal(task, signal);
     } else if (task->process->signals.alarm_at != 0 && getTime() >= task->process->signals.alarm_at) {
-        handleActualSignal(task, SIGALRM);
+        ret = handleActualSignal(task, SIGALRM);
         task->process->signals.alarm_at = 0;
     }
     unlockSpinLock(&task->process->lock);
+    return ret;
 }
 
 void returnFromSignal(Task* task) {
     lockSpinLock(&task->process->lock);
     if (task->process->signals.current_signal != SIGNONE) {
-        VirtPtr stack_pointer = virtPtrFor(task->process->signals.restore_frame, task->process->memory.mem);
+        VirtPtr stack_pointer = virtPtrForTask(task->process->signals.restore_frame, task);
         POP_FROM_VIRTPTR(stack_pointer, task->frame.regs);
         POP_FROM_VIRTPTR(stack_pointer, task->frame.fregs);
         POP_FROM_VIRTPTR(stack_pointer, task->frame.pc);
