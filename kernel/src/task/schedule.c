@@ -93,8 +93,10 @@ void enqueueTask(Task* task) {
             case RUNNING: // It is currently running
             case WAITING: // Task is already handled somewhere else
                 break;
-            case UNKNOWN: // We don't know what to do
             case TERMINATED: // Task can not be enqueue, it is only waiting to be freed
+                deallocTask(task);
+                break;
+            case UNKNOWN: // We don't know what to do
                 panic(); // These should not happen
                 break;
         }
@@ -103,7 +105,8 @@ void enqueueTask(Task* task) {
 
 void runNextTask() {
     awakenTasks();
-    Task* current = getCurrentTask();
+    Task* current = NULL;
+    current = getCurrentTask();
     if (current != NULL) {
         // If this is called from inside a process. Call exit syscall.
         syscall(SYSCALL_EXIT);
@@ -113,7 +116,14 @@ void runNextTask() {
 }
 
 void runNextTaskFrom(HartFrame* hart) {
-    Task* next = pullTaskForHart(hart);
+    Task* next = NULL;
+    while (next == NULL) {
+        next = pullTaskForHart(hart);
+        if (next->sched.state == TERMINATED) {
+            deallocTask(next);
+            next = NULL;
+        }
+    }
     next->sched.runs++;
     assert(next != NULL);
     enterTask(next);

@@ -94,11 +94,14 @@ void forkSyscall(bool is_kernel, TrapFrame* frame, SyscallArgs args) {
         enqueueTask(new_task);
     } else {
         Process* new_process = createUserProcess(task->process);
-        Task* new_task = createTaskInProcess(
-            new_process, task->frame.regs[REG_STACK_POINTER], task->frame.regs[REG_GLOBAL_POINTER],
-            task->frame.pc, task->sched.priority
-        );
+        Task* new_task = NULL;
         if (new_process != NULL && new_process->memory.mem != NULL) {
+            new_task = createTaskInProcess(
+                new_process, task->frame.regs[REG_STACK_POINTER], task->frame.regs[REG_GLOBAL_POINTER],
+                task->frame.pc, task->sched.priority
+            );
+        }
+        if (new_task != NULL) {
             // Copy frame
             new_task->frame.pc = task->frame.pc;
             memcpy(&new_task->frame.regs, &task->frame.regs, sizeof(task->frame.regs));

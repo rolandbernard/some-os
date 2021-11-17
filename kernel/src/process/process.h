@@ -19,6 +19,8 @@ void addTaskToProcess(Process* process, Task* task);
 
 void terminateAllProcessTasks(Process* process);
 
+void terminateAllProcessTasksBut(Process* process, Task* keep);
+
 void executeProcessWait(Task* process);
 
 void finalProcessWait(Task* process);

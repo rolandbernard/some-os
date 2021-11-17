@@ -165,8 +165,13 @@ Process* createUserProcess(Process* parent) {
     Process* process = zalloc(sizeof(Process));
     if (process != NULL) {
         process->pid = allocateNewPid();
-        process->memory.mem = createMemorySpace();
+        if (parent == NULL) {
+            process->memory.mem = createMemorySpace();
+        } else {
+            process->memory.mem = cloneMemorySpace(parent->memory.mem);
+        }
         process->tree.parent = parent;
+        process->resources.cwd = stringClone(process->resources.cwd);
         registerProcess(process);
     }
     return process;
@@ -192,16 +197,26 @@ void addTaskToProcess(Process* process, Task* task) {
     unlockSpinLock(&process->lock);
 }
 
-void terminateAllProcessTasks(Process* process) {
+void terminateAllProcessTasksBut(Process* process, Task* keep) {
     lockSpinLock(&process->lock);
     Task* current = process->tasks;
     while (current != NULL) {
-        sendMessageToAll(KILL_TASK, current);
-        current->sched.state = TERMINATED;
-        deallocTask(current);
+        if (current != keep) {
+            current->sched.state = TERMINATED;
+            sendMessageToAll(KILL_TASK, current);
+            current->sched.state = TERMINATED;
+        }
         current = current->proc_next;
     }
+    process->tasks = keep;
+    if (keep != NULL) {
+        process->tasks->proc_next = NULL;
+    }
     unlockSpinLock(&process->lock);
+}
+
+void terminateAllProcessTasks(Process* process) {
+    terminateAllProcessTasksBut(process, NULL);
 }
 
 static void freeProcessFiles(Process* process) {
