@@ -5,7 +5,7 @@
 
 #include "files/vfs.h"
 #include "memory/virtptr.h"
-#include "util/spinlock.h"
+#include "task/spinlock.h"
 
 #define MINIX3_MAGIC 0x4d5a
 #define MINIX_BLOCK_SIZE 1024

@@ -4,7 +4,7 @@
 #include <assert.h>
 
 #include "devices/virtio/virtio.h"
-#include "util/spinlock.h"
+#include "task/spinlock.h"
 
 #define BLOCK_SECTOR_SIZE 512
 #define BLOCK_MAX_REQUESTS (1 << 5)

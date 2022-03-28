@@ -4,7 +4,7 @@
 #include <stdint.h>
 #include <stddef.h>
 
-#include "util/spinlock.h"
+#include "task/spinlock.h"
 #include "interrupt/timer.h"
 
 struct HartFrame_s;

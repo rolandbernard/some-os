@@ -5,7 +5,7 @@
 #include <stdint.h>
 
 #include "error/error.h"
-#include "util/spinlock.h"
+#include "task/spinlock.h"
 #include "devices/serial/serial.h"
 
 typedef struct {

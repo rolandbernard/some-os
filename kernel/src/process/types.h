@@ -8,7 +8,7 @@
 
 #include "memory/pagetable.h"
 #include "memory/memspace.h"
-#include "util/spinlock.h"
+#include "task/spinlock.h"
 #include "files/vfs.h"
 #include "task/task.h"
 

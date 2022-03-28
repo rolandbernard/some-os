@@ -7,7 +7,7 @@
 #include "memory/pagealloc.h"
 #include "memory/pagetable.h"
 #include "memory/virtmem.h"
-#include "util/spinlock.h"
+#include "task/spinlock.h"
 #include "util/util.h"
 
 // Allocating into virtual memory will not allow accessing it in M-mode.

@@ -4,7 +4,7 @@
 #include <string.h>
 
 #include "memory/pagealloc.h"
-#include "util/spinlock.h"
+#include "task/spinlock.h"
 
 extern const void __heap_start;
 extern const void __heap_end;

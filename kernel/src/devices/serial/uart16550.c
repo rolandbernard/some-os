@@ -2,7 +2,7 @@
 #include "devices/serial/uart16550.h"
 
 #include "error/log.h"
-#include "util/spinlock.h"
+#include "task/spinlock.h"
 
 Error initUart16550(Uart16550* uart) {
     lockSpinLock(&uart->lock);

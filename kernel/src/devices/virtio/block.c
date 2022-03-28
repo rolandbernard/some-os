@@ -3,7 +3,7 @@
 #include "error/error.h"
 #include "interrupt/plic.h"
 #include "memory/kalloc.h"
-#include "util/spinlock.h"
+#include "task/spinlock.h"
 
 static void handleInterrupt(ExternalInterrupt id, void* udata) {
     virtIOBlockFreePendingRequests((VirtIOBlockDevice*)udata);

@@ -7,7 +7,7 @@
 #include "memory/pagealloc.h"
 #include "memory/pagetable.h"
 #include "memory/pageref.h"
-#include "util/spinlock.h"
+#include "task/spinlock.h"
 
 static SpinLock global_page_lock;
 static PageRefTable ref_count;

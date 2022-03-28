@@ -24,7 +24,7 @@
 #include "process/syscall.h"
 #include "process/types.h"
 #include "task/types.h"
-#include "util/spinlock.h"
+#include "task/spinlock.h"
 #include "util/util.h"
 
 extern void kernelTrapVector;

@@ -6,7 +6,7 @@
 
 #include "error/error.h"
 #include "memory/virtptr.h"
-#include "util/spinlock.h"
+#include "task/spinlock.h"
 #include "interrupt/timer.h"
 
 typedef enum {
