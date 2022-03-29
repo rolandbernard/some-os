@@ -36,6 +36,9 @@ Error initUart16550(Uart16550* uart) {
 Error writeUart16550(Uart16550* uart, char value) {
     lockSpinLock(&uart->lock);
     if (uart->initialized) {
+        while (((uart->base_address[5] >> 5) & 0x1) == 0) {
+            /* Wait for THR to be empty */
+        }
         // Write directly to MMIO
         uart->base_address[0] = value;
         unlockSpinLock(&uart->lock);
