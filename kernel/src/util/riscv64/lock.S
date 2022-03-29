@@ -4,7 +4,7 @@
 .global tryLockingUnsafeLock
 .global unlockUnsafeLock
 
-lockLock:
+lockUnsafeLock:
     li t0, 1
 1:
     amoswap.w t0, t0, (a0)
@@ -12,7 +12,7 @@ lockLock:
     bnez t0, 1b
     ret
 
-tryLockingLock:
+tryLockingUnsafeLock:
     li t0, 1
     amoswap.w t0, t0, (a0)
     fence
@@ -24,7 +24,7 @@ tryLockingLock:
 2:
     ret
 
-unlockLock:
+unlockUnsafeLock:
     fence
     amoswap.w zero, zero, (a0)
     ret
