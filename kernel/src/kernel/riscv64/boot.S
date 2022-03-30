@@ -64,7 +64,7 @@ _start:
 registerHart:
     mv s0, ra
     la a0, hart_lock
-    call lockSpinLock
+    call lockUnsafeLock
     la t0, hart_count
     lw t1, (t0)
     la t2, hart_ids
@@ -75,7 +75,7 @@ registerHart:
     addi t1, t1, 1
     sw t1, (t0)
     la a0, hart_lock
-    call unlockSpinLock
+    call unlockUnsafeLock
     mv ra, s0
     ret
 
