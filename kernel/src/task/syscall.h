@@ -7,4 +7,6 @@ void yieldSyscall(bool is_kernel, TrapFrame* frame, SyscallArgs args);
 
 void sleepSyscall(bool is_kernel, TrapFrame* frame, SyscallArgs args);
 
+void criticalSyscall(bool is_kernel, TrapFrame* frame, SyscallArgs args);
+
 #endif

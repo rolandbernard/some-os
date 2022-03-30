@@ -24,3 +24,12 @@ void sleepSyscall(bool is_kernel, TrapFrame* frame, SyscallArgs args) {
     }
 }
 
+void criticalSyscall(bool is_kernel, TrapFrame* frame, SyscallArgs args) {
+    if (is_kernel) {
+        frame->regs[REG_ARGUMENT_0] = (uintptr_t)task;
+        // TODO: enter the frame in non-preemptable context
+    } else {
+        frame->regs[REG_ARGUMENT_0] = -EPERM;
+    }
+}
+

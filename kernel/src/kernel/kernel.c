@@ -12,6 +12,7 @@
 #include "task/harts.h"
 #include "task/task.h"
 #include "task/schedule.h"
+#include "process/syscall.h"
 #include "kernel/init.h"
 
 void kernelMain();
@@ -69,13 +70,11 @@ void kernelMain() {
     if (res < 0) {
         KERNEL_LOG("[!] Failed to mount root filesystem: %s", getErrorKindMessage(-res));
         panic();
-        syscall(SYSCALL_EXIT);
     }
     // Start the init process
     res = syscall(SYSCALL_EXECVE, "/bin/init", NULL, NULL);
     // If we continue, there must be an error
     KERNEL_LOG("[!] Failed to start init process: %s", getErrorKindMessage(-res));
     panic();
-    syscall(SYSCALL_EXIT);
 }
 

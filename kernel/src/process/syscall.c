@@ -65,7 +65,7 @@ void forkSyscall(bool is_kernel, TrapFrame* frame, SyscallArgs args) {
     if (frame->hart == NULL || task->process == NULL) {
         // This is for forking kernel processes and trap handlers
         // Will not copy open file descriptors. And memory will remain the same.
-        // Only thing that is created is a new process and stack.
+        // Only thing that is created is a new task and stack.
         Priority priority = DEFAULT_PRIORITY;
         size_t stack_size = HART_STACK_SIZE;
         void* old_stack_top;
@@ -146,9 +146,13 @@ void forkSyscall(bool is_kernel, TrapFrame* frame, SyscallArgs args) {
 void exitSyscall(bool is_kernel, TrapFrame* frame, SyscallArgs args) {
     assert(frame->hart != NULL);
     Task* task = (Task*)frame;
-    task->process->status = (task->process->status & ~0xff) | (args[0] & 0xff);
-    terminateAllProcessTasks(task->process);
-    deallocProcess(task->process);
+    if (task->process != NULL) {
+        task->process->status = (task->process->status & ~0xff) | (args[0] & 0xff);
+        terminateAllProcessTasks(task->process);
+        deallocProcess(task->process);
+    } else {
+        task->sched.state = TERMINATED;
+    }
 }
 
 void pauseSyscall(bool is_kernel, TrapFrame* frame, SyscallArgs args) {
@@ -160,6 +164,7 @@ void pauseSyscall(bool is_kernel, TrapFrame* frame, SyscallArgs args) {
 void alarmSyscall(bool is_kernel, TrapFrame* frame, SyscallArgs args) {
     assert(frame->hart != NULL);
     Task* task = (Task*)frame;
+    assert(frame->process != NULL);
     if (task->process->signals.alarm_at == 0) {
         task->frame.regs[REG_ARGUMENT_0] = 0;
     } else {
@@ -182,12 +187,14 @@ void alarmSyscall(bool is_kernel, TrapFrame* frame, SyscallArgs args) {
 void getpidSyscall(bool is_kernel, TrapFrame* frame, SyscallArgs args) {
     assert(frame->hart != NULL);
     Task* task = (Task*)frame;
+    assert(frame->process != NULL);
     task->frame.regs[REG_ARGUMENT_0] = task->process->pid;
 }
 
 void getppidSyscall(bool is_kernel, TrapFrame* frame, SyscallArgs args) {
     assert(frame->hart != NULL);
     Task* task = (Task*)frame;
+    assert(frame->process != NULL);
     if (task->process->tree.parent != NULL) {
         task->frame.regs[REG_ARGUMENT_0] = task->process->tree.parent->pid;
     } else {
@@ -206,6 +213,7 @@ typedef SignalHandler SignalAction;
 void sigactionSyscall(bool is_kernel, TrapFrame* frame, SyscallArgs args) {
     assert(frame->hart != NULL);
     Task* task = (Task*)frame;
+    assert(frame->process != NULL);
     Signal sig = args[0];
     if (sig >= SIG_COUNT || sig == 0) {
         task->frame.regs[REG_ARGUMENT_0] = -EINVAL;
@@ -257,6 +265,7 @@ void sigreturnSyscall(bool is_kernel, TrapFrame* frame, SyscallArgs args) {
 void sigpendingSyscall(bool is_kernel, TrapFrame* frame, SyscallArgs args) {
     assert(frame->hart != NULL);
     Task* task = (Task*)frame;
+    assert(frame->process != NULL);
     SignalSet set = 0;
     PendingSignal* current = task->process->signals.signals;
     while (current != NULL) {
@@ -275,6 +284,7 @@ typedef enum {
 void sigprocmaskSyscall(bool is_kernel, TrapFrame* frame, SyscallArgs args) {
     assert(frame->hart != NULL);
     Task* task = (Task*)frame;
+    assert(frame->process != NULL);
     SignalSet old = task->process->signals.mask;
     SigProcHow how = args[0];
     SignalSet new = args[1];
@@ -308,6 +318,7 @@ void killSyscall(bool is_kernel, TrapFrame* frame, SyscallArgs args) {
 void setUidSyscall(bool is_kernel, TrapFrame* frame, SyscallArgs args) {
     assert(frame->hart != NULL);
     Task* task = (Task*)frame;
+    assert(frame->process != NULL);
     if (task->process->resources.uid == 0 || task->process->resources.gid == 0) {
         task->process->resources.uid = args[0];
         task->frame.regs[REG_ARGUMENT_0] = -SUCCESS;
@@ -319,6 +330,7 @@ void setUidSyscall(bool is_kernel, TrapFrame* frame, SyscallArgs args) {
 void setGidSyscall(bool is_kernel, TrapFrame* frame, SyscallArgs args) {
     assert(frame->hart != NULL);
     Task* task = (Task*)frame;
+    assert(frame->process != NULL);
     if (task->process->resources.uid == 0 || task->process->resources.gid == 0) {
         task->process->resources.gid = args[0];
         task->frame.regs[REG_ARGUMENT_0] = -SUCCESS;
@@ -330,12 +342,14 @@ void setGidSyscall(bool is_kernel, TrapFrame* frame, SyscallArgs args) {
 void getUidSyscall(bool is_kernel, TrapFrame* frame, SyscallArgs args) {
     assert(frame->hart != NULL);
     Task* task = (Task*)frame;
+    assert(frame->process != NULL);
     task->frame.regs[REG_ARGUMENT_0] = task->process->resources.uid;
 }
 
 void getGidSyscall(bool is_kernel, TrapFrame* frame, SyscallArgs args) {
     assert(frame->hart != NULL);
     Task* task = (Task*)frame;
+    assert(frame->process != NULL);
     task->frame.regs[REG_ARGUMENT_0] = task->process->resources.gid;
 }
 
