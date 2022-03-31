@@ -4,6 +4,8 @@
 #include "task/task.h"
 #include "process/process.h"
 
+#define KERNEL_ONLY_SYSCALL_OFFSET 10000
+
 typedef enum {
     SYSCALL_PRINT = 0,
     SYSCALL_EXIT = 1,
@@ -48,6 +50,8 @@ typedef enum {
     SYSCALL_SIGPENDING = 40,
     SYSCALL_SIGPROCMASK = 41,
     SYSCALL_MKNOD = 42,
+// Kernel only syscalls:
+    SYSCALL_CRITICAL = 0 + KERNEL_ONLY_SYSCALL_OFFSET,
 } Syscalls;
 
 // Simple wrapper around ecall
@@ -55,9 +59,6 @@ intptr_t syscall(int kind, ...);
 
 typedef uintptr_t SyscallArgs[7];
 typedef void (*SyscallFunction)(bool is_kernel, TrapFrame* process, SyscallArgs args);
-
-// Register a syscall at the given kind
-void registerSyscall(int kind, SyscallFunction function);
 
 // Run a syscall for the given process. Return and extract arguments from the process registers.
 void runSyscall(TrapFrame* frame, bool is_kernel);

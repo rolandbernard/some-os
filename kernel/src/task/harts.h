@@ -19,6 +19,8 @@ HartFrame* setupHartFrame(int hartid);
 
 TrapFrame* readSscratch();
 
+TrapFrame* getCurrentTrapFrame();
+
 void writeSscratch(TrapFrame* frame);
 
 HartFrame* getCurrentHartFrame();
@@ -28,5 +30,8 @@ int readMhartid();
 int getCurrentHartId();
 
 void* getKernelGlobalPointer();
+
+// Save the current state and return pointer to one TrapFrame and load from the other.
+void loadTrapFrame(TrapFrame* load_from, TrapFrame* save_to);
 
 #endif

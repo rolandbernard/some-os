@@ -67,6 +67,10 @@ HartFrame* getCurrentHartFrame() {
     }
 }
 
+TrapFrame* getCurrentTrapFrame() {
+    return readSscratch();
+}
+
 void* getKernelGlobalPointer() {
     return &__global_pointer;
 }

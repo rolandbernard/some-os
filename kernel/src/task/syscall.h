@@ -9,4 +9,8 @@ void sleepSyscall(bool is_kernel, TrapFrame* frame, SyscallArgs args);
 
 void criticalSyscall(bool is_kernel, TrapFrame* frame, SyscallArgs args);
 
+TrapFrame* criticalEnter();
+
+void criticalReturn(TrapFrame* to);
+
 #endif

@@ -13,65 +13,62 @@
 #include "memory/kalloc.h"
 #include "kernel/syscall.h"
 
-#define TABLE_SIZE 128
-
-SyscallFunction syscall_table[TABLE_SIZE] = {
-    [SYSCALL_PRINT] = printSyscall,
-    [SYSCALL_EXIT] = exitSyscall,
-    [SYSCALL_YIELD] = yieldSyscall,
-    [SYSCALL_FORK] = forkSyscall,
-    [SYSCALL_SLEEP] = sleepSyscall,
-    [SYSCALL_OPEN] = openSyscall,
-    [SYSCALL_LINK] = linkSyscall,
-    [SYSCALL_UNLINK] = unlinkSyscall,
-    [SYSCALL_RENAME] = renameSyscall,
-    [SYSCALL_CLOSE] = closeSyscall,
-    [SYSCALL_READ] = readSyscall,
-    [SYSCALL_WRITE] = writeSyscall,
-    [SYSCALL_SEEK] = seekSyscall,
-    [SYSCALL_STAT] = statSyscall,
-    [SYSCALL_DUP] = dupSyscall,
-    [SYSCALL_TRUNC] = truncSyscall,
-    [SYSCALL_CHMOD] = chmodSyscall,
-    [SYSCALL_CHOWN] = chownSyscall,
-    [SYSCALL_MOUNT] = mountSyscall,
-    [SYSCALL_UMOUNT] = umountSyscall,
-    [SYSCALL_EXECVE] = execveSyscall,
-    [SYSCALL_READDIR] = readdirSyscall,
-    [SYSCALL_GETPID] = getpidSyscall,
-    [SYSCALL_GETPPID] = getppidSyscall,
-    [SYSCALL_WAIT] = waitSyscall,
-    [SYSCALL_SBRK] = sbrkSyscall,
-    [SYSCALL_PROTECT] = protectSyscall,
-    [SYSCALL_SIGACTION] = sigactionSyscall,
-    [SYSCALL_SIGRETURN] = sigreturnSyscall,
-    [SYSCALL_KILL] = killSyscall,
-    [SYSCALL_GETUID] = getUidSyscall,
-    [SYSCALL_GETGID] = getGidSyscall,
-    [SYSCALL_SETUID] = setUidSyscall,
-    [SYSCALL_SETGID] = setGidSyscall,
-    [SYSCALL_CHDIR] = chdirSyscall,
-    [SYSCALL_GETCWD] = getcwdSyscall,
-    [SYSCALL_PIPE] = pipeSyscall,
-    [SYSCALL_TIMES] = timesSyscall,
-    [SYSCALL_PAUSE] = pauseSyscall,
-    [SYSCALL_ALARM] = alarmSyscall,
-    [SYSCALL_SIGPENDING] = sigpendingSyscall,
-    [SYSCALL_SIGPROCMASK] = sigprocmaskSyscall,
-    [SYSCALL_MKNOD] = mknodSyscall,
-};
-
-void registerSyscall(int kind, SyscallFunction function) {
-    if (kind < TABLE_SIZE) {
-        syscall_table[kind] = function;
+static SyscallFunction findSyscall(Syscalls sys) {
+    switch (sys) {
+        case SYSCALL_PRINT: return printSyscall;
+        case SYSCALL_EXIT: return exitSyscall;
+        case SYSCALL_YIELD: return yieldSyscall;
+        case SYSCALL_FORK: return forkSyscall;
+        case SYSCALL_SLEEP: return sleepSyscall;
+        case SYSCALL_OPEN: return openSyscall;
+        case SYSCALL_LINK: return linkSyscall;
+        case SYSCALL_UNLINK: return unlinkSyscall;
+        case SYSCALL_RENAME: return renameSyscall;
+        case SYSCALL_CLOSE: return closeSyscall;
+        case SYSCALL_READ: return readSyscall;
+        case SYSCALL_WRITE: return writeSyscall;
+        case SYSCALL_SEEK: return seekSyscall;
+        case SYSCALL_STAT: return statSyscall;
+        case SYSCALL_DUP: return dupSyscall;
+        case SYSCALL_TRUNC: return truncSyscall;
+        case SYSCALL_CHMOD: return chmodSyscall;
+        case SYSCALL_CHOWN: return chownSyscall;
+        case SYSCALL_MOUNT: return mountSyscall;
+        case SYSCALL_UMOUNT: return umountSyscall;
+        case SYSCALL_EXECVE: return execveSyscall;
+        case SYSCALL_READDIR: return readdirSyscall;
+        case SYSCALL_GETPID: return getpidSyscall;
+        case SYSCALL_GETPPID: return getppidSyscall;
+        case SYSCALL_WAIT: return waitSyscall;
+        case SYSCALL_SBRK: return sbrkSyscall;
+        case SYSCALL_PROTECT: return protectSyscall;
+        case SYSCALL_SIGACTION: return sigactionSyscall;
+        case SYSCALL_SIGRETURN: return sigreturnSyscall;
+        case SYSCALL_KILL: return killSyscall;
+        case SYSCALL_GETUID: return getUidSyscall;
+        case SYSCALL_GETGID: return getGidSyscall;
+        case SYSCALL_SETUID: return setUidSyscall;
+        case SYSCALL_SETGID: return setGidSyscall;
+        case SYSCALL_CHDIR: return chdirSyscall;
+        case SYSCALL_GETCWD: return getcwdSyscall;
+        case SYSCALL_PIPE: return pipeSyscall;
+        case SYSCALL_TIMES: return timesSyscall;
+        case SYSCALL_PAUSE: return pauseSyscall;
+        case SYSCALL_ALARM: return alarmSyscall;
+        case SYSCALL_SIGPENDING: return sigpendingSyscall;
+        case SYSCALL_SIGPROCMASK: return sigprocmaskSyscall;
+        case SYSCALL_MKNOD: return mknodSyscall;
+        case SYSCALL_CRITICAL: return criticalSyscall;
+        default: return NULL;
     }
 }
 
 void runSyscall(TrapFrame* frame, bool is_kernel) {
     frame->pc += 4;
     Syscalls kind = (uintptr_t)frame->regs[REG_ARGUMENT_0];
-    if (kind < TABLE_SIZE && syscall_table[kind] != NULL) {
-        syscall_table[kind](is_kernel, frame, &(frame->regs[REG_ARGUMENT_1]));
+    SyscallFunction func = findSyscall(kind);
+    if (func != NULL && (is_kernel || kind < KERNEL_ONLY_SYSCALL_OFFSET)) {
+        func(is_kernel, frame, &(frame->regs[REG_ARGUMENT_1]));
     } else {
         frame->regs[REG_ARGUMENT_0] = -EINVAL;
     }
