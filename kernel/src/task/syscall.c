@@ -37,10 +37,16 @@ void criticalSyscall(bool is_kernel, TrapFrame* frame, SyscallArgs args) {
 }
 
 TrapFrame* criticalEnter() {
-    return (TrapFrame*)syscall(SYSCALL_CRITICAL);
+    if (getCurrentTask() != NULL) {
+        return (TrapFrame*)syscall(SYSCALL_CRITICAL);
+    } else {
+        return NULL;
+    }
 }
 
 void criticalReturn(TrapFrame* to) {
-    loadTrapFrame(getCurrentTrapFrame(), to);
+    if (to != NULL) {
+        loadTrapFrame(getCurrentTrapFrame(), to);
+    }
 }
 
