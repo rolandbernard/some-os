@@ -50,7 +50,7 @@ loadTrapFrame:
     .set i, i+1
 .endr
     la t1, 1f # Save address we want to return to
-    sd t1, 512(a3)
+    sd t1, 512(a1)
 # Loading from a0
     # Restore floating point registers
 .set i, 0
@@ -59,17 +59,18 @@ loadTrapFrame:
     .set i, i+1
 .endr
     # Restore integer registers
-.set i, 2
-.rept 8 # Load up to (and not including) a0
+.set i, 1
+.rept 9 # Load up to (and not including) a0
     load_gp %i, a0
     .set i, i+1
 .endr
-    .set i, i+1
-.rept 21 # Load after (and not including) a0
+    .set i, i+2
+.rept 20 # Load after (and not including) a1
     load_gp %i, a0
     .set i, i+1
 .endr
-    ld ra, 512(a0) # Load return address
+    ld a1, 512(a0) # Load return address
+    jr a1
 1:
     ret
 

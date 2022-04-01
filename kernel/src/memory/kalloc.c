@@ -8,6 +8,7 @@
 #include "memory/pagetable.h"
 #include "memory/virtmem.h"
 #include "task/spinlock.h"
+#include "task/syscall.h"
 #include "util/util.h"
 
 #define KALLOC_MIN_PAGES_TO_FREE 8
@@ -72,6 +73,7 @@ void* kalloc(size_t size) {
     if (size == 0) {
         return NULL;
     } else {
+        TrapFrame* lock = criticalEnter();
         lockSpinLock(&kalloc_lock);
         size_t length = (size + sizeof(AllocatedMemory) + KALLOC_MEM_ALIGN - 1) & -KALLOC_MEM_ALIGN;
         FreeMemory** memory = findFreeMemoryThatFits(length);
@@ -94,6 +96,7 @@ void* kalloc(size_t size) {
             ret = mem->bytes;
         }
         unlockSpinLock(&kalloc_lock);
+        criticalReturn(lock);
         return ret;
     }
 }
@@ -156,11 +159,13 @@ static void tryFreeingOldMemory() {
 
 void dealloc(void* ptr) {
     if (ptr != NULL) {
+        TrapFrame* lock = criticalEnter();
         lockSpinLock(&kalloc_lock);
         FreeMemory* mem = (FreeMemory*)(ptr - sizeof(AllocatedMemory));
         insertFreeMemory(mem);
         tryFreeingOldMemory();
         unlockSpinLock(&kalloc_lock);
+        criticalReturn(lock);
     }
 }
 
@@ -200,6 +205,7 @@ void* krealloc(void* ptr, size_t size) {
         return kalloc(size);
     } else {
         size_t size_with_header = (size + sizeof(AllocatedMemory) + KALLOC_MEM_ALIGN - 1) & -KALLOC_MEM_ALIGN;
+        TrapFrame* lock = criticalEnter();
         lockSpinLock(&kalloc_lock);
         AllocatedMemory* mem = (AllocatedMemory*)(ptr - sizeof(AllocatedMemory));
         FreeMemory** before = findFreeMemoryBefore(mem);
@@ -240,9 +246,11 @@ void* krealloc(void* ptr, size_t size) {
             }
             tryFreeingOldMemory();
             unlockSpinLock(&kalloc_lock);
+            criticalReturn(lock);
             return start->bytes;
         } else {
             unlockSpinLock(&kalloc_lock);
+            criticalReturn(lock);
             void* ret = kalloc(size);
             if (ret != NULL) {
                 memcpy(ret, ptr, umin(mem->size - sizeof(AllocatedMemory), size));
