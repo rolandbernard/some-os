@@ -11,6 +11,7 @@
 #include "error/error.h"
 #include "files/path.h"
 #include "util/util.h"
+#include "task/syscall.h"
 
 VirtualFilesystem global_file_system;
 
@@ -60,6 +61,7 @@ void freeVirtualFilesystem(VirtualFilesystem* fs) {
 
 Error mountFilesystem(VirtualFilesystem* fs, VfsFilesystem* filesystem, const char* path) {
     assert(path[0] == '/');
+    TrapFrame* lock = criticalEnter();
     lockSpinLock(&fs->lock);
     fs->mounts = krealloc(fs->mounts, (fs->mount_count + 1) * sizeof(FilesystemMount));
     fs->mounts[fs->mount_count].type = MOUNT_TYPE_FS;
@@ -67,11 +69,13 @@ Error mountFilesystem(VirtualFilesystem* fs, VfsFilesystem* filesystem, const ch
     fs->mounts[fs->mount_count].data = filesystem;
     fs->mount_count++;
     unlockSpinLock(&fs->lock);
+    criticalReturn(lock);
     return simpleError(SUCCESS);
 }
 
 Error mountFile(VirtualFilesystem* fs, VfsFile* file, const char* path) {
     assert(path[0] == '/');
+    TrapFrame* lock = criticalEnter();
     lockSpinLock(&fs->lock);
     fs->mounts = krealloc(fs->mounts, (fs->mount_count + 1) * sizeof(FilesystemMount));
     fs->mounts[fs->mount_count].type = MOUNT_TYPE_FILE;
@@ -79,11 +83,13 @@ Error mountFile(VirtualFilesystem* fs, VfsFile* file, const char* path) {
     fs->mounts[fs->mount_count].data = file;
     fs->mount_count++;
     unlockSpinLock(&fs->lock);
+    criticalReturn(lock);
     return simpleError(SUCCESS);
 }
 
 Error mountRedirect(VirtualFilesystem* fs, const char* from, const char* to) {
     assert(from[0] == '/' && to[0] == '/');
+    TrapFrame* lock = criticalEnter();
     lockSpinLock(&fs->lock);
     fs->mounts = krealloc(fs->mounts, (fs->mount_count + 1) * sizeof(FilesystemMount));
     fs->mounts[fs->mount_count].type = MOUNT_TYPE_BIND;
@@ -91,10 +97,12 @@ Error mountRedirect(VirtualFilesystem* fs, const char* from, const char* to) {
     fs->mounts[fs->mount_count].data = stringClone(from);
     fs->mount_count++;
     unlockSpinLock(&fs->lock);
+    criticalReturn(lock);
     return simpleError(SUCCESS);
 }
 
 Error umount(VirtualFilesystem* fs, const char* from) {
+    TrapFrame* lock = criticalEnter();
     lockSpinLock(&fs->lock);
     for (size_t i = fs->mount_count; i > 0;) {
         i--;
@@ -103,9 +111,11 @@ Error umount(VirtualFilesystem* fs, const char* from) {
                 fs->mount_count--;
                 memmove(fs->mounts + i, fs->mounts + i + 1, fs->mount_count - i);
                 unlockSpinLock(&fs->lock);
+                criticalReturn(lock);
                 return simpleError(SUCCESS);
             } else {
                 unlockSpinLock(&fs->lock);
+                criticalReturn(lock);
                 return simpleError(EBUSY);
             }
         }
@@ -113,9 +123,11 @@ Error umount(VirtualFilesystem* fs, const char* from) {
     if (fs->parent != NULL) {
         CHECKED(umount(fs->parent, from), unlockSpinLock(&fs->lock));
         unlockSpinLock(&fs->lock);
+        criticalReturn(lock);
         return simpleError(SUCCESS);
     } else {
         unlockSpinLock(&fs->lock);
+        criticalReturn(lock);
         return simpleError(ENOENT);
     }
 }
