@@ -16,16 +16,16 @@ typedef struct {
 
 void timesSyscall(bool is_kernel, TrapFrame* frame, SyscallArgs args) {
     assert(frame->hart != NULL);
-    Process* process = (Process*)frame;
+    Task* task = (Task*)frame;
     TimesStruct times;
-    times.user_time = process->times.user_time;
-    times.system_time = process->times.system_time;
-    times.user_child_time = process->times.user_child_time;
-    times.system_child_time = process->times.system_child_time;
+    times.user_time = task->times.user_time;
+    times.system_time = task->times.system_time;
+    times.user_child_time = task->times.user_child_time;
+    times.system_child_time = task->times.system_child_time;
     if (args[0] != 0) {
-        VirtPtr buf = virtPtrFor(args[0], process->memory.mem);
+        VirtPtr buf = virtPtrForTask(args[0], task);
         memcpyBetweenVirtPtr(buf, virtPtrForKernel(&times), sizeof(TimesStruct));
     }
-    process->frame.regs[REG_ARGUMENT_0] = getTime();
+    task->frame.regs[REG_ARGUMENT_0] = getTime();
 }
 

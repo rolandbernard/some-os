@@ -6,30 +6,30 @@
 
 #include "error/error.h"
 #include "process/types.h"
+#include "task/types.h"
+#include "memory/memspace.h"
 
-void initTrapFrame(TrapFrame* frame, uintptr_t sp, uintptr_t gp, uintptr_t pc, uintptr_t asid, PageTable* table);
+void initTrapFrame(TrapFrame* frame, uintptr_t sp, uintptr_t gp, uintptr_t pc, uintptr_t asid, MemorySpace* table);
 
-Process* createKernelProcess(void* start, Priority priority, size_t stack_size);
+Process* createUserProcess(Process* parent);
 
-Pid allocateNewPid();
+Task* createTaskInProcess(Process* process, uintptr_t sp, uintptr_t gp, uintptr_t pc, Priority priority);
 
-Process* createUserProcess(uintptr_t sp, uintptr_t gp, uintptr_t pc, Process* parent, Priority priority);
+void addTaskToProcess(Process* process, Task* task);
 
-Process* createChildUserProcess(Process* parent);
+void terminateAllProcessTasks(Process* process);
 
-// Free all data connected with the process. Also the process itself.
+void terminateAllProcessTasksBut(Process* process, Task* keep);
+
+void executeProcessWait(Task* process);
+
+void finalProcessWait(Task* process);
+
+void handleTaskWakeup(Task* task);
+
+bool shouldTaskWakeup(Task* task);
+
 void deallocProcess(Process* process);
-
-Pid freeKilledChild(Process* parent, uint64_t* status);
-
-// Enter process into the user ot kernel mode depending on process.pid (pid == 0 -> kernel)
-void enterProcess(Process* process);
-
-void dumpProcessInfo(Process* process);
-
-void executeProcessWait(Process* process);
-
-void finalProcessWait(Process* process);
 
 typedef int (*ProcessFindCallback)(Process* process, void* udata);
 

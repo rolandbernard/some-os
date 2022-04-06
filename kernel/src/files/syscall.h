@@ -43,6 +43,6 @@ void pipeSyscall(bool is_kernel, TrapFrame* frame, SyscallArgs args);
 
 void mknodSyscall(bool is_kernel, TrapFrame* frame, SyscallArgs args);
 
-char* copyPathFromSyscallArgs(Process* process, uintptr_t ptr);
+char* copyPathFromSyscallArgs(Task* task, uintptr_t ptr);
 
 #endif

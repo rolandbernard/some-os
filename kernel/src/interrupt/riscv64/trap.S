@@ -32,7 +32,7 @@ initTraps:
     csrw mtvec, t0
     ret
 
-// Write to the supervisor interrupt enable register
+# Write to the supervisor interrupt enable register
 enableInterrupts:
     csrrsi zero, sstatus, 1 << 1 # Directly enable interrupts (SIE)
     ret

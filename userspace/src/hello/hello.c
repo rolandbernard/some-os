@@ -8,6 +8,7 @@
 // Simple hello world program
 
 int main() {
+    fprintf(stderr, "Started hello program\n");
     mkfifo("/fifo", S_IRWXU | S_IRWXG | S_IRWXO);
     int fd = open("/fifo", O_RDWR);
     char buffer[512];

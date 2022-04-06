@@ -3,7 +3,7 @@
 
 #include "error/error.h"
 #include "memory/pagetable.h"
-#include "util/spinlock.h"
+#include "task/spinlock.h"
 
 extern PageTable* kernel_page_table;
 

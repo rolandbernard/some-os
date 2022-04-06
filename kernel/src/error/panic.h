@@ -3,9 +3,16 @@
 
 #include <stdnoreturn.h>
 
+#include "error/log.h"
+
 // Terminate the kernel
-noreturn void panic();
+noreturn void _panic();
 
 noreturn void silentPanic();
+
+#define panic() { \
+    KERNEL_LOG("[!] Kernel panic!") \
+    _panic(); \
+}
 
 #endif

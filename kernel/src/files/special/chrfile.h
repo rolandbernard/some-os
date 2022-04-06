@@ -3,7 +3,7 @@
 
 #include "devices/serial/serial.h"
 #include "files/vfs.h"
-#include "util/spinlock.h"
+#include "task/spinlock.h"
 
 // File wrapper around single byte read and write functions
 

@@ -2,7 +2,7 @@
 #define _BLKFILE_H_
 
 #include "files/vfs.h"
-#include "util/spinlock.h"
+#include "task/spinlock.h"
 
 // File wrapper around a block device operation
 

@@ -1,10 +1,10 @@
 
 .section .text
-.global lockSpinLock
-.global tryLockingSpinLock
-.global unlockSpinLock
+.global lockUnsafeLock
+.global tryLockingUnsafeLock
+.global unlockUnsafeLock
 
-lockSpinLock:
+lockUnsafeLock:
     li t0, 1
 1:
     amoswap.w t0, t0, (a0)
@@ -12,7 +12,7 @@ lockSpinLock:
     bnez t0, 1b
     ret
 
-tryLockingSpinLock:
+tryLockingUnsafeLock:
     li t0, 1
     amoswap.w t0, t0, (a0)
     fence
@@ -24,7 +24,7 @@ tryLockingSpinLock:
 2:
     ret
 
-unlockSpinLock:
+unlockUnsafeLock:
     fence
     amoswap.w zero, zero, (a0)
     ret

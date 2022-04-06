@@ -8,8 +8,9 @@
 #include "interrupt/plic.h"
 #include "interrupt/trap.h"
 #include "memory/virtmem.h"
-#include "process/schedule.h"
+#include "task/schedule.h"
 #include "process/signals.h"
+#include "task/types.h"
 
 const char* getCauseString(bool interrupt, int code) {
     if (interrupt) {
@@ -64,11 +65,11 @@ void kernelTrap(uintptr_t cause, uintptr_t pc, uintptr_t val, TrapFrame* frame) 
         KERNEL_LOG("[!] Unhandled trap: %p %p %p %s", pc, val, frame, getCauseString(interrupt, code));
         panic();
     } else {
+        Task* task = (Task*)frame;
         if (frame->hart != NULL) {
-            Process* process = (Process*)frame;
-            process->times.user_time += getTime() - process->times.entered;
-            moveToSchedState(process, ENQUEUEABLE);
-            process->times.entered = getTime();
+            task->times.user_time += getTime() - task->times.entered;
+            task->sched.state = ENQUABLE;
+            task->times.entered = getTime();
         }
         if (interrupt) {
             frame->pc = pc;
@@ -104,37 +105,33 @@ void kernelTrap(uintptr_t cause, uintptr_t pc, uintptr_t val, TrapFrame* frame) 
                 case 12: // Instruction page fault
                 case 13: // Load page fault
                 case 15: // Store/AMO page fault
-                    if (frame->hart == NULL) {
+                    if (frame->hart == NULL || task->process == NULL) {
                         if (!handlePageFault(kernel_page_table, val)) {
                             KERNEL_LOG("[!] Unhandled exception: %p %p %p %s", pc, val, frame, getCauseString(interrupt, code));
                             panic();
                         }
                     } else {
-                        Process* process = (Process*)frame;
-                        if (!handlePageFault(process->memory.mem, val)) {
-                            KERNEL_LOG("[!] Segmentation fault: %i %p %p %p %s", process->pid, pc, val, frame, getCauseString(interrupt, code));
-                            addSignalToProcess(process, SIGSEGV);
+                        if (!handlePageFault(task->process->memory.mem, val)) {
+                            KERNEL_LOG("[!] Segmentation fault: %i %p %p %p %s", task->process->pid, pc, val, frame, getCauseString(interrupt, code));
+                            addSignalToProcess(task->process, SIGSEGV);
                         }
                     }
                     break;
                 default:
-                    if (frame->hart == NULL) {
+                    if (frame->hart == NULL || task->process == NULL) {
                         KERNEL_LOG("[!] Unhandled exception: %p %p %p %s", pc, val, frame, getCauseString(interrupt, code));
                         panic();
                     } else {
-                        Process* process = (Process*)frame;
-                        KERNEL_LOG("[!] Segmentation fault: %i %p %p %p %s", process->pid, pc, val, frame, getCauseString(interrupt, code));
-                        addSignalToProcess(process, SIGSEGV);
+                        KERNEL_LOG("[!] Segmentation fault: %i %p %p %p %s", task->process->pid, pc, val, frame, getCauseString(interrupt, code));
+                        addSignalToProcess(task->process, SIGSEGV);
                     }
                     break;
             }
         }
         if (frame->hart != NULL) {
-            // TODO: system time is not actually correct
-            Process* process = (Process*)frame;
-            process->times.system_time += getTime() - process->times.entered;
-            enqueueProcess(process);
-            runNextProcess();
+            task->times.system_time += getTime() - task->times.entered;
+            enqueueTask(task);
+            runNextTask();
         } else {
             // This is not called from a process, but from kernel init or interrupt handler
             enterKernelMode(frame);

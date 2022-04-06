@@ -1,7 +1,7 @@
 #ifndef _INTERRUPT_H_
 #define _INTERRUPT_H_
 
-#include "process/process.h"
+#include "task/types.h"
 
 // Initialize CSRs for traps
 void initTraps();

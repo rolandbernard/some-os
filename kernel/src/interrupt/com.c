@@ -7,8 +7,8 @@
 #include "error/panic.h"
 #include "kernel/init.h"
 #include "memory/memmap.h"
-#include "process/harts.h"
-#include "process/schedule.h"
+#include "task/harts.h"
+#include "task/schedule.h"
 
 // Locked by sender, unlocked by receiver
 static SpinLock message_write_lock;
@@ -54,13 +54,16 @@ void handleMessage(MessageType type, void* data) {
     if (type == INITIALIZE_HARTS) {
         unlockSpinLock(&message_read_lock);
         initHart(getCurrentHartId());
-        runNextProcess();
-    } else if (type == NONE || type == YIELD_PROCESS) {
+        runNextTask();
+    } else if (type == NONE || type == YIELD_TASK) {
         unlockSpinLock(&message_read_lock);
         // Do nothing, the point was to preempt the running process
     } else if (type == KERNEL_PANIC) {
         unlockSpinLock(&message_read_lock);
         silentPanic();
+    } else if (type == KILL_TASK) {
+        ((Task*)data)->sched.state = TERMINATED;
+        unlockSpinLock(&message_read_lock);
     } else {
         panic();
     }

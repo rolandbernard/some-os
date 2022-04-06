@@ -9,6 +9,7 @@
 #include "error/log.h"
 #include "memory/memmap.h"
 #include "memory/kalloc.h"
+#include "task/syscall.h"
 
 typedef struct InterruptEntry_s {
     struct InterruptEntry_s* next;
@@ -57,15 +58,18 @@ void setInterruptFunction(ExternalInterrupt id, ExternalInterruptFunction functi
     entry->id = id;
     entry->function = function;
     entry->udata = udata;
+    TrapFrame* lock = criticalEnter();
     lockSpinLock(&plic_lock);
     entry->next = interrupts;
     interrupts = entry; 
     unlockSpinLock(&plic_lock);
+    criticalReturn(lock);
     enableInterrupt(id);
 }
 
 void clearInterruptFunction(ExternalInterrupt id, ExternalInterruptFunction function, void* udata) {
     bool interrupt_used = false;
+    TrapFrame* lock = criticalEnter();
     lockSpinLock(&plic_lock);
     InterruptEntry** current = &interrupts;
     while (*current != NULL) {
@@ -80,6 +84,7 @@ void clearInterruptFunction(ExternalInterrupt id, ExternalInterruptFunction func
             current = &(*current)->next;
         }
     }
+    criticalReturn(lock);
     unlockSpinLock(&plic_lock);
     if (!interrupt_used) {
         disableInterrupt(id);

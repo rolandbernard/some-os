@@ -4,7 +4,7 @@
 #include <stddef.h>
 
 #include "files/vfs.h"
-#include "util/spinlock.h"
+#include "task/spinlock.h"
 #include "process/types.h"
 
 #define PIPE_BUFFER_CAPACITY 512
