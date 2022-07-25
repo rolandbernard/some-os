@@ -73,6 +73,9 @@ typedef struct HartFrame_s {
     ScheduleQueue queue;
     struct Task_s* idle_task;
     struct HartFrame_s* next; // Next hart. Used for scheduling
+#ifdef DEBUG
+    size_t spinlocks_locked;
+#endif
 } HartFrame;
 
 typedef enum {

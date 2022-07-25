@@ -1,4 +1,6 @@
 
+#include <assert.h>
+
 #include "task/task.h"
 
 #include "memory/virtmem.h"
@@ -49,6 +51,7 @@ void enterTask(Task* task) {
     task->frame.hart = hart;
     if (hart != NULL) {
         hart->frame.regs[REG_STACK_POINTER] = (uintptr_t)hart->stack_top;
+        assert(hart->spinlocks_locked == 0);
     }
     task->times.entered = getTime();
     if (task->process == NULL) {
