@@ -13,8 +13,10 @@ CC := $(ARCH)-someos-gcc
 #==
 
 # == Flags
-CCFLAGS += -nostdlib -mno-relax -fpic -fpie -ffreestanding
+CCFLAGS += -nostdlib -ffreestanding -mcmodel=medany
 CCFLAGS += -I$(SOURCE_DIR)/libc/include
+LDFLAGS += -L$(TOOLS_DIR)/lib/gcc/riscv64-someos/12.0.0/
+LDLIBS  += -lgcc
 LINK_SCRIPT = $(SOURCE_DIR)/bsp/$(BOARD)/link.ld
 # ==
 

@@ -9,20 +9,20 @@ ECHO    := echo
 
 # == gcc-no-headers
 PROJ_NAME.gcc-no-headers := gcc
-CONF_ARGS.gcc-no-headers := --prefix=$(TOOLS_DIR) --without-headers --enable-languages=c,c++
+CONF_ARGS.gcc-no-headers := --prefix=$(TOOLS_DIR) --without-headers --enable-languages=c,c++ --with-cmodel=medany
 MAKE_ARGS.gcc-no-headers := all-gcc
 INST_ARGS.gcc-no-headers := install-gcc
 # ==
 
 # == binutils-no-headers
 PROJ_NAME.binutils-no-headers := binutils
-CONF_ARGS.binutils-no-headers := --prefix=$(TOOLS_DIR) --without-headers --disable-werror
+CONF_ARGS.binutils-no-headers := --prefix=$(TOOLS_DIR) --without-headers --disable-werror --with-cmodel=medany
 INST_ARGS.binutils-no-headers := install
 # ==
 
 # == newlib-no-headers
 PROJ_NAME.newlib-no-headers  := newlib
-CONF_ARGS.newlib-no-headers  := --prefix=/
+CONF_ARGS.newlib-no-headers  := --prefix=/ --with-cmodel=medany
 BUILD_REQ.newlib-no-headers  := gcc-no-headers binutils-no-headers
 INST_ARGS.newlib-no-headers  := DESTDIR=$(SYSROOT_DIR) install
 POST_BUILD.newlib-no-headers := cp -ar $(SYSROOT_DIR)/$(TARGET)/* $(SYSROOT_DIR)/ && rm -rf $(SYSROOT_DIR)/$(TARGET)
@@ -31,7 +31,7 @@ POST_BUILD.newlib-no-headers := cp -ar $(SYSROOT_DIR)/$(TARGET)/* $(SYSROOT_DIR)
 # == gcc
 PROJ_NAME.gcc := gcc
 BUILD_REQ.gcc := newlib-no-headers
-CONF_ARGS.gcc := --prefix=$(TOOLS_DIR) --with-sysroot=$(SYSROOT_DIR) --enable-languages=c,c++
+CONF_ARGS.gcc := --prefix=$(TOOLS_DIR) --with-sysroot=$(SYSROOT_DIR) --enable-languages=c,c++ --with-cmodel=medany
 MAKE_ARGS.gcc := all-gcc all-target-libgcc
 INST_ARGS.gcc := install-gcc install-target-libgcc
 # ==
@@ -39,13 +39,13 @@ INST_ARGS.gcc := install-gcc install-target-libgcc
 # == binutils
 PROJ_NAME.binutils := binutils
 BUILD_REQ.binutils := newlib-no-headers
-CONF_ARGS.binutils := --prefix=$(TOOLS_DIR) --with-sysroot=$(SYSROOT_DIR) --disable-werror
+CONF_ARGS.binutils := --prefix=$(TOOLS_DIR) --with-sysroot=$(SYSROOT_DIR) --disable-werror --with-cmodel=medany
 INST_ARGS.binutils := install
 # ==
 
 # == newlib
 PROJ_NAME.newlib  := newlib
-CONF_ARGS.newlib  := --prefix=/
+CONF_ARGS.newlib  := --prefix=/ --with-cmodel=medany
 BUILD_REQ.newlib  := gcc binutils
 INST_ARGS.newlib  := DESTDIR=$(SYSROOT_DIR) install
 POST_BUILD.newlib := cp -ar $(SYSROOT_DIR)/$(TARGET)/* $(SYSROOT_DIR)/ && rm -rf $(SYSROOT_DIR)/$(TARGET)

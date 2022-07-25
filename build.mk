@@ -32,6 +32,7 @@ CCFLAGS += $(CCFLAGS.$(BUILD)) $(WARNINGS) -MMD -MP -I$(SOURCE_DIR)
 CCFLAGS += $(foreach SWITCH, $(SWITCHES), -D$(shell echo $(SWITCH) | tr '[:lower:]' '[:upper:]'))
 CCFLAGS += $(foreach SWITCH, $(filter-out $(SWITCHES), $(ALL_SWITCHES)), -DNO$(shell echo $(SWITCH) | tr '[:lower:]' '[:upper:]'))
 LDFLAGS += $(LDFLAGS.$(BUILD)) -static
+LDLIBS  += $(LDLIBS.$(BUILD))
 # ==
 
 # == Files
@@ -68,7 +69,7 @@ $(TARGETS): $(BINARY_DIR)/$$@
 
 $(BINARYS): $(BINARY_DIR)/%: $(OBJECTS) $$(TARGET_OBJECTS.$$*) $(LINK_SCRIPT) | $$(dir $$@)
 	@$(ECHO) "Building $@"
-	$(LD) $(LDFLAGS) -o $@ $(OBJECTS) $(TARGET_OBJECTS.$*) $(if $(LINK_SCRIPT), -T$(LINK_SCRIPT))
+	$(LD) $(LDFLAGS) -o $@ $(OBJECTS) $(TARGET_OBJECTS.$*) $(LDLIBS) $(if $(LINK_SCRIPT), -T$(LINK_SCRIPT))
 	@$(CHANGED)
 
 $(OBJECT_DIR)/%.o: $(SOURCE_DIR)/% $(MAKEFILE_LIST) | $$(dir $$@)
