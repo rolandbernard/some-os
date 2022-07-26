@@ -20,12 +20,20 @@ SECTIONS {
         *(.text .text*)
         PROVIDE(__text_end = .);
     } >ram AT>ram :text
+    
+    .eh_frame : {
+        *(.eh_frame .eh_frame*)
+    } >ram AT>ram :data
 
-    .data : {
+    .rodata : {
         . = ALIGN(4096);
         PROVIDE(__data_start = .);
         *(.got .got*)
         *(.rodata .rodata*)
+        *(.srodata .srodata*)
+    } >ram AT>ram :data
+
+    .data : {
         *(.sdata .sdata*)
         *(.data .data*)
         PROVIDE(__data_end = .);
