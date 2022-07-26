@@ -13,7 +13,7 @@
 
 static void blockSeekFunction(BlockDeviceFile* file, Process* process, size_t offset, VfsSeekWhence whence, VfsFunctionCallbackSizeT callback, void* udata) {
     lockSpinLock(&file->lock);
-    size_t new_position;
+    size_t new_position = 0;
     switch (whence) {
         case VFS_SEEK_CUR:
             new_position = file->position + offset;
