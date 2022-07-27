@@ -7,6 +7,9 @@
 extern char __text_start[];
 extern char __text_end[];
 
+extern char __eh_frame_start[];
+extern char __rodata_end[];
+
 extern char __data_start[];
 extern char __stack_top[];
 
@@ -21,10 +24,14 @@ static void identityMapMapedMemory(MemmapType type) {
 Error initKernelVirtualMemory() {
     lockSpinLock(&kernel_page_table_lock);
     kernel_page_table = createPageTable();
-    // Identity map all the memory. Only text is executable. Text is read only.
+    // Identity map all the memory. Only .text is executable. .text and .rodata are read only.
     mapPageRange(
         kernel_page_table, (uintptr_t)__text_start, (uintptr_t)__text_end,
         (uintptr_t)__text_start, PAGE_ENTRY_AD_RX
+    );
+    mapPageRange(
+        kernel_page_table, (uintptr_t)__eh_frame_start, (uintptr_t)__rodata_end,
+        (uintptr_t)__eh_frame_start, PAGE_ENTRY_AD_R
     );
     mapPageRange(
         kernel_page_table, (uintptr_t)__data_start, (uintptr_t)__stack_top,

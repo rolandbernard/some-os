@@ -4,16 +4,16 @@
 #include <assert.h>
 #include <string.h>
 
-#include "error/log.h"
 #include "devices/devices.h"
+#include "error/log.h"
 #include "interrupt/com.h"
 #include "interrupt/syscall.h"
 #include "interrupt/trap.h"
-#include "task/harts.h"
-#include "task/task.h"
-#include "task/schedule.h"
-#include "process/syscall.h"
 #include "kernel/init.h"
+#include "process/syscall.h"
+#include "task/harts.h"
+#include "task/schedule.h"
+#include "task/task.h"
 
 void kernelMain();
 void testingCode();

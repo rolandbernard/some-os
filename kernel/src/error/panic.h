@@ -6,13 +6,15 @@
 #include "error/log.h"
 
 // Terminate the kernel
-noreturn void _panic();
+noreturn void panicWithoutBacktrace();
+
+noreturn void panicWithBacktrace();
 
 noreturn void silentPanic();
 
-#define panic() { \
-    KERNEL_LOG("[!] Kernel panic!") \
-    _panic(); \
+#define panic() {                       \
+    KERNEL_LOG("[!] Kernel panic!")     \
+    panicWithBacktrace();               \
 }
 
 #endif
