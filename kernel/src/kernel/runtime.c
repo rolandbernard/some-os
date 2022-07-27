@@ -6,11 +6,11 @@
 
 extern void kernelInit();
 
-extern char __bss_start;
-extern char __bss_end;
+extern char __bss_start[];
+extern char __bss_end[];
 
 static void clearBss() {
-    memset(&__bss_start, 0, &__bss_end - &__bss_start);
+    memset(&__bss_start, 0, __bss_end - __bss_start);
 }
 
 typedef enum {

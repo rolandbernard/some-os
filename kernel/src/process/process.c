@@ -29,8 +29,6 @@
 
 extern void kernelTrapVector;
 extern void kernelTrap;
-extern void __data_start;
-extern void __data_end;
 
 static Pid next_pid = 1;
 

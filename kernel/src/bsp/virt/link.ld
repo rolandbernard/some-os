@@ -22,6 +22,7 @@ SECTIONS {
     } >ram AT>ram :text
     
     .eh_frame : {
+        PROVIDE(__eh_frame_start = .);
         *(.eh_frame .eh_frame*)
     } >ram AT>ram :data
 

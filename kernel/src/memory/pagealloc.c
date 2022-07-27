@@ -7,8 +7,8 @@
 #include "task/spinlock.h"
 #include "task/syscall.h"
 
-extern const void __heap_start;
-extern const void __heap_end;
+extern char __heap_start[];
+extern char __heap_end[];
 
 static SpinLock alloc_lock;
 static FreePages free_pages;
@@ -16,8 +16,8 @@ static FreePages free_pages;
 void* zero_page;
 
 Error initPageAllocator() {
-    uintptr_t start = ((uintptr_t)&__heap_start + PAGE_SIZE - 1) & -PAGE_SIZE;
-    uintptr_t end = (uintptr_t)&__heap_end & -PAGE_SIZE;
+    uintptr_t start = ((uintptr_t)__heap_start + PAGE_SIZE - 1) & -PAGE_SIZE;
+    uintptr_t end = (uintptr_t)__heap_end & -PAGE_SIZE;
     assert(end >= start);
     size_t count = (end - start) / PAGE_SIZE;
     if (count > 0) {
@@ -93,10 +93,10 @@ void deallocPage(void* ptr) {
 void deallocPages(PageAllocation alloc) {
     if (alloc.ptr != NULL && alloc.size != 0) {
         // Small sanity checks to only free pages in the heap
-        assert(alloc.ptr >= &__heap_start && alloc.ptr <= &__heap_end);
+        assert(alloc.ptr >= (void*)__heap_start && alloc.ptr <= (void*)__heap_end);
         assert(
-            alloc.ptr + alloc.size * PAGE_SIZE >= &__heap_start
-            && alloc.ptr + alloc.size * PAGE_SIZE <= &__heap_end
+            alloc.ptr + alloc.size * PAGE_SIZE >= (void*)__heap_start
+            && alloc.ptr + alloc.size * PAGE_SIZE <= (void*)__heap_end
         );
         TrapFrame* lock = criticalEnter();
         lockSpinLock(&alloc_lock);

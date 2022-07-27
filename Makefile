@@ -10,12 +10,14 @@ TARGET.sysroot := $(BUILD_DIR)/sysroot.flag
 # ==
 
 # == Qemu
-DISK := $(BUILD_DIR)/hdd.dsk
-QEMU := qemu-system-$(ARCH)
+DISK    := $(BUILD_DIR)/hdd.dsk
+KERNEL  := $(KERNEL_DIR)/build/$(BUILD)/bin/kernel
+QEMU    := qemu-system-$(ARCH)
+GDB     := $(ARCH)-someos-gdb
 
 # Qemu system
 QEMU_SMP  ?= 4
-QEMU_ARGS := -M virt -smp $(QEMU_SMP) -m 128M -s $(QEMU_ADD_ARGS)
+QEMU_ARGS := -M virt -m 128M -s $(QEMU_ADD_ARGS)
 QEMU_ARGS += -cpu rv64 -bios none -snapshot
 
 # Qemu devices
@@ -52,7 +54,13 @@ $(DISK): $(TARGET.sysroot) | $(MOUNT_DIR)/
 	sudo umount $(MOUNT_DIR)
 
 qemu: $(TARGET.kernel) $(DISK)
-	$(QEMU) $(QEMU_ARGS) -kernel $(KERNEL_DIR)/build/$(BUILD)/bin/kernel
+	$(QEMU) $(QEMU_ARGS) -smp $(QEMU_SMP) -kernel $(KERNEL)
+
+qemu-gdb: $(TARGET.kernel) $(DISK)
+	$(QEMU) $(QEMU_ARGS) -smp 1 -S -kernel $(KERNEL)
+
+gdb:
+	$(GDB) --init-eval-command="target remote localhost:1234" $(KERNEL)
 
 sysroot: $(TARGET.sysroot)
 

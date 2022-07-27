@@ -4,11 +4,11 @@
 #include "memory/memmap.h"
 #include "error/log.h"
 
-extern const void __text_start;
-extern const void __text_end;
+extern char __text_start[];
+extern char __text_end[];
 
-extern const void __data_start;
-extern const void __stack_top;
+extern char __data_start[];
+extern char __stack_top[];
 
 PageTable* kernel_page_table;
 SpinLock kernel_page_table_lock;
@@ -23,12 +23,12 @@ Error initKernelVirtualMemory() {
     kernel_page_table = createPageTable();
     // Identity map all the memory. Only text is executable. Text is read only.
     mapPageRange(
-        kernel_page_table, (uintptr_t)&__text_start, (uintptr_t)&__text_end,
-        (uintptr_t)&__text_start, PAGE_ENTRY_AD_RX
+        kernel_page_table, (uintptr_t)__text_start, (uintptr_t)__text_end,
+        (uintptr_t)__text_start, PAGE_ENTRY_AD_RX
     );
     mapPageRange(
-        kernel_page_table, (uintptr_t)&__data_start, (uintptr_t)&__stack_top,
-        (uintptr_t)&__data_start, PAGE_ENTRY_AD_RW
+        kernel_page_table, (uintptr_t)__data_start, (uintptr_t)__stack_top,
+        (uintptr_t)__data_start, PAGE_ENTRY_AD_RW
     );
     // Identity map UART
     identityMapMapedMemory(VIRT_UART0);

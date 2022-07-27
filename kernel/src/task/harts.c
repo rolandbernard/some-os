@@ -7,8 +7,7 @@
 #include "memory/kalloc.h"
 #include "memory/virtmem.h"
 
-extern char __global_pointer;
-extern const void __stack_top;
+extern char __global_pointer[];
 
 SpinLock hart_lock = 0;
 HartFrame* harts_head = NULL; // This will be a circular linked list
@@ -39,7 +38,7 @@ HartFrame* setupHartFrame(int hartid) {
     if (existing == NULL) {
         HartFrame* hart = zalloc(sizeof(HartFrame));
         hart->stack_top = kalloc(HART_STACK_SIZE) + HART_STACK_SIZE;
-        initTrapFrame(&hart->frame, (uintptr_t)hart->stack_top, (uintptr_t)&__global_pointer, 0, 0, kernel_page_table);
+        initTrapFrame(&hart->frame, (uintptr_t)hart->stack_top, (uintptr_t)__global_pointer, 0, 0, kernel_page_table);
         hart->idle_task = createKernelTask(idle, IDLE_STACK_SIZE, LOWEST_PRIORITY); // Every hart needs an idle process
         hart->hartid = hartid;
         lockSpinLock(&hart_lock); 
@@ -72,7 +71,7 @@ TrapFrame* getCurrentTrapFrame() {
 }
 
 void* getKernelGlobalPointer() {
-    return &__global_pointer;
+    return __global_pointer;
 }
 
 int getCurrentHartId() {
