@@ -2,10 +2,11 @@
 #include <unwind.h>
 
 #include "error/backtrace.h"
+#include "memory/kalloc.h"
 
 #include "error/log.h"
 
-void __register_frame(void *begin);
+void __register_frame(const void* begin);
 
 extern char __eh_frame_start[];
 
