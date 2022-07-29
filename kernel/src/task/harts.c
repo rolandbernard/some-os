@@ -41,6 +41,7 @@ HartFrame* setupHartFrame(int hartid) {
         initTrapFrame(&hart->frame, (uintptr_t)hart->stack_top, (uintptr_t)__global_pointer, 0, 0, kernel_page_table);
         hart->idle_task = createKernelTask(idle, IDLE_STACK_SIZE, LOWEST_PRIORITY); // Every hart needs an idle process
         hart->hartid = hartid;
+        writeSscratch(&hart->frame);
         lockSpinLock(&hart_lock); 
         hart->next = harts_head;
         harts_head = hart;
@@ -48,7 +49,6 @@ HartFrame* setupHartFrame(int hartid) {
             harts_tail = hart;
         }
         harts_tail->next = hart;
-        writeSscratch(&hart->frame);
         unlockSpinLock(&hart_lock); 
         return hart;
     } else {

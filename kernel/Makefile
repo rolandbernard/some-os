@@ -15,11 +15,12 @@ CC := $(ARCH)-someos-gcc
 # == Flags
 CCFLAGS += -nostdlib -ffreestanding -mcmodel=medany
 CCFLAGS += -I$(SOURCE_DIR)/libc/include
-CCFLAGS.debug += -funwind-tables
 
 LDFLAGS += -L$(TOOLS_DIR)/lib/gcc/riscv64-someos/12.0.0/
 LDLIBS  += -lgcc
 LINK_SCRIPT = $(SOURCE_DIR)/bsp/$(BOARD)/link.ld
+
+CCFLAGS.debug += -funwind-tables
 # ==
 
 include ../build.mk

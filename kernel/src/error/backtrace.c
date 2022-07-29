@@ -2,7 +2,6 @@
 #include <unwind.h>
 
 #include "error/backtrace.h"
-#include "memory/kalloc.h"
 
 #include "error/log.h"
 
