@@ -3,6 +3,8 @@
 
 #include <stdbool.h>
 
+#include "task/types.h"
+
 typedef int TaskLock;
 
 void lockTaskLock(TaskLock* lock);

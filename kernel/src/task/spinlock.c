@@ -31,6 +31,7 @@ bool tryLockingSpinLock(SpinLock* lock) {
 }
 
 void unlockSpinLock(SpinLock* lock) {
+    assert(getCurrentTask() == NULL);
     unlockUnsafeLock(lock);
 #ifdef DEBUG
     HartFrame* hart = getCurrentHartFrame();

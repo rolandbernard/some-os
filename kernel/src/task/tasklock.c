@@ -17,6 +17,7 @@ bool tryLockingTaskLock(TaskLock* lock) {
 }
 
 void unlockTaskLock(TaskLock* lock) {
+    assert(getCurrentTask() != NULL);
     unlockUnsafeLock(lock);
 }
 
