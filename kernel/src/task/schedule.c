@@ -89,7 +89,7 @@ void enqueueTask(Task* task) {
                 }
                 pushTaskToQueue(queue, task);
                 break;
-            case READY: // Task has already be enqueued
+            case READY: // Task has already been enqueued
             case RUNNING: // It is currently running
             case WAITING: // Task is already handled somewhere else
                 break;
@@ -97,8 +97,7 @@ void enqueueTask(Task* task) {
                 deallocTask(task);
                 break;
             case UNKNOWN: // We don't know what to do
-                panic(); // These should not happen
-                break;
+                panic();  // These should not happen
         }
     }
 }

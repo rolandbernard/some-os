@@ -302,9 +302,10 @@ Error vfsLink(VirtualFilesystem* fs, struct Process_s* process, const char* old,
             if (filesystem->functions->link != NULL) {
                 char* old_copy = toMountPath(mount_old, old);
                 char* new_copy = toMountPath(mount_new, new);
-                filesystem->functions->link(filesystem, process, old_copy, new_copy, callback, udata);
+                Error res = filesystem->functions->link(filesystem, process, old_copy, new_copy);
                 dealloc(old_copy);
                 dealloc(new_copy);
+                return res;
             } else {
                 return simpleError(EPERM);
             }
@@ -318,7 +319,7 @@ Error vfsLink(VirtualFilesystem* fs, struct Process_s* process, const char* old,
     }
 }
 
-void vfsRename(VirtualFilesystem* fs, struct Process_s* process, const char* old, const char* new, VfsFunctionCallbackVoid callback, void* udata) {
+Error vfsRename(VirtualFilesystem* fs, struct Process_s* process, const char* old, const char* new) {
     // Could just be a link and unlink.
     lockTaskLock(&fs->lock);
     FilesystemMount* mount_old = findMountHandling(fs, stringClone(old));
@@ -331,113 +332,53 @@ void vfsRename(VirtualFilesystem* fs, struct Process_s* process, const char* old
             if (filesystem->functions->link != NULL) {
                 char* old_copy = toMountPath(mount_old, old);
                 char* new_copy = toMountPath(mount_new, new);
-                filesystem->functions->rename(filesystem, process, old_copy, new_copy, callback, udata);
+                Error res = filesystem->functions->rename(filesystem, process, old_copy, new_copy);
                 dealloc(old_copy);
                 dealloc(new_copy);
+                return res;
             } else {
-                callback(simpleError(EPERM), udata);
+                return simpleError(EPERM);
             }
         } else {
             unlockTaskLock(&fs->lock);
-            callback(simpleError(EXDEV), udata);
+            return simpleError(EXDEV);
         }
     } else {
         unlockTaskLock(&fs->lock);
-        callback(simpleError(ENOENT), udata);
+        return simpleError(ENOENT);
     }
 }
 
-typedef struct {
-    VfsFile* file;
-    Process* process;
-    VirtPtr buffer;
-    size_t offset;
-    size_t size;
-    bool write;
-    VfsFunctionCallbackSizeT callback;
-    void* udata;
-} VfsReadAtRequest;
-
-static void vfsOperationAtReadWriteCallback(Error error, size_t read, VfsReadAtRequest* request) {
-    if (isError(error)) {
-        request->callback(error, 0, request->udata);
-        dealloc(request);
-    } else if (read == 0 || request->size == 0) {
-        request->callback(simpleError(SUCCESS), request->offset, request->udata);
-        dealloc(request);
+Error vfsReadAt(VfsFile* file, struct Process_s* process, VirtPtr ptr, size_t size, size_t offset, size_t* ret) {
+    size_t off = 0;
+    CHECKED(file->functions->seek(file, process, offset, VFS_SEEK_SET, &off));
+    if (offset != off) {
+        return simpleError(EIO);
     } else {
-        request->size -= read;
-        request->offset += read;
-        request->buffer.address += read;
-        if (request->size != 0) {
-            // Try to read/write the remaining bytes
-            if (request->write) {
-                request->file->functions->write(
-                    request->file, request->process, request->buffer, request->size,
-                    (VfsFunctionCallbackSizeT)vfsOperationAtReadWriteCallback, request
-                );
-            } else {
-                request->file->functions->read(
-                    request->file, request->process, request->buffer, request->size,
-                    (VfsFunctionCallbackSizeT)vfsOperationAtReadWriteCallback, request
-                );
-            }
-        } else {
-            // Don't read more for now
-            request->callback(simpleError(SUCCESS), request->offset, request->udata);
-            dealloc(request);
+        size_t len = 1;
+        while (size != 0 && len != 0) {
+            CHECKED(file->functions->read(file, process, ptr, size, &len));
+            ptr.address += len;
+            size -= len;
         }
+        return simpleError(SUCCESS);
     }
 }
 
-static void vfsOperationAtSeekCallback(Error error, size_t offset, VfsReadAtRequest* request) {
-    if (isError(error)) {
-        request->callback(error, 0, request->udata);
-        dealloc(request);
-    } else if (offset != request->offset) {
-        request->callback(simpleError(EIO), 0, request->udata);
-        dealloc(request);
+Error vfsWriteAt(VfsFile* file, struct Process_s* process, VirtPtr ptr, size_t size, size_t offset, size_t* ret) {
+    size_t off = 0;
+    CHECKED(file->functions->seek(file, process, offset, VFS_SEEK_SET, &off));
+    if (offset != off) {
+        return simpleError(EIO);
     } else {
-        request->offset = 0;
-        if (request->write) {
-            request->file->functions->write(
-                request->file, request->process, request->buffer, request->size,
-                (VfsFunctionCallbackSizeT)vfsOperationAtReadWriteCallback, request
-            );
-        } else {
-            request->file->functions->read(
-                request->file, request->process, request->buffer, request->size,
-                (VfsFunctionCallbackSizeT)vfsOperationAtReadWriteCallback, request
-            );
+        size_t len = 1;
+        while (size != 0 && len != 0) {
+            CHECKED(file->functions->write(file, process, ptr, size, &len));
+            ptr.address += len;
+            size -= len;
         }
+        return simpleError(SUCCESS);
     }
-}
-
-static void vfsGenericOperationAt(
-    VfsFile* file, struct Process_s* process, VirtPtr ptr, size_t size, size_t offset,
-    bool write, VfsFunctionCallbackSizeT callback, void* udata
-) {
-    VfsReadAtRequest* request = kalloc(sizeof(VfsReadAtRequest));
-    request->file = file;
-    request->process = process;
-    request->buffer = ptr;
-    request->offset = offset;
-    request->size = size;
-    request->write = write;
-    request->callback = callback;
-    request->udata = udata;
-    file->functions->seek(
-        file, process, offset, VFS_SEEK_SET,
-        (VfsFunctionCallbackSizeT)vfsOperationAtSeekCallback, request
-    );
-}
-
-void vfsReadAt(VfsFile* file, struct Process_s* process, VirtPtr ptr, size_t size, size_t offset, VfsFunctionCallbackSizeT callback, void* udata) {
-    vfsGenericOperationAt(file, process, ptr, size, offset, false, callback, udata);
-}
-
-void vfsWriteAt(VfsFile* file, struct Process_s* process, VirtPtr ptr, size_t size, size_t offset, VfsFunctionCallbackSizeT callback, void* udata) {
-    vfsGenericOperationAt(file, process, ptr, size, offset, true, callback, udata);
 }
 
 bool canAccess(VfsMode mode, Uid file_uid, Gid file_gid, struct Process_s* process, VfsAccessFlags flags) {
@@ -471,53 +412,17 @@ bool canAccess(VfsMode mode, Uid file_uid, Gid file_gid, struct Process_s* proce
     }
 }
 
-typedef struct {
-    char* type;
-    VirtPtr data;
-    VfsFunctionCallbackFilesystem callback;
-    void* udata;
-    VfsFilesystem* fs;
-} CreateFsRequest;
-
-static void createFsInitCallback(Error error, CreateFsRequest* request) {
-    if (isError(error)) {
-        request->fs->functions->free(request->fs, NULL, noop, NULL);
-        request->callback(error, NULL, request->udata);
-        dealloc(request);
+Error createFilesystemFrom(VirtualFilesystem* fs, const char* path, const char* type, VirtPtr data, VfsFilesystem** ret) {
+    VfsFile* file;
+    CHECKED(vfsOpen(fs, NULL, path, VFS_OPEN_READ, 0, &file));
+    if (strcmp(type, "minix") == 0) {
+        VfsFilesystem* fs = (VfsFilesystem*)createMinixFilesystem(file, data);
+        CHECKED(fs->functions->init(fs, NULL), fs->functions->free(fs, NULL));
+        *ret = fs;
+        return simpleError(SUCCESS);
     } else {
-        request->callback(simpleError(SUCCESS), request->fs, request->udata);
-        dealloc(request);
+        CHECKED(file->functions->close(file, NULL));
+        return simpleError(EINVAL);
     }
-}
-
-static void createFsOpenCallback(Error error, VfsFile* file, CreateFsRequest* request) {
-    if (isError(error)) {
-        dealloc(request->type);
-        request->callback(error, NULL, request->udata);
-        dealloc(request);
-    } else {
-        if (strcmp(request->type, "minix") == 0) {
-            dealloc(request->type);
-            MinixFilesystem* fs = createMinixFilesystem(file, request->data);
-            request->fs = (VfsFilesystem*)fs;
-            fs->base.functions->init(
-                (VfsFilesystem*)fs, NULL, (VfsFunctionCallbackVoid)createFsInitCallback, request
-            );
-        } else {
-            file->functions->close(file, NULL, noop, NULL);
-            dealloc(request->type);
-            request->callback(simpleError(EINVAL), NULL, request->udata);
-            dealloc(request);
-        }
-    }
-}
-
-void createFilesystemFrom(VirtualFilesystem* fs, const char* path, const char* type, VirtPtr data, VfsFunctionCallbackFilesystem callback, void* udata) {
-    CreateFsRequest* request = kalloc(sizeof(CreateFsRequest));
-    request->data = data;
-    request->type = stringClone(type);
-    request->callback = callback;
-    request->udata = udata;
-    vfsOpen(fs, NULL, path, VFS_OPEN_READ, 0, (VfsFunctionCallbackFile)createFsOpenCallback, request);
 }
 
