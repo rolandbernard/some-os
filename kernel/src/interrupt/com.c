@@ -61,9 +61,6 @@ void handleMessage(MessageType type, void* data) {
     } else if (type == KERNEL_PANIC) {
         unlockSpinLock(&message_read_lock);
         silentPanic();
-    } else if (type == KILL_TASK) {
-        ((Task*)data)->sched.state = TERMINATED;
-        unlockSpinLock(&message_read_lock);
     } else {
         panic();
     }

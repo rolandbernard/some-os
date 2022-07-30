@@ -195,26 +195,25 @@ void addTaskToProcess(Process* process, Task* task) {
     unlockSpinLock(&process->lock);
 }
 
-void terminateAllProcessTasksBut(Process* process, Task* keep) {
-    lockSpinLock(&process->lock);
-    Task* current = process->tasks;
-    while (current != NULL) {
-        Task* next = current->proc_next;
-        if (current != keep) {
-            current->sched.state = TERMINATED;
-            sendMessageToAll(KILL_TASK, current);
-        }
-        current = next;
-    }
-    process->tasks = keep;
-    if (keep != NULL) {
-        process->tasks->proc_next = NULL;
-    }
-    unlockSpinLock(&process->lock);
+static void terminateProcessTask(Task* task) {
+    // TODO: For adding multiple task for a process this must be implemented correctly.
+    // This fails for example if the task is running, is in a syscall, is waiting, etc.
+    task->process->times.user_time += task->times.user_time;
+    task->process->times.system_time += task->times.system_time;
+    task->process->times.user_child_time += task->times.user_child_time;
+    task->process->times.system_child_time += task->times.system_child_time;
+    task->sched.state = TERMINATED;
+    task->process = NULL;
 }
 
 void terminateAllProcessTasks(Process* process) {
-    terminateAllProcessTasksBut(process, NULL);
+    Task* current = process->tasks;
+    while (current != NULL) {
+        Task* next = current->proc_next;
+        terminateProcessTask(current);
+        current = next;
+    }
+    process->tasks = NULL;
 }
 
 static void freeProcessFiles(Process* process) {
@@ -234,6 +233,12 @@ void deallocProcess(Process* process) {
         deallocMemorySpace(process->memory.mem);
     }
     dealloc(process);
+}
+
+void exitProcess(Process* process, Signal signal, int exit) {
+    process->status = (exit & 0xff) | (signal << 8);
+    terminateAllProcessTasks(process);
+    deallocProcess(process);
 }
 
 int doForProcessWithPid(int pid, ProcessFindCallback callback, void* udata) {

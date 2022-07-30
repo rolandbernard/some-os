@@ -37,9 +37,7 @@ typedef struct {
 static bool handleActualSignal(Task* task, Signal signal) {
     if (signal == SIGKILL || signal == SIGSTOP) {
         // We don't actually have a stop at the moment
-        task->process->status = (task->process->status & ~0xff00) | ((signal & 0xff) << 8);
-        terminateAllProcessTasks(task->process);
-        deallocProcess(task->process);
+        exitProcess(task->process, signal, 0);
         return false;
     } else if (signal >= SIG_COUNT || signal == 0) {
         // This is an invalid signal, ignore for now
@@ -50,9 +48,7 @@ static bool handleActualSignal(Task* task, Signal signal) {
             // These are the only signals we ignore
             return true;
         } else {
-            task->process->status = (task->process->status & ~0xff00) | ((signal & 0xff) << 8);
-            terminateAllProcessTasks(task->process);
-            deallocProcess(task->process);
+            exitProcess(task->process, signal, 0);
             return false;
         }
     } else if (task->process->signals.handlers[signal] == SIG_IGN) {

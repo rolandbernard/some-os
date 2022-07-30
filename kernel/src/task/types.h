@@ -87,7 +87,6 @@ typedef enum {
     SLEEPING,
     PAUSED,
     TERMINATED,
-    // Special
     WAIT_CHLD,
 } TaskState;
 

@@ -31,6 +31,8 @@ bool shouldTaskWakeup(Task* task);
 
 void deallocProcess(Process* process);
 
+void exitProcess(Process* process, Signal signal, int exit);
+
 typedef int (*ProcessFindCallback)(Process* process, void* udata);
 
 int doForProcessWithPid(int pid, ProcessFindCallback callback, void* udata);

@@ -147,9 +147,7 @@ void exitSyscall(bool is_kernel, TrapFrame* frame, SyscallArgs args) {
     assert(frame->hart != NULL);
     Task* task = (Task*)frame;
     if (task->process != NULL) {
-        task->process->status = (task->process->status & ~0xff) | (args[0] & 0xff);
-        terminateAllProcessTasks(task->process);
-        deallocProcess(task->process);
+        exitProcess(task->process, 0, args[0]);
     } else {
         task->sched.state = TERMINATED;
     }

@@ -3,6 +3,8 @@
 
 #include <stdint.h>
 
+#define ARRAY_LENGTH(ARR) (sizeof(ARR) / sizeof(ARR[0]))
+
 uint64_t umin(uint64_t a, uint64_t b);
 
 uint64_t umax(uint64_t a, uint64_t b);

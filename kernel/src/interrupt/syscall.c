@@ -12,8 +12,12 @@
 #include "memory/kalloc.h"
 #include "memory/syscall.h"
 #include "process/syscall.h"
+#include "task/harts.h"
 #include "task/schedule.h"
 #include "task/syscall.h"
+#include "util/util.h"
+
+#define SYSCALL_STACK_SIZE HART_STACK_SIZE
 
 SyscallFunction user_syscalls[] = {
     [SYSCALL_PRINT] = printSyscall,
@@ -62,10 +66,24 @@ SyscallFunction user_syscalls[] = {
 };
 
 SyscallFunction kernel_syscalls[] = {
-    [SYSCALL_CRITICAL] = criticalSyscall,
+    [SYSCALL_CRITICAL - KERNEL_ONLY_SYSCALL_OFFSET] = criticalSyscall,
 };
 
 static SyscallFunction findSyscall(Syscalls id) {
+    if (id < KERNEL_ONLY_SYSCALL_OFFSET) {
+        if (id < ARRAY_LENGTH(user_syscalls)) {
+            return user_syscalls[id];
+        } else {
+            return NULL;
+        }
+    } else {
+        id -= KERNEL_ONLY_SYSCALL_OFFSET;
+        if (id < ARRAY_LENGTH(kernel_syscalls)) {
+            return kernel_syscalls[id];
+        } else {
+            return NULL;
+        }
+    }
 }
 
 static bool isSyncSyscall(Syscalls id) {
@@ -79,10 +97,16 @@ static void invokeSyscall(SyscallFunction func, TrapFrame* frame) {
 static void syscallTaskEntry(SyscallFunction func, TrapFrame* frame) {
     assert(frame->hart != NULL);
     Task* task = (Task*)frame;
+    Task* self = getCurrentTask();
+    assert(self != NULL);
     invokeSyscall(func, frame);
+    TrapFrame* lock = criticalEnter();
+    task->times.system_time += self->times.user_time + self->times.system_time;
+    task->times.system_time += self->times.user_child_time + self->times.system_child_time;
     task->sched.state = ENQUABLE;
     enqueueTask(task);
-    leave();
+    self->sched.state = TERMINATED;
+    criticalReturn(lock);
 }
 
 void runSyscall(TrapFrame* frame, bool is_kernel) {
@@ -93,10 +117,13 @@ void runSyscall(TrapFrame* frame, bool is_kernel) {
         if (isSyncSyscall(kind)) {
             invokeSyscall(func, frame);
         } else {
-            assert(frame->hart != NULL);
+            assert(frame->hart != NULL); // Only tasks can wait for async syscalls
             Task* task = (Task*)frame;
             task->sched.state = WAITING;
-            
+            Task* syscall_task = createKernelTask(syscallTaskEntry, SYSCALL_STACK_SIZE, task->sched.priority);
+            syscall_task->frame.regs[REG_ARGUMENT_0] = (uintptr_t)func;
+            syscall_task->frame.regs[REG_ARGUMENT_1] = (uintptr_t)frame;
+            enqueueTask(syscall_task);
         }
     } else {
         frame->regs[REG_ARGUMENT_0] = -EINVAL;
