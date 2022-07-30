@@ -17,9 +17,6 @@
 #include "task/types.h"
 #include "util/util.h"
 
-#define USER_STACK_TOP (1UL << 38)
-#define USER_STACK_SIZE (1UL << 19)
-
 typedef struct {
     Task* task;
     VirtPtr args;

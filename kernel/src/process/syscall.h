@@ -35,6 +35,6 @@ void getUidSyscall(bool is_kernel, TrapFrame* frame, SyscallArgs args);
 
 void getGidSyscall(bool is_kernel, TrapFrame* frame, SyscallArgs args);
 
-void exit();
+void leave();
 
 #endif

@@ -58,7 +58,7 @@ typedef enum {
 intptr_t syscall(int kind, ...);
 
 typedef uintptr_t SyscallArgs[7];
-typedef void (*SyscallFunction)(bool is_kernel, TrapFrame* process, SyscallArgs args);
+typedef uintptr_t (*SyscallFunction)(TrapFrame* process, SyscallArgs args);
 
 // Run a syscall for the given process. Return and extract arguments from the process registers.
 void runSyscall(TrapFrame* frame, bool is_kernel);

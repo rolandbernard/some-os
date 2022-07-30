@@ -199,12 +199,12 @@ void terminateAllProcessTasksBut(Process* process, Task* keep) {
     lockSpinLock(&process->lock);
     Task* current = process->tasks;
     while (current != NULL) {
+        Task* next = current->proc_next;
         if (current != keep) {
             current->sched.state = TERMINATED;
             sendMessageToAll(KILL_TASK, current);
-            current->sched.state = TERMINATED;
         }
-        current = current->proc_next;
+        current = next;
     }
     process->tasks = keep;
     if (keep != NULL) {

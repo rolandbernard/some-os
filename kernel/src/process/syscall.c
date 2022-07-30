@@ -353,7 +353,7 @@ void getGidSyscall(bool is_kernel, TrapFrame* frame, SyscallArgs args) {
     task->frame.regs[REG_ARGUMENT_0] = task->process->resources.gid;
 }
 
-void exit() {
+void leave() {
     syscall(SYSCALL_EXIT);
     panic(); // This will never return
 }
