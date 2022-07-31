@@ -37,11 +37,10 @@ static uintptr_t changeProcessBreak(Process* process, intptr_t change) {
     }
 }
 
-void sbrkSyscall(bool is_kernel, TrapFrame* frame, SyscallArgs args) {
+SyscallReturn sbrkSyscall(TrapFrame* frame) {
     assert(frame->hart != NULL);
     Task* task = (Task*)frame;
-    task->frame.regs[REG_ARGUMENT_0] =
-        changeProcessBreak(task->process, task->frame.regs[REG_ARGUMENT_1]);
+    SYSCALL_RETURN(changeProcessBreak(task->process, SYSCALL_ARG(0)));
 }
 
 typedef struct {
@@ -66,14 +65,14 @@ static void allPagesProtectCallback(PageTableEntry* entry, uintptr_t vaddr, void
     }
 }
 
-void protectSyscall(bool is_kernel, TrapFrame* frame, SyscallArgs args) {
+SyscallReturn protectSyscall(TrapFrame* frame) {
     assert(frame->hart != NULL);
     Task* task = (Task*)frame;
     uintptr_t addr = task->frame.regs[REG_ARGUMENT_1];
     uintptr_t length = task->frame.regs[REG_ARGUMENT_2];
     uintptr_t protect = task->frame.regs[REG_ARGUMENT_3];
     if ((protect & PROT_READ_WRITE_EXEC) == 0) {
-        task->frame.regs[REG_ARGUMENT_0] = -EINVAL;
+        SYSCALL_RETURN(-EINVAL);
     } else {
         if (length != 0) {
             ProtectSyscallRequest request = {
@@ -83,7 +82,7 @@ void protectSyscall(bool is_kernel, TrapFrame* frame, SyscallArgs args) {
             };
             allPagesDo(task->process->memory.mem, allPagesProtectCallback, &request);
         }
-        task->frame.regs[REG_ARGUMENT_0] = 0;
+        SYSCALL_RETURN(0);
     }
 }
 

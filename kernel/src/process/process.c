@@ -36,31 +36,31 @@ static Process* global_first = NULL;
 SpinLock process_lock;
 
 static bool basicProcessWait(Task* task) {
-    int wait_pid = task->frame.regs[REG_ARGUMENT_1];
+    Pid wait_pid = task->frame.regs[REG_ARGUMENT_1];
     ProcessWaitResult** current = &task->process->tree.waits;
     while (*current != NULL) {
+        ProcessWaitResult* wait = *current;
         if (wait_pid == 0 || wait_pid == (*current)->pid) {
             writeInt(
                 virtPtrForTask(task->frame.regs[REG_ARGUMENT_2], task),
-                sizeof(int) * 8, (*current)->status
+                sizeof(int) * 8, wait->status
             );
-            task->times.user_child_time += (*current)->user_time;
-            task->times.system_child_time += (*current)->system_time;
-            task->frame.regs[REG_ARGUMENT_0] = (*current)->pid;
-            *current = (*current)->next;
+            task->times.user_child_time += wait->user_time;
+            task->times.system_child_time += wait->system_time;
+            task->frame.regs[REG_ARGUMENT_0] = wait->pid;
+            *current = wait->next;
+            dealloc(wait);
             return true;
         } else {
-            current = &(*current)->next;
+            current = &wait->next;
         }
     }
     return false;
 }
 
 void finalProcessWait(Task* task) {
-    // Called before waking up the process
-    if (!basicProcessWait(task)) {
-        task->frame.regs[REG_ARGUMENT_0] = -EINTR;;
-    }
+    // Called before waking up the task
+    basicProcessWait(task);
 }
 
 void executeProcessWait(Task* task) {
@@ -68,9 +68,10 @@ void executeProcessWait(Task* task) {
     if (basicProcessWait(task)) {
         unlockSpinLock(&process_lock); 
         task->sched.state = ENQUABLE;
+        enqueueTask(task);
     } else {
         bool has_child = false;
-        int wait_pid = task->frame.regs[REG_ARGUMENT_1];
+        Pid wait_pid = task->frame.regs[REG_ARGUMENT_1];
         if (wait_pid == 0) {
             has_child = task->process->tree.children != NULL;
         } else {
@@ -84,10 +85,13 @@ void executeProcessWait(Task* task) {
         }
         unlockSpinLock(&process_lock); 
         if (has_child) {
+            task->frame.regs[REG_ARGUMENT_0] = -EINTR;
             task->sched.state = WAIT_CHLD;
+            enqueueTask(task);
         } else {
             task->frame.regs[REG_ARGUMENT_0] = -ECHILD;
             task->sched.state = ENQUABLE;
+            enqueueTask(task);
         }
     }
 }
@@ -129,6 +133,14 @@ static void unregisterProcess(Process* process) {
         new_entry->next = parent->tree.waits;
         parent->tree.waits = new_entry;
         addSignalToProcess(parent, SIGCHLD);
+    } else {
+        // Free pending waits
+        ProcessWaitResult* current = process->tree.waits;
+        while (current != NULL) {
+            ProcessWaitResult* wait = current;
+            current = wait->next;
+            dealloc(wait);
+        }
     }
     // Reparent children
     Process* child = process->tree.children;
@@ -206,14 +218,23 @@ static void terminateProcessTask(Task* task) {
     task->process = NULL;
 }
 
-void terminateAllProcessTasks(Process* process) {
+void terminateAllProcessTasksBut(Process* process, Task* keep) {
     Task* current = process->tasks;
     while (current != NULL) {
         Task* next = current->proc_next;
-        terminateProcessTask(current);
+        if (current != keep) {
+            terminateProcessTask(current);
+        }
         current = next;
     }
-    process->tasks = NULL;
+    process->tasks = keep;
+    if (keep != NULL) {
+        keep->proc_next = NULL;
+    }
+}
+
+void terminateAllProcessTasks(Process* process) {
+    terminateAllProcessTasksBut(process, NULL);
 }
 
 static void freeProcessFiles(Process* process) {
@@ -221,7 +242,7 @@ static void freeProcessFiles(Process* process) {
     while (current != NULL) {
         VfsFile* to_remove = current;
         current = current->next;
-        to_remove->functions->close(to_remove, NULL, noop, NULL);
+        to_remove->functions->close(to_remove, NULL);
     }
     process->resources.next_fd = 0;
 }

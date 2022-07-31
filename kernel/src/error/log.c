@@ -33,15 +33,16 @@ static void* writeVirtPtrString(VirtPtrBufferPart part, void* udata) {
     return udata;
 }
 
-void printSyscall(bool is_kernel, TrapFrame* frame, SyscallArgs args) {
+SyscallReturn printSyscall(TrapFrame* frame) {
     VirtPtr str;
     if (frame->hart == NULL) {
-        str = virtPtrForKernel((void*)args[0]);
+        str = virtPtrForKernel((void*)SYSCALL_ARG(0));
     } else {
         Task* task = (Task*)frame;
-        str = virtPtrForTask(args[0], task);
+        str = virtPtrForTask(SYSCALL_ARG(0), task);
     }
     size_t length = strlenVirtPtr(str);
     virtPtrPartsDo(str, length, writeVirtPtrString, NULL, false);
+    return CONTINUE;
 }
 

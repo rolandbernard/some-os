@@ -3,11 +3,11 @@
 
 #include "interrupt/syscall.h"
 
-void yieldSyscall(bool is_kernel, TrapFrame* frame, SyscallArgs args);
+SyscallReturn yieldSyscall(TrapFrame* frame);
 
-void sleepSyscall(bool is_kernel, TrapFrame* frame, SyscallArgs args);
+SyscallReturn sleepSyscall(TrapFrame* frame);
 
-void criticalSyscall(bool is_kernel, TrapFrame* frame, SyscallArgs args);
+SyscallReturn criticalSyscall(TrapFrame* frame);
 
 TrapFrame* criticalEnter();
 

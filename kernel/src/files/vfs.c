@@ -29,14 +29,16 @@ static Error freeFilesystemMount(FilesystemMount* mount, bool force) {
     switch (mount->type) {
         case MOUNT_TYPE_FILE: {
             VfsFile* file = (VfsFile*)mount->data;
-            return file->functions->close(file, NULL);
+            file->functions->close(file, NULL);
+            return simpleError(SUCCESS);
         }
         case MOUNT_TYPE_FS: {
             VfsFilesystem* filesystem = (VfsFilesystem*)mount->data;
             if (!force && filesystem->open_files != 0) {
                 return simpleError(EBUSY);
             } else {
-                return filesystem->functions->free(filesystem, NULL);
+                filesystem->functions->free(filesystem, NULL);
+                return simpleError(SUCCESS);
             }
         }
         case MOUNT_TYPE_BIND:
@@ -199,7 +201,7 @@ Error vfsOpen(VirtualFilesystem* fs, struct Process_s* process, const char* path
                 if (MODE_TYPE(file->mode) == VFS_TYPE_FIFO) {
                     // This is a fifo, we have to create one
                     *ret = (VfsFile*)createFifoFile(path, file->mode, file->uid, file->gid);
-                    CHECKED(file->functions->close(file, NULL))
+                    file->functions->close(file, NULL);
                     if (*ret != NULL) {
                         return simpleError(SUCCESS);
                     } else {
@@ -421,7 +423,7 @@ Error createFilesystemFrom(VirtualFilesystem* fs, const char* path, const char* 
         *ret = fs;
         return simpleError(SUCCESS);
     } else {
-        CHECKED(file->functions->close(file, NULL));
+        file->functions->close(file, NULL);
         return simpleError(EINVAL);
     }
 }

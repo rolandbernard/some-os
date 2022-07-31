@@ -3,37 +3,37 @@
 
 #include "interrupt/syscall.h"
 
-void forkSyscall(bool is_kernel, TrapFrame* frame, SyscallArgs args);
+SyscallReturn forkSyscall(TrapFrame* frame);
 
-void exitSyscall(bool is_kernel, TrapFrame* frame, SyscallArgs args);
+SyscallReturn exitSyscall(TrapFrame* frame);
 
-void pauseSyscall(bool is_kernel, TrapFrame* frame, SyscallArgs args);
+SyscallReturn pauseSyscall(TrapFrame* frame);
 
-void alarmSyscall(bool is_kernel, TrapFrame* frame, SyscallArgs args);
+SyscallReturn alarmSyscall(TrapFrame* frame);
 
-void getpidSyscall(bool is_kernel, TrapFrame* frame, SyscallArgs args);
+SyscallReturn getpidSyscall(TrapFrame* frame);
 
-void getppidSyscall(bool is_kernel, TrapFrame* frame, SyscallArgs args);
+SyscallReturn getppidSyscall(TrapFrame* frame);
 
-void waitSyscall(bool is_kernel, TrapFrame* frame, SyscallArgs args);
+SyscallReturn waitSyscall(TrapFrame* frame);
 
-void sigactionSyscall(bool is_kernel, TrapFrame* frame, SyscallArgs args);
+SyscallReturn sigactionSyscall(TrapFrame* frame);
 
-void sigreturnSyscall(bool is_kernel, TrapFrame* frame, SyscallArgs args);
+SyscallReturn sigreturnSyscall(TrapFrame* frame);
 
-void sigpendingSyscall(bool is_kernel, TrapFrame* frame, SyscallArgs args);
+SyscallReturn sigpendingSyscall(TrapFrame* frame);
 
-void sigprocmaskSyscall(bool is_kernel, TrapFrame* frame, SyscallArgs args);
+SyscallReturn sigprocmaskSyscall(TrapFrame* frame);
 
-void killSyscall(bool is_kernel, TrapFrame* frame, SyscallArgs args);
+SyscallReturn killSyscall(TrapFrame* frame);
 
-void setUidSyscall(bool is_kernel, TrapFrame* frame, SyscallArgs args);
+SyscallReturn setUidSyscall(TrapFrame* frame);
 
-void setGidSyscall(bool is_kernel, TrapFrame* frame, SyscallArgs args);
+SyscallReturn setGidSyscall(TrapFrame* frame);
 
-void getUidSyscall(bool is_kernel, TrapFrame* frame, SyscallArgs args);
+SyscallReturn getUidSyscall(TrapFrame* frame);
 
-void getGidSyscall(bool is_kernel, TrapFrame* frame, SyscallArgs args);
+SyscallReturn getGidSyscall(TrapFrame* frame);
 
 void leave();
 

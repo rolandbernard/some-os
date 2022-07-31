@@ -12,17 +12,6 @@
 
 #define MAX_PHDRS 128
 
-typedef struct {
-    PageTable* table;
-    VfsFile* file;
-    ElfFileLoadCallback callback;
-    void* udata;
-    ElfHeader header;
-    ElfProgramHeader* prog_headers;
-    size_t ph_index;
-    size_t size;
-} LoadElfFileRequest;
-
 bool allocatePages(PageTable* table, uintptr_t addr, size_t filesz, size_t memsz, uint32_t flags) {
     int bits = PAGE_ENTRY_USER | PAGE_ENTRY_AD;
     if ((flags & ELF_PROG_EXEC) != 0) {
@@ -79,102 +68,57 @@ bool allocatePages(PageTable* table, uintptr_t addr, size_t filesz, size_t memsz
     return true;
 }
 
-static void loadProgramSegment(LoadElfFileRequest* request);
-
-static void readProgramSegmentCallback(Error error, size_t read, void* udata) {
-    LoadElfFileRequest* request = (LoadElfFileRequest*)udata;
-    if (isError(error)) {
-        dealloc(request->prog_headers);
-        request->callback(error, 0, request->udata);
-        dealloc(request);
-    } else if (read != request->size) {
-        dealloc(request->prog_headers);
-        request->callback(simpleError(EIO), 0, request->udata);
-        dealloc(request);
-    } else {
-        request->ph_index++;
-        loadProgramSegment(request);
-    }
-}
-
-static void loadProgramSegment(LoadElfFileRequest* request) {
-    if (request->ph_index < request->header.phnum) {
-        ElfProgramHeader* header = &request->prog_headers[request->ph_index];
-        if (header->seg_type != ELF_PROG_TYPE_LOAD || header->memsz == 0) {
-            request->ph_index++;
-            loadProgramSegment(request);
-        } else {
-            if (allocatePages(request->table, header->vaddr, header->filesz, header->memsz, header->flags)) {
-                request->size = umin(header->memsz, header->filesz);
-                // Using an unsafeVirtPtr here because we might not have write permissions
-                vfsReadAt(
-                    request->file, NULL, unsafeVirtPtrFor(header->vaddr, request->table), request->size,
-                    header->off, readProgramSegmentCallback, request
-                );
+static Error loadProgramSegment(PageTable* table, VfsFile* file, ElfProgramHeader* header) {
+    if (header->seg_type == ELF_PROG_TYPE_LOAD && header->memsz != 0) {
+        if (allocatePages(table, header->vaddr, header->filesz, header->memsz, header->flags)) {
+            size_t size = umin(header->memsz, header->filesz);
+            size_t read;
+            // Using an unsafeVirtPtr here because we might not have write permissions
+            CHECKED(vfsReadAt(file, NULL, unsafeVirtPtrFor(header->vaddr, table), size, header->off, &read));
+            if (read != size) {
+                return simpleError(EIO);
             } else {
-                freeMemorySpace(request->table);
-                dealloc(request->prog_headers);
-                request->callback(simpleError(ENOMEM), 0, request->udata);
-                dealloc(request);
+                return simpleError(SUCCESS);
             }
+        } else {
+            return simpleError(ENOMEM);
         }
     } else {
-        // Finished loading all segments
-        dealloc(request->prog_headers);
-        request->callback(simpleError(SUCCESS), request->header.entry_addr, request->udata);
-        dealloc(request);
+        return simpleError(SUCCESS);
     }
 }
 
-static void readProgramHeadersCallback(Error error, size_t read, void* udata) {
-    LoadElfFileRequest* request = (LoadElfFileRequest*)udata;
-    if (isError(error)) {
-        dealloc(request->prog_headers);
-        request->callback(error, 0, request->udata);
-        dealloc(request);
-    } else if (read != sizeof(ElfProgramHeader) * request->header.phnum) {
-        dealloc(request->prog_headers);
-        request->callback(simpleError(EIO), 0, request->udata);
-        dealloc(request);
-    } else {
-        request->ph_index = 0;
-        loadProgramSegment(request);
-    }
-}
-
-static void readHeaderCallback(Error error, size_t read, void* udata) {
-    LoadElfFileRequest* request = (LoadElfFileRequest*)udata;
-    if (isError(error)) {
-        request->callback(error, 0, request->udata);
-        dealloc(request);
-    } else if (read != sizeof(ElfHeader)) {
-        request->callback(simpleError(EIO), 0, request->udata);
-        dealloc(request);
+Error loadProgramFromElfFile(PageTable* table, VfsFile* file, uintptr_t* entry) {
+    ElfHeader header;
+    size_t read;
+    CHECKED(vfsReadAt(file, NULL, virtPtrForKernel(&header), sizeof(ElfHeader), 0, &read));
+    if (read != sizeof(ElfHeader)) {
+        return simpleError(EIO);
     } else if (
-        request->header.magic != ELF_MAGIC
-        || request->header.machine != ELF_MACHINE_RISCV
-        || request->header.obj_type != ELF_TYPE_EXEC
-        || request->header.phnum > MAX_PHDRS
-        || request->header.phentsize != sizeof(ElfProgramHeader)
+        header.magic != ELF_MAGIC
+        || header.machine != ELF_MACHINE_RISCV
+        || header.obj_type != ELF_TYPE_EXEC
+        || header.phnum > MAX_PHDRS
+        || header.phentsize != sizeof(ElfProgramHeader)
     ) {
-        request->callback(simpleError(ENOEXEC), 0, request->udata);
-        dealloc(request);
+        return simpleError(ENOEXEC);
     } else {
-        request->prog_headers = kalloc(request->header.phnum * sizeof(ElfProgramHeader));
-        vfsReadAt(
-            request->file, NULL, virtPtrForKernel(request->prog_headers),
-            request->header.phnum * sizeof(ElfProgramHeader), request->header.phoff,
-            readProgramHeadersCallback, request
-        );
+        ElfProgramHeader* prog_headers = kalloc(header.phnum * sizeof(ElfProgramHeader));
+        CHECKED(vfsReadAt(
+            file, NULL, virtPtrForKernel(prog_headers), header.phnum * sizeof(ElfProgramHeader), header.phoff, &read
+        ), dealloc(prog_headers));
+        if (read != sizeof(ElfProgramHeader) * header.phnum) {
+            dealloc(prog_headers);
+            return simpleError(EIO);
+        } else {
+            for (size_t i = 0; i < header.phnum; i++) {
+                CHECKED(loadProgramSegment(table, file, &prog_headers[i]), dealloc(prog_headers));
+            }
+            // Finished loading all segments
+            dealloc(prog_headers);
+            *entry = header.entry_addr;
+            return simpleError(SUCCESS);
+        }
     }
-}
-
-void loadProgramFromElfFile(PageTable* table, VfsFile* file, ElfFileLoadCallback callback, void* udata) {
-    LoadElfFileRequest* request = kalloc(sizeof(LoadElfFileRequest));
-    request->table = table;
-    request->file = file;
-    request->callback = callback;
-    request->udata = udata;
-    vfsReadAt(file, NULL, virtPtrForKernel(&request->header), sizeof(ElfHeader), 0, readHeaderCallback, request);
 }
 

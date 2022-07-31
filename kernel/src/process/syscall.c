@@ -19,48 +19,7 @@
 #include "task/types.h"
 #include "util/util.h"
 
-typedef struct {
-    Task* new_task;
-    Task* old_task;
-    VfsFile* cur_file;
-} ForkSyscallRequest;
-
-static void forkFileDupCallback(Error error, VfsFile* file, void* udata);
-
-static void duplicateFilesStep(ForkSyscallRequest* request) {
-    if (request->cur_file == NULL) {
-        request->new_task->frame.regs[REG_ARGUMENT_0] = 0;
-        request->old_task->frame.regs[REG_ARGUMENT_0] = request->new_task->process->pid;
-        request->new_task->sched.state = ENQUABLE;
-        enqueueTask(request->new_task);
-        request->old_task->sched.state = ENQUABLE;
-        enqueueTask(request->old_task);
-        dealloc(request);
-    } else {
-        request->cur_file->functions->dup(request->cur_file, NULL, forkFileDupCallback, request);
-    }
-}
-
-static void forkFileDupCallback(Error error, VfsFile* file, void* udata) {
-    ForkSyscallRequest* request = (ForkSyscallRequest*)udata;
-    if (isError(error)) {
-        deallocProcess(request->new_task->process);
-        deallocTask(request->new_task);
-        request->old_task->frame.regs[REG_ARGUMENT_0] = -error.kind;
-        enqueueTask(request->old_task);
-        dealloc(request);
-    } else {
-        ProcessResources* new_res = &request->new_task->process->resources;
-        file->fd = request->cur_file->fd;
-        file->flags = request->cur_file->flags;
-        file->next = new_res->files;
-        new_res->files = file;
-        request->cur_file = request->cur_file->next;
-        duplicateFilesStep(request);
-    }
-}
-
-void forkSyscall(bool is_kernel, TrapFrame* frame, SyscallArgs args) {
+SyscallReturn forkSyscall(TrapFrame* frame) {
     Task* task = (Task*)frame;
     if (frame->hart == NULL || task->process == NULL) {
         // This is for forking kernel processes and trap handlers
@@ -90,8 +49,8 @@ void forkSyscall(bool is_kernel, TrapFrame* frame, SyscallArgs args) {
         }
         // Set the return value of the syscall to 1 for the new process
         new_task->frame.regs[REG_ARGUMENT_0] = 1;
-        frame->regs[REG_ARGUMENT_0] = 0;
         enqueueTask(new_task);
+        SYSCALL_RETURN(0);
     } else {
         Process* new_process = createUserProcess(task->process);
         Task* new_task = NULL;
@@ -113,108 +72,115 @@ void forkSyscall(bool is_kernel, TrapFrame* frame, SyscallArgs args) {
                 new_process->signals.handlers, task->process->signals.handlers,
                 sizeof(task->process->signals.handlers)
             );
-            // Copy files
+            // Copy resource information
             new_process->resources.uid = task->process->resources.uid;
             new_process->resources.gid = task->process->resources.gid;
             new_process->resources.next_fd = task->process->resources.next_fd;
             new_process->memory.start_brk = task->process->memory.start_brk;
             new_process->memory.brk = task->process->memory.brk;
-            if (task->process->resources.files != NULL) {
-                task->sched.state = WAITING;
-                new_task->sched.state = WAITING;
-                ForkSyscallRequest* request = kalloc(sizeof(ForkSyscallRequest));
-                request->new_task = new_task;
-                request->old_task = task;
-                request->cur_file = task->process->resources.files;
-                duplicateFilesStep(request);
-            } else {
-                task->sched.state = ENQUABLE;
-                new_task->sched.state = ENQUABLE;
-                // No files have to be duplicated
-                new_task->frame.regs[REG_ARGUMENT_0] = 0;
-                task->frame.regs[REG_ARGUMENT_0] = new_process->pid;
-                enqueueTask(new_task);
+            // Copy files
+            VfsFile* files = task->process->resources.files;
+            while (files != NULL) {
+                VfsFile* copy = NULL;
+                Error err = files->functions->dup(files, NULL, &copy);
+                if (isError(err)) {
+                    deallocTask(new_task);
+                    deallocProcess(new_process);
+                    SYSCALL_RETURN(-err.kind);
+                }
+                copy->fd = files->fd;
+                copy->flags = files->flags;
+                copy->next = new_process->resources.files;
+                new_process->resources.files = copy;
+                files = files->next;
             }
+            new_task->frame.regs[REG_ARGUMENT_0] = 0;
+            enqueueTask(new_task);
+            SYSCALL_RETURN(new_process->pid);
         } else {
             deallocTask(new_task);
             deallocProcess(new_process);
-            task->frame.regs[REG_ARGUMENT_0] = -ENOMEM;
+            SYSCALL_RETURN(-ENOMEM);
         }
     }
 }
 
-void exitSyscall(bool is_kernel, TrapFrame* frame, SyscallArgs args) {
+SyscallReturn exitSyscall(TrapFrame* frame) {
     assert(frame->hart != NULL);
     Task* task = (Task*)frame;
     if (task->process != NULL) {
-        exitProcess(task->process, 0, args[0]);
+        exitProcess(task->process, 0, SYSCALL_ARG(0));
     } else {
         task->sched.state = TERMINATED;
     }
+    SYSCALL_RETURN(-SUCCESS);
 }
 
-void pauseSyscall(bool is_kernel, TrapFrame* frame, SyscallArgs args) {
+SyscallReturn pauseSyscall(TrapFrame* frame) {
     assert(frame->hart != NULL);
     Task* task = (Task*)frame;
     task->sched.state = PAUSED;
+    SYSCALL_RETURN(-SUCCESS);
 }
 
-void alarmSyscall(bool is_kernel, TrapFrame* frame, SyscallArgs args) {
+SyscallReturn alarmSyscall(TrapFrame* frame) {
     assert(frame->hart != NULL);
     Task* task = (Task*)frame;
     assert(task->process != NULL);
-    if (task->process->signals.alarm_at == 0) {
-        task->frame.regs[REG_ARGUMENT_0] = 0;
-    } else {
+    uintptr_t curr_time = 0;
+    if (task->process->signals.alarm_at != 0) {
         Time time = getTime();
         if (time >= task->process->signals.alarm_at) {
-            task->frame.regs[REG_ARGUMENT_0] = 1;
+            time = 1;
         } else {
-            task->frame.regs[REG_ARGUMENT_0] = umax(1, (task->process->signals.alarm_at - time) / CLOCKS_PER_SEC);
+            time = umax(1, (task->process->signals.alarm_at - time) / CLOCKS_PER_SEC);
         }
     }
-    if (args[0] == 0) {
+    if (SYSCALL_ARG(0) == 0) {
         task->process->signals.alarm_at = 0;
     } else {
-        Time delay = args[0] * CLOCKS_PER_SEC; // Argument is in seconds
+        Time delay = SYSCALL_ARG(0) * CLOCKS_PER_SEC; // Argument is in seconds
         Time end = getTime() + delay;
         task->process->signals.alarm_at = end;
     }
+    SYSCALL_RETURN(curr_time);
 }
 
-void getpidSyscall(bool is_kernel, TrapFrame* frame, SyscallArgs args) {
+SyscallReturn getpidSyscall(TrapFrame* frame) {
     assert(frame->hart != NULL);
     Task* task = (Task*)frame;
     assert(task->process != NULL);
-    task->frame.regs[REG_ARGUMENT_0] = task->process->pid;
+    SYSCALL_RETURN(task->process->pid);
 }
 
-void getppidSyscall(bool is_kernel, TrapFrame* frame, SyscallArgs args) {
+SyscallReturn getppidSyscall(TrapFrame* frame) {
     assert(frame->hart != NULL);
     Task* task = (Task*)frame;
     assert(task->process != NULL);
     if (task->process->tree.parent != NULL) {
-        task->frame.regs[REG_ARGUMENT_0] = task->process->tree.parent->pid;
+        SYSCALL_RETURN(task->process->tree.parent->pid);
     } else {
-        task->frame.regs[REG_ARGUMENT_0] = 0;
+        SYSCALL_RETURN(0);
     }
 }
 
-void waitSyscall(bool is_kernel, TrapFrame* frame, SyscallArgs args) {
+SyscallReturn waitSyscall(TrapFrame* frame) {
     assert(frame->hart != NULL);
     Task* task = (Task*)frame;
+    assert(task->process != NULL);
     executeProcessWait(task);
+    return WAIT;
 }
 
 typedef SignalHandler SignalAction;
 
-void sigactionSyscall(bool is_kernel, TrapFrame* frame, SyscallArgs args) {
+SyscallReturn sigactionSyscall(TrapFrame* frame) {
     assert(frame->hart != NULL);
     Task* task = (Task*)frame;
     assert(task->process != NULL);
-    Signal sig = args[0];
+    Signal sig = SYSCALL_ARG(0);
     if (sig >= SIG_COUNT || sig == 0) {
-        task->frame.regs[REG_ARGUMENT_0] = -EINVAL;
+        SYSCALL_RETURN(-EINVAL);
     } else {
         lockSpinLock(&task->process->lock);
         SignalAction oldaction = {
@@ -228,8 +194,8 @@ void sigactionSyscall(bool is_kernel, TrapFrame* frame, SyscallArgs args) {
             oldaction = *task->process->signals.handlers[sig];
         }
         SignalAction newaction;
-        VirtPtr new = virtPtrForTask(args[1], task);
-        VirtPtr old = virtPtrForTask(args[2], task);
+        VirtPtr new = virtPtrForTask(SYSCALL_ARG(1), task);
+        VirtPtr old = virtPtrForTask(SYSCALL_ARG(2), task);
         if (new.address != 0) {
             memcpyBetweenVirtPtr(virtPtrForKernel(&newaction), new, sizeof(SignalAction));
             if (newaction.handler == (uintptr_t)SIG_DFL || newaction.handler == (uintptr_t)SIG_IGN) {
@@ -248,19 +214,20 @@ void sigactionSyscall(bool is_kernel, TrapFrame* frame, SyscallArgs args) {
         if (old.address != 0) {
             memcpyBetweenVirtPtr(old, virtPtrForKernel(&oldaction), sizeof(SignalAction));
         }
-        task->frame.regs[REG_ARGUMENT_0] = -SUCCESS;
+        SYSCALL_RETURN(-SUCCESS);
     }
 }
 
-void sigreturnSyscall(bool is_kernel, TrapFrame* frame, SyscallArgs args) {
+SyscallReturn sigreturnSyscall(TrapFrame* frame) {
     assert(frame->hart != NULL);
     Task* task = (Task*)frame;
     // If we are not in a handler, this is an error
     task->frame.regs[REG_ARGUMENT_0] = -EINVAL;
     returnFromSignal(task);
+    return CONTINUE;
 }
 
-void sigpendingSyscall(bool is_kernel, TrapFrame* frame, SyscallArgs args) {
+SyscallReturn sigpendingSyscall(TrapFrame* frame) {
     assert(frame->hart != NULL);
     Task* task = (Task*)frame;
     assert(task->process != NULL);
@@ -270,7 +237,7 @@ void sigpendingSyscall(bool is_kernel, TrapFrame* frame, SyscallArgs args) {
         set |= (1UL << (current->signal - 1));
         current = current->next;
     }
-    task->frame.regs[REG_ARGUMENT_0] = set & task->process->signals.mask;
+    SYSCALL_RETURN(set & task->process->signals.mask);
 }
 
 typedef enum {
@@ -279,13 +246,13 @@ typedef enum {
     SIG_UNBLOCK,
 } SigProcHow;
 
-void sigprocmaskSyscall(bool is_kernel, TrapFrame* frame, SyscallArgs args) {
+SyscallReturn sigprocmaskSyscall(TrapFrame* frame) {
     assert(frame->hart != NULL);
     Task* task = (Task*)frame;
     assert(task->process != NULL);
     SignalSet old = task->process->signals.mask;
-    SigProcHow how = args[0];
-    SignalSet new = args[1];
+    SigProcHow how = SYSCALL_ARG(0);
+    SignalSet new = SYSCALL_ARG(1);
     if (how == SIG_SETMASK) {
         task->process->signals.mask = new;
     } else if (how == SIG_BLOCK) {
@@ -293,7 +260,7 @@ void sigprocmaskSyscall(bool is_kernel, TrapFrame* frame, SyscallArgs args) {
     } else if (how == SIG_UNBLOCK) {
         task->process->signals.mask &= ~new;
     }
-    task->frame.regs[REG_ARGUMENT_0] = old;
+    SYSCALL_RETURN(old);
 }
 
 int killSyscallCallback(Process* process, void* udata) {
@@ -306,49 +273,49 @@ int killSyscallCallback(Process* process, void* udata) {
     }
 }
 
-void killSyscall(bool is_kernel, TrapFrame* frame, SyscallArgs args) {
+SyscallReturn killSyscall(TrapFrame* frame) {
     assert(frame->hart != NULL);
     Task* task = (Task*)frame;
-    int pid = args[0];
-    task->frame.regs[REG_ARGUMENT_0] = doForProcessWithPid(pid, killSyscallCallback, task);
+    int pid = SYSCALL_ARG(0);
+    SYSCALL_RETURN(doForProcessWithPid(pid, killSyscallCallback, task));
 }
 
-void setUidSyscall(bool is_kernel, TrapFrame* frame, SyscallArgs args) {
+SyscallReturn setUidSyscall(TrapFrame* frame) {
     assert(frame->hart != NULL);
     Task* task = (Task*)frame;
     assert(task->process != NULL);
     if (task->process->resources.uid == 0 || task->process->resources.gid == 0) {
-        task->process->resources.uid = args[0];
-        task->frame.regs[REG_ARGUMENT_0] = -SUCCESS;
+        task->process->resources.uid = SYSCALL_ARG(0);
+        SYSCALL_RETURN(-SUCCESS);
     } else {
-        task->frame.regs[REG_ARGUMENT_0] = -EACCES;
+        SYSCALL_RETURN(-EACCES);
     }
 }
 
-void setGidSyscall(bool is_kernel, TrapFrame* frame, SyscallArgs args) {
+SyscallReturn setGidSyscall(TrapFrame* frame) {
     assert(frame->hart != NULL);
     Task* task = (Task*)frame;
     assert(task->process != NULL);
     if (task->process->resources.uid == 0 || task->process->resources.gid == 0) {
-        task->process->resources.gid = args[0];
-        task->frame.regs[REG_ARGUMENT_0] = -SUCCESS;
+        task->process->resources.gid = SYSCALL_ARG(0);
+        SYSCALL_RETURN(-SUCCESS);
     } else {
-        task->frame.regs[REG_ARGUMENT_0] = -EACCES;
+        SYSCALL_RETURN(-EACCES);
     }
 }
 
-void getUidSyscall(bool is_kernel, TrapFrame* frame, SyscallArgs args) {
+SyscallReturn getUidSyscall(TrapFrame* frame) {
     assert(frame->hart != NULL);
     Task* task = (Task*)frame;
     assert(task->process != NULL);
-    task->frame.regs[REG_ARGUMENT_0] = task->process->resources.uid;
+    SYSCALL_RETURN(task->process->resources.uid);
 }
 
-void getGidSyscall(bool is_kernel, TrapFrame* frame, SyscallArgs args) {
+SyscallReturn getGidSyscall(TrapFrame* frame) {
     assert(frame->hart != NULL);
     Task* task = (Task*)frame;
     assert(task->process != NULL);
-    task->frame.regs[REG_ARGUMENT_0] = task->process->resources.gid;
+    SYSCALL_RETURN(task->process->resources.gid);
 }
 
 void leave() {

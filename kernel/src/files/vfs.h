@@ -117,12 +117,13 @@ typedef Error (*SeekFunction)(struct VfsFile_s* file, struct Process_s* process,
 typedef Error (*ReadFunction)(struct VfsFile_s* file, struct Process_s* process, VirtPtr buffer, size_t size, size_t* ret);
 typedef Error (*WriteFunction)(struct VfsFile_s* file, struct Process_s* process, VirtPtr buffer, size_t size, size_t* ret);
 typedef Error (*StatFunction)(struct VfsFile_s* file, struct Process_s* process, VfsStat* ret);
-typedef Error (*CloseFunction)(struct VfsFile_s* file, struct Process_s* process);
 typedef Error (*DupFunction)(struct VfsFile_s* file, struct Process_s* process, struct VfsFile_s** ret);
 typedef Error (*TruncFunction)(struct VfsFile_s* file, struct Process_s* process, size_t size);
 typedef Error (*ChmodFunction)(struct VfsFile_s* file, struct Process_s* process, VfsMode mode);
 typedef Error (*ChownFunction)(struct VfsFile_s* file, struct Process_s* process, Uid new_uid, Gid new_gid);
 typedef Error (*ReaddirFunction)(struct VfsFile_s* file, struct Process_s* process, VirtPtr buff, size_t size, size_t* ret);
+// Close must not fail.
+typedef void (*CloseFunction)(struct VfsFile_s* file, struct Process_s* process);
 
 typedef struct {
     SeekFunction seek;
@@ -156,8 +157,9 @@ typedef Error (*MknodFunction)(struct VfsFilesystem_s* fs, struct Process_s* pro
 typedef Error (*UnlinkFunction)(struct VfsFilesystem_s* fs, struct Process_s* process, const char* path);
 typedef Error (*LinkFunction)(struct VfsFilesystem_s* fs, struct Process_s* process, const char* old, const char* new);
 typedef Error (*RenameFunction)(struct VfsFilesystem_s* fs, struct Process_s* process, const char* old, const char* new);
-typedef Error (*FreeFunction)(struct VfsFilesystem_s* fs, struct Process_s* process);
 typedef Error (*InitFunction)(struct VfsFilesystem_s* fs, struct Process_s* process);
+// Free must not fail.
+typedef void (*FreeFunction)(struct VfsFilesystem_s* fs, struct Process_s* process);
 
 typedef struct {
     OpenFunction open;

@@ -11,8 +11,8 @@
 
 typedef void (*ProgramLoadCallback)(Error error, void* udata);
 
-void loadProgramInto(Task* task, const char* path, VirtPtr args, VirtPtr envs, ProgramLoadCallback callback, void* udata);
+Error loadProgramInto(Task* task, const char* path, VirtPtr args, VirtPtr envs);
 
-void execveSyscall(bool is_kernel, TrapFrame* frame, SyscallArgs args);
+SyscallReturn execveSyscall(TrapFrame* frame);
 
 #endif
