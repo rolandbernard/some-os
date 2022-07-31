@@ -3,7 +3,9 @@
 
 #include <stdbool.h>
 
-typedef int SpinLock;
+typedef struct {
+    int spinlock;
+} SpinLock;
 
 void lockSpinLock(SpinLock* lock);
 

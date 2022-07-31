@@ -9,7 +9,7 @@
 
 void lockSpinLock(SpinLock* lock) {
     assert(getCurrentTask() == NULL);
-    lockUnsafeLock(lock);
+    lockUnsafeLock(&lock->spinlock);
 #ifdef DEBUG
     HartFrame* hart = getCurrentHartFrame();
     if (hart != NULL) {
@@ -20,7 +20,7 @@ void lockSpinLock(SpinLock* lock) {
 
 bool tryLockingSpinLock(SpinLock* lock) {
     assert(getCurrentTask() == NULL);
-    bool res = tryLockingUnsafeLock(lock);
+    bool res = tryLockingUnsafeLock(&lock->spinlock);
 #ifdef DEBUG
     HartFrame* hart = getCurrentHartFrame();
     if (res && hart != NULL) {
@@ -32,7 +32,7 @@ bool tryLockingSpinLock(SpinLock* lock) {
 
 void unlockSpinLock(SpinLock* lock) {
     assert(getCurrentTask() == NULL);
-    unlockUnsafeLock(lock);
+    unlockUnsafeLock(&lock->spinlock);
 #ifdef DEBUG
     HartFrame* hart = getCurrentHartFrame();
     if (hart != NULL) {

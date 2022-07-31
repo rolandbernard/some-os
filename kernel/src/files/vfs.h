@@ -116,7 +116,7 @@ struct Process_s;
 typedef Error (*SeekFunction)(struct VfsFile_s* file, struct Process_s* process, size_t offset, VfsSeekWhence whence, size_t* ret);
 typedef Error (*ReadFunction)(struct VfsFile_s* file, struct Process_s* process, VirtPtr buffer, size_t size, size_t* ret);
 typedef Error (*WriteFunction)(struct VfsFile_s* file, struct Process_s* process, VirtPtr buffer, size_t size, size_t* ret);
-typedef Error (*StatFunction)(struct VfsFile_s* file, struct Process_s* process, VfsStat* ret);
+typedef Error (*StatFunction)(struct VfsFile_s* file, struct Process_s* process, VirtPtr stat_ret);
 typedef Error (*DupFunction)(struct VfsFile_s* file, struct Process_s* process, struct VfsFile_s** ret);
 typedef Error (*TruncFunction)(struct VfsFile_s* file, struct Process_s* process, size_t size);
 typedef Error (*ChmodFunction)(struct VfsFile_s* file, struct Process_s* process, VfsMode mode);

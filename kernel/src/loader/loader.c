@@ -74,7 +74,7 @@ Error loadProgramInto(Task* task, const char* path, VirtPtr args, VirtPtr envs) 
     VfsFile* file;
     CHECKED(vfsOpen(&global_file_system, task->process, path, VFS_OPEN_EXECUTE, 0, &file));
     VfsStat stat;
-    CHECKED(file->functions->stat(file, task->process, &stat), file->functions->close(file, task->process));
+    CHECKED(file->functions->stat(file, task->process, virtPtrForKernel(&stat)), file->functions->close(file, task->process));
     MemorySpace* memory = createMemorySpace();
     uintptr_t entry;
     CHECKED(loadProgramFromElfFile(memory, file, &entry), {

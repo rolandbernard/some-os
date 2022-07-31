@@ -8,16 +8,16 @@
 
 void lockTaskLock(TaskLock* lock) {
     assert(getCurrentTask() != NULL);
-    lockUnsafeLock(lock);
+    lockUnsafeLock(&lock->spinlock);
 }
 
 bool tryLockingTaskLock(TaskLock* lock) {
     assert(getCurrentTask() != NULL);
-    return tryLockingUnsafeLock(lock);
+    return tryLockingUnsafeLock(&lock->spinlock);
 }
 
 void unlockTaskLock(TaskLock* lock) {
     assert(getCurrentTask() != NULL);
-    unlockUnsafeLock(lock);
+    unlockUnsafeLock(&lock->spinlock);
 }
 

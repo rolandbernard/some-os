@@ -5,7 +5,9 @@
 
 #include "task/types.h"
 
-typedef int TaskLock;
+typedef struct {
+    int spinlock;
+} TaskLock;
 
 void lockTaskLock(TaskLock* lock);
 
