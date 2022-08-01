@@ -10,10 +10,14 @@
 
 void lockSpinLock(SpinLock* lock) {
     TrapFrame* frame = criticalEnter();
-    lockUnsafeLock(&lock->spinlock);
-    lock->locked_by = frame;
-#ifdef DEBUG
     HartFrame* hart = getCurrentHartFrame();
+    if (lock->locked_by != hart) {
+        lockUnsafeLock(&lock->spinlock);
+    }
+    lock->num_locks++;
+    lock->locked_by = hart;
+    lock->crit_ret_frame = frame;
+#ifdef DEBUG
     if (hart != NULL) {
         hart->spinlocks_locked++;
     }
@@ -22,30 +26,36 @@ void lockSpinLock(SpinLock* lock) {
 
 bool tryLockingSpinLock(SpinLock* lock) {
     TrapFrame* frame = criticalEnter();
-    bool res = tryLockingUnsafeLock(&lock->spinlock);
-    if (res) {
-        lock->locked_by = frame;
+    HartFrame* hart = getCurrentHartFrame();
+    if (lock->locked_by == hart || tryLockingUnsafeLock(&lock->spinlock)) {
+        lock->num_locks++;
+        lock->locked_by = hart;
+        lock->crit_ret_frame = frame;
+#ifdef DEBUG
+        if (hart != NULL) {
+            hart->spinlocks_locked++;
+        }
+#endif
+        return true;
     } else {
         criticalReturn(frame);
+        return false;
     }
-#ifdef DEBUG
-    HartFrame* hart = getCurrentHartFrame();
-    if (res && hart != NULL) {
-        hart->spinlocks_locked++;
-    }
-#endif
-    return res;
 }
 
 void unlockSpinLock(SpinLock* lock) {
-    TrapFrame* frame = lock->locked_by;
-    unlockUnsafeLock(&lock->spinlock);
+    TrapFrame* frame = lock->crit_ret_frame;
+    lock->num_locks--;
+    if (lock->num_locks == 0) {
+        lock->locked_by = NULL;
+        unlockUnsafeLock(&lock->spinlock);
 #ifdef DEBUG
-    HartFrame* hart = getCurrentHartFrame();
-    if (hart != NULL) {
-        hart->spinlocks_locked--;
-    }
+        HartFrame* hart = getCurrentHartFrame();
+        if (hart != NULL) {
+            hart->spinlocks_locked--;
+        }
 #endif
-    criticalReturn(frame);
+        criticalReturn(frame);
+    }
 }
 
