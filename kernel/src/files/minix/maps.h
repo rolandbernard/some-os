@@ -3,12 +3,12 @@
 
 #include "files/minix/minix.h"
 
-void getFreeMinixInode(MinixFilesystem* fs, MinixINodeCallback callback, void* udata);
+Error getFreeMinixInode(MinixFilesystem* fs, uint32_t* inode);
 
-void getFreeMinixZone(MinixFilesystem* fs, VfsFunctionCallbackSizeT callback, void* udata);
+Error getFreeMinixZone(MinixFilesystem* fs, size_t* zone);
 
-void freeMinixInode(MinixFilesystem* fs, uint32_t inode, VfsFunctionCallbackVoid callback, void* udata);
+Error freeMinixInode(MinixFilesystem* fs, uint32_t inode);
 
-void freeMinixZone(MinixFilesystem* fs, size_t zone, VfsFunctionCallbackVoid callback, void* udata);
+Error freeMinixZone(MinixFilesystem* fs, size_t zone);
 
 #endif

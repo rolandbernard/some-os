@@ -190,7 +190,7 @@ typedef struct {
 
 typedef struct VirtualFilesystem_s {
     struct VirtualFilesystem_s* parent;
-    TaskLock lock;
+    SpinLock lock;
     size_t mount_count;
     FilesystemMount* mounts;
 } VirtualFilesystem;

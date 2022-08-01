@@ -59,58 +59,58 @@ void freeVirtualFilesystem(VirtualFilesystem* fs) {
 
 Error mountFilesystem(VirtualFilesystem* fs, VfsFilesystem* filesystem, const char* path) {
     assert(path[0] == '/');
-    lockTaskLock(&fs->lock);
+    lockSpinLock(&fs->lock);
     fs->mounts = krealloc(fs->mounts, (fs->mount_count + 1) * sizeof(FilesystemMount));
     fs->mounts[fs->mount_count].type = MOUNT_TYPE_FS;
     fs->mounts[fs->mount_count].path = stringClone(path);
     fs->mounts[fs->mount_count].data = filesystem;
     fs->mount_count++;
-    unlockTaskLock(&fs->lock);
+    unlockSpinLock(&fs->lock);
     return simpleError(SUCCESS);
 }
 
 Error mountFile(VirtualFilesystem* fs, VfsFile* file, const char* path) {
     assert(path[0] == '/');
-    lockTaskLock(&fs->lock);
+    lockSpinLock(&fs->lock);
     fs->mounts = krealloc(fs->mounts, (fs->mount_count + 1) * sizeof(FilesystemMount));
     fs->mounts[fs->mount_count].type = MOUNT_TYPE_FILE;
     fs->mounts[fs->mount_count].path = stringClone(path);
     fs->mounts[fs->mount_count].data = file;
     fs->mount_count++;
-    unlockTaskLock(&fs->lock);
+    unlockSpinLock(&fs->lock);
     return simpleError(SUCCESS);
 }
 
 Error mountRedirect(VirtualFilesystem* fs, const char* from, const char* to) {
     assert(from[0] == '/' && to[0] == '/');
-    lockTaskLock(&fs->lock);
+    lockSpinLock(&fs->lock);
     fs->mounts = krealloc(fs->mounts, (fs->mount_count + 1) * sizeof(FilesystemMount));
     fs->mounts[fs->mount_count].type = MOUNT_TYPE_BIND;
     fs->mounts[fs->mount_count].path = stringClone(to);
     fs->mounts[fs->mount_count].data = stringClone(from);
     fs->mount_count++;
-    unlockTaskLock(&fs->lock);
+    unlockSpinLock(&fs->lock);
     return simpleError(SUCCESS);
 }
 
 Error umount(VirtualFilesystem* fs, const char* from) {
-    lockTaskLock(&fs->lock);
+    lockSpinLock(&fs->lock);
     for (size_t i = fs->mount_count; i > 0;) {
         i--;
         if (strcmp(fs->mounts[i].path, from) == 0) {
-            CHECKED(freeFilesystemMount(&fs->mounts[i], false), unlockTaskLock(&fs->lock));
+            CHECKED(freeFilesystemMount(&fs->mounts[i], false), unlockSpinLock(&fs->lock));
             fs->mount_count--;
             memmove(fs->mounts + i, fs->mounts + i + 1, fs->mount_count - i);
-            unlockTaskLock(&fs->lock);
+            unlockSpinLock(&fs->lock);
             return simpleError(SUCCESS);
         }
     }
     if (fs->parent != NULL) {
-        CHECKED(umount(fs->parent, from), unlockTaskLock(&fs->lock));
-        unlockTaskLock(&fs->lock);
+        CHECKED(umount(fs->parent, from), unlockSpinLock(&fs->lock));
+        unlockSpinLock(&fs->lock);
         return simpleError(SUCCESS);
     } else {
-        unlockTaskLock(&fs->lock);
+        unlockSpinLock(&fs->lock);
         return simpleError(ENOENT);
     }
 }
@@ -190,14 +190,14 @@ static char* toMountPath(FilesystemMount* mount, const char* path) {
 }
 
 Error vfsOpen(VirtualFilesystem* fs, struct Process_s* process, const char* path, VfsOpenFlags flags, VfsMode mode, VfsFile** ret) {
-    lockTaskLock(&fs->lock);
+    lockSpinLock(&fs->lock);
     FilesystemMount* mount = findMountHandling(fs, stringClone(path));
     if (mount != NULL) {
         switch (mount->type) {
             case MOUNT_TYPE_FILE: {
                 VfsFile* file = (VfsFile*)mount->data;
-                unlockTaskLock(&fs->lock);
-                CHECKED(file->functions->dup(file, process, ret), unlockTaskLock(&fs->lock));
+                unlockSpinLock(&fs->lock);
+                CHECKED(file->functions->dup(file, process, ret));
                 if (MODE_TYPE(file->mode) == VFS_TYPE_FIFO) {
                     // This is a fifo, we have to create one
                     *ret = (VfsFile*)createFifoFile(path, file->mode, file->uid, file->gid);
@@ -214,66 +214,66 @@ Error vfsOpen(VirtualFilesystem* fs, struct Process_s* process, const char* path
             case MOUNT_TYPE_FS: {
                 VfsFilesystem* filesystem = (VfsFilesystem*)mount->data;
                 if (filesystem->functions->open != NULL) {
-                    unlockTaskLock(&fs->lock);
+                    unlockSpinLock(&fs->lock);
                     char* path_copy = toMountPath(mount, path);
                     Error res = filesystem->functions->open(filesystem, process, path_copy, flags, mode, ret);
                     dealloc(path_copy);
                     return res;
                 } else {
-                    unlockTaskLock(&fs->lock);
+                    unlockSpinLock(&fs->lock);
                     return simpleError(EPERM);
                 }
             }
             case MOUNT_TYPE_BIND: panic(); // Can't happen. Would return NULL.
         }
     } else {
-        unlockTaskLock(&fs->lock);
+        unlockSpinLock(&fs->lock);
         return simpleError(ENOENT);
     }
 }
 
 Error vfsMknod(VirtualFilesystem* fs, struct Process_s* process, const char* path, VfsMode mode, DeviceId dev) {
-    lockTaskLock(&fs->lock);
+    lockSpinLock(&fs->lock);
     FilesystemMount* mount = findMountHandling(fs, stringClone(path));
     if (mount != NULL) {
         switch (mount->type) {
             case MOUNT_TYPE_FILE: {
-                unlockTaskLock(&fs->lock);
+                unlockSpinLock(&fs->lock);
                 return simpleError(EPERM);
             }
             case MOUNT_TYPE_FS: {
                 VfsFilesystem* filesystem = (VfsFilesystem*)mount->data;
                 if (filesystem->functions->mknod != NULL) {
-                    unlockTaskLock(&fs->lock);
+                    unlockSpinLock(&fs->lock);
                     char* path_copy = toMountPath(mount, path);
                     Error res = filesystem->functions->mknod(filesystem, process, path_copy, mode, dev);
                     dealloc(path_copy);
                     return res;
                 } else {
-                    unlockTaskLock(&fs->lock);
+                    unlockSpinLock(&fs->lock);
                     return simpleError(EPERM);
                 }
             }
             case MOUNT_TYPE_BIND: panic(); // Can't happen. Would return NULL.
         }
     } else {
-        unlockTaskLock(&fs->lock);
+        unlockSpinLock(&fs->lock);
         return simpleError(ENOENT);
     }
 }
 
 Error vfsUnlink(VirtualFilesystem* fs, struct Process_s* process, const char* path) {
-    lockTaskLock(&fs->lock);
+    lockSpinLock(&fs->lock);
     FilesystemMount* mount = findMountHandling(fs, stringClone(path));
     if (mount != NULL) {
         switch (mount->type) {
             case MOUNT_TYPE_FILE: {
-                unlockTaskLock(&fs->lock);
+                unlockSpinLock(&fs->lock);
                 return simpleError(EPERM);
             }
             case MOUNT_TYPE_FS: {
                 VfsFilesystem* filesystem = (VfsFilesystem*)mount->data;
-                unlockTaskLock(&fs->lock);
+                unlockSpinLock(&fs->lock);
                 if (filesystem->functions->unlink != NULL) {
                     char* path_copy = toMountPath(mount, path);
                     Error res = filesystem->functions->unlink(filesystem, process, path_copy);
@@ -287,20 +287,20 @@ Error vfsUnlink(VirtualFilesystem* fs, struct Process_s* process, const char* pa
             case MOUNT_TYPE_BIND: panic(); // Can't happen. Would return NULL.
         }
     } else {
-        unlockTaskLock(&fs->lock);
+        unlockSpinLock(&fs->lock);
         return simpleError(ENOENT);
     }
 }
 
 Error vfsLink(VirtualFilesystem* fs, struct Process_s* process, const char* old, const char* new) {
-    lockTaskLock(&fs->lock);
+    lockSpinLock(&fs->lock);
     FilesystemMount* mount_old = findMountHandling(fs, stringClone(old));
     FilesystemMount* mount_new = findMountHandling(fs, stringClone(new));
     if (mount_old != NULL && mount_new != NULL) {
         if (mount_new == mount_old && mount_new->type == MOUNT_TYPE_FS) {
             // Linking across filesystem boundaries is impossible
             VfsFilesystem* filesystem = (VfsFilesystem*)mount_old->data;
-            unlockTaskLock(&fs->lock);
+            unlockSpinLock(&fs->lock);
             if (filesystem->functions->link != NULL) {
                 char* old_copy = toMountPath(mount_old, old);
                 char* new_copy = toMountPath(mount_new, new);
@@ -312,25 +312,25 @@ Error vfsLink(VirtualFilesystem* fs, struct Process_s* process, const char* old,
                 return simpleError(EPERM);
             }
         } else {
-            unlockTaskLock(&fs->lock);
+            unlockSpinLock(&fs->lock);
             return simpleError(EXDEV);
         }
     } else {
-        unlockTaskLock(&fs->lock);
+        unlockSpinLock(&fs->lock);
         return simpleError(ENOENT);
     }
 }
 
 Error vfsRename(VirtualFilesystem* fs, struct Process_s* process, const char* old, const char* new) {
     // Could just be a link and unlink.
-    lockTaskLock(&fs->lock);
+    lockSpinLock(&fs->lock);
     FilesystemMount* mount_old = findMountHandling(fs, stringClone(old));
     FilesystemMount* mount_new = findMountHandling(fs, stringClone(new));
     if (mount_old != NULL && mount_new != NULL) {
         if (mount_new == mount_old && mount_new->type == MOUNT_TYPE_FS) {
             // Moving across filesystem boundaries requires copying
             VfsFilesystem* filesystem = (VfsFilesystem*)mount_old->data;
-            unlockTaskLock(&fs->lock);
+            unlockSpinLock(&fs->lock);
             if (filesystem->functions->link != NULL) {
                 char* old_copy = toMountPath(mount_old, old);
                 char* new_copy = toMountPath(mount_new, new);
@@ -342,11 +342,11 @@ Error vfsRename(VirtualFilesystem* fs, struct Process_s* process, const char* ol
                 return simpleError(EPERM);
             }
         } else {
-            unlockTaskLock(&fs->lock);
+            unlockSpinLock(&fs->lock);
             return simpleError(EXDEV);
         }
     } else {
-        unlockTaskLock(&fs->lock);
+        unlockSpinLock(&fs->lock);
         return simpleError(ENOENT);
     }
 }

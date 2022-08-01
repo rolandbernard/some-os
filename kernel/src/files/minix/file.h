@@ -6,7 +6,7 @@
 typedef struct {
     VfsFile base;
     MinixFilesystem* fs;
-    SpinLock lock;
+    TaskLock lock;
     size_t position;
     uint32_t inodenum;
 } MinixFile;
