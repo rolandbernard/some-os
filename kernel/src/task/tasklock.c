@@ -7,17 +7,33 @@
 #include "task/task.h"
 
 void lockTaskLock(TaskLock* lock) {
-    assert(getCurrentTask() != NULL);
-    lockUnsafeLock(&lock->spinlock);
+    Task* task = getCurrentTask();
+    assert(task != NULL);
+    if (lock->locked_by != task) {
+        lockUnsafeLock(&lock->spinlock);
+    }
+    lock->num_locks++;
+    lock->locked_by = task;
 }
 
 bool tryLockingTaskLock(TaskLock* lock) {
-    assert(getCurrentTask() != NULL);
-    return tryLockingUnsafeLock(&lock->spinlock);
+    Task* task = getCurrentTask();
+    assert(task != NULL);
+    if (lock->locked_by == task || tryLockingUnsafeLock(&lock->spinlock)) {
+        lock->num_locks++;
+        lock->locked_by = task;
+        return true;
+    } else {
+        return false;
+    }
 }
 
 void unlockTaskLock(TaskLock* lock) {
     assert(getCurrentTask() != NULL);
-    unlockUnsafeLock(&lock->spinlock);
+    lock->num_locks--;
+    if (lock->num_locks == 0) {
+        lock->locked_by = NULL;
+        unlockUnsafeLock(&lock->spinlock);
+    }
 }
 
