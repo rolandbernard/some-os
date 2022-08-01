@@ -11,6 +11,8 @@ typedef struct {
     struct TrapFrame_s* crit_ret_frame;
 } SpinLock;
 
+void initSpinLock(SpinLock* lock);
+
 void lockSpinLock(SpinLock* lock);
 
 bool tryLockingSpinLock(SpinLock* lock);

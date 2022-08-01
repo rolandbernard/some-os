@@ -6,6 +6,12 @@
 #include "util/unsafelock.h"
 #include "task/task.h"
 
+void initTaskLock(TaskLock* lock) {
+    lock->spinlock = 0;
+    lock->locked_by = NULL;
+    lock->num_locks = 0;
+}
+
 void lockTaskLock(TaskLock* lock) {
     Task* task = getCurrentTask();
     assert(task != NULL);

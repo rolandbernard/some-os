@@ -11,6 +11,8 @@ typedef struct {
     size_t num_locks;
 } TaskLock;
 
+void initTaskLock(TaskLock* lock);
+
 void lockTaskLock(TaskLock* lock);
 
 bool tryLockingTaskLock(TaskLock* lock);
