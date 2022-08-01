@@ -43,7 +43,7 @@ typedef enum { // This is offset by one to be used as the index into TrapFrame.r
     REG_TEMP_6 = 30,
 } RegisterNames;
 
-typedef struct {
+typedef struct TrapFrame_s {
     // Be careful changing this. It's used from assembly
     struct HartFrame_s* hart;
     uintptr_t regs[31];

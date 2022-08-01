@@ -19,11 +19,9 @@ Error logKernelMessage(const char* fmt, ...) {
     // Logging happens to the default serial device
     Serial serial = getDefaultSerialDevice();
     FORMAT_STRING(string, fmt);
-    TrapFrame* lock = criticalEnter();
     lockSpinLock(&kernel_log_lock);
     Error error = writeToSerial(serial, "%s", string);
     unlockSpinLock(&kernel_log_lock);
-    criticalReturn(lock);
     return error;
 }
 

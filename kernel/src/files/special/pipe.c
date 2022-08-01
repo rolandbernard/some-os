@@ -151,11 +151,9 @@ static Error pipeCloseFunction(PipeFile* file, Process* process) {
 
 PipeFile* duplicatePipeFile(PipeFile* file) {
     if (file != NULL) {
-        TrapFrame* lock = criticalEnter();
         lockSpinLock(&file->data->lock);
         file->data->ref_count++;
         unlockSpinLock(&file->data->lock);
-        criticalReturn(lock);
         PipeFile* copy = kalloc(sizeof(PipeFile));
         memcpy(copy, file, sizeof(PipeFile));
         return copy;

@@ -14,7 +14,6 @@
 #include "util/util.h"
 
 static Error blockSeekFunction(BlockDeviceFile* file, Process* process, size_t offset, VfsSeekWhence whence, size_t* new_pos) {
-    TrapFrame* lock = criticalEnter();
     lockSpinLock(&file->lock);
     size_t new_position = 0;
     switch (whence) {
@@ -30,7 +29,6 @@ static Error blockSeekFunction(BlockDeviceFile* file, Process* process, size_t o
     }
     file->position = new_position;
     unlockSpinLock(&file->lock);
-    criticalReturn(lock);
     *new_pos = new_position;
     return simpleError(SUCCESS);
 }
@@ -62,12 +60,10 @@ static Error genericBlockFileFunction(BlockDeviceFile* file, bool write, VirtPtr
     size_t block_size = file->block_size;
     BlockOperationFunction block_op = file->block_operation;
     char* tmp_buffer = kalloc(block_size);
-    TrapFrame* lock = criticalEnter();
     lockSpinLock(&file->lock);
     size_t offset = file->position;
     file->position += size;
     unlockSpinLock(&file->lock);
-    criticalReturn(lock);
     size_t left = size;
     while (left > 0) {
         size_t size_diff;

@@ -12,7 +12,6 @@
 static Error serialReadFunction(SerialDeviceFile* file, Process* process, VirtPtr buffer, size_t size, size_t* read) {
     Error status;
     size_t i;
-    TrapFrame* lock = criticalEnter();
     lockSpinLock(&file->lock);
     for (i = 0; i < size; i++) {
         char c;
@@ -23,7 +22,6 @@ static Error serialReadFunction(SerialDeviceFile* file, Process* process, VirtPt
         writeIntAt(buffer, 8, i, c);
     }
     unlockSpinLock(&file->lock);
-    criticalReturn(lock);
     *read = i;
     if (status.kind == EAGAIN && i != 0) {
         return simpleError(SUCCESS);
@@ -34,13 +32,11 @@ static Error serialReadFunction(SerialDeviceFile* file, Process* process, VirtPt
 }
 
 static Error serialWriteFunction(SerialDeviceFile* file, Process* process, VirtPtr buffer, size_t size, size_t* written) {
-    TrapFrame* lock = criticalEnter();
     lockSpinLock(&file->lock);
     for (size_t i = 0; i < size; i++) {
         file->serial.write(file->serial.data, readIntAt(buffer, i, 8));
     }
     unlockSpinLock(&file->lock);
-    criticalReturn(lock);
     *written = size;
     return simpleError(SUCCESS);
 }

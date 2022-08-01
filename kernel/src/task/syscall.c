@@ -48,7 +48,7 @@ TrapFrame* criticalEnter() {
 }
 
 void criticalReturn(TrapFrame* to) {
-    if (to != NULL) {
+    if (to != NULL && getCurrentTask() == NULL) {
         loadTrapFrame(getCurrentTrapFrame(), to);
     }
 }

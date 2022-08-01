@@ -5,6 +5,7 @@
 
 typedef struct {
     int spinlock;
+    struct TrapFrame_s* locked_by;
 } SpinLock;
 
 void lockSpinLock(SpinLock* lock);

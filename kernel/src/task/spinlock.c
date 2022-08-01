@@ -3,13 +3,15 @@
 
 #include "task/spinlock.h"
 
-#include "util/unsafelock.h"
-#include "task/task.h"
 #include "task/harts.h"
+#include "task/syscall.h"
+#include "task/task.h"
+#include "util/unsafelock.h"
 
 void lockSpinLock(SpinLock* lock) {
-    assert(getCurrentTask() == NULL);
+    TrapFrame* frame = criticalEnter();
     lockUnsafeLock(&lock->spinlock);
+    lock->locked_by = frame;
 #ifdef DEBUG
     HartFrame* hart = getCurrentHartFrame();
     if (hart != NULL) {
@@ -19,8 +21,13 @@ void lockSpinLock(SpinLock* lock) {
 }
 
 bool tryLockingSpinLock(SpinLock* lock) {
-    assert(getCurrentTask() == NULL);
+    TrapFrame* frame = criticalEnter();
     bool res = tryLockingUnsafeLock(&lock->spinlock);
+    if (res) {
+        lock->locked_by = frame;
+    } else {
+        criticalReturn(frame);
+    }
 #ifdef DEBUG
     HartFrame* hart = getCurrentHartFrame();
     if (res && hart != NULL) {
@@ -31,7 +38,7 @@ bool tryLockingSpinLock(SpinLock* lock) {
 }
 
 void unlockSpinLock(SpinLock* lock) {
-    assert(getCurrentTask() == NULL);
+    TrapFrame* frame = lock->locked_by;
     unlockUnsafeLock(&lock->spinlock);
 #ifdef DEBUG
     HartFrame* hart = getCurrentHartFrame();
@@ -39,5 +46,6 @@ void unlockSpinLock(SpinLock* lock) {
         hart->spinlocks_locked--;
     }
 #endif
+    criticalReturn(frame);
 }
 
