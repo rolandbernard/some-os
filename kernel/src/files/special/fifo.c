@@ -56,19 +56,23 @@ static void decreaseReferenceFor(const char* name) {
     unlockSpinLock(&fifo_name_lock);
 }
 
-static void fifoReadFunction(FifoFile* file, Process* process, VirtPtr buffer, size_t size, VfsFunctionCallbackSizeT callback, void* udata) {
+static Error fifoReadFunction(FifoFile* file, Process* process, VirtPtr buffer, size_t size, size_t* ret) {
     if (canAccess(file->base.mode, file->uid, file->gid, process, VFS_ACCESS_R)) {
-        executePipeOperation(file->data, process, buffer, size, false, callback, udata);
+        return executePipeOperation(file->data, process, buffer, size, false, ret);
+    } else {
+        return simpleError(EACCES);
     }
 }
 
-static void fifoWriteFunction(FifoFile* file, Process* process, VirtPtr buffer, size_t size, VfsFunctionCallbackSizeT callback, void* udata) {
+static Error fifoWriteFunction(FifoFile* file, Process* process, VirtPtr buffer, size_t size, size_t* ret) {
     if (canAccess(file->base.mode, file->uid, file->gid, process, VFS_ACCESS_W)) {
-        executePipeOperation(file->data, process, buffer, size, true, callback, udata);
+        return executePipeOperation(file->data, process, buffer, size, true, ret);
+    } else {
+        return simpleError(EACCES);
     }
 }
 
-static void fifoStatFunction(FifoFile* file, Process* process, VfsFunctionCallbackStat callback, void* udata) {
+static Error fifoStatFunction(FifoFile* file, Process* process, VirtPtr stat) {
     VfsStat ret = {
         .id = file->base.ino,
         .mode = file->base.mode,
@@ -82,20 +86,21 @@ static void fifoStatFunction(FifoFile* file, Process* process, VfsFunctionCallba
         .st_ctime = getNanoseconds(),
         .dev = 0,
     };
-    callback(simpleError(SUCCESS), ret, udata);
+    memcpyBetweenVirtPtr(stat, virtPtrForKernel(&ret), sizeof(VfsStat));
+    return simpleError(SUCCESS);
 }
 
-static void fifoCloseFunction(FifoFile* file, Process* process, VfsFunctionCallbackVoid callback, void* udata) {
+static void fifoCloseFunction(FifoFile* file, Process* process) {
     decreaseReferenceFor(file->name);
     dealloc(file);
-    callback(simpleError(SUCCESS), udata);
 }
 
-static void fifoDupFunction(FifoFile* file, Process* process, VfsFunctionCallbackFile callback, void* udata) {
+static Error fifoDupFunction(FifoFile* file, Process* process, VfsFile** ret) {
     increaseReferenceFor(file->name);
     FifoFile* copy = kalloc(sizeof(FifoFile));
     memcpy(copy, file, sizeof(FifoFile));
-    callback(simpleError(SUCCESS), (VfsFile*)copy, udata);
+    *ret = (VfsFile*)copy;
+    return simpleError(SUCCESS);
 }
 
 static const VfsFileVtable functions = {

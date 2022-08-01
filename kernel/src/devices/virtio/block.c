@@ -39,7 +39,7 @@ Error initVirtIOBlockDevice(int id, volatile VirtIODeviceLayout* base, VirtIODev
 }
 
 void virtIOBlockDeviceOperation(
-    VirtIOBlockDevice* device, VirtPtr buffer, uint32_t offset, uint32_t size, bool write,
+    VirtIOBlockDevice* device, VirtPtr buffer, size_t offset, size_t size, bool write,
     VirtIOBlockCallback callback, void* udata
 ) {
     assert(size % BLOCK_SECTOR_SIZE == 0);
