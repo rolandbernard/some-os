@@ -585,279 +585,94 @@ static void minixMknodFunction(
     minixFindINodeForPath(fs, process, path, minixMknodINodeCallback, request);
 }
 
-typedef struct {
-    MinixFilesystem* fs;
-    Process* process;
-    char* path;
-    VfsFunctionCallbackVoid callback;
-    void* udata;
-    VfsFile* dir;
-    VfsFile* file;
+static Error minixCheckDirectoryCanBeRemoved(VfsFile* file, Process* process, MinixInode* inode) {
+    if (inode->size < sizeof(MinixDirEntry)) {
+        return simpleError(SUCCESS);
+    } else if (inode->size > 2 * sizeof(MinixDirEntry)) {
+        return simpleError(EPERM);
+    } else {
+        size_t tmp_size;
+        MinixDirEntry entries[2];
+        CHECKED(file->functions->read(file, process, virtPtrForKernel(entries), inode.size, &tmp_size));
+        if (tmp_size != inode.size) {
+            return simpleError(EIO);
+        } else if (strcmp((char*)entries[0].name, ".") != 0 && strcmp((char*)entries[0].name, "..") != 0) {
+            return simpleError(EPERM);
+        } else if (
+            inode->size == 2 * sizeof(MinixDirEntry)
+            && strcmp((char*)entries[1].name, ".") != 0
+            && strcmp((char*)entries[1].name, "..") != 0
+        ) {
+            return simpleError(EPERM);
+        } else {
+            return simpleError(SUCCESS);
+        }
+    }
+}
+
+static Error minixChangeInodeRefCount(MinixFilesystem* fs, Process* process, uint32_t inodenum, int delta) {
+    size_t tmp_size;
+    MinixInode inode;
+    CHECKED(vfsReadAt(fs->block_device, NULL, virtPtrForKernel(&inode), sizeof(MinixInode), offsetForINode(fs, inodenum), &tmp_size));
+    if (tmp_size != sizeof(MinixInode)) {
+        return simpleError(EIO);
+    }
+    inode.nlinks += delta;
+    if (inode.nlinks == 0) {
+        VfsFile* file = (VfsFile*)createMinixFileForINode(fs, inodenum, true);
+        if (MODE_TYPE(stat.mode) != VFS_TYPE_DIR) {
+            CHECKED(minixCheckDirectoryCanBeRemoved(file, process, &inode), file->functions->close(file, NULL));
+        }
+        CHECKED(file->functions->trunc(file, process, 0), file->functions->close(file, NULL));
+        file->functions->close(file, NULL);
+        CHECKED(freeMinixInode(fs, inodenum));
+        return simpleError(SUCCESS);
+    } else {
+        CHECKED(vfsWriteAt(fs->block_device, NULL, virtPtrForKernel(&inode), sizeof(MinixInode), offsetForINode(fs, old_inode), &tmp_size));
+        if (tmp_size != sizeof(MinixInode)) {
+            return simpleError(EIO);
+        }
+        return simpleError(SUCCESS);
+    }
+}
+
+static Error minixRemoveDirectoryEntry(MinixFilesystem* fs, Process* process, VfsFile* parent, const char* name) {
+    uint32_t inodenum;
     size_t offset;
     size_t dir_size;
-    Error error;
-    uint32_t inodenum;
+    CHECKED(minixFindINodeForNameIn((MinixFile*)parent, process, name, &inodenum, &offset, &dir_size));
+    CHECKED(minixChangeInodeRefCount(fs, inodenum, -1))
+    size_t tmp_size;
     MinixDirEntry entry;
-    MinixInode inode;
-} MinixUnlinkRequest;
-
-static void minixUnlinkDirCloseCallback(Error error, MinixUnlinkRequest* request) {
-    request->callback(request->error, request->udata);
-    dealloc(request);
-}
-
-static void minixUnlinkFileErrorCloseCallback(Error error, MinixUnlinkRequest* request) {
-    request->dir->functions->close(
-        (VfsFile*)request->dir, NULL, (VfsFunctionCallbackVoid)minixUnlinkDirCloseCallback, request
-    );
-}
-
-static void minixUnlinkDirectoryTruncCallback(Error error, MinixUnlinkRequest* request) {
-    unlockTaskLock(&request->fs->lock);
-    if (isError(error)) {
-        request->error = error;
-    } else {
-        request->error = simpleError(SUCCESS);
+    CHECKED(vfsReadAt(parent, request->process, virtPtrForKernel(&entry), sizeof(MinixDirEntry), dir_size - sizeof(MinixDirEntry), &tmp_size));
+    if (tmp_size != sizeof(MinixDirEntry)) {
+        return simpleError(EIO);
     }
-    request->dir->functions->close(
-        (VfsFile*)request->dir, NULL, (VfsFunctionCallbackVoid)minixUnlinkDirCloseCallback, request
-    );
-}
-
-static void minixUnlinkDirectoryWriteCallback(Error error, size_t read, MinixUnlinkRequest* request) {
-    if (isError(error)) {
-        unlockTaskLock(&request->fs->lock);
-        request->error = error;
-        request->dir->functions->close(
-            (VfsFile*)request->dir, NULL, (VfsFunctionCallbackVoid)minixUnlinkDirCloseCallback, request
-        );
-    } else if (read != sizeof(MinixDirEntry)) {
-        unlockTaskLock(&request->fs->lock);
-        request->error = simpleError(EIO);
-        request->dir->functions->close(
-            (VfsFile*)request->dir, NULL, (VfsFunctionCallbackVoid)minixUnlinkDirCloseCallback, request
-        );
-    } else {
-        request->dir->functions->trunc(
-            request->dir, request->process, request->dir_size - sizeof(MinixDirEntry),
-            (VfsFunctionCallbackVoid)minixUnlinkDirectoryTruncCallback, request
-        );
+    CHECKED(vfsWriteAt(parent, process, virtPtrForKernel(&entry), sizeof(MinixDirEntry), offset, &tmp_size));
+    if (tmp_size != sizeof(MinixDirEntry)) {
+        return simpleError(EIO);
     }
+    CHECKED(parent->functions->trunc(parent, process, dir_size - sizeof(MinixDirEntry)));
+    return simpleError(SUCCESS);
 }
 
-static void minixUnlinkDirectoryReadCallback(Error error, size_t read, MinixUnlinkRequest* request) {
-    if (isError(error)) {
-        unlockTaskLock(&request->fs->lock);
-        request->error = error;
-        request->dir->functions->close(
-            (VfsFile*)request->dir, NULL, (VfsFunctionCallbackVoid)minixUnlinkDirCloseCallback, request
-        );
-    } else if (read != sizeof(MinixDirEntry)) {
-        unlockTaskLock(&request->fs->lock);
-        request->error = simpleError(EIO);
-        request->dir->functions->close(
-            (VfsFile*)request->dir, NULL, (VfsFunctionCallbackVoid)minixUnlinkDirCloseCallback, request
-        );
-    } else {
-        vfsWriteAt(
-            request->dir, request->process, virtPtrForKernel(&request->entry), sizeof(MinixDirEntry),
-            request->offset, (VfsFunctionCallbackSizeT)minixUnlinkDirectoryWriteCallback, request
-        );
-    }
-}
-
-static void minixUnlinkRemoveEntry(MinixUnlinkRequest* request) {
-    // Both paths (decrease nlinks and free space) merge here
-    vfsReadAt(
-        request->dir, request->process, virtPtrForKernel(&request->entry), sizeof(MinixDirEntry),
-        request->dir_size - sizeof(MinixDirEntry),
-        (VfsFunctionCallbackSizeT)minixUnlinkDirectoryReadCallback, request
-    );
-}
-
-static void minixUnlinkWriteCallback(Error error, size_t read, MinixUnlinkRequest* request) {
-    if (isError(error)) {
-        unlockTaskLock(&request->fs->lock);
-        request->error = error;
-        request->dir->functions->close(
-            (VfsFile*)request->dir, NULL, (VfsFunctionCallbackVoid)minixUnlinkDirCloseCallback, request
-        );
-    } else if (read != sizeof(MinixInode)) {
-        unlockTaskLock(&request->fs->lock);
-        request->error = simpleError(EIO);
-        request->dir->functions->close(
-            (VfsFile*)request->dir, NULL, (VfsFunctionCallbackVoid)minixUnlinkDirCloseCallback, request
-        );
-    } else {
-        minixUnlinkRemoveEntry(request);
-    }
-}
-
-static void minixUnlinkFreeInodeCallback(Error error, MinixUnlinkRequest* request) {
-    if (isError(error)) {
-        unlockTaskLock(&request->fs->lock);
-        request->error = simpleError(EIO);
-        request->dir->functions->close(
-            (VfsFile*)request->dir, NULL, (VfsFunctionCallbackVoid)minixUnlinkDirCloseCallback, request
-        );
-    } else {
-        minixUnlinkRemoveEntry(request);
-    }
-}
-
-static void minixUnlinkFileCloseCallback(Error error, MinixUnlinkRequest* request) {
-    if (isError(error)) {
-        unlockTaskLock(&request->fs->lock);
-        request->error = simpleError(EIO);
-        request->dir->functions->close(
-            (VfsFile*)request->dir, NULL, (VfsFunctionCallbackVoid)minixUnlinkDirCloseCallback, request
-        );
-    } else {
-        lockTaskLock(&request->fs->lock);
-        freeMinixInode(request->fs, request->inodenum, (VfsFunctionCallbackVoid)minixUnlinkFreeInodeCallback, request);
-    }
-}
-
-static void minixUnlinkTruncCallback(Error error, MinixUnlinkRequest* request) {
-    if (isError(error)) {
-        unlockTaskLock(&request->fs->lock);
-        request->error = error;
-        request->file->functions->close(
-            request->file, NULL, (VfsFunctionCallbackVoid)minixUnlinkFileErrorCloseCallback, request
-        );
-    } else {
-        unlockTaskLock(&request->fs->lock);
-        request->file->functions->close(
-            request->file, NULL, (VfsFunctionCallbackVoid)minixUnlinkFileCloseCallback, request
-        );
-    }
-}
-
-static void minixUnlinkGetINodeCallback(Error error, size_t read, MinixUnlinkRequest* request) {
-    if (isError(error)) {
-        unlockTaskLock(&request->fs->lock);
-        request->error = error;
-        request->dir->functions->close(
-            (VfsFile*)request->dir, NULL, (VfsFunctionCallbackVoid)minixUnlinkDirCloseCallback, request
-        );
-    } else {
-        if (request->inode.nlinks == 1) {
-            request->file = (VfsFile*)createMinixFileForINode(request->fs, request->inodenum, true);
-            request->file->functions->trunc(
-                request->file, NULL, 0, (VfsFunctionCallbackVoid)minixUnlinkTruncCallback, request
-            );
-        } else {
-            request->inode.nlinks--;
-            vfsWriteAt(
-                request->fs->block_device, NULL, virtPtrForKernel(&request->inode), sizeof(MinixInode),
-                offsetForINode(request->fs, request->inodenum),
-                (VfsFunctionCallbackSizeT)minixUnlinkWriteCallback, request
-            );
-        }
-    }
-}
-
-static void minixUnlinkFindEntryStepCallback(Error error, uint32_t inode, size_t offset, size_t size, MinixUnlinkRequest* request) {
-    if (isError(error)) {
-        dealloc(request->path);
-        unlockTaskLock(&request->fs->lock);
-        request->error = error;
-        request->dir->functions->close(
-            request->dir, NULL, (VfsFunctionCallbackVoid)minixUnlinkDirCloseCallback, request
-        );
-    } else {
-        dealloc(request->path);
-        request->inodenum = inode;
-        request->dir_size = size;
-        request->offset = offset;
-        vfsReadAt(
-            request->fs->block_device, NULL, virtPtrForKernel(&request->inode), sizeof(MinixInode),
-            offsetForINode(request->fs, request->inodenum),
-            (VfsFunctionCallbackSizeT)minixUnlinkGetINodeCallback, request
-        );
-    }
-}
-
-static void minixUnlinkOpenParentCallback(Error error, VfsFile* file, MinixUnlinkRequest* request) {
-    if (isError(error)) {
-        dealloc(request->path);
-        unlockTaskLock(&request->fs->lock);
-        request->callback(error, request->udata);
-        dealloc(request);
-    } else {
-        lockTaskLock(&request->fs->lock);
-        request->dir = file;
-        size_t len = strlen(request->path) - 1;
-        while (len > 0 && request->path[len] != '/') {
-            len--;
-        }
-        minixFindINodeForNameIn(
-            (MinixFile*)request->dir, request->process, request->path + len + 1,
-            (MinixDirSearchCallback)minixUnlinkFindEntryStepCallback, request
-        );
-    }
-}
-
-static void minixUnlinkFunction(MinixFilesystem* fs, Process* process, const char* path, VfsFunctionCallbackVoid callback, void* udata) {
-    MinixUnlinkRequest* request = kalloc(sizeof(MinixUnlinkRequest));
+static Error minixUnlinkFunction(MinixFilesystem* fs, Process* process, const char* path) {
     lockTaskLock(&fs->lock);
-    request->fs = fs;
-    request->process = process;
-    request->path = stringClone(path);
-    request->callback = callback;
-    request->udata = udata;
     // Try opening the parent
-    char* path_copy = stringClone(request->path);
-    size_t len = strlen(path_copy) - 1;
-    while (len > 0 && path_copy[len] != '/') {
-        len--;
-    }
-    if (len == 0) {
-        len++;
-    }
-    path_copy[len] = 0;
+    char* parent_path = getParentPath(path);
+    VfsFile* parent;
+    CHECKED(fs->base.functions->open((VfsFilesystem*)fs, process, path_copy, VFS_OPEN_DIRECTORY | VFS_OPEN_WRITE, 0, &parent), {
+        dealloc(parent_path);
+        unlockTaskLock(&fs->lock);
+    });
+    dealloc(parent_path);
+    CHECKED(minixRemoveDirectoryEntry(fs, process, parent, getBaseFilename(name)), {
+        parent->functions->close(parent, NULL);
+        unlockTaskLock(&request->fs->lock);
+    });
+    parent->functions->close(parent, NULL);
     unlockTaskLock(&request->fs->lock);
-    request->fs->base.functions->open(
-        (VfsFilesystem*)request->fs, request->process, path_copy,
-        VFS_OPEN_DIRECTORY | VFS_OPEN_WRITE, 0,
-        (VfsFunctionCallbackFile)minixUnlinkOpenParentCallback, request
-    );
-    dealloc(path_copy);
-}
-
-typedef struct {
-    MinixFilesystem* fs;
-    Process* process;
-    char* old;
-    char* path;
-    VfsFunctionCallbackVoid callback;
-    void* udata;
-    VfsFile* file;
-    Error error;
-    uint32_t inodenum;
-    MinixDirEntry entry;
-    MinixInode inode;
-} MinixLinkRequest;
-
-static void minixLinkDirCloseCallback(Error error, MinixLinkRequest* request) {
-    request->callback(request->error, request->udata);
-    dealloc(request);
-}
-
-static void minixLinkWriteDirCallback(Error error, size_t read, MinixLinkRequest* request) {
-    if (isError(error)) {
-        unlockTaskLock(&request->fs->lock);
-        request->error = error;
-        request->file->functions->close(
-            (VfsFile*)request->file, NULL, (VfsFunctionCallbackVoid)minixLinkDirCloseCallback, request
-        );
-    } else {
-        unlockTaskLock(&request->fs->lock);
-        request->error = simpleError(SUCCESS);
-        request->file->functions->close(
-            (VfsFile*)request->file, NULL, (VfsFunctionCallbackVoid)minixLinkDirCloseCallback, request
-        );
-    }
+    return simpleError(SUCCESS);
 }
 
 static Error minixAppendDirEntryInto(VfsFile* dir, Process* process, uint32_t inodenum, const char* name) {
@@ -875,21 +690,6 @@ static Error minixAppendDirEntryInto(VfsFile* dir, Process* process, uint32_t in
     return simpleError(SUCCESS);
 }
 
-static Error minixChangeInodeRefCount(MinixFilesystem* fs, uint32_t inodenum, int delta) {
-    size_t tmp_size;
-    MinixInode inode;
-    CHECKED(vfsReadAt(fs->block_device, NULL, virtPtrForKernel(&inode), sizeof(MinixInode), offsetForINode(fs, inodenum), &tmp_size));
-    if (tmp_size != sizeof(MinixInode)) {
-        return simpleError(EIO);
-    }
-    inode.nlinks += delta;
-    CHECKED(vfsWriteAt(fs->block_device, NULL, virtPtrForKernel(&inode), sizeof(MinixInode), offsetForINode(fs, old_inode), &tmp_size));
-    if (tmp_size != sizeof(MinixInode)) {
-        return simpleError(EIO);
-    }
-    return simpleError(SUCCESS);
-}
-
 static Error minixLinkFunction(MinixFilesystem* fs, Process* process, const char* old, const char* new) {
     lockTaskLock(&fs->lock);
     uint32_t inodenum;
@@ -897,26 +697,20 @@ static Error minixLinkFunction(MinixFilesystem* fs, Process* process, const char
     if (error.kind == ENOENT) {
         CHECKED(minixFindINodeForPath(fs, process, old, &inodenum), unlockTaskLock(&fs->lock));
         // Try opening the parent
-        char* parent_name = stringClone(new);
-        size_t len = strlen(parent_name) - 1;
-        while (len > 0 && parent_name[len] != '/') {
-            len--;
-        }
-        parent_name[umax(1, len)] = 0;
-        char* file_name = new + len + 1;
+        char* parent_path = getParentPath(new);
         VfsFile* parent;
         CHECKED(fs->base.functions->open(
-            (VfsFilesystem*)fs, process, parent_name, VFS_OPEN_APPEND | VFS_OPEN_DIRECTORY | VFS_OPEN_WRITE, 0, &parent
+            (VfsFilesystem*)fs, process, parent_path, VFS_OPEN_APPEND | VFS_OPEN_DIRECTORY | VFS_OPEN_WRITE, 0, &parent
         ), {
-            dealloc(parent_name);
+            dealloc(parent_path);
             unlockTaskLock(&fs->lock);
         });
-        dealloc(parent_name);
-        CHECKED(minixChangeInodeRefCount(fs, inodenum, 1), {
+        dealloc(parent_path);
+        CHECKED(minixChangeInodeRefCount(fs, process, inodenum, 1), {
             parent->functions->close(parent, NULL);
             unlockTaskLock(&fs->lock);
         });
-        CHECKED(minixAppendDirEntryInto(parent, process, inodenum, file_name), {
+        CHECKED(minixAppendDirEntryInto(parent, process, inodenum, getBaseFilename(new)), {
             parent->functions->close(parent, NULL);
             unlockTaskLock(&fs->lock);
         });
