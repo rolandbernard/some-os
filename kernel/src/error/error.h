@@ -44,6 +44,8 @@ typedef enum {
     EDOM    = 33,   /* Math argument out of domain of func */
     ERANGE  = 34,   /* Math result not representable */
     EUNSUP  = 35,   /* Operation not supported */
+
+    SUCCESS_EXIT,
 } ErrorKind;
 
 typedef struct {

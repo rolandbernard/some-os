@@ -19,6 +19,10 @@ size_t offsetForINode(const MinixFilesystem* fs, uint32_t inode) {
            + (inode - 1) * sizeof(MinixInode);
 }
 
+size_t offsetForZone(size_t zone) {
+    return zone * MINIX_BLOCK_SIZE;
+}
+
 #define MAX_SINGLE_READ_SIZE (1 << 16)
 
 static Error minixFindINodeForNameIn(MinixFile* file, Process* process, const char* name, uint32_t* inodenum, size_t* off, size_t* dir_size) {
@@ -36,7 +40,7 @@ static Error minixFindINodeForNameIn(MinixFile* file, Process* process, const ch
         MinixDirEntry* tmp_buffer = kalloc(umin(MAX_SINGLE_READ_SIZE, left));
         while (left > 0) {
             size_t tmp_size = umin(MAX_SINGLE_READ_SIZE, left);
-            CHECKED(file->base.functions->read((VfsFile*)file, process, virtPtrForKernel(&tmp_buffer), tmp_size, &tmp_size), {
+            CHECKED(vfsReadAt((VfsFile*)file, process, virtPtrForKernel(&tmp_buffer), tmp_size, offset, &tmp_size), {
                 dealloc(tmp_buffer);
             });
             if (tmp_size == 0) {
@@ -229,7 +233,7 @@ static Error minixCheckDirectoryCanBeRemoved(VfsFile* file, Process* process, Mi
     } else {
         size_t tmp_size;
         MinixDirEntry entries[2];
-        CHECKED(file->functions->read(file, process, virtPtrForKernel(entries), inode->size, &tmp_size));
+        CHECKED(vfsReadAt(file, process, virtPtrForKernel(entries), inode->size, 0, &tmp_size));
         if (tmp_size != inode->size) {
             return simpleError(EIO);
         } else if (strcmp((char*)entries[0].name, ".") != 0 && strcmp((char*)entries[0].name, "..") != 0) {

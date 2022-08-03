@@ -56,7 +56,8 @@ const char* getErrorKindMessage(ErrorKind error) {
         case EPIPE:     return "Broken pipe";
         case EDOM:      return "Math argument out of domain of func";
         case ERANGE:    return "Math result not representable";
-        case EUNSUP:     return "Operation not supported";
+        case EUNSUP:    return "Operation not supported";
+        case SUCCESS_EXIT: return "Success (exit)";
     }
     // Like default but we still get an warning for an incomplete switch
     return "Unknown?";

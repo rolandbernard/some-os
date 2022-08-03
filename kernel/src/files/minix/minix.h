@@ -10,6 +10,7 @@
 #define MINIX3_MAGIC 0x4d5a
 #define MINIX_BLOCK_SIZE 1024
 #define MINIX_NUM_IPTRS MINIX_BLOCK_SIZE / 4
+#define MINIX_NUM_IPTRS_LOG2 8
 
 typedef struct {
     uint32_t ninodes;
@@ -55,5 +56,7 @@ typedef struct {
 MinixFilesystem* createMinixFilesystem(VfsFile* block_device, VirtPtr data);
 
 size_t offsetForINode(const MinixFilesystem* fs, uint32_t inode);
+
+size_t offsetForZone(size_t zone);
 
 #endif
