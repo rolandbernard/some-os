@@ -1,13 +1,13 @@
 
 #include <assert.h>
-#include <sys/wait.h>
-#include <unistd.h>
+#include <errno.h>
+#include <fcntl.h>
+#include <signal.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <stdnoreturn.h>
 #include <string.h>
-#include <errno.h>
-#include <signal.h>
-#include <fcntl.h>
+#include <sys/wait.h>
 #include <unistd.h>
 
 void signalHandler(int signal) {
@@ -38,12 +38,11 @@ void setupTty() {
     }
 }
 
-void setupSystem() {
-    signal(SIGCHLD, signalHandler);
+void startProgram(const char* name) {
     int pid = fork();
     if (pid == 0) {
-        execl("/bin/hello", "/bin/hello", NULL);
-        fprintf(stderr, "Failed to start `/bin/hello`: %s\n", strerror(errno));
+        execl(name, name, NULL);
+        fprintf(stderr, "Failed to start `%s`: %s\n", name, strerror(errno));
         exit(1);
     } else {
         // Process started
@@ -51,7 +50,12 @@ void setupSystem() {
     }
 }
 
-void idleLoop() {
+void setupSystem() {
+    signal(SIGCHLD, signalHandler);
+    startProgram("/bin/hello");
+}
+
+noreturn void idleLoop() {
     // After setting up the system, for now we only wait for children
     for (;;) {
         pause();
