@@ -213,7 +213,7 @@ static Error minixSeekFunction(MinixFile* file, Process* process, size_t offset,
             case VFS_SEEK_SET:
                 new_position = offset;
                 break;
-            case VFS_SEEK_END:
+            default:
                 panic();
         }
     }

@@ -70,6 +70,8 @@ void kernelMain() {
     if (res < 0) {
         KERNEL_LOG("[!] Failed to mount root filesystem: %s", getErrorKindMessage(-res));
         panic();
+    } else {
+        KERNEL_LOG("[+] Mounted root filesystem /dev/blk0 at /");
     }
     // Start the init process
     res = syscall(SYSCALL_EXECVE, "/bin/init", NULL, NULL);

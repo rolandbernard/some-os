@@ -4,6 +4,7 @@
 #include "error/backtrace.h"
 
 #include "error/log.h"
+#include "error/debuginfo.h"
 
 void __register_frame(const void* begin);
 
@@ -17,9 +18,13 @@ Error initBacktrace() {
     return simpleError(SUCCESS);
 }
 
+static void logStackFrameForAddress(int depth, uintptr_t addr) {
+    logKernelMessage("    \e[2;3m#%d: %p\e[m\n", depth, addr);
+}
+
 _Unwind_Reason_Code unwindTracingFunction(struct _Unwind_Context *ctx, void *d) {
-    int *depth = (int*)d;
-    logKernelMessage("    \e[2;3m#%d: %p\e[m\n", *depth, _Unwind_GetIP(ctx));
+    int* depth = (int*)d;
+    logStackFrameForAddress(*depth, _Unwind_GetIP(ctx));
     (*depth)++;
     return _URC_NO_REASON;
 }

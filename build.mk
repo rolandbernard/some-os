@@ -36,7 +36,7 @@ LDLIBS  += $(LDLIBS.$(BUILD))
 # ==
 
 # == Files
-PATTERNS        := *.c *.S
+PATTERNS         := *.c *.S
 $(foreach SWITCH, $(ALL_SWITCHES), \
 	$(eval SWITCH_SOURCES.$(SWITCH) \
 		= $(foreach PATTERN, $(PATTERNS), $(shell find $(SOURCE_DIR) -type f -path '$(SOURCE_DIR)*/$(SWITCH)/*' -name '$(PATTERN)'))))
@@ -67,9 +67,9 @@ build: $(TARGETS)
 
 $(TARGETS): $(BINARY_DIR)/$$@
 
-$(BINARYS): $(BINARY_DIR)/%: $(OBJECTS) $$(TARGET_OBJECTS.$$*) $(LINK_SCRIPT) | $$(dir $$@)
+$(BINARYS): $(BINARY_DIR)/%: $(OBJECTS) $$(TARGET_OBJECTS.$$*) $(LINK_SCRIPT) $(PREBUILD.$(BUILD)) | $$(dir $$@)
 	@$(ECHO) "Building $@"
-	$(LD) $(LDFLAGS) -o $@ $(OBJECTS) $(TARGET_OBJECTS.$*) $(LDLIBS) $(if $(LINK_SCRIPT), -T$(LINK_SCRIPT))
+	$(LD) $(LDFLAGS) -o $@ $(OBJECTS) $(PREBUILD.$(BUILD)) $(TARGET_OBJECTS.$*) $(LDLIBS) $(if $(LINK_SCRIPT), -T$(LINK_SCRIPT))
 	@$(CHANGED)
 
 $(OBJECT_DIR)/%.o: $(SOURCE_DIR)/% $(MAKEFILE_LIST) | $$(dir $$@)
