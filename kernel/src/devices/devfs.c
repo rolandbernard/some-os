@@ -3,14 +3,15 @@
 
 #include "devices/devfs.h"
 
+#include "devices/devices.h"
 #include "devices/virtio/block.h"
 #include "devices/virtio/virtio.h"
-#include "devices/devices.h"
 #include "files/special/blkfile.h"
 #include "files/special/chrfile.h"
 #include "files/vfs.h"
 #include "kernel/time.h"
 #include "memory/kalloc.h"
+#include "task/syscall.h"
 #include "util/util.h"
 
 static size_t countAllDeviceFiles() {
@@ -20,7 +21,7 @@ static size_t countAllDeviceFiles() {
     return count;
 }
 
-static void deviceSeekFunction(DeviceDirectoryFile* file, Process* process, size_t offset, VfsSeekWhence whence, VfsFunctionCallbackSizeT callback, void* udata) {
+static Error deviceSeekFunction(DeviceDirectoryFile* file, Process* process, size_t offset, VfsSeekWhence whence, size_t* ret) {
     lockSpinLock(&file->lock);
     size_t new_position = 0;
     switch (whence) {
@@ -35,11 +36,12 @@ static void deviceSeekFunction(DeviceDirectoryFile* file, Process* process, size
             break;
     }
     file->entry = new_position;
+    *ret = file->entry;
     unlockSpinLock(&file->lock);
-    callback(simpleError(SUCCESS), file->entry, udata);
+    return simpleError(SUCCESS);
 }
 
-static void deviceStatFunction(DeviceDirectoryFile* file, Process* process, VfsFunctionCallbackStat callback, void* udata) {
+static Error deviceStatFunction(DeviceDirectoryFile* file, Process* process, VirtPtr stat) {
     lockSpinLock(&file->lock);
     VfsStat ret = {
         .id = 1,
@@ -55,24 +57,27 @@ static void deviceStatFunction(DeviceDirectoryFile* file, Process* process, VfsF
         .dev = DEV_INO,
     };
     unlockSpinLock(&file->lock);
-    callback(simpleError(SUCCESS), ret, udata);
+    memcpyBetweenVirtPtr(stat, virtPtrForKernel(&ret), sizeof(VfsStat));
+    return simpleError(SUCCESS);
 }
 
-static void deviceCloseFunction(
-    DeviceDirectoryFile* file, Process* process, VfsFunctionCallbackVoid callback, void* udata
-) {
+static void deviceCloseFunction(DeviceDirectoryFile* file, Process* process) {
+    TrapFrame* lock = criticalEnter();
     lockSpinLock(&file->lock);
     dealloc(file);
-    callback(simpleError(SUCCESS), udata);
+    criticalReturn(lock);
 }
 
-static void deviceDupFunction(DeviceDirectoryFile* file, Process* process, VfsFunctionCallbackFile callback, void* udata) {
+static Error deviceDupFunction(DeviceDirectoryFile* file, Process* process, VfsFile** ret) {
+    TrapFrame* lock = criticalEnter();
     lockSpinLock(&file->lock);
     DeviceDirectoryFile* copy = kalloc(sizeof(DeviceDirectoryFile));
     memcpy(copy, file, sizeof(DeviceDirectoryFile));
     unlockSpinLock(&file->lock);
     unlockSpinLock(&copy->lock); // Also unlock the new file
-    callback(simpleError(SUCCESS), (VfsFile*)copy, udata);
+    criticalReturn(lock);
+    *ret = (VfsFile*)copy;
+    return simpleError(SUCCESS);
 }
 
 static size_t writeDirectoryEntryNamed(size_t ino, char* name, VfsFileType type, size_t off, VirtPtr buff, size_t size) {
@@ -88,7 +93,7 @@ static size_t writeDirectoryEntryNamed(size_t ino, char* name, VfsFileType type,
     return umin(entry_size, size);
 }
 
-static void deviceReaddirFunction(DeviceDirectoryFile* file, Process* process, VirtPtr buff, size_t size, VfsFunctionCallbackSizeT callback, void* udata) {
+static Error deviceReaddirFunction(DeviceDirectoryFile* file, Process* process, VirtPtr buff, size_t size, size_t* ret) {
     lockSpinLock(&file->lock);
     size_t written = 0;
     size_t position = file->entry;
@@ -121,7 +126,8 @@ static void deviceReaddirFunction(DeviceDirectoryFile* file, Process* process, V
     }
     file->entry++;
     unlockSpinLock(&file->lock);
-    callback(simpleError(SUCCESS), written, udata);
+    *ret = written;
+    return simpleError(SUCCESS);
 }
 
 static const VfsFileVtable file_functions = {
@@ -138,21 +144,18 @@ DeviceDirectoryFile* createDeviceDirectoryFile() {
     return file;
 }
 
-static void deviceOpenFunction(
-    DeviceFilesystem* fs, Process* process, const char* path, VfsOpenFlags flags, VfsMode mode,
-    VfsFunctionCallbackFile callback, void* udata
+static Error deviceOpenFunction(
+    DeviceFilesystem* fs, Process* process, const char* path, VfsOpenFlags flags, VfsMode mode, VfsFile** ret
 ) {
-    size_t ino = 2; // Reserved for . and ..
+    size_t ino = 2; // 1 and 2 reserved for . and ..
     if (strcmp(path, "/") == 0) {
-        VfsFile* file = (VfsFile*)createDeviceDirectoryFile();
-        callback(simpleError(SUCCESS), file, udata);
-        return;
+        *ret = (VfsFile*)createDeviceDirectoryFile();
+        return simpleError(SUCCESS);
     }
     ino++;
     if (strcmp(path, "/tty0") == 0) {
-        VfsFile* file = (VfsFile*)createSerialDeviceFile(ino, getDefaultSerialDevice());
-        callback(simpleError(SUCCESS), file, udata);
-        return;
+        *ret = (VfsFile*)createSerialDeviceFile(ino, getDefaultSerialDevice());
+        return simpleError(SUCCESS);
     }
     ino++;
     if (strncmp(path, "/blk", 4) == 0 && path[4] != 0) {
@@ -171,29 +174,27 @@ static void deviceOpenFunction(
                 VirtIOBlockDevice* device = (VirtIOBlockDevice*)getDeviceOfType(VIRTIO_BLOCK, id);
                 if (device != NULL) {
                     VirtIOBlockDeviceLayout* info = (VirtIOBlockDeviceLayout*)device->virtio.mmio;
-                    VfsFile* file = (VfsFile*)createBlockDeviceFile(
+                    *ret = (VfsFile*)createBlockDeviceFile(
                         ino + id, device, info->config.blk_size,
                         info->config.capacity * info->config.blk_size,
                         (BlockOperationFunction)virtIOBlockDeviceOperation
                     );
-                    callback(simpleError(SUCCESS), file, udata);
-                    return;
+                    return simpleError(SUCCESS);
                 }
             }
         }
     }
     ino += getDeviceCountOfType(VIRTIO_BLOCK);
-    callback(simpleError(ENOENT), NULL, udata);
+    return simpleError(ENOENT);
 }
 
-static void deviceFreeFunction(DeviceFilesystem* fs, Process* process, VfsFunctionCallbackVoid callback, void* udata) {
+static void deviceFreeFunction(DeviceFilesystem* fs, Process* process) {
     dealloc(fs);
-    callback(simpleError(SUCCESS), udata);
 }
 
-static void deviceInitFunction(DeviceFilesystem* fs, Process* process, VfsFunctionCallbackVoid callback, void* udata) {
+static Error deviceInitFunction(DeviceFilesystem* fs, Process* process) {
     // Nothing to initialize yet
-    callback(simpleError(SUCCESS), udata);
+    return simpleError(SUCCESS);
 }
 
 static const VfsFilesystemVtable fs_functions = {

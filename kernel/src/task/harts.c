@@ -4,12 +4,13 @@
 #include "interrupt/trap.h"
 #include "task/harts.h"
 #include "task/task.h"
+#include "util/unsafelock.h"
 #include "memory/kalloc.h"
 #include "memory/virtmem.h"
 
 extern char __global_pointer[];
 
-SpinLock hart_lock = 0;
+UnsafeLock hart_lock;
 HartFrame* harts_head = NULL; // This will be a circular linked list
 HartFrame* harts_tail = NULL;
 
@@ -42,14 +43,14 @@ HartFrame* setupHartFrame(int hartid) {
         hart->idle_task = createKernelTask(idle, IDLE_STACK_SIZE, LOWEST_PRIORITY); // Every hart needs an idle process
         hart->hartid = hartid;
         writeSscratch(&hart->frame);
-        lockSpinLock(&hart_lock); 
+        lockUnsafeLock(&hart_lock); 
         hart->next = harts_head;
         harts_head = hart;
         if (harts_tail == NULL) {
             harts_tail = hart;
         }
         harts_tail->next = hart;
-        unlockSpinLock(&hart_lock); 
+        unlockUnsafeLock(&hart_lock); 
         return hart;
     } else {
         existing->hartid = hartid;

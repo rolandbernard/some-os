@@ -4,9 +4,10 @@
 #include <stdbool.h>
 
 #include "task/types.h"
+#include "util/unsafelock.h"
 
 typedef struct {
-    int spinlock;
+    UnsafeLock spinlock;
     Task* locked_by;
     size_t num_locks;
 } TaskLock;

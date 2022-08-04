@@ -134,7 +134,7 @@ static Error pipeStatFunction(PipeFile* file, Process* process, VirtPtr stat) {
     return simpleError(SUCCESS);
 }
 
-static Error pipeCloseFunction(PipeFile* file, Process* process) {
+static void pipeCloseFunction(PipeFile* file, Process* process) {
     TrapFrame* lock = criticalEnter();
     lockSpinLock(&file->data->lock);
     file->data->ref_count--;
@@ -146,7 +146,6 @@ static Error pipeCloseFunction(PipeFile* file, Process* process) {
     }
     dealloc(file);
     criticalReturn(lock);
-    return simpleError(SUCCESS);
 }
 
 PipeFile* duplicatePipeFile(PipeFile* file) {

@@ -224,7 +224,7 @@ Error vfsOpen(VirtualFilesystem* fs, struct Process_s* process, const char* path
                     return simpleError(EPERM);
                 }
             }
-            case MOUNT_TYPE_BIND: panic(); // Can't happen. Would return NULL.
+            default: panic(); // Can't happen. Would return NULL.
         }
     } else {
         unlockSpinLock(&fs->lock);
@@ -254,7 +254,7 @@ Error vfsMknod(VirtualFilesystem* fs, struct Process_s* process, const char* pat
                     return simpleError(EPERM);
                 }
             }
-            case MOUNT_TYPE_BIND: panic(); // Can't happen. Would return NULL.
+            default: panic(); // Can't happen. Would return NULL.
         }
     } else {
         unlockSpinLock(&fs->lock);
@@ -284,7 +284,7 @@ Error vfsUnlink(VirtualFilesystem* fs, struct Process_s* process, const char* pa
                 }
                 break;
             }
-            case MOUNT_TYPE_BIND: panic(); // Can't happen. Would return NULL.
+            default: panic(); // Can't happen. Would return NULL.
         }
     } else {
         unlockSpinLock(&fs->lock);

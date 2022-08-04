@@ -3,11 +3,10 @@
 
 #include "task/tasklock.h"
 
-#include "util/unsafelock.h"
 #include "task/task.h"
 
 void initTaskLock(TaskLock* lock) {
-    lock->spinlock = 0;
+    lock->spinlock.lock = 0;
     lock->locked_by = NULL;
     lock->num_locks = 0;
 }
