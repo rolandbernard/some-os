@@ -9,6 +9,11 @@ size_t __attribute__((weak)) __attribute__((section(".rtdebug"))) symbol_debug_c
 SymbolDebugInfo __attribute__((weak)) __attribute__((section(".rtdebug"))) symbol_debug[0];
 
 SymbolDebugInfo* searchSymbolDebugInfo(uintptr_t addr) {
+    for (size_t i = 0; i < symbol_debug_count - 1; i++) {
+        if (symbol_debug[i + 1].addr > addr) {
+            return &symbol_debug[i];
+        }
+    }
     return NULL;
 }
 

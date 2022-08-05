@@ -1,5 +1,5 @@
-#ifndef _BACKTRACE_H_
-#define _BACKTRACE_H_
+#ifndef _DEBUGINFO_H_
+#define _DEBUGINFO_H_
 
 #include <stdint.h>
 #include <stddef.h>

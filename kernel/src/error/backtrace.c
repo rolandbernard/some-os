@@ -19,12 +19,19 @@ Error initBacktrace() {
 }
 
 static void logStackFrameForAddress(int depth, uintptr_t addr) {
-    logKernelMessage("    \e[2;3m#%d: %p\e[m\n", depth, addr);
+    SymbolDebugInfo* info = searchSymbolDebugInfo(addr);
+    if (info == NULL) {
+        logKernelMessage("    \e[2;3m#%d: %p\e[m\n", depth, addr);
+    } else {
+        logKernelMessage("    \e[2;3m#%d: %s+%p\e[m\n", depth, info->symbol, addr - info->addr);
+    }
 }
 
 _Unwind_Reason_Code unwindTracingFunction(struct _Unwind_Context *ctx, void *d) {
     int* depth = (int*)d;
-    logStackFrameForAddress(*depth, _Unwind_GetIP(ctx));
+    if (*depth >= 2) {
+        logStackFrameForAddress(*depth - 2, _Unwind_GetIP(ctx));
+    }
     (*depth)++;
     return _URC_NO_REASON;
 }
