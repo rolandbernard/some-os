@@ -117,20 +117,15 @@ static Error blockStatFunction(BlockDeviceFile* file, Process* process, VirtPtr 
 }
 
 static void blockCloseFunction(BlockDeviceFile* file, Process* process) {
-    TrapFrame* lock = criticalEnter();
-    lockSpinLock(&file->lock);
     dealloc(file);
-    criticalReturn(lock);
 }
 
 static Error blockDupFunction(BlockDeviceFile* file, Process* process, VfsFile** ret) {
-    TrapFrame* lock = criticalEnter();
-    lockSpinLock(&file->lock);
     BlockDeviceFile* copy = kalloc(sizeof(BlockDeviceFile));
+    lockSpinLock(&file->lock);
     memcpy(copy, file, sizeof(BlockDeviceFile));
     unlockSpinLock(&file->lock);
-    unlockSpinLock(&copy->lock); // Also unlock the new file
-    criticalReturn(lock);
+    initSpinLock(&copy->lock);
     *ret = (VfsFile*)copy;
     return simpleError(SUCCESS);
 }

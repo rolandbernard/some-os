@@ -254,7 +254,6 @@ static Error minixStatFunction(MinixFile* file, Process* process, VirtPtr stat) 
 }
 
 static void minixCloseFunction(MinixFile* file, Process* process) {
-    lockTaskLock(&file->lock);
     lockTaskLock(&file->fs->lock);
     file->fs->base.open_files--;
     unlockTaskLock(&file->fs->lock);
@@ -263,13 +262,13 @@ static void minixCloseFunction(MinixFile* file, Process* process) {
 
 static Error minixDupFunction(MinixFile* file, Process* process, VfsFile** ret) {
     MinixFile* copy = kalloc(sizeof(MinixFile));
-    lockTaskLock(&file->lock);
     lockTaskLock(&file->fs->lock);
     file->fs->base.open_files++;
     unlockTaskLock(&file->fs->lock);
+    lockTaskLock(&file->lock);
     memcpy(copy, file, sizeof(MinixFile));
     unlockTaskLock(&file->lock);
-    unlockTaskLock(&copy->lock); // Also unlock the new file
+    initTaskLock(&copy->lock);
     *ret = (VfsFile*)copy;
     return simpleError(SUCCESS);
 }

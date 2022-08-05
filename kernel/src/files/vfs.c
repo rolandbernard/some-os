@@ -351,36 +351,36 @@ Error vfsRename(VirtualFilesystem* fs, struct Process_s* process, const char* ol
     }
 }
 
-Error vfsReadAt(VfsFile* file, struct Process_s* process, VirtPtr ptr, size_t size, size_t offset, size_t* ret) {
+static Error vfsReadWriteAt(
+    VfsFile* file, struct Process_s* process, VirtPtr ptr, size_t size, size_t offset, bool write, size_t* ret
+) {
     size_t off = 0;
     CHECKED(file->functions->seek(file, process, offset, VFS_SEEK_SET, &off));
     if (offset != off) {
         return simpleError(EIO);
     } else {
+        size_t left = size;
         size_t len = 1;
-        while (size != 0 && len != 0) {
-            CHECKED(file->functions->read(file, process, ptr, size, &len));
+        while (left > 0 && len > 0) {
+            if (write) {
+                CHECKED(file->functions->write(file, process, ptr, size, &len));
+            } else {
+                CHECKED(file->functions->read(file, process, ptr, left, &len));
+            }
             ptr.address += len;
-            size -= len;
+            left -= len;
         }
+        *ret = size - left;
         return simpleError(SUCCESS);
     }
 }
 
+Error vfsReadAt(VfsFile* file, struct Process_s* process, VirtPtr ptr, size_t size, size_t offset, size_t* ret) {
+    return vfsReadWriteAt(file, process, ptr, size, offset, false, ret);
+}
+
 Error vfsWriteAt(VfsFile* file, struct Process_s* process, VirtPtr ptr, size_t size, size_t offset, size_t* ret) {
-    size_t off = 0;
-    CHECKED(file->functions->seek(file, process, offset, VFS_SEEK_SET, &off));
-    if (offset != off) {
-        return simpleError(EIO);
-    } else {
-        size_t len = 1;
-        while (size != 0 && len != 0) {
-            CHECKED(file->functions->write(file, process, ptr, size, &len));
-            ptr.address += len;
-            size -= len;
-        }
-        return simpleError(SUCCESS);
-    }
+    return vfsReadWriteAt(file, process, ptr, size, offset, true, ret);
 }
 
 bool canAccess(VfsMode mode, Uid file_uid, Gid file_gid, struct Process_s* process, VfsAccessFlags flags) {

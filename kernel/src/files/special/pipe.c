@@ -139,6 +139,7 @@ static void pipeCloseFunction(PipeFile* file, Process* process) {
     lockSpinLock(&file->data->lock);
     file->data->ref_count--;
     if (file->data->ref_count == 0) {
+        unlockSpinLock(&file->data->lock);
         dealloc(file->data->buffer);
         dealloc(file->data);
     } else {

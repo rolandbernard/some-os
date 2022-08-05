@@ -47,6 +47,7 @@ static void decreaseReferenceFor(const char* name) {
         lockSpinLock(&data->lock);
         data->ref_count--;
         if (data->ref_count == 0) {
+            unlockSpinLock(&data->lock);
             dealloc(data);
             deleteFromStringMap(&named_data, name);
         } else {

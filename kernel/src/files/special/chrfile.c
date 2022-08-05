@@ -60,20 +60,15 @@ static Error serialStatFunction(SerialDeviceFile* file, Process* process, VirtPt
 }
 
 static void serialCloseFunction(SerialDeviceFile* file, Process* process) {
-    TrapFrame* lock = criticalEnter();
-    lockSpinLock(&file->lock);
     dealloc(file);
-    criticalReturn(lock);
 }
 
 static Error serialDupFunction(SerialDeviceFile* file, Process* process, VfsFile** ret) {
-    TrapFrame* lock = criticalEnter();
-    lockSpinLock(&file->lock);
     SerialDeviceFile* copy = kalloc(sizeof(SerialDeviceFile));
+    lockSpinLock(&file->lock);
     memcpy(copy, file, sizeof(SerialDeviceFile));
     unlockSpinLock(&file->lock);
-    unlockSpinLock(&copy->lock); // Also unlock the new file
-    criticalReturn(lock);
+    initSpinLock(&file->lock);
     *ret = (VfsFile*)copy;
     return simpleError(SUCCESS);
 }
