@@ -8,6 +8,7 @@
 .global enterKernelMode
 .global waitForInterrupt
 .global kernelTrapVector
+.global kernelTrapReturn
 
 # Simple function to wait for interrupt
 waitForInterrupt:
@@ -146,7 +147,6 @@ kernelTrapVector:
     csrr a0, scause
     csrr a1, sepc
     csrr a2, stval
-    jal kernelTrap
-    mv a0, a3
-    j kernelTrapReturn
+    mv ra, a1
+    j kernelTrap
 

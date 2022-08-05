@@ -32,7 +32,7 @@ SyscallReturn sleepSyscall(TrapFrame* frame) {
 SyscallReturn criticalSyscall(TrapFrame* frame) {
     if (frame->hart != NULL) {
         frame->regs[REG_ARGUMENT_0] = (uintptr_t)frame;
-        loadTrapFrame(frame, getCurrentTrapFrame());
+        swapTrapFrame(frame, getCurrentTrapFrame());
     } else {
         frame->regs[REG_ARGUMENT_0] = 0;
     }
@@ -49,7 +49,7 @@ TrapFrame* criticalEnter() {
 
 void criticalReturn(TrapFrame* to) {
     if (to != NULL && getCurrentTask() == NULL) {
-        loadTrapFrame(getCurrentTrapFrame(), to);
+        swapTrapFrame(getCurrentTrapFrame(), to);
     }
 }
 

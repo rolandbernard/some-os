@@ -3,12 +3,13 @@
 
 #include "task/task.h"
 
-#include "memory/virtmem.h"
+#include "interrupt/trap.h"
 #include "memory/kalloc.h"
+#include "memory/virtmem.h"
 #include "memory/virtptr.h"
 #include "process/signals.h"
+#include "process/syscall.h"
 #include "task/harts.h"
-#include "interrupt/trap.h"
 #include "task/schedule.h"
 #include "task/types.h"
 

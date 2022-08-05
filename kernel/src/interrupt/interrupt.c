@@ -1,6 +1,7 @@
 
 #include <stdint.h>
 #include <stdbool.h>
+#include <stdnoreturn.h>
 
 #include "error/log.h"
 #include "error/panic.h"
@@ -56,6 +57,8 @@ void machineTrap(uintptr_t cause, uintptr_t pc, uintptr_t val, uintptr_t scratch
     KERNEL_LOG("[!] Unhandled machine trap: %p %p %p %s", pc, val, scratch, getCauseString(interrupt, code));
     panic();
 }
+
+noreturn void kernelTrapReturn(TrapFrame* frame);
 
 void kernelTrap(uintptr_t cause, uintptr_t pc, uintptr_t val, TrapFrame* frame) {
     bool interrupt = cause >> (sizeof(uintptr_t) * 8 - 1);
@@ -137,5 +140,6 @@ void kernelTrap(uintptr_t cause, uintptr_t pc, uintptr_t val, TrapFrame* frame) 
             enterKernelMode(frame);
         }
     }
+    kernelTrapReturn(frame);
 }
 

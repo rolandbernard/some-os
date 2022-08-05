@@ -1,18 +1,10 @@
 
-#include "error/backtrace.h"
-#include "error/log.h"
 #include "error/panic.h"
-#include "interrupt/trap.h"
+#include "error/log.h"
 #include "interrupt/com.h"
+#include "interrupt/trap.h"
 
-noreturn void panicWithBacktrace() {
-#ifdef DEBUG
-    logBacktrace();
-#endif
-    panicWithoutBacktrace();
-}
-
-noreturn void panicWithoutBacktrace() {
+noreturn void notifyPanic() {
     sendMessageToAll(KERNEL_PANIC, NULL);
     silentPanic();
 }

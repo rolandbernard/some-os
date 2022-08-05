@@ -6,7 +6,7 @@
 
 noreturn void abort() {
     KERNEL_LOG("[!] Kernel abort!")
-    panicWithoutBacktrace();
+    notifyPanic();
 }
 
 void* malloc(size_t size) {

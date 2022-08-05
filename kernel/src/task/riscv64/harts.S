@@ -5,7 +5,7 @@
 .global readMhartid
 .global readSscratch
 .global writeSscratch
-.global loadTrapFrame
+.global swapTrapFrame
 
 readMhartid:
     csrr a0, mhartid
@@ -35,7 +35,7 @@ writeSscratch:
 # Save the current state to TrapFrame in a1 and load from a TrapFrame in a0.
 # Because this is only to be used inside the kernel, we can assume that we do not have to
 # preserve caller saved registers.
-loadTrapFrame:
+swapTrapFrame:
 # Saving to a1
     # Save integer registers
 .set i, 1
@@ -73,4 +73,3 @@ loadTrapFrame:
     jr a1
 1:
     ret
-

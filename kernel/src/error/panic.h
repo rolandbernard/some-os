@@ -5,16 +5,23 @@
 
 #include "error/log.h"
 
-// Terminate the kernel
-noreturn void panicWithoutBacktrace();
+#ifdef DEBUG
+#include "error/backtrace.h"
 
-noreturn void panicWithBacktrace();
+#define BACKTRACE() logBacktrace();
+#else
+#define BABACKTRACE()
+#endif
+
+// Terminate the kernel
+noreturn void notifyPanic();
 
 noreturn void silentPanic();
 
 #define panic() {                       \
     KERNEL_LOG("[!] Kernel panic!")     \
-    panicWithBacktrace();               \
+    BACKTRACE();                        \
+    notifyPanic();                      \
 }
 
 #endif
