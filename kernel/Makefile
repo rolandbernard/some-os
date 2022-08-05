@@ -36,7 +36,7 @@ $(BINARY_DIR)/kernel-nortdebug: $(OBJECTS) $$(TARGET_OBJECTS.kernel) $(LINK_SCRI
 	$(RM) PREBUILD.debug
 	$(LD) $(LDFLAGS) -o $@ $(OBJECTS) $(TARGET_OBJECTS.kernel) $(LDLIBS) $(if $(LINK_SCRIPT), -T$(LINK_SCRIPT))
 
-$(OBJECT_DIR)/debuginfo.gen.o: $(BINARY_DIR)/kernel-nortdebug
+$(OBJECT_DIR)/debuginfo.gen.o: $(BINARY_DIR)/kernel-nortdebug $(SOURCE_DIR)/error/debuginfo.gen.sh
 	@$(ECHO) "Building $@"
 	bash $(SOURCE_DIR)/error/debuginfo.gen.sh $(BINARY_DIR)/kernel-nortdebug > $(OBJECT_DIR)/debuginfo.gen.c
 	$(CC) $(CCFLAGS) -c -o $@ $(OBJECT_DIR)/debuginfo.gen.c

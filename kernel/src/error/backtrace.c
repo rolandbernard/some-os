@@ -19,18 +19,22 @@ Error initBacktrace() {
 }
 
 static void logStackFrameForAddress(int depth, uintptr_t addr) {
-    SymbolDebugInfo* info = searchSymbolDebugInfo(addr);
-    if (info == NULL) {
-        logKernelMessage("    \e[2;3m#%d: %p\e[m\n", depth, addr);
-    } else {
-        logKernelMessage("    \e[2;3m#%d: %s+%p\e[m\n", depth, info->symbol, addr - info->addr);
+    logKernelMessage("    \e[2;3m#%d: %p", depth, addr);
+    LineDebugInfo* line_info = searchLineDebugInfo(addr);
+    if (line_info != NULL) {
+        logKernelMessage(" %s:%d", line_info->file, line_info->line);
     }
+    SymbolDebugInfo* symb_info = searchSymbolDebugInfo(addr);
+    if (symb_info != NULL) {
+        logKernelMessage(" (%s+%p)", symb_info->symbol, addr - symb_info->addr);
+    }
+    logKernelMessage("\e[m\n");
 }
 
 _Unwind_Reason_Code unwindTracingFunction(struct _Unwind_Context *ctx, void *d) {
     int* depth = (int*)d;
     if (*depth >= 2) {
-        logStackFrameForAddress(*depth - 2, _Unwind_GetIP(ctx));
+        logStackFrameForAddress(*depth - 2, _Unwind_GetIP(ctx) - 4);
     }
     (*depth)++;
     return _URC_NO_REASON;
