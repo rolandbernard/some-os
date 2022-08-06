@@ -32,8 +32,9 @@ Task* createKernelTask(void* enter, size_t stack_size, Priority priority) {
         return NULL;
     }
     task->stack = kalloc(stack_size);
+    task->stack_top = (uintptr_t)task->stack + stack_size;
     initTrapFrame(
-        &task->frame, (uintptr_t)task->stack + stack_size, (uintptr_t)getKernelGlobalPointer(),
+        &task->frame, task->stack_top, (uintptr_t)getKernelGlobalPointer(),
         (uintptr_t)enter, 0, kernel_page_table
     );
     task->sched.priority = priority;

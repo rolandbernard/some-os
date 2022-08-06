@@ -65,7 +65,8 @@ static Error minixFindINodeForNameIn(MinixFile* file, Process* process, const ch
 
 static Error minixFindINodeForPath(MinixFilesystem* fs, Process* process, const char* path, uint32_t* inodenum) {
     uint32_t current_inodenum = 0;
-    char* segments = stringClone(path) + (path[0] == '/' ? 1 : 0); // all paths start with /, skip it
+    char* path_clone = stringClone(path);
+    char* segments = path_clone + (path[0] == '/' ? 1 : 0); // all paths start with /, skip it
     while (*segments != 0) {
         const char* segment = segments;
         while (*segments != 0 && *segments != '/') {
@@ -79,11 +80,11 @@ static Error minixFindINodeForPath(MinixFilesystem* fs, Process* process, const 
         size_t tmp_offset;
         size_t tmp_dir_size;
         CHECKED(minixFindINodeForNameIn(current_dir, process, segment, &current_inodenum, &tmp_offset, &tmp_dir_size), {
-            dealloc(segments);
+            dealloc(path_clone);
         });
         current_dir->base.functions->close((VfsFile*)current_dir, NULL);
     }
-    dealloc(segments);
+    dealloc(path_clone);
     *inodenum = current_inodenum;
     return simpleError(SUCCESS);
 }

@@ -2,19 +2,18 @@
 .altmacro
 
 .section .text
-.global readMhartid
-.global readSscratch
-.global writeSscratch
-.global swapTrapFrame
 
+.global readMhartid
 readMhartid:
     csrr a0, mhartid
     ret
 
+.global readSscratch
 readSscratch:
     csrr a0, sscratch
     ret
 
+.global writeSscratch
 writeSscratch:
     csrw sscratch, a0
     ret
@@ -35,6 +34,7 @@ writeSscratch:
 # Save the current state to TrapFrame in a1 and load from a TrapFrame in a0.
 # Because this is only to be used inside the kernel, we can assume that we do not have to
 # preserve caller saved registers.
+.global swapTrapFrame
 swapTrapFrame:
 # Saving to a1
     # Save integer registers

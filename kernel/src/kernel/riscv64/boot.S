@@ -1,10 +1,9 @@
 
 .section .text.boot
-.global _start
-.global registerHart
-.global getHartStack
 
+.global _start
 _start:
+    li ra, 0
     # Set global and stack pointe
     la gp, __global_pointer
     la sp, __stack_top
@@ -38,6 +37,9 @@ _start:
     csrw mepc, t0
     la ra, 3f
     mret
+3:
+    wfi
+    j 3b
 
 1:
     # Wait for boot hart
@@ -57,10 +59,9 @@ _start:
     csrrsi zero, mie, 1 << 3
     csrrsi zero, mstatus, 1 << 3
     # Wait for the hart to be woken up
-3:
-    wfi
     j 3b
 
+.global registerHart
 registerHart:
     mv s0, ra
     la a0, hart_lock
@@ -81,6 +82,7 @@ registerHart:
 
 # Determine the stack for the hart. Only used when no specific stack has been allocated.
 # Can not be implemented in C, because we can't use the stack yet
+.global getHartStack
 getHartStack:
     li t0, 0
     la t1, hart_count
@@ -102,8 +104,8 @@ getHartStack:
     sub a0, a0, t0
     ret
 
-.align 4
 # Called for machine mode traps, call out to C code
+.align 4
 machineTrapVector:
     la gp, __global_pointer
     jal getHartStack

@@ -1,7 +1,7 @@
 
 .section .text
-.global storeConditional
 
+.global storeConditional
 storeConditional:
 cas:
     lr.d t0, (a0)

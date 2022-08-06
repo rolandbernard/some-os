@@ -2,20 +2,15 @@
 .altmacro
 
 .section .text
-.global initTraps
-.global enableInterrupts
-.global enterUserMode
-.global enterKernelMode
-.global waitForInterrupt
-.global kernelTrapVector
-.global kernelTrapReturn
 
 # Simple function to wait for interrupt
+.global waitForInterrupt
 waitForInterrupt:
     wfi
     ret
 
 # Initialize CSRs for traps
+.global initTraps
 initTraps:
     la t0, kernelTrapVector
     csrw stvec, t0
@@ -34,11 +29,13 @@ initTraps:
     ret
 
 # Write to the supervisor interrupt enable register
+.global enableInterrupts
 enableInterrupts:
     csrrsi zero, sstatus, 1 << 1 # Directly enable interrupts (SIE)
     ret
 
 # Enter as user using trap frame in a0
+.global enterUserMode
 enterUserMode:
     # 0b0 << 8 SPP (Previous Protection Mode) is 0 (U mode)
     li t0, 1 << 8
@@ -46,6 +43,7 @@ enterUserMode:
     j kernelTrapReturn
 
 # Enter as superior using trap frame in a0
+.global enterKernelMode
 enterKernelMode:
     # 0b1 << 8 SPP (Previous Protection Mode) is 1 (S mode)
     li t0, 1 << 8
@@ -63,6 +61,9 @@ enterKernelMode:
 .endm
 .macro load_fp i, basereg=x31
     fld f\i, ((32+(\i))*8)(\basereg)
+.endm
+.macro cfi_gp i
+.cfi_offset x\i, ((\i)*8)
 .endm
 
 # Return from trap using trap frame in a0
@@ -106,7 +107,8 @@ indirectKernelTrapVector:
     j kernelTrapVector
 
 .align 4
-# Called on supervisor tarps, call out to C code
+# Called on supervisor tarps, save all registers and call out to C code.
+.global kernelTrapVector
 kernelTrapVector:
     csrrw x31, sscratch, x31 # Swap scratch (with trap frame) with x31
     beqz x31, 1f
@@ -133,7 +135,6 @@ kernelTrapVector:
     sd t1, 512(a3)
     csrr t1, satp
     sd t1, 520(a3)
-    beqz t0, 2f
     # Load global an stack pointer
     load_gp 2, t0
     load_gp 3, t0
@@ -144,9 +145,21 @@ kernelTrapVector:
     jal getHartStack
     mv sp, a0
 2:
+# Small section with call frame information
+.cfi_startproc
     csrr a0, scause
     csrr a1, sepc
     csrr a2, stval
-    mv ra, a1
-    j kernelTrap
+    mv s0, a3
+.cfi_def_cfa s0, 0
+.cfi_offset ra, 512
+.set i, 2
+.rept 30
+    cfi_gp %i
+    .set i, i+1
+.endr
+    jal kernelTrap
+    mv a0, s0
+    j kernelTrapReturn
+.cfi_endproc
 

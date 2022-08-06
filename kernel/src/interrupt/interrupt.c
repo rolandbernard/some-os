@@ -58,8 +58,6 @@ void machineTrap(uintptr_t cause, uintptr_t pc, uintptr_t val, uintptr_t scratch
     panic();
 }
 
-noreturn void kernelTrapReturn(TrapFrame* frame);
-
 void kernelTrap(uintptr_t cause, uintptr_t pc, uintptr_t val, TrapFrame* frame) {
     bool interrupt = cause >> (sizeof(uintptr_t) * 8 - 1);
     int code = cause & 0xff;
@@ -140,6 +138,5 @@ void kernelTrap(uintptr_t cause, uintptr_t pc, uintptr_t val, TrapFrame* frame) 
             enterKernelMode(frame);
         }
     }
-    kernelTrapReturn(frame);
 }
 

@@ -1,9 +1,7 @@
 
 .section .text
-.global lockUnsafeLock
-.global tryLockingUnsafeLock
-.global unlockUnsafeLock
 
+.global lockUnsafeLock
 lockUnsafeLock:
     li t0, 1
 1:
@@ -12,6 +10,7 @@ lockUnsafeLock:
     bnez t0, 1b
     ret
 
+.global tryLockingUnsafeLock
 tryLockingUnsafeLock:
     li t0, 1
     amoswap.w t0, t0, (a0)
@@ -24,6 +23,7 @@ tryLockingUnsafeLock:
 2:
     ret
 
+.global unlockUnsafeLock
 unlockUnsafeLock:
     fence
     amoswap.w zero, zero, (a0)
