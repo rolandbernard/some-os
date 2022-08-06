@@ -4,6 +4,7 @@
 #include <stdnoreturn.h>
 
 #include "error/log.h"
+#include "util/unsafelock.h"
 
 #ifdef DEBUG
 #include "error/backtrace.h"
@@ -13,15 +14,19 @@
 #define BABACKTRACE()
 #endif
 
+extern UnsafeLock global_panic_lock;
+
 // Terminate the kernel
 noreturn void notifyPanic();
 
 noreturn void silentPanic();
 
-#define panic() {                       \
-    KERNEL_LOG("[!] Kernel panic!")     \
-    BACKTRACE();                        \
-    notifyPanic();                      \
+#define panic() {                                       \
+    if (tryLockingUnsafeLock(&global_panic_lock)) {     \
+        KERNEL_LOG("[!] Kernel panic!")                 \
+        BACKTRACE();                                    \
+    }                                                   \
+    notifyPanic();                                      \
 }
 
 #endif

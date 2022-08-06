@@ -4,6 +4,8 @@
 #include "interrupt/com.h"
 #include "interrupt/trap.h"
 
+UnsafeLock global_panic_lock;
+
 noreturn void notifyPanic() {
     sendMessageToAll(KERNEL_PANIC, NULL);
     silentPanic();
