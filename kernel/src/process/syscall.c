@@ -113,7 +113,8 @@ SyscallReturn exitSyscall(TrapFrame* frame) {
     } else {
         task->sched.state = TERMINATED;
     }
-    SYSCALL_RETURN(-SUCCESS);
+    enqueueTask(task);
+    return WAIT;
 }
 
 SyscallReturn pauseSyscall(TrapFrame* frame) {

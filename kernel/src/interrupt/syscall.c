@@ -86,6 +86,20 @@ static SyscallFunction findSyscall(Syscalls id) {
     }
 }
 
+#ifdef DEBUG_LOG_SYSCALLS
+#include "error/debuginfo.h"
+
+static const char* findSyscallName(Syscalls id) {
+    SyscallFunction func = findSyscall(id);
+    if (func == NULL) {
+        return NULL;
+    } else {
+        SymbolDebugInfo* symb = searchSymbolDebugInfo((uintptr_t)func);
+        return symb == NULL ? NULL : symb->symbol;
+    }
+}
+#endif
+
 static bool isSyncSyscall(Syscalls id) {
     return id == SYSCALL_CRITICAL;
 }
@@ -101,6 +115,7 @@ static void syscallTaskEntry(SyscallFunction func, TrapFrame* frame) {
     task->times.system_time += self->times.user_time + self->times.system_time;
     task->times.system_time += self->times.user_child_time + self->times.system_child_time;
     if (ret == CONTINUE) {
+        assert(task->sched.state == WAITING); // If this fails, don't return continue.
         task->sched.state = ENQUABLE;
         enqueueTask(task);
     }
@@ -112,6 +127,22 @@ static void syscallTaskEntry(SyscallFunction func, TrapFrame* frame) {
 void runSyscall(TrapFrame* frame, bool is_kernel) {
     frame->pc += 4;
     Syscalls kind = (uintptr_t)frame->regs[REG_ARGUMENT_0];
+#ifdef DEBUG_LOG_SYSCALLS
+    if (kind != SYSCALL_CRITICAL) {
+        const char* name = findSyscallName(kind);
+        if (frame->hart == NULL) {
+            HartFrame* hart = (HartFrame*)frame;
+            KERNEL_LOG("[?] %s from hart %i (%p)", name, hart->hartid, frame);
+        } else {
+            Task* task = (Task*)frame;
+            if (task->process != NULL) {
+                KERNEL_LOG("[?] %s from user process %i (%p)", name, task->process->pid, frame);
+            } else {
+                KERNEL_LOG("[?] %s from kernel task (%p)", name, frame);
+            }
+        }
+    }
+#endif
     SyscallFunction func = findSyscall(kind);
     if (func != NULL && (is_kernel || kind < KERNEL_ONLY_SYSCALL_OFFSET)) {
         if (isSyncSyscall(kind)) {
