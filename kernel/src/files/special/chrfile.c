@@ -68,7 +68,7 @@ static Error serialDupFunction(SerialDeviceFile* file, Process* process, VfsFile
     lockSpinLock(&file->lock);
     memcpy(copy, file, sizeof(SerialDeviceFile));
     unlockSpinLock(&file->lock);
-    initSpinLock(&file->lock);
+    initSpinLock(&copy->lock);
     *ret = (VfsFile*)copy;
     return simpleError(SUCCESS);
 }

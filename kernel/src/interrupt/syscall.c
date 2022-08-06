@@ -91,11 +91,12 @@ static bool isSyncSyscall(Syscalls id) {
 }
 
 static void syscallTaskEntry(SyscallFunction func, TrapFrame* frame) {
+    assert(getCurrentTask() != NULL);
     assert(frame->hart != NULL);
     Task* task = (Task*)frame;
-    Task* self = getCurrentTask();
-    assert(self != NULL);
     SyscallReturn ret = func(frame);
+    Task* self = getCurrentTask();
+    assert(self != NULL); // Make sure we did not miss to call criticalReturn somewhere
     TrapFrame* lock = criticalEnter();
     task->times.system_time += self->times.user_time + self->times.system_time;
     task->times.system_time += self->times.user_child_time + self->times.system_child_time;
