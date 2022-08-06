@@ -3,6 +3,7 @@
 
 .global _start
 _start:
+.cfi_startproc
     li ra, 0
     # Set global and stack pointe
     la gp, __global_pointer
@@ -60,9 +61,11 @@ _start:
     csrrsi zero, mstatus, 1 << 3
     # Wait for the hart to be woken up
     j 3b
+.cfi_endproc
 
 .global registerHart
 registerHart:
+.cfi_startproc
     mv s0, ra
     la a0, hart_lock
     call lockUnsafeLock
@@ -79,11 +82,13 @@ registerHart:
     call unlockUnsafeLock
     mv ra, s0
     ret
+.cfi_endproc
 
 # Determine the stack for the hart. Only used when no specific stack has been allocated.
 # Can not be implemented in C, because we can't use the stack yet
 .global getHartStack
 getHartStack:
+.cfi_startproc
     li t0, 0
     la t1, hart_count
     lw t1, (t1)
@@ -103,10 +108,12 @@ getHartStack:
     sll t0, t0, 11 # 2**11 is one 32th of the allocated stack space
     sub a0, a0, t0
     ret
+.cfi_endproc
 
 # Called for machine mode traps, call out to C code
 .align 4
 machineTrapVector:
+.cfi_startproc
     la gp, __global_pointer
     jal getHartStack
     mv sp, a0
@@ -116,4 +123,5 @@ machineTrapVector:
     csrr a3, mscratch
     jal machineTrap
     mret
+.cfi_endproc
 

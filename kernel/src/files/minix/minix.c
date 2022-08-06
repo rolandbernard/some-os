@@ -40,7 +40,7 @@ static Error minixFindINodeForNameIn(MinixFile* file, Process* process, const ch
         MinixDirEntry* tmp_buffer = kalloc(umin(MAX_SINGLE_READ_SIZE, left));
         while (left > 0) {
             size_t tmp_size = umin(MAX_SINGLE_READ_SIZE, left);
-            CHECKED(vfsReadAt((VfsFile*)file, process, virtPtrForKernel(&tmp_buffer), tmp_size, offset, &tmp_size), {
+            CHECKED(vfsReadAt((VfsFile*)file, process, virtPtrForKernel(tmp_buffer), tmp_size, offset, &tmp_size), {
                 dealloc(tmp_buffer);
             });
             if (tmp_size == 0) {
@@ -64,7 +64,7 @@ static Error minixFindINodeForNameIn(MinixFile* file, Process* process, const ch
 }
 
 static Error minixFindINodeForPath(MinixFilesystem* fs, Process* process, const char* path, uint32_t* inodenum) {
-    uint32_t current_inodenum = 0;
+    uint32_t current_inodenum = 1;
     char* path_clone = stringClone(path);
     char* segments = path_clone + (path[0] == '/' ? 1 : 0); // all paths start with /, skip it
     while (*segments != 0) {

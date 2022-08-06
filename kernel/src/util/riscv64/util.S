@@ -3,6 +3,7 @@
 
 .global storeConditional
 storeConditional:
+.cfi_startproc
 cas:
     lr.d t0, (a0)
     bne t0, a1, fail
@@ -13,4 +14,5 @@ cas:
 fail:
     li a0, 0
     ret
+.cfi_endproc
 

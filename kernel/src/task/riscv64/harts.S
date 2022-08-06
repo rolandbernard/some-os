@@ -5,18 +5,24 @@
 
 .global readMhartid
 readMhartid:
+.cfi_startproc
     csrr a0, mhartid
     ret
+.cfi_endproc
 
 .global readSscratch
 readSscratch:
+.cfi_startproc
     csrr a0, sscratch
     ret
+.cfi_endproc
 
 .global writeSscratch
 writeSscratch:
+.cfi_startproc
     csrw sscratch, a0
     ret
+.cfi_endproc
 
 .macro save_gp i, basereg
     sd x\i, ((\i)*8)(\basereg)
@@ -36,6 +42,7 @@ writeSscratch:
 # preserve caller saved registers.
 .global swapTrapFrame
 swapTrapFrame:
+.cfi_startproc
 # Saving to a1
     # Save integer registers
 .set i, 1
@@ -73,3 +80,4 @@ swapTrapFrame:
     jr a1
 1:
     ret
+.cfi_endproc
