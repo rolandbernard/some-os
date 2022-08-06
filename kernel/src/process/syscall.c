@@ -121,7 +121,8 @@ SyscallReturn pauseSyscall(TrapFrame* frame) {
     assert(frame->hart != NULL);
     Task* task = (Task*)frame;
     task->sched.state = PAUSED;
-    SYSCALL_RETURN(-SUCCESS);
+    enqueueTask(task);
+    return WAIT;
 }
 
 SyscallReturn alarmSyscall(TrapFrame* frame) {
@@ -170,6 +171,7 @@ SyscallReturn waitSyscall(TrapFrame* frame) {
     Task* task = (Task*)frame;
     assert(task->process != NULL);
     executeProcessWait(task);
+    enqueueTask(task);
     return WAIT;
 }
 

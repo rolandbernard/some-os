@@ -68,7 +68,6 @@ void executeProcessWait(Task* task) {
     if (basicProcessWait(task)) {
         unlockSpinLock(&process_lock); 
         task->sched.state = ENQUABLE;
-        enqueueTask(task);
     } else {
         bool has_child = false;
         Pid wait_pid = task->frame.regs[REG_ARGUMENT_1];
@@ -87,11 +86,9 @@ void executeProcessWait(Task* task) {
         if (has_child) {
             task->frame.regs[REG_ARGUMENT_0] = -EINTR;
             task->sched.state = WAIT_CHLD;
-            enqueueTask(task);
         } else {
             task->frame.regs[REG_ARGUMENT_0] = -ECHILD;
             task->sched.state = ENQUABLE;
-            enqueueTask(task);
         }
     }
 }

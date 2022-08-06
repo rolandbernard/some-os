@@ -4,6 +4,7 @@
 #include "task/syscall.h"
 
 #include "task/harts.h"
+#include "task/schedule.h"
 
 SyscallReturn yieldSyscall(TrapFrame* frame) {
     assert(frame->hart != NULL); // Only a tasks can be yielded
@@ -25,6 +26,7 @@ SyscallReturn sleepSyscall(TrapFrame* frame) {
         Task* task = (Task*)frame;
         task->sched.sleeping_until = end;
         task->sched.state = SLEEPING;
+        enqueueTask(task);
         return WAIT;
     }
 }
