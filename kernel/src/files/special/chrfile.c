@@ -59,7 +59,7 @@ static Error serialStatFunction(SerialDeviceFile* file, Process* process, VirtPt
     return simpleError(SUCCESS);
 }
 
-static void serialCloseFunction(SerialDeviceFile* file, Process* process) {
+static void serialCloseFunction(SerialDeviceFile* file) {
     dealloc(file);
 }
 

@@ -158,7 +158,7 @@ SyscallReturn renameSyscall(TrapFrame* frame) {
 SyscallReturn closeSyscall(TrapFrame* frame) {
     FILE_SYSCALL_OP(false, false, close, {
         file = removeFileDescriptor(task->process, fd);
-        file->functions->close(file, task->process);
+        file->functions->close(file);
         SYSCALL_RETURN(-SUCCESS);
     });
 }
@@ -230,7 +230,7 @@ SyscallReturn dupSyscall(TrapFrame* frame) {
             } else {
                 VfsFile* existing = removeFileDescriptor(task->process, fd);
                 if (existing != NULL) {
-                    existing->functions->close(existing, NULL);
+                    existing->functions->close(existing);
                 }
             }
             putNewFileDescriptor(task->process, fd, flags, new_file);
@@ -399,7 +399,7 @@ SyscallReturn pipeSyscall(TrapFrame* frame) {
     if (file_read != NULL) {
         PipeFile* file_write = duplicatePipeFile(file_read);
         if (file_write == NULL) {
-            file_read->base.functions->close((VfsFile*)file_read, NULL);
+            file_read->base.functions->close((VfsFile*)file_read);
             SYSCALL_RETURN(-ENOMEM);
         } else {
             int pipe_read = allocateNewFileDescriptor(task->process);

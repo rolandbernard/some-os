@@ -11,7 +11,6 @@
 
 int main() {
     fprintf(stderr, "Started hello program\n");
-    mkfifo("/fifo", S_IRWXU | S_IRWXG | S_IRWXO);
     int fd = open("/fifo", O_RDWR);
     if (fd == -1) {
         fprintf(stderr, "Error opening fifo: %s\n", strerror(errno));

@@ -8,6 +8,7 @@
 #include <stdnoreturn.h>
 #include <string.h>
 #include <sys/wait.h>
+#include <sys/stat.h>
 #include <unistd.h>
 
 void signalHandler(int signal) {
@@ -41,6 +42,7 @@ void setupTty() {
 void startProgram(const char* name) {
     int pid = fork();
     if (pid == 0) {
+        fprintf(stderr, "[?] Forked\n");
         execl(name, name, NULL);
         fprintf(stderr, "Failed to start `%s`: %s\n", name, strerror(errno));
         exit(1);
@@ -66,8 +68,8 @@ noreturn void idleLoop() {
 int main(int argc, char* argv[], char* env[]) {
     setupTty();
     fprintf(stderr, "[+] Started init process\n");
+    mkfifo("/fifo", S_IRWXU | S_IRWXG | S_IRWXO);
     setupSystem();
-    sleep(1); // This is here just now for testing
     int fd = open("/fifo", O_RDWR);
     const char* msg = "Test message";
     write(fd, msg, strlen(msg));

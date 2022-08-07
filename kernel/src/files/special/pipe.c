@@ -134,7 +134,7 @@ static Error pipeStatFunction(PipeFile* file, Process* process, VirtPtr stat) {
     return simpleError(SUCCESS);
 }
 
-static void pipeCloseFunction(PipeFile* file, Process* process) {
+static void pipeCloseFunction(PipeFile* file) {
     TrapFrame* lock = criticalEnter();
     lockSpinLock(&file->data->lock);
     file->data->ref_count--;

@@ -74,14 +74,14 @@ Error loadProgramInto(Task* task, const char* path, VirtPtr args, VirtPtr envs) 
     VfsFile* file;
     CHECKED(vfsOpen(&global_file_system, task->process, path, VFS_OPEN_EXECUTE, 0, &file));
     VfsStat stat;
-    CHECKED(file->functions->stat(file, task->process, virtPtrForKernel(&stat)), file->functions->close(file, task->process));
+    CHECKED(file->functions->stat(file, task->process, virtPtrForKernel(&stat)), file->functions->close(file));
     MemorySpace* memory = createMemorySpace();
     uintptr_t entry;
     CHECKED(loadProgramFromElfFile(memory, file, &entry), {
         deallocMemorySpace(memory);
-        file->functions->close(file, task->process);
+        file->functions->close(file);
     });
-    file->functions->close(file, task->process);
+    file->functions->close(file);
     // Find the start_brk in the memory
     uintptr_t start_brk = findStartBrk(memory);
     // Allocate stack
@@ -120,7 +120,7 @@ Error loadProgramInto(Task* task, const char* path, VirtPtr args, VirtPtr envs) 
         if (((*current)->flags & VFS_FILE_CLOEXEC) != 0) {
             VfsFile* to_remove = *current;
             *current = to_remove->next;
-            to_remove->functions->close(to_remove, NULL);
+            to_remove->functions->close(to_remove);
         } else {
             current = &(*current)->next;
         }

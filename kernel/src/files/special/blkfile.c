@@ -1,4 +1,5 @@
 
+#include <assert.h>
 #include <string.h>
 
 #include "files/special/blkfile.h"
@@ -46,6 +47,7 @@ static void blockOperatonCallback(Error status, BlockFileWakeup* wakeup) {
 
 static Error syncBlockOperation(BlockOperationFunction func, void* dev, VirtPtr buf, size_t off, size_t size, bool write) {
     Task* self = getCurrentTask();
+    assert(self != NULL);
     BlockFileWakeup wakeup;
     wakeup.wakeup = self;
     TrapFrame* lock = criticalEnter();
@@ -55,15 +57,11 @@ static Error syncBlockOperation(BlockOperationFunction func, void* dev, VirtPtr 
     return wakeup.result;
 }
 
-static Error genericBlockFileFunction(BlockDeviceFile* file, bool write, VirtPtr buffer, size_t size, size_t* ret) {
+static Error genericBlockFileFunction(BlockDeviceFile* file, bool write, VirtPtr buffer, size_t size, size_t offset, size_t* ret) {
     void* block_device = file->device;
     size_t block_size = file->block_size;
     BlockOperationFunction block_op = file->block_operation;
     char* tmp_buffer = kalloc(block_size);
-    lockSpinLock(&file->lock);
-    size_t offset = file->position;
-    file->position += size;
-    unlockSpinLock(&file->lock);
     size_t left = size;
     while (left > 0) {
         size_t size_diff;
@@ -91,11 +89,27 @@ static Error genericBlockFileFunction(BlockDeviceFile* file, bool write, VirtPtr
 }
 
 static Error blockReadFunction(BlockDeviceFile* file, Process* process, VirtPtr buffer, size_t size, size_t* read) {
-    return genericBlockFileFunction(file, false, buffer, size, read);
+    lockSpinLock(&file->lock);
+    size_t offset = file->position;
+    file->position += size;
+    unlockSpinLock(&file->lock);
+    return genericBlockFileFunction(file, false, buffer, size, offset, read);
 }
 
 static Error blockWriteFunction(BlockDeviceFile* file, Process* process, VirtPtr buffer, size_t size, size_t* written) {
-    return genericBlockFileFunction(file, true, buffer, size, written);
+    lockSpinLock(&file->lock);
+    size_t offset = file->position;
+    file->position += size;
+    unlockSpinLock(&file->lock);
+    return genericBlockFileFunction(file, true, buffer, size, offset, written);
+}
+
+static Error blockReadAtFunction(BlockDeviceFile* file, Process* process, VirtPtr buffer, size_t size, size_t offset, size_t* read) {
+    return genericBlockFileFunction(file, false, buffer, size, offset, read);
+}
+
+static Error blockWriteAtFunction(BlockDeviceFile* file, Process* process, VirtPtr buffer, size_t size, size_t offset, size_t* written) {
+    return genericBlockFileFunction(file, true, buffer, size, offset, written);
 }
 
 static Error blockStatFunction(BlockDeviceFile* file, Process* process, VirtPtr stat) {
@@ -116,7 +130,7 @@ static Error blockStatFunction(BlockDeviceFile* file, Process* process, VirtPtr 
     return simpleError(SUCCESS);
 }
 
-static void blockCloseFunction(BlockDeviceFile* file, Process* process) {
+static void blockCloseFunction(BlockDeviceFile* file) {
     dealloc(file);
 }
 
@@ -134,6 +148,8 @@ static const VfsFileVtable functions = {
     .seek = (SeekFunction)blockSeekFunction,
     .read = (ReadFunction)blockReadFunction,
     .write = (WriteFunction)blockWriteFunction,
+    .read_at = (ReadAtFunction)blockReadAtFunction,
+    .write_at = (WriteAtFunction)blockWriteAtFunction,
     .stat = (StatFunction)blockStatFunction,
     .close = (CloseFunction)blockCloseFunction,
     .dup = (DupFunction)blockDupFunction,

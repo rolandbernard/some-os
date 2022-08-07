@@ -29,7 +29,7 @@ static Error freeFilesystemMount(FilesystemMount* mount, bool force) {
     switch (mount->type) {
         case MOUNT_TYPE_FILE: {
             VfsFile* file = (VfsFile*)mount->data;
-            file->functions->close(file, NULL);
+            file->functions->close(file);
             return simpleError(SUCCESS);
         }
         case MOUNT_TYPE_FS: {
@@ -194,7 +194,7 @@ static Error postOpenOperations(const char* path, VfsFile** ret) {
     if (MODE_TYPE(file->mode) == VFS_TYPE_FIFO) {
         // This is a fifo, we have to create one
         *ret = (VfsFile*)createFifoFile(path, file->mode, file->uid, file->gid);
-        file->functions->close(file, NULL);
+        file->functions->close(file);
         if (*ret != NULL) {
             return simpleError(SUCCESS);
         } else {
@@ -360,33 +360,51 @@ Error vfsRename(VirtualFilesystem* fs, struct Process_s* process, const char* ol
 static Error vfsReadWriteAt(
     VfsFile* file, struct Process_s* process, VirtPtr ptr, size_t size, size_t offset, bool write, size_t* ret
 ) {
+    if (
+        file->functions->lock == NULL || file->functions->unlock == NULL
+        || file->functions->seek == NULL || (write && file->functions->write == NULL)
+        || (!write && file->functions->read == NULL)
+    ) {
+        return simpleError(EPERM);
+    }
     size_t off = 0;
+    file->functions->lock(file);
     CHECKED(file->functions->seek(file, process, offset, VFS_SEEK_SET, &off));
     if (offset != off) {
+        file->functions->unlock(file);
         return simpleError(EIO);
     } else {
         size_t left = size;
         size_t len = 1;
         while (left > 0 && len > 0) {
             if (write) {
-                CHECKED(file->functions->write(file, process, ptr, size, &len));
+                CHECKED(file->functions->write(file, process, ptr, size, &len), file->functions->unlock(file));
             } else {
-                CHECKED(file->functions->read(file, process, ptr, left, &len));
+                CHECKED(file->functions->read(file, process, ptr, left, &len), file->functions->unlock(file));
             }
             ptr.address += len;
             left -= len;
         }
         *ret = size - left;
+        file->functions->unlock(file);
         return simpleError(SUCCESS);
     }
 }
 
 Error vfsReadAt(VfsFile* file, struct Process_s* process, VirtPtr ptr, size_t size, size_t offset, size_t* ret) {
-    return vfsReadWriteAt(file, process, ptr, size, offset, false, ret);
+    if (file->functions->read_at != NULL) {
+        return file->functions->read_at(file, process, ptr, size, offset, ret);
+    } else {
+        return vfsReadWriteAt(file, process, ptr, size, offset, false, ret);
+    }
 }
 
 Error vfsWriteAt(VfsFile* file, struct Process_s* process, VirtPtr ptr, size_t size, size_t offset, size_t* ret) {
-    return vfsReadWriteAt(file, process, ptr, size, offset, true, ret);
+    if (file->functions->write_at != NULL) {
+        return file->functions->write_at(file, process, ptr, size, offset, ret);
+    } else {
+        return vfsReadWriteAt(file, process, ptr, size, offset, true, ret);
+    }
 }
 
 bool canAccess(VfsMode mode, Uid file_uid, Gid file_gid, struct Process_s* process, VfsAccessFlags flags) {
@@ -429,7 +447,7 @@ Error createFilesystemFrom(VirtualFilesystem* fs, const char* path, const char* 
         *ret = fs;
         return simpleError(SUCCESS);
     } else {
-        file->functions->close(file, NULL);
+        file->functions->close(file);
         return simpleError(EINVAL);
     }
 }

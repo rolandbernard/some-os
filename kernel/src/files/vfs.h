@@ -116,26 +116,35 @@ struct Process_s;
 typedef Error (*SeekFunction)(struct VfsFile_s* file, struct Process_s* process, size_t offset, VfsSeekWhence whence, size_t* ret);
 typedef Error (*ReadFunction)(struct VfsFile_s* file, struct Process_s* process, VirtPtr buffer, size_t size, size_t* ret);
 typedef Error (*WriteFunction)(struct VfsFile_s* file, struct Process_s* process, VirtPtr buffer, size_t size, size_t* ret);
+typedef Error (*ReadAtFunction)(struct VfsFile_s* file, struct Process_s* process, VirtPtr buffer, size_t size, size_t offset, size_t* ret);
+typedef Error (*WriteAtFunction)(struct VfsFile_s* file, struct Process_s* process, VirtPtr buffer, size_t size, size_t offset, size_t* ret);
 typedef Error (*StatFunction)(struct VfsFile_s* file, struct Process_s* process, VirtPtr stat_ret);
 typedef Error (*DupFunction)(struct VfsFile_s* file, struct Process_s* process, struct VfsFile_s** ret);
 typedef Error (*TruncFunction)(struct VfsFile_s* file, struct Process_s* process, size_t size);
 typedef Error (*ChmodFunction)(struct VfsFile_s* file, struct Process_s* process, VfsMode mode);
 typedef Error (*ChownFunction)(struct VfsFile_s* file, struct Process_s* process, Uid new_uid, Gid new_gid);
 typedef Error (*ReaddirFunction)(struct VfsFile_s* file, struct Process_s* process, VirtPtr buff, size_t size, size_t* ret);
-// Close must not fail.
-typedef void (*CloseFunction)(struct VfsFile_s* file, struct Process_s* process);
+// Note: Close must not fail.
+typedef void (*CloseFunction)(struct VfsFile_s* file);
+// Note: Lock and Unlock must be TaskLocks. They are used for generic ReadAt and WriteAt implementation.
+typedef void (*LockFunction)(struct VfsFile_s* file);
+typedef void (*UnlockFunction)(struct VfsFile_s* file);
 
 typedef struct {
     SeekFunction seek;
     ReadFunction read;
     WriteFunction write;
-    CloseFunction close;
+    ReadAtFunction read_at;
+    WriteAtFunction write_at;
     StatFunction stat;
     DupFunction dup;
     TruncFunction trunc;
     ChmodFunction chmod;
     ChownFunction chown;
     ReaddirFunction readdir;
+    CloseFunction close;
+    LockFunction lock;
+    UnlockFunction unlock;
 } VfsFileVtable;
 
 typedef struct VfsFile_s {

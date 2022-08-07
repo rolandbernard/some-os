@@ -253,7 +253,7 @@ static Error minixStatFunction(MinixFile* file, Process* process, VirtPtr stat) 
     return simpleError(SUCCESS);
 }
 
-static void minixCloseFunction(MinixFile* file, Process* process) {
+static void minixCloseFunction(MinixFile* file) {
     lockTaskLock(&file->fs->lock);
     file->fs->base.open_files--;
     unlockTaskLock(&file->fs->lock);
@@ -413,6 +413,14 @@ static Error minixReaddirFunction(MinixFile* file, Process* process, VirtPtr buf
     }
 }
 
+static void minixLockFunction(MinixFile* file) {
+    lockTaskLock(&file->lock);
+}
+
+static void minixUnlockFunction(MinixFile* file) {
+    unlockTaskLock(&file->lock);
+}
+
 static VfsFileVtable functions_file = {
     .seek = (SeekFunction)minixSeekFunction,
     .read = (ReadFunction)minixReadFunction,
@@ -423,6 +431,8 @@ static VfsFileVtable functions_file = {
     .trunc = (TruncFunction)minixTruncFunction,
     .chmod = (ChmodFunction)minixChmodFunction,
     .chown = (ChownFunction)minixChownFunction,
+    .lock = (LockFunction)minixLockFunction,
+    .unlock = (UnlockFunction)minixUnlockFunction,
 };
 
 static VfsFileVtable functions_directory = {
@@ -436,6 +446,8 @@ static VfsFileVtable functions_directory = {
     .chmod = (ChmodFunction)minixChmodFunction,
     .chown = (ChownFunction)minixChownFunction,
     .readdir = (ReaddirFunction)minixReaddirFunction,
+    .lock = (LockFunction)minixLockFunction,
+    .unlock = (UnlockFunction)minixUnlockFunction,
 };
 
 MinixFile* createMinixFileForINode(MinixFilesystem* fs, uint32_t inode, bool dir) {

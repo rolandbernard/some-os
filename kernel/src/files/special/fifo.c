@@ -91,7 +91,7 @@ static Error fifoStatFunction(FifoFile* file, Process* process, VirtPtr stat) {
     return simpleError(SUCCESS);
 }
 
-static void fifoCloseFunction(FifoFile* file, Process* process) {
+static void fifoCloseFunction(FifoFile* file) {
     decreaseReferenceFor(file->name);
     dealloc(file);
 }

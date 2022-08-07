@@ -239,7 +239,7 @@ static void freeProcessFiles(Process* process) {
     while (current != NULL) {
         VfsFile* to_remove = current;
         current = current->next;
-        to_remove->functions->close(to_remove, NULL);
+        to_remove->functions->close(to_remove);
     }
     process->resources.next_fd = 0;
 }

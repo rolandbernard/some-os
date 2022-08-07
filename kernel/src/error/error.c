@@ -3,10 +3,6 @@
 
 #include "error/error.h"
 
-Error simpleError(ErrorKind kind) {
-    return someError(kind, NULL);
-}
-
 Error someError(ErrorKind kind, const char* details) {
     Error ret = {
         .kind = kind,
