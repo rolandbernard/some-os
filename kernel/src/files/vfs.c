@@ -189,6 +189,22 @@ static char* toMountPath(FilesystemMount* mount, const char* path) {
     return path_copy;
 }
 
+static Error postOpenOperations(const char* path, VfsFile** ret) {
+    VfsFile* file = *ret;
+    if (MODE_TYPE(file->mode) == VFS_TYPE_FIFO) {
+        // This is a fifo, we have to create one
+        *ret = (VfsFile*)createFifoFile(path, file->mode, file->uid, file->gid);
+        file->functions->close(file, NULL);
+        if (*ret != NULL) {
+            return simpleError(SUCCESS);
+        } else {
+            return simpleError(ENOMEM);
+        }
+    } else {
+        return simpleError(SUCCESS);
+    }
+}
+
 Error vfsOpen(VirtualFilesystem* fs, struct Process_s* process, const char* path, VfsOpenFlags flags, VfsMode mode, VfsFile** ret) {
     lockSpinLock(&fs->lock);
     FilesystemMount* mount = findMountHandling(fs, stringClone(path));
@@ -198,27 +214,17 @@ Error vfsOpen(VirtualFilesystem* fs, struct Process_s* process, const char* path
                 VfsFile* file = (VfsFile*)mount->data;
                 unlockSpinLock(&fs->lock);
                 CHECKED(file->functions->dup(file, process, ret));
-                if (MODE_TYPE(file->mode) == VFS_TYPE_FIFO) {
-                    // This is a fifo, we have to create one
-                    *ret = (VfsFile*)createFifoFile(path, file->mode, file->uid, file->gid);
-                    file->functions->close(file, NULL);
-                    if (*ret != NULL) {
-                        return simpleError(SUCCESS);
-                    } else {
-                        return simpleError(ENOMEM);
-                    }
-                } else {
-                    return simpleError(SUCCESS);
-                }
+                return postOpenOperations(path, ret);
             }
             case MOUNT_TYPE_FS: {
                 VfsFilesystem* filesystem = (VfsFilesystem*)mount->data;
                 if (filesystem->functions->open != NULL) {
                     unlockSpinLock(&fs->lock);
                     char* path_copy = toMountPath(mount, path);
-                    Error res = filesystem->functions->open(filesystem, process, path_copy, flags, mode, ret);
-                    dealloc(path_copy);
-                    return res;
+                    CHECKED(filesystem->functions->open(filesystem, process, path_copy, flags, mode, ret), {
+                        dealloc(path_copy);
+                    });
+                    return postOpenOperations(path, ret);
                 } else {
                     unlockSpinLock(&fs->lock);
                     return simpleError(EPERM);

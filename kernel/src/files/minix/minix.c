@@ -167,7 +167,7 @@ static Error minixCreateNewNodeAt(MinixFilesystem* fs, Process* process, const c
     char* parent_path = getParentPath(path);
     VfsFile* parent;
     CHECKED(fs->base.functions->open(
-        (VfsFilesystem*)fs, process, path, VFS_OPEN_APPEND | VFS_OPEN_DIRECTORY | VFS_OPEN_WRITE, 0, &parent
+        (VfsFilesystem*)fs, process, parent_path, VFS_OPEN_APPEND | VFS_OPEN_DIRECTORY | VFS_OPEN_WRITE, 0, &parent
     ), {
         dealloc(parent_path);
     });
