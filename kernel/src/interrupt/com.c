@@ -9,10 +9,12 @@
 #include "memory/memmap.h"
 #include "task/harts.h"
 #include "task/schedule.h"
+#include "task/syscall.h"
+#include "util/unsafelock.h"
 
 // Locked by sender, unlocked by receiver
-static SpinLock message_write_lock;
-static SpinLock message_read_lock;
+static UnsafeLock message_write_lock;
+static UnsafeLock message_read_lock;
 static MessageType message_type;
 static void* message_data;
 
@@ -25,16 +27,18 @@ void clearMachineSoftwareInterrupt(int hart) {
 }
 
 void sendMessageTo(int hartid, MessageType type, void* data) {
-    lockSpinLock(&message_write_lock);
+    TrapFrame* lock = criticalEnter();
+    lockUnsafeLock(&message_write_lock);
     message_type = type;
     message_data = data;
     sendMachineSoftwareInterrupt(hartid);
-    lockSpinLock(&message_read_lock);
+    lockUnsafeLock(&message_read_lock);
     // Wait for the receiver to unlock the read lock
-    lockSpinLock(&message_read_lock);
-    unlockSpinLock(&message_read_lock);
+    lockUnsafeLock(&message_read_lock);
+    unlockUnsafeLock(&message_read_lock);
     // Only after the message has been handled can we write another one
-    unlockSpinLock(&message_write_lock);
+    unlockUnsafeLock(&message_write_lock);
+    criticalReturn(lock);
 }
 
 void sendMessageToAll(MessageType type, void* data) {
@@ -52,14 +56,14 @@ void sendMessageToSelf(MessageType type, void* data) {
 
 void handleMessage(MessageType type, void* data) {
     if (type == INITIALIZE_HARTS) {
-        unlockSpinLock(&message_read_lock);
+        unlockUnsafeLock(&message_read_lock);
         initHart(getCurrentHartId());
         runNextTask();
     } else if (type == NONE || type == YIELD_TASK) {
-        unlockSpinLock(&message_read_lock);
+        unlockUnsafeLock(&message_read_lock);
         // Do nothing, the point was to preempt the running process
     } else if (type == KERNEL_PANIC) {
-        unlockSpinLock(&message_read_lock);
+        unlockUnsafeLock(&message_read_lock);
         silentPanic();
     } else {
         panic();

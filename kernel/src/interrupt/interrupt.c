@@ -9,8 +9,8 @@
 #include "interrupt/plic.h"
 #include "interrupt/trap.h"
 #include "memory/virtmem.h"
-#include "task/schedule.h"
 #include "process/signals.h"
+#include "task/schedule.h"
 #include "task/types.h"
 
 const char* getCauseString(bool interrupt, int code) {
@@ -76,9 +76,15 @@ void kernelTrap(uintptr_t cause, uintptr_t pc, uintptr_t val, TrapFrame* frame) 
 #ifdef DEBUG_LOG_EXECUTION_TIMES
             if (task != frame->hart->idle_task) {
                 if (task->process != NULL) {
-                    KERNEL_DEBUG("Spent %u in process %u (prio %u)", elapsed, task->process->pid, task->sched.queue_priority);
+                    KERNEL_DEBUG(
+                        "Hart %u spent %uus in process %u (prio %u)", getCurrentHartId(),
+                        elapsed / 10, task->process->pid, task->sched.queue_priority
+                    );
                 } else {
-                    KERNEL_DEBUG("Spent %u in task %p (prio %u)", elapsed, task, task->sched.queue_priority);
+                    KERNEL_DEBUG(
+                        "Hart %u spent %uus in task %p (prio %u)", getCurrentHartId(), elapsed / 10,
+                        task, task->sched.queue_priority
+                    );
                 }
             }
 #endif

@@ -4,6 +4,7 @@
 #include <stdnoreturn.h>
 
 #include "error/log.h"
+#include "task/harts.h"
 #include "util/unsafelock.h"
 
 #ifdef DEBUG
@@ -21,12 +22,12 @@ noreturn void notifyPanic();
 
 noreturn void silentPanic();
 
-#define panic() {                                       \
-    if (tryLockingUnsafeLock(&global_panic_lock)) {     \
-        KERNEL_ERROR("Kernel panic!")                   \
-        BACKTRACE();                                    \
-    }                                                   \
-    notifyPanic();                                      \
+#define panic() {                                                                   \
+    if (tryLockingUnsafeLock(&global_panic_lock)) {                                 \
+        KERNEL_ERROR("Kernel panic!" STYLE_DEBUG " on hart %u", getCurrentHartId()) \
+        BACKTRACE();                                                                \
+    }                                                                               \
+    notifyPanic();                                                                  \
 }
 
 #endif
