@@ -61,7 +61,7 @@ static Error deviceStatFunction(DeviceDirectoryFile* file, Process* process, Vir
     return simpleError(SUCCESS);
 }
 
-static void deviceCloseFunction(DeviceDirectoryFile* file, Process* process) {
+static void deviceCloseFunction(DeviceDirectoryFile* file) {
     TrapFrame* lock = criticalEnter();
     lockSpinLock(&file->lock);
     dealloc(file);
@@ -188,7 +188,7 @@ static Error deviceOpenFunction(
     return simpleError(ENOENT);
 }
 
-static void deviceFreeFunction(DeviceFilesystem* fs, Process* process) {
+static void deviceFreeFunction(DeviceFilesystem* fs) {
     dealloc(fs);
 }
 

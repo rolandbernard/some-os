@@ -24,7 +24,7 @@ Error initDevices() {
 
 Error mountDeviceFiles() {
     CHECKED(mountFilesystem(&global_file_system, (VfsFilesystem*)createDeviceFilesystem(), "/dev"))
-    KERNEL_LOG("[>] Mounted device filesystem at /dev");
+    KERNEL_SUBSUCCESS("Mounted device filesystem at /dev");
     return simpleError(SUCCESS);
 }
 

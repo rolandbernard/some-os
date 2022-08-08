@@ -121,7 +121,7 @@ void completeInterrupt(ExternalInterrupt id) {
 
 Error initPlic() {
     setPlicPriorityThreshold(0);
-    KERNEL_LOG("[>] Initialized PLIC");
+    KERNEL_SUBSUCCESS("Initialized PLIC");
     return simpleError(SUCCESS);
 }
 

@@ -27,11 +27,11 @@ void initHart(int hartid) {
     setupHartFrame(hartid);
     initTraps();
     initTimerInterrupt();
-    KERNEL_LOG("[+] Initialized hart %i", hartid);
+    KERNEL_SUCCESS("Initialized hart %i", hartid);
 }
 
 void initPrimaryHart() {
     setupHartFrame(0);
-    KERNEL_LOG("[+] Initialized hart 0");
+    KERNEL_SUCCESS("Initialized hart 0");
 }
 

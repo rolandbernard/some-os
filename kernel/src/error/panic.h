@@ -23,7 +23,7 @@ noreturn void silentPanic();
 
 #define panic() {                                       \
     if (tryLockingUnsafeLock(&global_panic_lock)) {     \
-        KERNEL_LOG("[!] Kernel panic!")                 \
+        KERNEL_ERROR("Kernel panic!")                   \
         BACKTRACE();                                    \
     }                                                   \
     notifyPanic();                                      \

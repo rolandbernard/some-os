@@ -24,15 +24,15 @@ static void logFrameReturnAddress(int depth, uintptr_t addr, uintptr_t stack, bo
         logKernelMessage(" ");
         indent *= 10;
     }
-    logKernelMessage("\e[2;3m#%d: %p[%p]", depth, addr, stack);
+    logKernelMessage(STYLE_DEBUG "#%d: \e[m" STYLE_INFO "%p\e[m" STYLE_DEBUG "[%p]\e[m", depth, addr, stack);
     if (kernel) {
         LineDebugInfo* line_info = searchLineDebugInfo(addr - 1);
         if (line_info != NULL) {
-            logKernelMessage(" %s:%d", line_info->file, line_info->line);
+            logKernelMessage(STYLE_INFO " %s:%d\e[m", line_info->file, line_info->line);
         }
         SymbolDebugInfo* symb_info = searchSymbolDebugInfo(addr - 1);
         if (symb_info != NULL) {
-            logKernelMessage(" (%s+%p)", symb_info->symbol, addr - symb_info->addr);
+            logKernelMessage(STYLE_DEBUG "(\e[m" STYLE_INFO "%s\e[m" STYLE_DEBUG "+%p)\e[m", symb_info->symbol, addr - symb_info->addr);
         }
     }
     logKernelMessage("\e[m\n");
@@ -62,7 +62,7 @@ void logBacktrace() {
         UnwindTraceData data = {
             .depth = 0,
         };
-        _Unwind_Backtrace(&unwindTracingFunction, &data);
+        _Unwind_Backtrace(unwindTracingFunction, &data);
     }
 }
 

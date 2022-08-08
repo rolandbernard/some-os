@@ -44,7 +44,7 @@ Error initKernelVirtualMemory() {
     identityMapMapedMemory(VIRT_VIRTIO);
     setVirtualMemory(0, kernel_page_table);
     unlockSpinLock(&kernel_page_table_lock);
-    KERNEL_LOG("[>] Initialized kernel virtual memory");
+    KERNEL_SUBSUCCESS("Initialized kernel virtual memory");
     return simpleError(SUCCESS);
 }
 

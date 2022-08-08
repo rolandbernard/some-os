@@ -132,13 +132,13 @@ void runSyscall(TrapFrame* frame, bool is_kernel) {
         const char* name = findSyscallName(kind);
         if (frame->hart == NULL) {
             HartFrame* hart = (HartFrame*)frame;
-            KERNEL_LOG("[?] %s from hart %i (%p)", name, hart->hartid, frame);
+            KERNEL_DEBUG("%s from hart %i (%p)", name, hart->hartid, frame);
         } else {
             Task* task = (Task*)frame;
             if (task->process != NULL) {
-                KERNEL_LOG("[?] %s from user process %i (%p)", name, task->process->pid, frame);
+                KERNEL_DEBUG("%s from user process %i (%p)", name, task->process->pid, frame);
             } else {
-                KERNEL_LOG("[?] %s from kernel task (%p)", name, frame);
+                KERNEL_DEBUG("%s from kernel task (%p)", name, frame);
             }
         }
     }

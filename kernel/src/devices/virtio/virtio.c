@@ -31,15 +31,15 @@ Error initVirtIODevices() {
             if (type < VIRTIO_DEVICE_TYPE_END && device_inits[type].init != NULL) {
                 Error error = device_inits[type].init(i, address, devices + i);
                 if (isError(error)) {
-                    KERNEL_LOG(
-                        "[!] Failed to initialize VirtIO %s device %i: %s", device_inits[type].name, i,
+                    KERNEL_ERROR(
+                        "Failed to initialize VirtIO %s device %i: %s", device_inits[type].name, i,
                         getErrorMessage(error)
                     );
                 } else {
-                    KERNEL_LOG("[>] Initialized VirtIO %s device %i", device_inits[type].name, i);
+                    KERNEL_SUBSUCCESS("Initialized VirtIO %s device %i", device_inits[type].name, i);
                 }
             } else {
-                KERNEL_LOG("[>] Unknown VirtIO device %i", i);
+                KERNEL_WARNING("Unknown VirtIO device %i", i);
             }
         }
     }

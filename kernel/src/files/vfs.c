@@ -37,7 +37,7 @@ static Error freeFilesystemMount(FilesystemMount* mount, bool force) {
             if (!force && filesystem->open_files != 0) {
                 return simpleError(EBUSY);
             } else {
-                filesystem->functions->free(filesystem, NULL);
+                filesystem->functions->free(filesystem);
                 return simpleError(SUCCESS);
             }
         }
@@ -443,7 +443,7 @@ Error createFilesystemFrom(VirtualFilesystem* fs, const char* path, const char* 
     CHECKED(vfsOpen(fs, NULL, path, VFS_OPEN_READ, 0, &file));
     if (strcmp(type, "minix") == 0) {
         VfsFilesystem* fs = (VfsFilesystem*)createMinixFilesystem(file, data);
-        CHECKED(fs->functions->init(fs, NULL), fs->functions->free(fs, NULL));
+        CHECKED(fs->functions->init(fs, NULL), fs->functions->free(fs));
         *ret = fs;
         return simpleError(SUCCESS);
     } else {

@@ -299,11 +299,11 @@ SyscallReturn mountSyscall(TrapFrame* frame) {
                         err = mountFilesystem(&global_file_system, fs, target);
                         dealloc(target);
                         if (isError(err)) {
-                            fs->functions->free(fs, NULL);
+                            fs->functions->free(fs);
                         }
                         SYSCALL_RETURN(-err.kind);
                     } else {
-                        fs->functions->free(fs, NULL);
+                        fs->functions->free(fs);
                         SYSCALL_RETURN(-EINVAL);
                     }
                 }

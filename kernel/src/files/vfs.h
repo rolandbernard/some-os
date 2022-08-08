@@ -168,7 +168,7 @@ typedef Error (*LinkFunction)(struct VfsFilesystem_s* fs, struct Process_s* proc
 typedef Error (*RenameFunction)(struct VfsFilesystem_s* fs, struct Process_s* process, const char* old, const char* new);
 typedef Error (*InitFunction)(struct VfsFilesystem_s* fs, struct Process_s* process);
 // Free must not fail.
-typedef void (*FreeFunction)(struct VfsFilesystem_s* fs, struct Process_s* process);
+typedef void (*FreeFunction)(struct VfsFilesystem_s* fs);
 
 typedef struct {
     OpenFunction open;

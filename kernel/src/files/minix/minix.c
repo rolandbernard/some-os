@@ -360,7 +360,7 @@ static Error minixRenameFunction(MinixFilesystem* fs, Process* process, const ch
     return simpleError(SUCCESS);
 }
 
-static void minixFreeFunction(MinixFilesystem* fs, Process* process) {
+static void minixFreeFunction(MinixFilesystem* fs) {
     // We don't do any caching. Otherwise write it to disk here.
     fs->block_device->functions->close(fs->block_device);
     dealloc(fs);
