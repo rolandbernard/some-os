@@ -12,7 +12,7 @@
 #include "task/types.h"
 #include "util/util.h"
 
-#define PRIORITY_DECREASE 64
+#define PRIORITY_DECREASE (CLOCKS_PER_SEC / 75)
 
 SpinLock sleeping_lock;
 Task* sleeping = NULL;
@@ -41,11 +41,11 @@ void enqueueTask(Task* task) {
                 break;
             case ENQUABLE:
                 task->sched.state = READY;
-                if (task->sched.runs % PRIORITY_DECREASE == 0) {
+                if (task->sched.run_for > PRIORITY_DECREASE) {
                     // Lower priority to not starve other processes
                     task->sched.queue_priority =
-                        task->sched.priority
-                        + ((task->sched.runs / PRIORITY_DECREASE) % MAX_PRIORITY);
+                        task->sched.priority + umin(task->sched.run_for / PRIORITY_DECREASE, 5);
+                    task->sched.run_for -= PRIORITY_DECREASE / 4;
                 } else {
                     task->sched.queue_priority = task->sched.priority;
                 }
@@ -123,7 +123,6 @@ void runNextTaskFrom(HartFrame* hart) {
             next = NULL;
         }
     }
-    next->sched.runs++;
     assert(next != NULL);
     enterTask(next);
 }
