@@ -17,8 +17,8 @@ Error logKernelMessage(const char* fmt, ...);
 #define STYLE_SUCCESS "\e[92m"
 #define STYLE_SUB_SUCCESS "\e[2;92m"
 #define STYLE_INFO "\e[2m"
-#define STYLE_DEBUG "\e[2;90m"
-#define STYLE_DEBUG_LOC "\e[2;3;90m"
+#define STYLE_DEBUG "\e[90m"
+#define STYLE_DEBUG_LOC "\e[3;90m"
 
 #ifdef DEBUG
 #define KERNEL_INTERNAL_LOG(FMT, ...)                                                              \

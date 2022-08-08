@@ -26,13 +26,13 @@ static void logFrameReturnAddress(int depth, uintptr_t addr, uintptr_t stack, bo
     }
     logKernelMessage(STYLE_DEBUG "#%d: \e[m" STYLE_INFO "%p\e[m" STYLE_DEBUG "[%p]\e[m", depth, addr, stack);
     if (kernel) {
-        LineDebugInfo* line_info = searchLineDebugInfo(addr - 1);
-        if (line_info != NULL) {
-            logKernelMessage(STYLE_INFO " %s:%d\e[m", line_info->file, line_info->line);
-        }
         SymbolDebugInfo* symb_info = searchSymbolDebugInfo(addr - 1);
         if (symb_info != NULL) {
-            logKernelMessage(STYLE_DEBUG "(\e[m" STYLE_INFO "%s\e[m" STYLE_DEBUG "+%p)\e[m", symb_info->symbol, addr - symb_info->addr);
+            logKernelMessage(STYLE_DEBUG " (\e[m" STYLE_INFO "%s\e[m" STYLE_DEBUG "+%p)\e[m", symb_info->symbol, addr - symb_info->addr);
+        }
+        LineDebugInfo* line_info = searchLineDebugInfo(addr - 1);
+        if (line_info != NULL) {
+            logKernelMessage(STYLE_DEBUG_LOC " %s:%d\e[m", line_info->file, line_info->line);
         }
     }
     logKernelMessage("\e[m\n");

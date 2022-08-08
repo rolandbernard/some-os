@@ -2,9 +2,10 @@
 .section .text.boot
 
 .global _start
+    nop
 _start:
 .cfi_startproc
-    li ra, 0
+.cfi_undefined ra
     # Set global and stack pointe
     la gp, __global_pointer
     la sp, __stack_top

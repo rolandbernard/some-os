@@ -27,6 +27,7 @@ SECTIONS {
         . = ALIGN(4096);
         PROVIDE(__eh_frame_start = .);
         *(.eh_frame .eh_frame*)
+        . += 8;
         PROVIDE(__eh_frame_end = .);
     } >ram AT>ram :rodata
 
