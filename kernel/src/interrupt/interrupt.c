@@ -68,9 +68,19 @@ void kernelTrap(uintptr_t cause, uintptr_t pc, uintptr_t val, TrapFrame* frame) 
     } else {
         Task* task = (Task*)frame;
         if (frame->hart != NULL) {
-            task->times.user_time += getTime() - task->times.entered;
+            Time elapsed = getTime() - task->times.entered;
+            task->times.user_time += elapsed;
             task->sched.state = ENQUABLE;
             task->times.entered = getTime();
+#ifdef DEBUG_LOG_EXECUTION_TIMES
+            if (task != frame->hart->idle_task) {
+                if (task->process != NULL) {
+                    KERNEL_DEBUG("Spent %u in process %u", elapsed, task->process->pid);
+                } else {
+                    KERNEL_DEBUG("Spent %u in task %p", elapsed, task);
+                }
+            }
+#endif
         }
         if (interrupt) {
             frame->pc = pc;

@@ -7,9 +7,10 @@
 #include "util/unsafelock.h"
 
 typedef struct {
-    UnsafeLock spinlock;
+    UnsafeLock unsafelock;
     Task* locked_by;
     size_t num_locks;
+    Task* wait_queue;
 } TaskLock;
 
 void initTaskLock(TaskLock* lock);

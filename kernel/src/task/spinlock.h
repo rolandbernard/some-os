@@ -7,7 +7,7 @@
 #include "util/unsafelock.h"
 
 typedef struct {
-    UnsafeLock spinlock;
+    UnsafeLock unsafelock;
     struct HartFrame_s* locked_by;
     size_t num_locks;
     struct TrapFrame_s* crit_ret_frame;

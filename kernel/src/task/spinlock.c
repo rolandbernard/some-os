@@ -8,7 +8,7 @@
 #include "task/task.h"
 
 void initSpinLock(SpinLock* lock) {
-    lock->spinlock.lock = 0;
+    lock->unsafelock.lock = 0;
     lock->locked_by = NULL;
     lock->num_locks = 0;
 }
@@ -17,7 +17,7 @@ void lockSpinLock(SpinLock* lock) {
     TrapFrame* frame = criticalEnter();
     HartFrame* hart = getCurrentHartFrame();
     if (hart == NULL || lock->locked_by != hart) {
-        lockUnsafeLock(&lock->spinlock);
+        lockUnsafeLock(&lock->unsafelock);
     }
     lock->num_locks++;
     lock->locked_by = hart;
@@ -32,7 +32,7 @@ void lockSpinLock(SpinLock* lock) {
 bool tryLockingSpinLock(SpinLock* lock) {
     TrapFrame* frame = criticalEnter();
     HartFrame* hart = getCurrentHartFrame();
-    if ((hart != NULL && lock->locked_by == hart) || tryLockingUnsafeLock(&lock->spinlock)) {
+    if ((hart != NULL && lock->locked_by == hart) || tryLockingUnsafeLock(&lock->unsafelock)) {
         lock->num_locks++;
         lock->locked_by = hart;
         lock->crit_ret_frame = frame;
@@ -53,7 +53,7 @@ void unlockSpinLock(SpinLock* lock) {
     lock->num_locks--;
     if (lock->num_locks == 0) {
         lock->locked_by = NULL;
-        unlockUnsafeLock(&lock->spinlock);
+        unlockUnsafeLock(&lock->unsafelock);
 #ifdef DEBUG
         HartFrame* hart = getCurrentHartFrame();
         if (hart != NULL) {
