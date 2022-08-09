@@ -21,7 +21,7 @@ Error logKernelMessage(const char* fmt, ...);
 #define STYLE_DEBUG_LOC "\e[3;90m"
 
 #ifdef DEBUG
-#define KERNEL_INTERNAL_LOG(FMT, ...)                                                              \
+#define KERNEL_INTERNAL_LOG(FMT, ...) \
     logKernelMessage(FMT "\e[m\n" STYLE_DEBUG_LOC " ∟<%s>\t" __FILE__ ":" STRINGX(__LINE__) "\e[m\n" __VA_OPT__(,) __VA_ARGS__, __PRETTY_FUNCTION__);
 #else
 #define KERNEL_INTERNAL_LOG(FMR, ...) \
