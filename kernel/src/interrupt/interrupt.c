@@ -1,6 +1,7 @@
 
 #include <stdint.h>
 #include <stdbool.h>
+#include <stdnoreturn.h>
 
 #include "error/log.h"
 #include "error/panic.h"
@@ -8,8 +9,8 @@
 #include "interrupt/plic.h"
 #include "interrupt/trap.h"
 #include "memory/virtmem.h"
-#include "task/schedule.h"
 #include "process/signals.h"
+#include "task/schedule.h"
 #include "task/types.h"
 
 const char* getCauseString(bool interrupt, int code) {
@@ -53,7 +54,7 @@ void machineTrap(uintptr_t cause, uintptr_t pc, uintptr_t val, uintptr_t scratch
     if (interrupt && (code == 0 || code == 1 || code == 3)) {
         handleMachineSoftwareInterrupt();
     }
-    KERNEL_LOG("[!] Unhandled machine trap: %p %p %p %s", pc, val, scratch, getCauseString(interrupt, code));
+    KERNEL_ERROR("Unhandled machine trap: %p %p %p %s", pc, val, scratch, getCauseString(interrupt, code));
     panic();
 }
 
@@ -62,14 +63,31 @@ void kernelTrap(uintptr_t cause, uintptr_t pc, uintptr_t val, TrapFrame* frame) 
     int code = cause & 0xff;
     if (frame == NULL) {
         // Can't handle traps before the hart was initialized. (initBasicHart)
-        KERNEL_LOG("[!] Unhandled trap: %p %p %p %s", pc, val, frame, getCauseString(interrupt, code));
+        KERNEL_ERROR("Unhandled trap: %p %p %p %s", pc, val, frame, getCauseString(interrupt, code));
         panic();
     } else {
         Task* task = (Task*)frame;
         if (frame->hart != NULL) {
-            task->times.user_time += getTime() - task->times.entered;
-            task->sched.state = ENQUABLE;
+            Time elapsed = getTime() - task->times.entered;
+            task->times.user_time += elapsed;
             task->times.entered = getTime();
+            task->sched.run_for += elapsed;
+            task->sched.state = ENQUABLE;
+#ifdef DEBUG_LOG_EXECUTION_TIMES
+            if (task != frame->hart->idle_task) {
+                if (task->process != NULL) {
+                    KERNEL_DEBUG(
+                        "Hart %u spent %uus in process %u (prio %u)", getCurrentHartId(),
+                        elapsed / 10, task->process->pid, task->sched.queue_priority
+                    );
+                } else {
+                    KERNEL_DEBUG(
+                        "Hart %u spent %uus in task %p (prio %u)", getCurrentHartId(), elapsed / 10,
+                        task, task->sched.queue_priority
+                    );
+                }
+            }
+#endif
         }
         if (interrupt) {
             frame->pc = pc;
@@ -90,7 +108,7 @@ void kernelTrap(uintptr_t cause, uintptr_t pc, uintptr_t val, TrapFrame* frame) 
                     handleExternalInterrupt();
                     break;
                 default:
-                    KERNEL_LOG("[!] Unhandled interrupt: %p %p %p %s", pc, val, frame, getCauseString(interrupt, code));
+                    KERNEL_WARNING("Unhandled interrupt: %p %p %p %s", pc, val, frame, getCauseString(interrupt, code));
                     break;
             }
         } else {
@@ -107,22 +125,22 @@ void kernelTrap(uintptr_t cause, uintptr_t pc, uintptr_t val, TrapFrame* frame) 
                 case 15: // Store/AMO page fault
                     if (frame->hart == NULL || task->process == NULL) {
                         if (!handlePageFault(kernel_page_table, val)) {
-                            KERNEL_LOG("[!] Unhandled exception: %p %p %p %s", pc, val, frame, getCauseString(interrupt, code));
+                            KERNEL_ERROR("Unhandled exception: %p %p %p %s", pc, val, frame, getCauseString(interrupt, code));
                             panic();
                         }
                     } else {
                         if (!handlePageFault(task->process->memory.mem, val)) {
-                            KERNEL_LOG("[!] Segmentation fault: %i %p %p %p %s", task->process->pid, pc, val, frame, getCauseString(interrupt, code));
+                            KERNEL_WARNING("Segmentation fault: %i %p %p %p %s", task->process->pid, pc, val, frame, getCauseString(interrupt, code));
                             addSignalToProcess(task->process, SIGSEGV);
                         }
                     }
                     break;
                 default:
                     if (frame->hart == NULL || task->process == NULL) {
-                        KERNEL_LOG("[!] Unhandled exception: %p %p %p %s", pc, val, frame, getCauseString(interrupt, code));
+                        KERNEL_ERROR("Unhandled exception: %p %p %p %s", pc, val, frame, getCauseString(interrupt, code));
                         panic();
                     } else {
-                        KERNEL_LOG("[!] Segmentation fault: %i %p %p %p %s", task->process->pid, pc, val, frame, getCauseString(interrupt, code));
+                        KERNEL_WARNING("Segmentation fault: %i %p %p %p %s", task->process->pid, pc, val, frame, getCauseString(interrupt, code));
                         addSignalToProcess(task->process, SIGSEGV);
                     }
                     break;

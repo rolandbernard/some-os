@@ -36,31 +36,31 @@ static Process* global_first = NULL;
 SpinLock process_lock;
 
 static bool basicProcessWait(Task* task) {
-    int wait_pid = task->frame.regs[REG_ARGUMENT_1];
+    Pid wait_pid = task->frame.regs[REG_ARGUMENT_1];
     ProcessWaitResult** current = &task->process->tree.waits;
     while (*current != NULL) {
+        ProcessWaitResult* wait = *current;
         if (wait_pid == 0 || wait_pid == (*current)->pid) {
             writeInt(
                 virtPtrForTask(task->frame.regs[REG_ARGUMENT_2], task),
-                sizeof(int) * 8, (*current)->status
+                sizeof(int) * 8, wait->status
             );
-            task->times.user_child_time += (*current)->user_time;
-            task->times.system_child_time += (*current)->system_time;
-            task->frame.regs[REG_ARGUMENT_0] = (*current)->pid;
-            *current = (*current)->next;
+            task->times.user_child_time += wait->user_time;
+            task->times.system_child_time += wait->system_time;
+            task->frame.regs[REG_ARGUMENT_0] = wait->pid;
+            *current = wait->next;
+            dealloc(wait);
             return true;
         } else {
-            current = &(*current)->next;
+            current = &wait->next;
         }
     }
     return false;
 }
 
 void finalProcessWait(Task* task) {
-    // Called before waking up the process
-    if (!basicProcessWait(task)) {
-        task->frame.regs[REG_ARGUMENT_0] = -EINTR;;
-    }
+    // Called before waking up the task
+    basicProcessWait(task);
 }
 
 void executeProcessWait(Task* task) {
@@ -70,7 +70,7 @@ void executeProcessWait(Task* task) {
         task->sched.state = ENQUABLE;
     } else {
         bool has_child = false;
-        int wait_pid = task->frame.regs[REG_ARGUMENT_1];
+        Pid wait_pid = task->frame.regs[REG_ARGUMENT_1];
         if (wait_pid == 0) {
             has_child = task->process->tree.children != NULL;
         } else {
@@ -84,6 +84,7 @@ void executeProcessWait(Task* task) {
         }
         unlockSpinLock(&process_lock); 
         if (has_child) {
+            task->frame.regs[REG_ARGUMENT_0] = -EINTR;
             task->sched.state = WAIT_CHLD;
         } else {
             task->frame.regs[REG_ARGUMENT_0] = -ECHILD;
@@ -129,6 +130,14 @@ static void unregisterProcess(Process* process) {
         new_entry->next = parent->tree.waits;
         parent->tree.waits = new_entry;
         addSignalToProcess(parent, SIGCHLD);
+    } else {
+        // Free pending waits
+        ProcessWaitResult* current = process->tree.waits;
+        while (current != NULL) {
+            ProcessWaitResult* wait = current;
+            current = wait->next;
+            dealloc(wait);
+        }
     }
     // Reparent children
     Process* child = process->tree.children;
@@ -195,22 +204,30 @@ void addTaskToProcess(Process* process, Task* task) {
     unlockSpinLock(&process->lock);
 }
 
+static void terminateProcessTask(Task* task) {
+    // TODO: For adding multiple task for a process this must be implemented correctly.
+    // This fails for example if the task is running, is in a syscall, is waiting, etc.
+    task->process->times.user_time += task->times.user_time;
+    task->process->times.system_time += task->times.system_time;
+    task->process->times.user_child_time += task->times.user_child_time;
+    task->process->times.system_child_time += task->times.system_child_time;
+    task->sched.state = TERMINATED;
+    task->process = NULL;
+}
+
 void terminateAllProcessTasksBut(Process* process, Task* keep) {
-    lockSpinLock(&process->lock);
     Task* current = process->tasks;
     while (current != NULL) {
+        Task* next = current->proc_next;
         if (current != keep) {
-            current->sched.state = TERMINATED;
-            sendMessageToAll(KILL_TASK, current);
-            current->sched.state = TERMINATED;
+            terminateProcessTask(current);
         }
-        current = current->proc_next;
+        current = next;
     }
     process->tasks = keep;
     if (keep != NULL) {
-        process->tasks->proc_next = NULL;
+        keep->proc_next = NULL;
     }
-    unlockSpinLock(&process->lock);
 }
 
 void terminateAllProcessTasks(Process* process) {
@@ -222,7 +239,7 @@ static void freeProcessFiles(Process* process) {
     while (current != NULL) {
         VfsFile* to_remove = current;
         current = current->next;
-        to_remove->functions->close(to_remove, NULL, noop, NULL);
+        to_remove->functions->close(to_remove);
     }
     process->resources.next_fd = 0;
 }
@@ -234,6 +251,12 @@ void deallocProcess(Process* process) {
         deallocMemorySpace(process->memory.mem);
     }
     dealloc(process);
+}
+
+void exitProcess(Process* process, Signal signal, int exit) {
+    process->status = (exit & 0xff) | (signal << 8);
+    terminateAllProcessTasks(process);
+    deallocProcess(process);
 }
 
 int doForProcessWithPid(int pid, ProcessFindCallback callback, void* udata) {

@@ -31,15 +31,15 @@ Error initVirtIODevices() {
             if (type < VIRTIO_DEVICE_TYPE_END && device_inits[type].init != NULL) {
                 Error error = device_inits[type].init(i, address, devices + i);
                 if (isError(error)) {
-                    KERNEL_LOG(
-                        "[!] Failed to initialize VirtIO %s device %i: %s", device_inits[type].name, i,
+                    KERNEL_ERROR(
+                        "Failed to initialize VirtIO %s device %i: %s", device_inits[type].name, i,
                         getErrorMessage(error)
                     );
                 } else {
-                    KERNEL_LOG("[>] Initialized VirtIO %s device %i", device_inits[type].name, i);
+                    KERNEL_SUBSUCCESS("Initialized VirtIO %s device %i", device_inits[type].name, i);
                 }
             } else {
-                KERNEL_LOG("[>] Unknown VirtIO device %i", i);
+                KERNEL_WARNING("Unknown VirtIO device %i", i);
             }
         }
     }
@@ -112,19 +112,19 @@ Error setupVirtIOQueue(VirtIODevice* device) {
 }
 
 uint16_t fillNextDescriptor(VirtIODevice* device, VirtIODescriptor descriptor) {
-    device->index = (device->index + 1) % VIRTIO_RING_SIZE;
-    device->queue->descriptors[device->index] = descriptor;
+    device->desc_index = (device->desc_index + 1) % VIRTIO_RING_SIZE;
+    device->queue->descriptors[device->desc_index] = descriptor;
     if ((descriptor.flags & VIRTIO_DESC_NEXT) != 0) {
-        device->queue->descriptors[device->index].next = (device->index + 1) % VIRTIO_RING_SIZE;
+        device->queue->descriptors[device->desc_index].next = (device->desc_index + 1) % VIRTIO_RING_SIZE;
     }
-    return device->index;
+    return device->desc_index;
 }
 
 uint16_t addDescriptorsFor(VirtIODevice* device, VirtPtr buffer, size_t length, VirtIODescriptorFlags flags, bool write) {
     size_t part_count = getVirtPtrParts(buffer, length, NULL, 0, write);
     VirtPtrBufferPart parts[part_count];
     getVirtPtrParts(buffer, length, parts, part_count, write);
-    uint16_t ret = 0;
+    uint16_t first_id = 0;
     for (size_t i = 0; i < part_count; i++) {
         VirtIODescriptor desc = {
             .address = (uintptr_t)parts[i].address,
@@ -134,10 +134,10 @@ uint16_t addDescriptorsFor(VirtIODevice* device, VirtPtr buffer, size_t length, 
         };
         uint16_t index = fillNextDescriptor(device, desc);
         if (i == 0) {
-            ret = index;
+            first_id = index;
         }
     }
-    return ret;
+    return first_id;
 }
 
 void sendRequestAt(VirtIODevice* device, uint16_t descriptor) {

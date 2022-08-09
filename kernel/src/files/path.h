@@ -7,4 +7,8 @@ char* reducedPathCopy(const char* path);
 
 char* stringClone(const char* path);
 
+char* getParentPath(const char* path);
+
+const char* getBaseFilename(const char* path);
+
 #endif

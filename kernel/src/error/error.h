@@ -3,6 +3,8 @@
 
 #include <stdbool.h>
 
+#include "util/macro.h"
+
 #define CHECKED(OP, ...) { Error res = OP; if (isError(res)) { { __VA_ARGS__ ; } ; return res; } } 
 
 typedef enum {
@@ -44,6 +46,8 @@ typedef enum {
     EDOM    = 33,   /* Math argument out of domain of func */
     ERANGE  = 34,   /* Math result not representable */
     EUNSUP  = 35,   /* Operation not supported */
+
+    SUCCESS_EXIT,
 } ErrorKind;
 
 typedef struct {
@@ -51,8 +55,12 @@ typedef struct {
     const char* details;
 } Error;
 
-// Create error struct without a message
-Error simpleError(ErrorKind kind);
+// Create error struct without a specific message
+#ifdef DEBUG
+#define simpleError(KIND) someError(KIND, __FILE__ ":" STRINGX(__LINE__))
+#else
+#define simpleError(KIND) someError(KIND, NULL)
+#endif
 
 // Create error struct with a message
 Error someError(ErrorKind kind, const char* details);

@@ -19,11 +19,9 @@ Error logKernelMessage(const char* fmt, ...) {
     // Logging happens to the default serial device
     Serial serial = getDefaultSerialDevice();
     FORMAT_STRING(string, fmt);
-    TrapFrame* lock = criticalEnter();
     lockSpinLock(&kernel_log_lock);
     Error error = writeToSerial(serial, "%s", string);
     unlockSpinLock(&kernel_log_lock);
-    criticalReturn(lock);
     return error;
 }
 
@@ -33,15 +31,16 @@ static void* writeVirtPtrString(VirtPtrBufferPart part, void* udata) {
     return udata;
 }
 
-void printSyscall(bool is_kernel, TrapFrame* frame, SyscallArgs args) {
+SyscallReturn printSyscall(TrapFrame* frame) {
     VirtPtr str;
     if (frame->hart == NULL) {
-        str = virtPtrForKernel((void*)args[0]);
+        str = virtPtrForKernel((void*)SYSCALL_ARG(0));
     } else {
         Task* task = (Task*)frame;
-        str = virtPtrForTask(args[0], task);
+        str = virtPtrForTask(SYSCALL_ARG(0), task);
     }
     size_t length = strlenVirtPtr(str);
     virtPtrPartsDo(str, length, writeVirtPtrString, NULL, false);
+    return CONTINUE;
 }
 

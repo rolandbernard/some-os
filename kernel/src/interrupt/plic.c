@@ -58,18 +58,15 @@ void setInterruptFunction(ExternalInterrupt id, ExternalInterruptFunction functi
     entry->id = id;
     entry->function = function;
     entry->udata = udata;
-    TrapFrame* lock = criticalEnter();
     lockSpinLock(&plic_lock);
     entry->next = interrupts;
     interrupts = entry; 
     unlockSpinLock(&plic_lock);
-    criticalReturn(lock);
     enableInterrupt(id);
 }
 
 void clearInterruptFunction(ExternalInterrupt id, ExternalInterruptFunction function, void* udata) {
     bool interrupt_used = false;
-    TrapFrame* lock = criticalEnter();
     lockSpinLock(&plic_lock);
     InterruptEntry** current = &interrupts;
     while (*current != NULL) {
@@ -84,7 +81,6 @@ void clearInterruptFunction(ExternalInterrupt id, ExternalInterruptFunction func
             current = &(*current)->next;
         }
     }
-    criticalReturn(lock);
     unlockSpinLock(&plic_lock);
     if (!interrupt_used) {
         disableInterrupt(id);
@@ -125,7 +121,7 @@ void completeInterrupt(ExternalInterrupt id) {
 
 Error initPlic() {
     setPlicPriorityThreshold(0);
-    KERNEL_LOG("[>] Initialized PLIC");
+    KERNEL_SUBSUCCESS("Initialized PLIC");
     return simpleError(SUCCESS);
 }
 

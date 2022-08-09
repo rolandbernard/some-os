@@ -6,10 +6,13 @@
 #include "memory/virtptr.h"
 #include "files/vfs.h"
 
+#define USER_STACK_TOP (1UL << 38)
+#define USER_STACK_SIZE (1UL << 19)
+
 typedef void (*ProgramLoadCallback)(Error error, void* udata);
 
-void loadProgramInto(Task* task, const char* path, VirtPtr args, VirtPtr envs, ProgramLoadCallback callback, void* udata);
+Error loadProgramInto(Task* task, const char* path, VirtPtr args, VirtPtr envs);
 
-void execveSyscall(bool is_kernel, TrapFrame* frame, SyscallArgs args);
+SyscallReturn execveSyscall(TrapFrame* frame);
 
 #endif

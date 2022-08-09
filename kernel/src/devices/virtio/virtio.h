@@ -142,7 +142,7 @@ typedef struct {
     volatile VirtIODeviceLayout* mmio;
     volatile VirtIOQueue* queue;
     VirtIODeviceType type;
-    uint16_t index;
+    uint16_t desc_index;
     uint16_t ack_index;
 } VirtIODevice;
 

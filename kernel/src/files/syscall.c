@@ -52,336 +52,312 @@ static VfsFile* removeFileDescriptor(Process* process, int fd) {
     return NULL;
 }
 
-static void openCallback(Error error, VfsFile* file, void* udata) {
-    Task* task = (Task*)udata;
-    if (isError(error)) {
-        task->frame.regs[REG_ARGUMENT_0] = -error.kind;
-    } else {
-        size_t fd = allocateNewFileDescriptor(task->process);
-        int flags = 0;
-        if ((task->frame.regs[REG_ARGUMENT_2] & VFS_OPEN_CLOEXEC) != 0) {
-            flags |= VFS_FILE_CLOEXEC;
-        }
-        if ((task->frame.regs[REG_ARGUMENT_2] & VFS_OPEN_RDONLY) != 0) {
-            flags |= VFS_FILE_RDONLY;
-        }
-        if ((task->frame.regs[REG_ARGUMENT_2] & VFS_OPEN_WRONLY) != 0) {
-            flags |= VFS_FILE_WRONLY;
-        }
-        putNewFileDescriptor(task->process, fd, flags, file);
-        task->frame.regs[REG_ARGUMENT_0] = fd;
-    }
-    task->sched.state = ENQUABLE;
-    enqueueTask(task);
-}
-
-void openSyscall(bool is_kernel, TrapFrame* frame, SyscallArgs args) {
+SyscallReturn openSyscall(TrapFrame* frame) {
     assert(frame->hart != NULL);
     Task* task = (Task*)frame;
-    char* string = copyPathFromSyscallArgs(task, args[0]);
+    char* string = copyPathFromSyscallArgs(task, SYSCALL_ARG(0));
     if (string != NULL) {
-        task->sched.state = WAITING;
-        vfsOpen(&global_file_system, task->process, string, args[1], args[2], openCallback, task);
+        VfsFile* file;
+        Error err = vfsOpen(&global_file_system, task->process, string, SYSCALL_ARG(1), SYSCALL_ARG(2), &file);
         dealloc(string);
+        if (isError(err)) {
+            SYSCALL_RETURN(-err.kind);
+        } else {
+            size_t fd = allocateNewFileDescriptor(task->process);
+            int flags = 0;
+            if ((SYSCALL_ARG(1) & VFS_OPEN_CLOEXEC) != 0) {
+                flags |= VFS_FILE_CLOEXEC;
+            }
+            if ((SYSCALL_ARG(1) & VFS_OPEN_RDONLY) != 0) {
+                flags |= VFS_FILE_RDONLY;
+            }
+            if ((SYSCALL_ARG(1) & VFS_OPEN_WRONLY) != 0) {
+                flags |= VFS_FILE_WRONLY;
+            }
+            putNewFileDescriptor(task->process, fd, flags, file);
+            SYSCALL_RETURN(fd);
+        }
     } else {
-        task->frame.regs[REG_ARGUMENT_0] = -EINVAL;
+        SYSCALL_RETURN(-EINVAL);
     }
 }
 
-static void voidSyscallCallback(Error error, void* udata) {
-    Task* task = (Task*)udata;
-    task->frame.regs[REG_ARGUMENT_0] = -error.kind;
-    task->sched.state = ENQUABLE;
-    enqueueTask(task);
-}
-
-void unlinkSyscall(bool is_kernel, TrapFrame* frame, SyscallArgs args) {
+SyscallReturn unlinkSyscall(TrapFrame* frame) {
     assert(frame->hart != NULL);
     Task* task = (Task*)frame;
-    char* string = copyPathFromSyscallArgs(task, args[0]);
+    char* string = copyPathFromSyscallArgs(task, SYSCALL_ARG(0));
     if (string != NULL) {
-        task->sched.state = WAITING;
-        vfsUnlink(&global_file_system, task->process, string, voidSyscallCallback, task);
+        Error err = vfsUnlink(&global_file_system, task->process, string);
         dealloc(string);
+        SYSCALL_RETURN(-err.kind);
     } else {
-        task->frame.regs[REG_ARGUMENT_0] = -EINVAL;
+        SYSCALL_RETURN(-EINVAL);
     }
 }
 
-void linkSyscall(bool is_kernel, TrapFrame* frame, SyscallArgs args) {
+SyscallReturn linkSyscall(TrapFrame* frame) {
     assert(frame->hart != NULL);
     Task* task = (Task*)frame;
-    char* old = copyPathFromSyscallArgs(task, args[0]);
+    char* old = copyPathFromSyscallArgs(task, SYSCALL_ARG(0));
     if (old != NULL) {
-        char* new = copyPathFromSyscallArgs(task, args[1]);
+        char* new = copyPathFromSyscallArgs(task, SYSCALL_ARG(1));
         if (new != NULL) {
-            task->sched.state = WAITING;
-            vfsLink(&global_file_system, task->process, old, new, voidSyscallCallback, task);
+            Error err = vfsLink(&global_file_system, task->process, old, new);
             dealloc(new);
             dealloc(old);
+            SYSCALL_RETURN(-err.kind);
         } else {
             dealloc(old);
-            task->frame.regs[REG_ARGUMENT_0] = -EINVAL;
+            SYSCALL_RETURN(-EINVAL);
         }
     } else {
-        task->frame.regs[REG_ARGUMENT_0] = -EINVAL;
+        SYSCALL_RETURN(-EINVAL);
     }
 }
 
-void renameSyscall(bool is_kernel, TrapFrame* frame, SyscallArgs args) {
+SyscallReturn renameSyscall(TrapFrame* frame) {
     assert(frame->hart != NULL);
     Task* task = (Task*)frame;
-    char* old = copyPathFromSyscallArgs(task, args[0]);
+    char* old = copyPathFromSyscallArgs(task, SYSCALL_ARG(0));
     if (old != NULL) {
-        char* new = copyPathFromSyscallArgs(task, args[1]);
+        char* new = copyPathFromSyscallArgs(task, SYSCALL_ARG(1));
         if (new != NULL) {
-            task->sched.state = WAITING;
-            vfsRename(&global_file_system, task->process, old, new, voidSyscallCallback, task);
+            Error err = vfsRename(&global_file_system, task->process, old, new);
             dealloc(new);
             dealloc(old);
+            SYSCALL_RETURN(-err.kind);
         } else {
             dealloc(old);
-            task->frame.regs[REG_ARGUMENT_0] = -EINVAL;
+            SYSCALL_RETURN(-EINVAL);
         }
     } else {
-        task->frame.regs[REG_ARGUMENT_0] = -EINVAL;
+        SYSCALL_RETURN(-EINVAL);
     }
 }
 
 #define FILE_SYSCALL_OP(READ, WRITE, NAME, DO) \
     assert(frame->hart != NULL); \
     Task* task = (Task*)frame; \
-    size_t fd = args[0]; \
+    size_t fd = SYSCALL_ARG(0); \
     VfsFile* file = getFileDescriptor(task->process, fd); \
     if (file != NULL) { \
         if ((file->flags & VFS_FILE_RDONLY) != 0 && WRITE) { \
-            task->frame.regs[REG_ARGUMENT_0] = -EPERM; \
+            SYSCALL_RETURN(-EPERM); \
         } else if ((file->flags & VFS_FILE_WRONLY) != 0 && READ) { \
-            task->frame.regs[REG_ARGUMENT_0] = -EPERM; \
+            SYSCALL_RETURN(-EPERM); \
         } else if (file->functions->NAME != NULL) { \
-            task->sched.state = WAITING; \
             DO; \
         } else { \
-            task->frame.regs[REG_ARGUMENT_0] = -EINVAL; \
+            SYSCALL_RETURN(-EINVAL); \
         } \
     } else { \
-        task->frame.regs[REG_ARGUMENT_0] = -EBADF; \
+        SYSCALL_RETURN(-EBADF); \
     }
-    
 
-void closeSyscall(bool is_kernel, TrapFrame* frame, SyscallArgs args) {
+
+SyscallReturn closeSyscall(TrapFrame* frame) {
     FILE_SYSCALL_OP(false, false, close, {
         file = removeFileDescriptor(task->process, fd);
-        file->functions->close(file, task->process, voidSyscallCallback, task);
+        file->functions->close(file);
+        SYSCALL_RETURN(-SUCCESS);
     });
 }
 
-static void sizeTSyscallCallback(Error error, size_t size, void* udata) {
-    Task* task = (Task*)udata;
-    if (isError(error)) {
-        task->frame.regs[REG_ARGUMENT_0] = -error.kind;
-    } else {
-        task->frame.regs[REG_ARGUMENT_0] = size;
-    }
-    task->sched.state = ENQUABLE;
-    enqueueTask(task);
-}
-
-void readSyscall(bool is_kernel, TrapFrame* frame, SyscallArgs args) {
+SyscallReturn readSyscall(TrapFrame* frame) {
     FILE_SYSCALL_OP(true, false, read, {
-        file->functions->read(
-            file, task->process, virtPtrForTask(args[1], task), args[2], sizeTSyscallCallback, task
-        );
+        size_t size;
+        Error err = file->functions->read(file, task->process, virtPtrForTask(SYSCALL_ARG(1), task), SYSCALL_ARG(2), &size);
+        if (isError(err)) {
+            SYSCALL_RETURN(-err.kind);
+        } else {
+            SYSCALL_RETURN(size);
+        }
     });
 }
 
-void writeSyscall(bool is_kernel, TrapFrame* frame, SyscallArgs args) {
+SyscallReturn writeSyscall(TrapFrame* frame) {
     FILE_SYSCALL_OP(false, true, write, {
-        file->functions->write(
-            file, task->process, virtPtrForTask(args[1], task), args[2], sizeTSyscallCallback, task
-        );
+        size_t size;
+        Error err = file->functions->write(file, task->process, virtPtrForTask(SYSCALL_ARG(1), task), SYSCALL_ARG(2), &size);
+        if (isError(err)) {
+            SYSCALL_RETURN(-err.kind);
+        } else {
+            SYSCALL_RETURN(size);
+        }
     });
 }
 
-void seekSyscall(bool is_kernel, TrapFrame* frame, SyscallArgs args) {
+SyscallReturn seekSyscall(TrapFrame* frame) {
     FILE_SYSCALL_OP(false, false, seek, {
-        file->functions->seek(file, task->process, args[1], args[2], sizeTSyscallCallback, task);
+        size_t size;
+        Error err = file->functions->seek(file, task->process, SYSCALL_ARG(1), SYSCALL_ARG(2), &size);
+        if (isError(err)) {
+            SYSCALL_RETURN(-err.kind);
+        } else {
+            SYSCALL_RETURN(size);
+        }
     });
 }
 
-static void statSyscallCallback(Error error, VfsStat stat, void* udata) {
-    Task* task = (Task*)udata;
-    task->frame.regs[REG_ARGUMENT_0] = -error.kind;
-    if (!isError(error)) {
-        VirtPtr ptr = virtPtrForTask(task->frame.regs[REG_ARGUMENT_2], task);
-        memcpyBetweenVirtPtr(ptr, virtPtrForKernel(&stat), sizeof(VfsStat));
-    }
-    task->sched.state = ENQUABLE;
-    enqueueTask(task);
-}
-
-void statSyscall(bool is_kernel, TrapFrame* frame, SyscallArgs args) {
+SyscallReturn statSyscall(TrapFrame* frame) {
     FILE_SYSCALL_OP(false, false, stat, {
-        file->functions->stat(file, task->process, statSyscallCallback, task);
+        VirtPtr ptr = virtPtrForTask(SYSCALL_ARG(1), task);
+        Error err = file->functions->stat(file, task->process, ptr);
+        SYSCALL_RETURN(-err.kind);
     });
 }
 
-static void dupCallback(Error error, VfsFile* file, void* udata) {
-    Task* task = (Task*)udata;
-    if (isError(error)) {
-        task->frame.regs[REG_ARGUMENT_0] = -error.kind;
-    } else {
-        int flags = 0;
-        if ((task->frame.regs[REG_ARGUMENT_3] & VFS_OPEN_CLOEXEC) != 0) {
-            flags |= VFS_FILE_CLOEXEC;
-        }
-        if ((task->frame.regs[REG_ARGUMENT_3] & VFS_OPEN_RDONLY) != 0) {
-            flags |= VFS_FILE_RDONLY;
-        }
-        if ((task->frame.regs[REG_ARGUMENT_3] & VFS_OPEN_WRONLY) != 0) {
-            flags |= VFS_FILE_WRONLY;
-        }
-        if ((int)task->frame.regs[REG_ARGUMENT_2] < 0) {
-            size_t fd = allocateNewFileDescriptor(task->process);
-            putNewFileDescriptor(task->process, fd, flags, file);
-            task->frame.regs[REG_ARGUMENT_0] = fd;
-        } else {
-            size_t fd = task->frame.regs[REG_ARGUMENT_2];
-            VfsFile* existing = removeFileDescriptor(task->process, fd);
-            if (existing != NULL) {
-                existing->functions->close(existing, NULL, noop, NULL);
-            }
-            putNewFileDescriptor(task->process, fd, flags, file);
-            task->frame.regs[REG_ARGUMENT_0] = fd;
-        }
-    }
-    task->sched.state = ENQUABLE;
-    enqueueTask(task);
-}
-
-void dupSyscall(bool is_kernel, TrapFrame* frame, SyscallArgs args) {
+SyscallReturn dupSyscall(TrapFrame* frame) {
     FILE_SYSCALL_OP(false, false, dup, {
-        file->functions->dup(file, task->process, dupCallback, task);
-    });
-}
-
-void truncSyscall(bool is_kernel, TrapFrame* frame, SyscallArgs args) {
-    FILE_SYSCALL_OP(false, true, trunc, {
-        file->functions->trunc(file, task->process, args[1], voidSyscallCallback, task);
-    });
-}
-
-void chmodSyscall(bool is_kernel, TrapFrame* frame, SyscallArgs args) {
-    FILE_SYSCALL_OP(false, true, chmod, {
-        file->functions->chmod(file, task->process, args[1], voidSyscallCallback, task);
-    });
-}
-
-void chownSyscall(bool is_kernel, TrapFrame* frame, SyscallArgs args) {
-    FILE_SYSCALL_OP(false, true, chown, {
-        file->functions->chown(file, task->process, args[1], args[2], voidSyscallCallback, task);
-    });
-}
-
-void readdirSyscall(bool is_kernel, TrapFrame* frame, SyscallArgs args) {
-    FILE_SYSCALL_OP(true, false, readdir, {
-        file->functions->readdir(
-            file, task->process, virtPtrForTask(args[1], task), args[2], sizeTSyscallCallback, task
-        );
-    });
-}
-
-static void mountCreateFsCallback(Error error, VfsFilesystem* fs, void* udata) {
-    Task* task = (Task*)udata;
-    if (isError(error)) {
-        task->frame.regs[REG_ARGUMENT_0] = -error.kind;
-    } else {
-        char* target = copyPathFromSyscallArgs(task, task->frame.regs[REG_ARGUMENT_2]);
-        if (target != NULL) {
-            error = mountFilesystem(&global_file_system, fs, target);
-            dealloc(target);
-            if (isError(error)) {
-                fs->functions->free(fs, NULL, noop, NULL);
-            }
-            task->frame.regs[REG_ARGUMENT_0] = -error.kind;
+        VfsFile* new_file;
+        Error err = file->functions->dup(file, task->process, &new_file);
+        if (isError(err)) {
+            SYSCALL_RETURN(-err.kind);
         } else {
-            fs->functions->free(fs, NULL, noop, NULL);
-            task->frame.regs[REG_ARGUMENT_0] = -EINVAL;
+            int flags = 0;
+            if ((SYSCALL_ARG(2) & VFS_OPEN_CLOEXEC) != 0) {
+                flags |= VFS_FILE_CLOEXEC;
+            }
+            if ((SYSCALL_ARG(2) & VFS_OPEN_RDONLY) != 0) {
+                flags |= VFS_FILE_RDONLY;
+            }
+            if ((SYSCALL_ARG(2) & VFS_OPEN_WRONLY) != 0) {
+                flags |= VFS_FILE_WRONLY;
+            }
+            int fd = SYSCALL_ARG(1);
+            if (fd < 0) {
+                fd = allocateNewFileDescriptor(task->process);
+            } else {
+                VfsFile* existing = removeFileDescriptor(task->process, fd);
+                if (existing != NULL) {
+                    existing->functions->close(existing);
+                }
+            }
+            putNewFileDescriptor(task->process, fd, flags, new_file);
+            SYSCALL_RETURN(fd);
         }
-    }
-    task->sched.state = ENQUABLE;
-    enqueueTask(task);
+    });
 }
 
-void mountSyscall(bool is_kernel, TrapFrame* frame, SyscallArgs args) {
+SyscallReturn truncSyscall(TrapFrame* frame) {
+    FILE_SYSCALL_OP(false, true, trunc, {
+        Error err = file->functions->trunc(file, task->process, SYSCALL_ARG(1));
+        SYSCALL_RETURN(-err.kind);
+    });
+}
+
+SyscallReturn chmodSyscall(TrapFrame* frame) {
+    FILE_SYSCALL_OP(false, true, chmod, {
+        Error err = file->functions->chmod(file, task->process, SYSCALL_ARG(1));
+        SYSCALL_RETURN(-err.kind);
+    });
+}
+
+SyscallReturn chownSyscall(TrapFrame* frame) {
+    FILE_SYSCALL_OP(false, true, chown, {
+        Error err = file->functions->chown(file, task->process, SYSCALL_ARG(1), SYSCALL_ARG(2));
+        SYSCALL_RETURN(-err.kind);
+    });
+}
+
+SyscallReturn readdirSyscall(TrapFrame* frame) {
+    FILE_SYSCALL_OP(true, false, readdir, {
+        size_t size;
+        Error err = file->functions->readdir(
+            file, task->process, virtPtrForTask(SYSCALL_ARG(1), task), SYSCALL_ARG(2), &size
+        );
+        if (isError(err)) {
+            SYSCALL_RETURN(-err.kind);
+        } else {
+            SYSCALL_RETURN(size);
+        }
+    });
+}
+
+SyscallReturn mountSyscall(TrapFrame* frame) {
     assert(frame->hart != NULL);
     Task* task = (Task*)frame;
     if (
         task->process != NULL && task->process->resources.uid != 0
         && task->process->resources.gid != 0
     ) { // Only root can mount
-        task->frame.regs[REG_ARGUMENT_0] = -EACCES;
+        SYSCALL_RETURN(-EACCES);
     } else {
-        char* source = copyPathFromSyscallArgs(task, args[0]);
+        char* source = copyPathFromSyscallArgs(task, SYSCALL_ARG(0));
         if (source != NULL) {
-            char* type = copyStringFromSyscallArgs(task, args[2]);
+            char* type = copyStringFromSyscallArgs(task, SYSCALL_ARG(2));
             if (type != NULL) {
-                task->sched.state = WAITING;
-                createFilesystemFrom(
-                    &global_file_system, source, type, virtPtrForTask(args[3], task),
-                    mountCreateFsCallback, task
-                );
+                VfsFilesystem* fs;
+                Error err = createFilesystemFrom(&global_file_system, source, type, virtPtrForTask(SYSCALL_ARG(3), task), &fs);
                 dealloc(type);
                 dealloc(source);
+                if (isError(err)) {
+                    SYSCALL_RETURN(-err.kind);
+                } else {
+                    char* target = copyPathFromSyscallArgs(task, SYSCALL_ARG(1));
+                    if (target != NULL) {
+                        err = mountFilesystem(&global_file_system, fs, target);
+                        dealloc(target);
+                        if (isError(err)) {
+                            fs->functions->free(fs);
+                        }
+                        SYSCALL_RETURN(-err.kind);
+                    } else {
+                        fs->functions->free(fs);
+                        SYSCALL_RETURN(-EINVAL);
+                    }
+                }
             } else {
                 dealloc(source);
-                task->frame.regs[REG_ARGUMENT_0] = -EINVAL;
+                SYSCALL_RETURN(-EINVAL);
             }
         } else {
-            task->frame.regs[REG_ARGUMENT_0] = -EINVAL;
+            SYSCALL_RETURN(-EINVAL);
         }
     }
 }
 
-void umountSyscall(bool is_kernel, TrapFrame* frame, SyscallArgs args) {
+SyscallReturn umountSyscall(TrapFrame* frame) {
     assert(frame->hart != NULL);
     Task* task = (Task*)frame;
-    if (task->process->resources.uid != 0 && task->process->resources.gid != 0) { // Only root can mount
-        task->frame.regs[REG_ARGUMENT_0] = -EACCES;
+    if (task->process->resources.uid != 0 && task->process->resources.gid != 0) {
+        // Only root can mount
+        SYSCALL_RETURN(-EACCES);
     } else {
-        char* path = copyPathFromSyscallArgs(task, args[0]);
+        char* path = copyPathFromSyscallArgs(task, SYSCALL_ARG(0));
         if (path != NULL) {
-            task->frame.regs[REG_ARGUMENT_0] = -umount(&global_file_system, path).kind;
+            Error err = umount(&global_file_system, path);
             dealloc(path);
+            SYSCALL_RETURN(-err.kind);
         } else {
-            task->frame.regs[REG_ARGUMENT_0] = -EINVAL;
+            SYSCALL_RETURN(-EINVAL);
         }
     }
 }
 
-void chdirSyscall(bool is_kernel, TrapFrame* frame, SyscallArgs args) {
+SyscallReturn chdirSyscall(TrapFrame* frame) {
     assert(frame->hart != NULL);
     Task* task = (Task*)frame;
-    char* path = copyPathFromSyscallArgs(task, args[0]);
+    char* path = copyPathFromSyscallArgs(task, SYSCALL_ARG(0));
     if (path != NULL) {
         dealloc(task->process->resources.cwd);
         task->process->resources.cwd = path;
-        task->frame.regs[REG_ARGUMENT_0] = -SUCCESS;
+        SYSCALL_RETURN(-SUCCESS);
     } else {
-        task->frame.regs[REG_ARGUMENT_0] = -EINVAL;
+        SYSCALL_RETURN(-EINVAL);
     }
 }
 
-void getcwdSyscall(bool is_kernel, TrapFrame* frame, SyscallArgs args) {
+SyscallReturn getcwdSyscall(TrapFrame* frame) {
     assert(frame->hart != NULL);
     Task* task = (Task*)frame;
-    VirtPtr buff = virtPtrForTask(args[0], task);
-    size_t length = args[1];
+    VirtPtr buff = virtPtrForTask(SYSCALL_ARG(0), task);
+    size_t length = SYSCALL_ARG(1);
     size_t cwd_length = strlen(task->process->resources.cwd);
     memcpyBetweenVirtPtr(
         buff, virtPtrForKernel(task->process->resources.cwd), umin(length, cwd_length + 1)
     );
-    task->frame.regs[REG_ARGUMENT_0] = args[0];
+    SYSCALL_RETURN(SYSCALL_ARG(0));
 }
 
 char* copyPathFromSyscallArgs(Task* task, uintptr_t ptr) {
@@ -416,40 +392,40 @@ char* copyPathFromSyscallArgs(Task* task, uintptr_t ptr) {
     }
 }
 
-void pipeSyscall(bool is_kernel, TrapFrame* frame, SyscallArgs args) {
+SyscallReturn pipeSyscall(TrapFrame* frame) {
     assert(frame->hart != NULL);
     Task* task = (Task*)frame;
     PipeFile* file_read = createPipeFile();
     if (file_read != NULL) {
         PipeFile* file_write = duplicatePipeFile(file_read);
         if (file_write == NULL) {
-            file_read->base.functions->close((VfsFile*)file_read, NULL, noop, NULL);
-            task->frame.regs[REG_ARGUMENT_0] = -ENOMEM;
+            file_read->base.functions->close((VfsFile*)file_read);
+            SYSCALL_RETURN(-ENOMEM);
         } else {
             int pipe_read = allocateNewFileDescriptor(task->process);
             int pipe_write = allocateNewFileDescriptor(task->process);
             putNewFileDescriptor(task->process, pipe_read, VFS_FILE_RDONLY, (VfsFile*)file_read);
             putNewFileDescriptor(task->process, pipe_write, VFS_FILE_WRONLY, (VfsFile*)file_write);
-            VirtPtr arr = virtPtrForTask(args[0], task);
+            VirtPtr arr = virtPtrForTask(SYSCALL_ARG(0), task);
             writeIntAt(arr, sizeof(int) * 8, 0, pipe_read);
             writeIntAt(arr, sizeof(int) * 8, 1, pipe_write);
-            task->frame.regs[REG_ARGUMENT_0] = -SUCCESS;
+            SYSCALL_RETURN(-SUCCESS);
         }
     } else {
-        task->frame.regs[REG_ARGUMENT_0] = -ENOMEM;
+        SYSCALL_RETURN(-ENOMEM);
     }
 }
 
-void mknodSyscall(bool is_kernel, TrapFrame* frame, SyscallArgs args) {
+SyscallReturn mknodSyscall(TrapFrame* frame) {
     assert(frame->hart != NULL);
     Task* task = (Task*)frame;
-    char* string = copyPathFromSyscallArgs(task, args[0]);
+    char* string = copyPathFromSyscallArgs(task, SYSCALL_ARG(0));
     if (string != NULL) {
-        task->sched.state = WAITING;
-        vfsMknod(&global_file_system, task->process, string, args[1], args[2], voidSyscallCallback, task);
+        Error err = vfsMknod(&global_file_system, task->process, string, SYSCALL_ARG(1), SYSCALL_ARG(2));
         dealloc(string);
+        SYSCALL_RETURN(-err.kind);
     } else {
-        task->frame.regs[REG_ARGUMENT_0] = -EINVAL;
+        SYSCALL_RETURN(-EINVAL);
     }
 }
 

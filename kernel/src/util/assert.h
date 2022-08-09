@@ -6,9 +6,9 @@
 #include "util/macro.h"
 
 #ifdef DEBUG
-#define ASSERT(COND, ...) { if (!(COND)) { \
-        KERNEL_LOG("[!] Assertion failed: %s", IFE(__VA_ARGS__)(#COND) __VA_ARGS__); \
-        panic(); \
+#define ASSERT(COND, ...) { if (!(COND)) {                                          \
+        KERNEL_ERROR("Assertion failed: %s", IFE(__VA_ARGS__)(#COND) __VA_ARGS__);  \
+        panic();                                                                    \
     } }
 #else
 #define ASSERT(COND, ...) { /* NOOP */ }

@@ -1,18 +1,20 @@
 
 .section .text
-.global lockUnsafeLock
-.global tryLockingUnsafeLock
-.global unlockUnsafeLock
 
+.global lockUnsafeLock
 lockUnsafeLock:
+.cfi_startproc
     li t0, 1
 1:
     amoswap.w t0, t0, (a0)
     fence
     bnez t0, 1b
     ret
+.cfi_endproc
 
+.global tryLockingUnsafeLock
 tryLockingUnsafeLock:
+.cfi_startproc
     li t0, 1
     amoswap.w t0, t0, (a0)
     fence
@@ -23,9 +25,13 @@ tryLockingUnsafeLock:
     li a0, 1
 2:
     ret
+.cfi_endproc
 
+.global unlockUnsafeLock
 unlockUnsafeLock:
+.cfi_startproc
     fence
     amoswap.w zero, zero, (a0)
     ret
+.cfi_endproc
 

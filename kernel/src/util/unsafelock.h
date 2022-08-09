@@ -3,7 +3,10 @@
 
 #include <stdbool.h>
 
-typedef int UnsafeLock;
+typedef struct {
+    // This is used from assembly.
+    int lock;
+} UnsafeLock;
 
 // Lock simple spinlock with fences
 void lockUnsafeLock(UnsafeLock* lock);

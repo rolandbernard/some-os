@@ -3,7 +3,17 @@
 
 #include <stdbool.h>
 
-typedef int TaskLock;
+#include "task/types.h"
+#include "util/unsafelock.h"
+
+typedef struct {
+    UnsafeLock unsafelock;
+    Task* locked_by;
+    size_t num_locks;
+    Task* wait_queue;
+} TaskLock;
+
+void initTaskLock(TaskLock* lock);
 
 void lockTaskLock(TaskLock* lock);
 

@@ -9,7 +9,7 @@
 typedef void (*BlockOperatonCallback)(Error status, void* udata);
 
 typedef void (*BlockOperationFunction)(
-    void* device, VirtPtr buffer, uint32_t offset, uint32_t size, bool write,
+    void* device, VirtPtr buffer, size_t offset, size_t size, bool write,
     BlockOperatonCallback callback, void* udata
 );
 

@@ -3,12 +3,13 @@
 
 #include "files/special/chrfile.h"
 
+#include "devices/devfs.h"
 #include "kernel/time.h"
 #include "memory/kalloc.h"
-#include "devices/devfs.h"
 #include "process/types.h"
+#include "task/syscall.h"
 
-static void serialReadFunction(SerialDeviceFile* file, Process* process, VirtPtr buffer, size_t size, VfsFunctionCallbackSizeT callback, void* udata) {
+static Error serialReadFunction(SerialDeviceFile* file, Process* process, VirtPtr buffer, size_t size, size_t* read) {
     Error status;
     size_t i;
     lockSpinLock(&file->lock);
@@ -21,25 +22,26 @@ static void serialReadFunction(SerialDeviceFile* file, Process* process, VirtPtr
         writeIntAt(buffer, 8, i, c);
     }
     unlockSpinLock(&file->lock);
+    *read = i;
     if (status.kind == EAGAIN && i != 0) {
-        callback(simpleError(SUCCESS), i, udata);
+        return simpleError(SUCCESS);
     } else {
         // Success or any other error
-        callback(status, i, udata);
+        return status;
     }
 }
 
-static void serialWriteFunction(SerialDeviceFile* file, Process* process, VirtPtr buffer, size_t size, VfsFunctionCallbackSizeT callback, void* udata) {
+static Error serialWriteFunction(SerialDeviceFile* file, Process* process, VirtPtr buffer, size_t size, size_t* written) {
     lockSpinLock(&file->lock);
     for (size_t i = 0; i < size; i++) {
         file->serial.write(file->serial.data, readIntAt(buffer, i, 8));
     }
     unlockSpinLock(&file->lock);
-    callback(simpleError(SUCCESS), size, udata);
+    *written = size;
+    return simpleError(SUCCESS);
 }
 
-static void serialStatFunction(SerialDeviceFile* file, Process* process, VfsFunctionCallbackStat callback, void* udata) {
-    lockSpinLock(&file->lock);
+static Error serialStatFunction(SerialDeviceFile* file, Process* process, VirtPtr stat) {
     VfsStat ret = {
         .id = file->base.ino,
         .mode = TYPE_MODE(VFS_TYPE_CHAR) | VFS_MODE_OG_RW,
@@ -53,23 +55,22 @@ static void serialStatFunction(SerialDeviceFile* file, Process* process, VfsFunc
         .st_ctime = getNanoseconds(),
         .dev = DEV_INO,
     };
-    unlockSpinLock(&file->lock);
-    callback(simpleError(SUCCESS), ret, udata);
+    memcpyBetweenVirtPtr(stat, virtPtrForKernel(&ret), sizeof(VfsStat));
+    return simpleError(SUCCESS);
 }
 
-static void serialCloseFunction(SerialDeviceFile* file, Process* process, VfsFunctionCallbackVoid callback, void* udata) {
-    lockSpinLock(&file->lock);
+static void serialCloseFunction(SerialDeviceFile* file) {
     dealloc(file);
-    callback(simpleError(SUCCESS), udata);
 }
 
-static void serialDupFunction(SerialDeviceFile* file, Process* process, VfsFunctionCallbackFile callback, void* udata) {
-    lockSpinLock(&file->lock);
+static Error serialDupFunction(SerialDeviceFile* file, Process* process, VfsFile** ret) {
     SerialDeviceFile* copy = kalloc(sizeof(SerialDeviceFile));
+    lockSpinLock(&file->lock);
     memcpy(copy, file, sizeof(SerialDeviceFile));
     unlockSpinLock(&file->lock);
-    unlockSpinLock(&copy->lock); // Also unlock the new file
-    callback(simpleError(SUCCESS), (VfsFile*)copy, udata);
+    initSpinLock(&copy->lock);
+    *ret = (VfsFile*)copy;
+    return simpleError(SUCCESS);
 }
 
 static const VfsFileVtable functions = {

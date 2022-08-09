@@ -13,8 +13,7 @@ typedef struct WaitingPipeOperation_s {
     VirtPtr buffer;
     size_t size;
     size_t written;
-    VfsFunctionCallbackSizeT callback;
-    void* udata;
+    Task* wakeup;
     struct WaitingPipeOperation_s* next;
 } WaitingPipeOperation;
 
@@ -39,7 +38,7 @@ PipeFile* createPipeFile();
 
 PipeFile* duplicatePipeFile(PipeFile* file);
 
-void executePipeOperation(PipeSharedData* data, Process* process, VirtPtr buffer, size_t size, bool write, VfsFunctionCallbackSizeT callback, void* udata);
+Error executePipeOperation(PipeSharedData* data, Process* process, VirtPtr buffer, size_t size, bool write, size_t* ret);
 
 PipeSharedData* createPipeSharedData();
 

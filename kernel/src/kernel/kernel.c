@@ -23,18 +23,18 @@ void kernelInit() {
     // Initialize baseline devices
     status = initBaselineDevices();
     if (isError(status)) {
-        KERNEL_LOG("[!] Failed to initialize baseline devices: %s", getErrorMessage(status));
+        KERNEL_ERROR("Failed to initialize baseline devices: %s", getErrorMessage(status));
         panic();
     } else {
-        KERNEL_LOG("[+] Kernel started");
+        KERNEL_SUCCESS("Kernel started");
     }
     // Initialize kernel systems
     status = initAllSystems();
     if (isError(status)) {
-        KERNEL_LOG("[!] Failed to initialize kernel: %s", getErrorMessage(status));
+        KERNEL_ERROR("Failed to initialize kernel: %s", getErrorMessage(status));
         panic();
     } else {
-        KERNEL_LOG("[+] Kernel initialized");
+        KERNEL_SUCCESS("Kernel initialized");
     }
     // Wake up the remaining harts
     sendMessageToAll(INITIALIZE_HARTS, NULL);
@@ -51,30 +51,32 @@ void kernelMain() {
     // Initialize devices
     status = initDevices();
     if (isError(status)) {
-        KERNEL_LOG("[!] Failed to initialize devices: %s", getErrorMessage(status));
+        KERNEL_ERROR("Failed to initialize devices: %s", getErrorMessage(status));
         panic();
     } else {
-        KERNEL_LOG("[+] Devices initialized");
+        KERNEL_SUCCESS("Devices initialized");
     }
     // Initialize virtual filesystem
     status = initVirtualFileSystem();
     if (isError(status)) {
-        KERNEL_LOG("[!] Failed to initialize filesystem: %s", getErrorMessage(status));
+        KERNEL_ERROR("Failed to initialize filesystem: %s", getErrorMessage(status));
         panic();
     } else {
-        KERNEL_LOG("[+] Filesystem initialized");
+        KERNEL_SUCCESS("Filesystem initialized");
     }
     int res;
     // Mount filesystem
     res = syscall(SYSCALL_MOUNT, "/dev/blk0", "/", "minix", NULL); // Mount root filesystem
     if (res < 0) {
-        KERNEL_LOG("[!] Failed to mount root filesystem: %s", getErrorKindMessage(-res));
+        KERNEL_ERROR("Failed to mount root filesystem: %s", getErrorKindMessage(-res));
         panic();
+    } else {
+        KERNEL_SUCCESS("Mounted root filesystem /dev/blk0 at /");
     }
     // Start the init process
     res = syscall(SYSCALL_EXECVE, "/bin/init", NULL, NULL);
     // If we continue, there must be an error
-    KERNEL_LOG("[!] Failed to start init process: %s", getErrorKindMessage(-res));
+    KERNEL_ERROR("Failed to start init process: %s", getErrorKindMessage(-res));
     panic();
 }
 

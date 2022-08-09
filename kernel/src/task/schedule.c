@@ -3,16 +3,16 @@
 
 #include "task/schedule.h"
 
-#include "interrupt/trap.h"
 #include "error/log.h"
-#include "task/task.h"
-#include "task/harts.h"
+#include "interrupt/trap.h"
 #include "process/process.h"
-#include "task/types.h"
+#include "task/harts.h"
 #include "task/spinlock.h"
+#include "task/task.h"
+#include "task/types.h"
 #include "util/util.h"
 
-#define PRIORITY_DECREASE 64
+#define PRIORITY_DECREASE (CLOCKS_PER_SEC / 75)
 
 SpinLock sleeping_lock;
 Task* sleeping = NULL;
@@ -22,6 +22,46 @@ static void addSleepingTask(Task* task) {
     task->sched.sched_next = sleeping;
     sleeping = task;
     unlockSpinLock(&sleeping_lock);
+}
+
+void enqueueTask(Task* task) {
+    HartFrame* hart = task->frame.hart;
+    if (hart == NULL) {
+        // Prefer the last hart of the process, but if NULL enqueue for the current
+        hart = getCurrentHartFrame();
+    }
+    assert(hart != NULL);
+    ScheduleQueue* queue = &hart->queue;
+    if (hart->idle_task != task) { // Ignore the idle process
+        switch (task->sched.state) {
+            case SLEEPING:
+            case PAUSED:
+            case WAIT_CHLD:
+                addSleepingTask(task);
+                break;
+            case ENQUABLE:
+                task->sched.state = READY;
+                if (task->sched.run_for > PRIORITY_DECREASE) {
+                    // Lower priority to not starve other processes
+                    task->sched.queue_priority =
+                        task->sched.priority + umin(task->sched.run_for / PRIORITY_DECREASE, 5);
+                    task->sched.run_for -= PRIORITY_DECREASE / 4;
+                } else {
+                    task->sched.queue_priority = task->sched.priority;
+                }
+                pushTaskToQueue(queue, task);
+                break;
+            case READY: // Task has already been enqueued
+            case RUNNING: // It is currently running
+            case WAITING: // Task is already handled somewhere else
+                break;
+            case TERMINATED: // Task can not be enqueue, it is only waiting to be freed.
+                deallocTask(task);
+                break;
+            case UNKNOWN: // We don't know what to do
+                panic();  // These should not happen
+        }
+    }
 }
 
 static void awakenTask(Task* task) {
@@ -62,47 +102,6 @@ static void awakenTasks() {
     unlockSpinLock(&sleeping_lock);
 }
 
-void enqueueTask(Task* task) {
-    HartFrame* hart = task->frame.hart;
-    if (hart == NULL) {
-        // Prefer the last hart of the process, but if NULL enqueue for the current
-        hart = getCurrentHartFrame();
-    }
-    assert(hart != NULL);
-    ScheduleQueue* queue = &hart->queue;
-    if (hart->idle_task != task) { // Ignore the idle process
-        switch (task->sched.state) {
-            case SLEEPING:
-            case PAUSED:
-            case WAIT_CHLD:
-                addSleepingTask(task);
-                break;
-            case ENQUABLE:
-                task->sched.state = READY;
-                if (task->sched.runs % PRIORITY_DECREASE == 0) {
-                    // Lower priority to not starve other processes
-                    task->sched.queue_priority =
-                        task->sched.priority
-                        + ((task->sched.runs / PRIORITY_DECREASE) % MAX_PRIORITY);
-                } else {
-                    task->sched.queue_priority = task->sched.priority;
-                }
-                pushTaskToQueue(queue, task);
-                break;
-            case READY: // Task has already be enqueued
-            case RUNNING: // It is currently running
-            case WAITING: // Task is already handled somewhere else
-                break;
-            case TERMINATED: // Task can not be enqueue, it is only waiting to be freed
-                deallocTask(task);
-                break;
-            case UNKNOWN: // We don't know what to do
-                panic(); // These should not happen
-                break;
-        }
-    }
-}
-
 void runNextTask() {
     awakenTasks();
     Task* current = NULL;
@@ -124,7 +123,6 @@ void runNextTaskFrom(HartFrame* hart) {
             next = NULL;
         }
     }
-    next->sched.runs++;
     assert(next != NULL);
     enterTask(next);
 }

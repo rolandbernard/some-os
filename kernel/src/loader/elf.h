@@ -61,6 +61,6 @@ bool allocatePages(PageTable* table, uintptr_t addr, size_t filesz, size_t memsz
 
 typedef void (*ElfFileLoadCallback)(Error error, uintptr_t entry, void* udata);
 
-void loadProgramFromElfFile(PageTable* table, VfsFile* file, ElfFileLoadCallback callback, void* udata);
+Error loadProgramFromElfFile(PageTable* table, VfsFile* file, uintptr_t* entry);
 
 #endif

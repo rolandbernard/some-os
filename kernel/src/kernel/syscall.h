@@ -3,6 +3,6 @@
 
 #include "interrupt/syscall.h"
 
-void timesSyscall(bool is_kernel, TrapFrame* frame, SyscallArgs args);
+SyscallReturn timesSyscall(TrapFrame* frame);
 
 #endif

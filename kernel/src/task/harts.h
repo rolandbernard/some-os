@@ -6,7 +6,6 @@
 #define HART_STACK_SIZE (1 << 16)
 #define IDLE_STACK_SIZE 64
 
-extern int hart_lock;
 extern int hart_count;
 extern int hart_ids[];
 
@@ -31,7 +30,7 @@ int getCurrentHartId();
 
 void* getKernelGlobalPointer();
 
-// Save the current state and return pointer to one TrapFrame and load from the other.
-void loadTrapFrame(TrapFrame* load_from, TrapFrame* save_to);
+// Save the current state to one TrapFrame and load from the other.
+void swapTrapFrame(TrapFrame* load_from, TrapFrame* save_to);
 
 #endif

@@ -10,6 +10,7 @@ PHDRS {
     rodata PT_LOAD;
     data PT_LOAD;
     bss PT_LOAD;
+    rtdebug PT_LOAD;
 }
 
 SECTIONS {
@@ -26,6 +27,7 @@ SECTIONS {
         . = ALIGN(4096);
         PROVIDE(__eh_frame_start = .);
         *(.eh_frame .eh_frame*)
+        . += 8;
         PROVIDE(__eh_frame_end = .);
     } >ram AT>ram :rodata
 
@@ -55,12 +57,18 @@ SECTIONS {
         PROVIDE(__bss_end = .);
     } >ram AT>ram :bss
 
+    .rtdebug : {
+        PROVIDE(__rtdebug_start = .);
+        *(.rtdebug)
+        PROVIDE(__rtdebug_end = .);
+    } >ram AT>ram :rtdebug
+
     PROVIDE(__global_pointer = __rodata_start);
 
     PROVIDE(__stack_top    = ORIGIN(ram) + LENGTH(ram));
     PROVIDE(__stack_bottom = __stack_top - 0x10000);
 
-    PROVIDE(__heap_start = __bss_end);
+    PROVIDE(__heap_start = __rtdebug_end);
     PROVIDE(__heap_end   = __stack_bottom);
 }
 

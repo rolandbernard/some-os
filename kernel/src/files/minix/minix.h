@@ -10,8 +10,7 @@
 #define MINIX3_MAGIC 0x4d5a
 #define MINIX_BLOCK_SIZE 1024
 #define MINIX_NUM_IPTRS MINIX_BLOCK_SIZE / 4
-
-typedef void (*MinixINodeCallback)(Error error, uint32_t inode, void* udata);
+#define MINIX_NUM_IPTRS_LOG2 8
 
 typedef struct {
     uint32_t ninodes;
@@ -50,12 +49,14 @@ typedef struct {
     VfsFilesystem base;
     Minix3Superblock superblock;
     VfsFile* block_device;
-    SpinLock lock;
-    SpinLock maps_lock;
+    TaskLock lock;
+    TaskLock maps_lock;
 } MinixFilesystem;
 
 MinixFilesystem* createMinixFilesystem(VfsFile* block_device, VirtPtr data);
 
 size_t offsetForINode(const MinixFilesystem* fs, uint32_t inode);
+
+size_t offsetForZone(size_t zone);
 
 #endif

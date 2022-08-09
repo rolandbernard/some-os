@@ -3,12 +3,13 @@
 
 #include "task/task.h"
 
-#include "memory/virtmem.h"
+#include "interrupt/trap.h"
 #include "memory/kalloc.h"
+#include "memory/virtmem.h"
 #include "memory/virtptr.h"
 #include "process/signals.h"
+#include "process/syscall.h"
 #include "task/harts.h"
-#include "interrupt/trap.h"
 #include "task/schedule.h"
 #include "task/types.h"
 
@@ -31,8 +32,9 @@ Task* createKernelTask(void* enter, size_t stack_size, Priority priority) {
         return NULL;
     }
     task->stack = kalloc(stack_size);
+    task->stack_top = (uintptr_t)task->stack + stack_size;
     initTrapFrame(
-        &task->frame, (uintptr_t)task->stack + stack_size, (uintptr_t)getKernelGlobalPointer(),
+        &task->frame, task->stack_top, (uintptr_t)getKernelGlobalPointer(),
         (uintptr_t)enter, 0, kernel_page_table
     );
     task->sched.priority = priority;

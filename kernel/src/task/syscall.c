@@ -4,36 +4,41 @@
 #include "task/syscall.h"
 
 #include "task/harts.h"
+#include "task/schedule.h"
 
-void yieldSyscall(bool is_kernel, TrapFrame* frame, SyscallArgs args) {
+SyscallReturn yieldSyscall(TrapFrame* frame) {
     assert(frame->hart != NULL); // Only a tasks can be yielded
     // Do nothing, task will be enqueued
+    SYSCALL_RETURN(0);
 }
 
-void sleepSyscall(bool is_kernel, TrapFrame* frame, SyscallArgs args) {
-    Time delay = args[0] / (1000000000UL / CLOCKS_PER_SEC); // Argument is in nanoseconds
+SyscallReturn sleepSyscall(TrapFrame* frame) {
+    Time delay = SYSCALL_ARG(0) / (1000000000UL / CLOCKS_PER_SEC); // Argument is in nanoseconds
     Time end = getTime() + delay;
     if (frame->hart == NULL) {
         // If this is not a task. Just loop.
         while (end > getTime()) {
             // Wait for the time to come
         }
+        SYSCALL_RETURN(0);
     } else {
         // This is a task. We can put it into wait.
         Task* task = (Task*)frame;
         task->sched.sleeping_until = end;
         task->sched.state = SLEEPING;
+        enqueueTask(task);
+        return WAIT;
     }
 }
 
-void criticalSyscall(bool is_kernel, TrapFrame* frame, SyscallArgs args) {
-    assert(is_kernel);
+SyscallReturn criticalSyscall(TrapFrame* frame) {
     if (frame->hart != NULL) {
         frame->regs[REG_ARGUMENT_0] = (uintptr_t)frame;
-        loadTrapFrame(frame, getCurrentTrapFrame());
+        swapTrapFrame(frame, getCurrentTrapFrame());
     } else {
         frame->regs[REG_ARGUMENT_0] = 0;
     }
+    return CONTINUE;
 }
 
 TrapFrame* criticalEnter() {
@@ -45,8 +50,8 @@ TrapFrame* criticalEnter() {
 }
 
 void criticalReturn(TrapFrame* to) {
-    if (to != NULL) {
-        loadTrapFrame(getCurrentTrapFrame(), to);
+    if (to != NULL && getCurrentTask() == NULL) {
+        swapTrapFrame(getCurrentTrapFrame(), to);
     }
 }
 

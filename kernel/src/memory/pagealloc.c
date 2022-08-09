@@ -28,9 +28,9 @@ Error initPageAllocator() {
     } else {
         free_pages.first = NULL;
     }
-    KERNEL_LOG("[>] Initialized page allocator");
+    KERNEL_SUBSUCCESS("Initialized page allocator");
     zero_page = zallocPage();
-    KERNEL_LOG("[>] Initialized zero page");
+    KERNEL_SUBSUCCESS("Initialized zero page");
     return simpleError(SUCCESS);
 }
 
@@ -40,7 +40,6 @@ void* allocPage() {
 
 PageAllocation allocPages(size_t pages) {
     if (pages != 0) {
-        TrapFrame* lock = criticalEnter();
         lockSpinLock(&alloc_lock);
         FreePage** current = &free_pages.first;
         while (*current != NULL) {
@@ -55,7 +54,6 @@ PageAllocation allocPages(size_t pages) {
                     .size = pages,
                 };
                 unlockSpinLock(&alloc_lock);
-                criticalReturn(lock);
                 return ret;
             } else if ((*current)->size == pages) {
                 FreePage* page = *current;
@@ -65,14 +63,12 @@ PageAllocation allocPages(size_t pages) {
                     .size = page->size,
                 };
                 unlockSpinLock(&alloc_lock);
-                criticalReturn(lock);
                 return ret;
             } else {
                 current = &(*current)->next;
             }
         }
         unlockSpinLock(&alloc_lock);
-        criticalReturn(lock);
     }
     // TODO: handle memory pressure
     PageAllocation ret = {
@@ -98,7 +94,6 @@ void deallocPages(PageAllocation alloc) {
             alloc.ptr + alloc.size * PAGE_SIZE >= (void*)__heap_start
             && alloc.ptr + alloc.size * PAGE_SIZE <= (void*)__heap_end
         );
-        TrapFrame* lock = criticalEnter();
         lockSpinLock(&alloc_lock);
         FreePage* memory = alloc.ptr;
         memory->next = NULL;
@@ -121,7 +116,6 @@ void deallocPages(PageAllocation alloc) {
         memory->next = free_pages.first;
         free_pages.first = memory;
         unlockSpinLock(&alloc_lock);
-        criticalReturn(lock);
     }
 }
 

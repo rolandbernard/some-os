@@ -89,3 +89,24 @@ char* stringClone(const char* path) {
     }
 }
 
+char* getParentPath(const char* path) {
+    char* path_copy = stringClone(path);
+    size_t len = strlen(path_copy) - 1;
+    while (len > 0 && path_copy[len] != '/') {
+        len--;
+    }
+    if (len == 0) {
+        len++;
+    }
+    path_copy[len] = 0;
+    return path_copy;
+}
+
+const char* getBaseFilename(const char* path) {
+    size_t len = strlen(path) - 1;
+    while (len > 0 && path[len] != '/') {
+        len--;
+    }
+    return path + len + 1;
+}
+

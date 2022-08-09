@@ -21,7 +21,7 @@ void terminateAllProcessTasks(Process* process);
 
 void terminateAllProcessTasksBut(Process* process, Task* keep);
 
-void executeProcessWait(Task* process);
+void executeProcessWait(Task* task);
 
 void finalProcessWait(Task* process);
 
@@ -30,6 +30,8 @@ void handleTaskWakeup(Task* task);
 bool shouldTaskWakeup(Task* task);
 
 void deallocProcess(Process* process);
+
+void exitProcess(Process* process, Signal signal, int exit);
 
 typedef int (*ProcessFindCallback)(Process* process, void* udata);
 

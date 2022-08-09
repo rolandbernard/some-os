@@ -17,20 +17,6 @@
 #include "task/types.h"
 #include "util/util.h"
 
-#define USER_STACK_TOP (1UL << 38)
-#define USER_STACK_SIZE (1UL << 19)
-
-typedef struct {
-    Task* task;
-    VirtPtr args;
-    VirtPtr envs;
-    ProgramLoadCallback callback;
-    void* udata;
-    VfsFile* file;
-    PageTable* memory;
-    VfsStat file_stat;
-} LoadProgramRequest;
-
 static size_t stringArrayLength(VirtPtr addr) {
     size_t length = 0;
     while (readInt(addr, sizeof(uintptr_t) * 8) != 0) {
@@ -78,128 +64,85 @@ static void allPagesBrkCallback(PageTableEntry* entry, uintptr_t vaddr, void* ud
     }
 }
 
-static uintptr_t findStartBrk(PageTable* table) {
+static uintptr_t findStartBrk(MemorySpace* memspc) {
     uintptr_t last_page = 0;
-    allPagesDo(table, allPagesBrkCallback, &last_page);
+    allPagesDo(memspc, allPagesBrkCallback, &last_page);
     return last_page + PAGE_SIZE;
 }
 
-static void readElfFileCallback(Error error, uintptr_t entry, void* udata) {
-    LoadProgramRequest* request = (LoadProgramRequest*)udata;
-    request->file->functions->close(request->file, NULL, noop, NULL);
-    if (isError(error)) {
-        freePageTable(request->memory);
-        request->callback(error, request->udata);
-        dealloc(request);
+Error loadProgramInto(Task* task, const char* path, VirtPtr args, VirtPtr envs) {
+    VfsFile* file;
+    CHECKED(vfsOpen(&global_file_system, task->process, path, VFS_OPEN_EXECUTE, 0, &file));
+    VfsStat stat;
+    CHECKED(file->functions->stat(file, task->process, virtPtrForKernel(&stat)), file->functions->close(file));
+    MemorySpace* memory = createMemorySpace();
+    uintptr_t entry;
+    CHECKED(loadProgramFromElfFile(memory, file, &entry), {
+        deallocMemorySpace(memory);
+        file->functions->close(file);
+    });
+    file->functions->close(file);
+    // Find the start_brk in the memory
+    uintptr_t start_brk = findStartBrk(memory);
+    // Allocate stack
+    if (!allocatePages(memory, USER_STACK_TOP - USER_STACK_SIZE, 0, USER_STACK_SIZE, ELF_PROG_READ | ELF_PROG_WRITE)) {
+        deallocMemorySpace(memory);
+        return simpleError(ENOMEM);
+    }
+    // Push arguments and env to stack
+    uintptr_t envs_addr = pushStringArray(virtPtrFor(USER_STACK_TOP, memory), envs, NULL);
+    size_t argc = 0;
+    uintptr_t args_addr = pushStringArray(virtPtrFor(envs_addr, memory), args, &argc);
+    // If everything went well, replace the original process
+    if (task->process == NULL) {
+        task->process = createUserProcess(NULL);
     } else {
-        // Find the start_brk in the memory
-        uintptr_t start_brk = findStartBrk(request->memory);
-        // Allocate stack
-        if (!allocatePages(request->memory, USER_STACK_TOP - USER_STACK_SIZE, 0, USER_STACK_SIZE, ELF_PROG_READ | ELF_PROG_WRITE)) {
-            deallocMemorySpace(request->memory);
-            request->callback(simpleError(ENOMEM), request->udata);
-            dealloc(request);
-            return;
-        }
-        // Push arguments and env to stack
-        uintptr_t envs = pushStringArray(virtPtrFor(USER_STACK_TOP, request->memory), request->envs, NULL);
-        size_t argc = 0;
-        uintptr_t args = pushStringArray(virtPtrFor(envs, request->memory), request->args, &argc);
-        // If everything went well, replace the original process
-        if (request->task->process == NULL) {
-            request->task->process = createUserProcess(NULL);
+        terminateAllProcessTasksBut(task->process, task);
+    }
+    deallocMemorySpace(task->process->memory.mem);
+    if (stat.mode & VFS_MODE_SETUID) {
+        task->process->resources.uid = stat.uid;
+    }
+    if (stat.mode & VFS_MODE_SETGID) {
+        task->process->resources.gid = stat.gid;
+    }
+    task->process->memory.mem = memory;
+    task->process->memory.start_brk = start_brk;
+    task->process->memory.brk = start_brk;
+    initTrapFrame(&task->frame, args_addr, 0, entry, task->process->pid, memory);
+    // Set main function arguments
+    task->frame.regs[REG_ARGUMENT_0] = argc;
+    task->frame.regs[REG_ARGUMENT_1] = args_addr;
+    task->frame.regs[REG_ARGUMENT_2] = envs_addr;
+    // Close files with CLOEXEC flag
+    VfsFile** current = &task->process->resources.files;
+    while (*current != NULL) {
+        if (((*current)->flags & VFS_FILE_CLOEXEC) != 0) {
+            VfsFile* to_remove = *current;
+            *current = to_remove->next;
+            to_remove->functions->close(to_remove);
         } else {
-            terminateAllProcessTasksBut(request->task->process, request->task);
+            current = &(*current)->next;
         }
-        deallocMemorySpace(request->task->process->memory.mem);
-        if (request->file_stat.mode & VFS_MODE_SETUID) {
-            request->task->process->resources.uid = request->file_stat.uid;
-        }
-        if (request->file_stat.mode & VFS_MODE_SETGID) {
-            request->task->process->resources.gid = request->file_stat.gid;
-        }
-        request->task->process->memory.mem = request->memory;
-        request->task->process->memory.start_brk = start_brk;
-        request->task->process->memory.brk = start_brk;
-        initTrapFrame(&request->task->frame, args, 0, entry, request->task->process->pid, request->memory);
-        // Set main function arguments
-        request->task->frame.regs[REG_ARGUMENT_0] = argc;
-        request->task->frame.regs[REG_ARGUMENT_1] = args;
-        request->task->frame.regs[REG_ARGUMENT_2] = envs;
-        // Close files with CLOEXEC flag
-        VfsFile** current = &request->task->process->resources.files;
-        while (*current != NULL) {
-            if (((*current)->flags & VFS_FILE_CLOEXEC) != 0) {
-                VfsFile* to_remove = *current;
-                *current = to_remove->next;
-                to_remove->functions->close(to_remove, NULL, noop, NULL);
-            } else {
-                current = &(*current)->next;
-            }
-        }
-        // Return from loading
-        request->callback(simpleError(SUCCESS), request->udata);
-        dealloc(request);
     }
+    return simpleError(SUCCESS);
 }
 
-static void fileStatCallback(Error error, VfsStat stat, void* udata) {
-    LoadProgramRequest* request = (LoadProgramRequest*)udata;
-    if (isError(error)) {
-        request->file->functions->close(request->file, NULL, noop, NULL);
-        request->callback(error, request->udata);
-        dealloc(request);
-    } else {
-        request->file_stat = stat;
-        request->memory = createPageTable();
-        loadProgramFromElfFile(request->memory, request->file, readElfFileCallback, request);
-    }
-}
-
-static void openFileCallback(Error error, VfsFile* file, void* udata) {
-    LoadProgramRequest* request = (LoadProgramRequest*)udata;
-    if (isError(error)) {
-        request->callback(error, request->udata);
-        dealloc(request);
-    } else {
-        request->file = file;
-        file->functions->stat(file, NULL, fileStatCallback, request);
-    }
-}
-
-void loadProgramInto(Task* task, const char* path, VirtPtr args, VirtPtr envs, ProgramLoadCallback callback, void* udata) {
-    LoadProgramRequest* request = kalloc(sizeof(LoadProgramRequest));
-    request->task = task;
-    request->args = args;
-    request->envs = envs;
-    request->callback = callback;
-    request->udata = udata;
-    vfsOpen(&global_file_system, task->process, path, VFS_OPEN_EXECUTE, 0, openFileCallback, request);
-}
-
-static void loadProgramCallback(Error error, void* udata) {
-    Task* task = (Task*)udata;
-    if (isError(error)) {
-        task->frame.regs[REG_ARGUMENT_0] = -error.kind;
-    } else {
-        task->sched.state = ENQUABLE;
-        enqueueTask(task);
-    }
-}
-
-void execveSyscall(bool is_kernel, TrapFrame* frame, SyscallArgs args) {
+SyscallReturn execveSyscall(TrapFrame* frame) {
     assert(frame->hart != NULL);
     Task* task = (Task*)frame;
-    char* string = copyPathFromSyscallArgs(task, args[0]);
+    char* string = copyPathFromSyscallArgs(task, SYSCALL_ARG(0));
     if (string != NULL) {
         task->sched.state = WAITING;
-        loadProgramInto(
-            task, string, virtPtrForTask(args[1], task), virtPtrForTask(args[2], task),
-            loadProgramCallback, task
-        );
+        Error e = loadProgramInto(task, string, virtPtrForTask(SYSCALL_ARG(1), task), virtPtrForTask(SYSCALL_ARG(2), task));
         dealloc(string);
+        if (isError(e)) {
+            SYSCALL_RETURN(-e.kind);
+        } else {
+            return CONTINUE;
+        }
     } else {
-        task->frame.regs[REG_ARGUMENT_0] = -EINVAL;
+        SYSCALL_RETURN(-EINVAL);
     }
 }
 

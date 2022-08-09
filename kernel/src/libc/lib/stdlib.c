@@ -5,8 +5,7 @@
 #include "memory/kalloc.h"
 
 noreturn void abort() {
-    KERNEL_LOG("[!] Kernel abort!")
-    panicWithoutBacktrace();
+    panic();
 }
 
 void* malloc(size_t size) {

@@ -3,45 +3,45 @@
 
 #include "interrupt/syscall.h"
 
-void openSyscall(bool is_kernel, TrapFrame* frame, SyscallArgs args);
+SyscallReturn openSyscall(TrapFrame* frame);
 
-void linkSyscall(bool is_kernel, TrapFrame* frame, SyscallArgs args);
+SyscallReturn linkSyscall(TrapFrame* frame);
 
-void unlinkSyscall(bool is_kernel, TrapFrame* frame, SyscallArgs args);
+SyscallReturn unlinkSyscall(TrapFrame* frame);
 
-void renameSyscall(bool is_kernel, TrapFrame* frame, SyscallArgs args);
+SyscallReturn renameSyscall(TrapFrame* frame);
 
-void closeSyscall(bool is_kernel, TrapFrame* frame, SyscallArgs args);
+SyscallReturn closeSyscall(TrapFrame* frame);
 
-void readSyscall(bool is_kernel, TrapFrame* frame, SyscallArgs args);
+SyscallReturn readSyscall(TrapFrame* frame);
 
-void writeSyscall(bool is_kernel, TrapFrame* frame, SyscallArgs args);
+SyscallReturn writeSyscall(TrapFrame* frame);
 
-void seekSyscall(bool is_kernel, TrapFrame* frame, SyscallArgs args);
+SyscallReturn seekSyscall(TrapFrame* frame);
 
-void statSyscall(bool is_kernel, TrapFrame* frame, SyscallArgs args);
+SyscallReturn statSyscall(TrapFrame* frame);
 
-void dupSyscall(bool is_kernel, TrapFrame* frame, SyscallArgs args);
+SyscallReturn dupSyscall(TrapFrame* frame);
 
-void truncSyscall(bool is_kernel, TrapFrame* frame, SyscallArgs args);
+SyscallReturn truncSyscall(TrapFrame* frame);
 
-void chmodSyscall(bool is_kernel, TrapFrame* frame, SyscallArgs args);
+SyscallReturn chmodSyscall(TrapFrame* frame);
 
-void chownSyscall(bool is_kernel, TrapFrame* frame, SyscallArgs args);
+SyscallReturn chownSyscall(TrapFrame* frame);
 
-void mountSyscall(bool is_kernel, TrapFrame* frame, SyscallArgs args);
+SyscallReturn mountSyscall(TrapFrame* frame);
 
-void umountSyscall(bool is_kernel, TrapFrame* frame, SyscallArgs args);
+SyscallReturn umountSyscall(TrapFrame* frame);
 
-void readdirSyscall(bool is_kernel, TrapFrame* frame, SyscallArgs args);
+SyscallReturn readdirSyscall(TrapFrame* frame);
 
-void chdirSyscall(bool is_kernel, TrapFrame* frame, SyscallArgs args);
+SyscallReturn chdirSyscall(TrapFrame* frame);
 
-void getcwdSyscall(bool is_kernel, TrapFrame* frame, SyscallArgs args);
+SyscallReturn getcwdSyscall(TrapFrame* frame);
 
-void pipeSyscall(bool is_kernel, TrapFrame* frame, SyscallArgs args);
+SyscallReturn pipeSyscall(TrapFrame* frame);
 
-void mknodSyscall(bool is_kernel, TrapFrame* frame, SyscallArgs args);
+SyscallReturn mknodSyscall(TrapFrame* frame);
 
 char* copyPathFromSyscallArgs(Task* task, uintptr_t ptr);
 

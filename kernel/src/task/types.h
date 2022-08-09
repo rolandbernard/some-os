@@ -43,7 +43,7 @@ typedef enum { // This is offset by one to be used as the index into TrapFrame.r
     REG_TEMP_6 = 30,
 } RegisterNames;
 
-typedef struct {
+typedef struct TrapFrame_s {
     // Be careful changing this. It's used from assembly
     struct HartFrame_s* hart;
     uintptr_t regs[31];
@@ -87,7 +87,6 @@ typedef enum {
     SLEEPING,
     PAUSED,
     TERMINATED,
-    // Special
     WAIT_CHLD,
 } TaskState;
 
@@ -97,7 +96,7 @@ typedef struct {
     // All data needed for scheduling
     Priority priority;
     Priority queue_priority; // Is at maximum priority, but will be decreased over time
-    uint16_t runs;
+    Time run_for;
     TaskState state;
     struct Task_s* sched_next; // Used for ready and waiting lists
     Time sleeping_until;

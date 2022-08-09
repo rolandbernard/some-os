@@ -14,7 +14,7 @@ typedef struct {
     size_t system_child_time;
 } TimesStruct;
 
-void timesSyscall(bool is_kernel, TrapFrame* frame, SyscallArgs args) {
+SyscallReturn timesSyscall(TrapFrame* frame) {
     assert(frame->hart != NULL);
     Task* task = (Task*)frame;
     TimesStruct times;
@@ -22,10 +22,10 @@ void timesSyscall(bool is_kernel, TrapFrame* frame, SyscallArgs args) {
     times.system_time = task->times.system_time;
     times.user_child_time = task->times.user_child_time;
     times.system_child_time = task->times.system_child_time;
-    if (args[0] != 0) {
-        VirtPtr buf = virtPtrForTask(args[0], task);
+    if (SYSCALL_ARG(0) != 0) {
+        VirtPtr buf = virtPtrForTask(SYSCALL_ARG(0), task);
         memcpyBetweenVirtPtr(buf, virtPtrForKernel(&times), sizeof(TimesStruct));
     }
-    task->frame.regs[REG_ARGUMENT_0] = getTime();
+    SYSCALL_RETURN(getTime());
 }
 

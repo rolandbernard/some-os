@@ -2,22 +2,27 @@
 .altmacro
 
 .section .text
-.global readMhartid
-.global readSscratch
-.global writeSscratch
-.global loadTrapFrame
 
+.global readMhartid
 readMhartid:
+.cfi_startproc
     csrr a0, mhartid
     ret
+.cfi_endproc
 
+.global readSscratch
 readSscratch:
+.cfi_startproc
     csrr a0, sscratch
     ret
+.cfi_endproc
 
+.global writeSscratch
 writeSscratch:
+.cfi_startproc
     csrw sscratch, a0
     ret
+.cfi_endproc
 
 .macro save_gp i, basereg
     sd x\i, ((\i)*8)(\basereg)
@@ -35,7 +40,9 @@ writeSscratch:
 # Save the current state to TrapFrame in a1 and load from a TrapFrame in a0.
 # Because this is only to be used inside the kernel, we can assume that we do not have to
 # preserve caller saved registers.
-loadTrapFrame:
+.global swapTrapFrame
+swapTrapFrame:
+.cfi_startproc
 # Saving to a1
     # Save integer registers
 .set i, 1
@@ -73,4 +80,4 @@ loadTrapFrame:
     jr a1
 1:
     ret
-
+.cfi_endproc
