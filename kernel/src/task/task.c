@@ -7,6 +7,7 @@
 #include "memory/kalloc.h"
 #include "memory/virtmem.h"
 #include "memory/virtptr.h"
+#include "process/process.h"
 #include "process/signals.h"
 #include "process/syscall.h"
 #include "task/harts.h"
@@ -43,6 +44,9 @@ Task* createKernelTask(void* enter, size_t stack_size, Priority priority) {
 }
 
 void deallocTask(Task* task) {
+    if (task->process != NULL) {
+        removeProcessTask(task);
+    }
     dealloc(task->stack);
     dealloc(task);
 }

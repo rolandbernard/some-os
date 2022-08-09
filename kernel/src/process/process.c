@@ -3,7 +3,6 @@
 #include <assert.h>
 #include <string.h>
 
-#include "interrupt/com.h"
 #include "process/process.h"
 
 #include "error/log.h"
@@ -23,6 +22,7 @@
 #include "process/signals.h"
 #include "process/syscall.h"
 #include "process/types.h"
+#include "task/syscall.h"
 #include "task/types.h"
 #include "task/spinlock.h"
 #include "util/util.h"
@@ -202,12 +202,7 @@ void addTaskToProcess(Process* process, Task* task) {
 static void terminateProcessTask(Task* task) {
     // TODO: For adding multiple task for a process this must be implemented correctly.
     // This fails for example if the task is running, is in a syscall, is waiting, etc.
-    task->process->times.user_time += task->times.user_time;
-    task->process->times.system_time += task->times.system_time;
-    task->process->times.user_child_time += task->times.user_child_time;
-    task->process->times.system_child_time += task->times.system_child_time;
     task->sched.state = TERMINATED;
-    task->process = NULL;
 }
 
 void terminateAllProcessTasksBut(Process* process, Task* keep) {
@@ -218,10 +213,6 @@ void terminateAllProcessTasksBut(Process* process, Task* keep) {
             terminateProcessTask(current);
         }
         current = next;
-    }
-    process->tasks = keep;
-    if (keep != NULL) {
-        keep->proc_next = NULL;
     }
 }
 
@@ -251,7 +242,31 @@ void deallocProcess(Process* process) {
 void exitProcess(Process* process, Signal signal, int exit) {
     process->status = (exit & 0xff) | (signal << 8);
     terminateAllProcessTasks(process);
-    deallocProcess(process);
+}
+
+void removeProcessTask(Task* task) {
+    assert(task->process != NULL);
+    Process* process = task->process;
+    lockSpinLock(&process->lock);
+    Task** curr = &process->tasks;
+    while (*curr != NULL) {
+        if (*curr == task) {
+            *curr = task->proc_next;
+        } else {
+            curr = &(*curr)->proc_next;
+        }
+    }
+    process->times.user_time += task->times.user_time;
+    process->times.system_time += task->times.system_time;
+    process->times.user_child_time += task->times.user_child_time;
+    process->times.system_child_time += task->times.system_child_time;
+    task->process = NULL;
+    if (process->tasks == NULL) {
+        unlockSpinLock(&process->lock);
+        deallocProcess(process);
+    } else {
+        unlockSpinLock(&process->lock);
+    }
 }
 
 int doForProcessWithPid(int pid, ProcessFindCallback callback, void* udata) {

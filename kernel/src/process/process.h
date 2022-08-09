@@ -27,6 +27,8 @@ void finalProcessWait(Task* process);
 
 void handleProcessTaskWakeup(Task* task);
 
+void removeProcessTask(Task* task);
+
 bool shouldTaskWakeup(Task* task);
 
 void deallocProcess(Process* process);
