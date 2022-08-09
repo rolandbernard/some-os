@@ -72,12 +72,11 @@ static void awakenTask(Task* task) {
         } else {
             task->frame.regs[REG_ARGUMENT_0] = task->sched.sleeping_until - time;
         }
-    } else if (task->sched.state == PAUSED) {
-        if (task->process != NULL) {
-            handleTaskWakeup(task);
-        } else {
-            task->frame.regs[REG_ARGUMENT_0] = -EINTR;
-        }
+    } else {
+        task->frame.regs[REG_ARGUMENT_0] = -EINTR;
+    }
+    if (task->process != NULL) {
+        handleProcessTaskWakeup(task);
     }
     task->sched.state = ENQUABLE;
     enqueueTask(task);

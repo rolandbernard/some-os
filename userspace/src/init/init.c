@@ -1,20 +1,14 @@
 
-#include <assert.h>
-#include <errno.h>
 #include <fcntl.h>
 #include <signal.h>
-#include <stdio.h>
 #include <stdlib.h>
 #include <stdnoreturn.h>
-#include <string.h>
 #include <sys/wait.h>
-#include <sys/stat.h>
 #include <unistd.h>
-
-#define PROGRAM_NAME "init"
 
 #include "systest.h"
 #include "log.h"
+#include "util.h"
 
 void signalHandler(int signal) {
     USPACE_DEBUG("Signal handler");
@@ -48,22 +42,9 @@ void setupTty() {
     }
 }
 
-void startProgram(const char* name) {
-    int pid = fork();
-    if (pid == 0) {
-        USPACE_DEBUG("Forked");
-        execl(name, name, NULL);
-        USPACE_ERROR("Failed to start `%s`: %s", name, strerror(errno));
-        exit(1);
-    } else {
-        // Process started
-        return;
-    }
-}
-
 void setupSystem() {
     signal(SIGCHLD, signalHandler);
-    startProgram("/bin/hello");
+    // TO DO
 }
 
 noreturn void idleLoop() {

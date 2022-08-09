@@ -25,7 +25,7 @@ void executeProcessWait(Task* task);
 
 void finalProcessWait(Task* process);
 
-void handleTaskWakeup(Task* task);
+void handleProcessTaskWakeup(Task* task);
 
 bool shouldTaskWakeup(Task* task);
 

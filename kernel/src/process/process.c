@@ -58,11 +58,6 @@ static bool basicProcessWait(Task* task) {
     return false;
 }
 
-void finalProcessWait(Task* task) {
-    // Called before waking up the task
-    basicProcessWait(task);
-}
-
 void executeProcessWait(Task* task) {
     lockSpinLock(&process_lock); 
     if (basicProcessWait(task)) {
@@ -273,11 +268,9 @@ int doForProcessWithPid(int pid, ProcessFindCallback callback, void* udata) {
     return -ESRCH;
 }
 
-void handleTaskWakeup(Task* task) {
+void handleProcessTaskWakeup(Task* task) {
     if (task->sched.state == WAIT_CHLD) {
-        finalProcessWait(task);
-    } else {
-        task->frame.regs[REG_ARGUMENT_0] = -EINTR;
+        basicProcessWait(task);
     }
 }
 
