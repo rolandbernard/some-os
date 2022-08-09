@@ -97,9 +97,10 @@ typedef struct {
     Priority priority;
     Priority queue_priority; // Is at maximum priority, but will be decreased over time
     Time run_for;
-    TaskState state;
+    TaskState _state;
     struct Task_s* sched_next; // Used for ready and waiting lists
     Time sleeping_until;
+    SpinLock lock;
 } TaskSched;
 
 typedef struct {
@@ -119,6 +120,7 @@ typedef struct Task_s {
     uintptr_t stack_top;
     TaskSched sched;
     TaskTimes times;
+    struct Task_s* syscall_task;
     struct Process_s* process;
     struct Task_s* proc_next;
 } Task;

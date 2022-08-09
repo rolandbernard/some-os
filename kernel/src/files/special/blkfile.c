@@ -41,7 +41,7 @@ typedef struct {
 
 static void blockOperatonCallback(Error status, BlockFileWakeup* wakeup) {
     wakeup->result = status;
-    wakeup->wakeup->sched.state = ENQUABLE;
+    moveTaskToState(wakeup->wakeup, ENQUABLE);
     enqueueTask(wakeup->wakeup);
 }
 
@@ -51,7 +51,7 @@ static Error syncBlockOperation(BlockOperationFunction func, void* dev, VirtPtr 
     BlockFileWakeup wakeup;
     wakeup.wakeup = self;
     TrapFrame* lock = criticalEnter();
-    self->sched.state = WAITING;
+    moveTaskToState(self, WAITING);
     func(dev, buf, off, size, write, (BlockOperatonCallback)blockOperatonCallback, &wakeup);
     criticalReturn(lock);
     return wakeup.result;

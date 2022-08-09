@@ -72,7 +72,7 @@ void kernelTrap(uintptr_t cause, uintptr_t pc, uintptr_t val, TrapFrame* frame) 
             task->times.user_time += elapsed;
             task->times.entered = getTime();
             task->sched.run_for += elapsed;
-            task->sched.state = ENQUABLE;
+            moveTaskToState(task, ENQUABLE);
 #ifdef DEBUG_LOG_EXECUTION_TIMES
             if (task != frame->hart->idle_task) {
                 if (task->process != NULL) {

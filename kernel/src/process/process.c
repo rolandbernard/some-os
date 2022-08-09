@@ -62,7 +62,7 @@ void executeProcessWait(Task* task) {
     lockSpinLock(&process_lock); 
     if (basicProcessWait(task)) {
         unlockSpinLock(&process_lock); 
-        task->sched.state = ENQUABLE;
+        moveTaskToState(task, ENQUABLE);
     } else {
         bool has_child = false;
         Pid wait_pid = task->frame.regs[REG_ARGUMENT_1];
@@ -80,10 +80,10 @@ void executeProcessWait(Task* task) {
         unlockSpinLock(&process_lock); 
         if (has_child) {
             task->frame.regs[REG_ARGUMENT_0] = -EINTR;
-            task->sched.state = WAIT_CHLD;
+            moveTaskToState(task, WAIT_CHLD);
         } else {
             task->frame.regs[REG_ARGUMENT_0] = -ECHILD;
-            task->sched.state = ENQUABLE;
+            moveTaskToState(task, ENQUABLE);
         }
     }
 }
@@ -184,7 +184,7 @@ Task* createTaskInProcess(Process* process, uintptr_t sp, uintptr_t gp, uintptr_
     if (task != NULL) {
         task->process = process;
         task->sched.priority = priority;
-        task->sched.state = ENQUABLE;
+        moveTaskToState(task, ENQUABLE);
         initTrapFrame(&task->frame, sp, gp, pc, process->pid, process->memory.mem);
         addTaskToProcess(process, task);
     }
@@ -202,7 +202,7 @@ void addTaskToProcess(Process* process, Task* task) {
 static void terminateProcessTask(Task* task) {
     // TODO: For adding multiple task for a process this must be implemented correctly.
     // This fails for example if the task is running, is in a syscall, is waiting, etc.
-    task->sched.state = TERMINATED;
+    moveTaskToState(task, TERMINATED);
 }
 
 void terminateAllProcessTasksBut(Process* process, Task* keep) {
@@ -284,7 +284,7 @@ int doForProcessWithPid(int pid, ProcessFindCallback callback, void* udata) {
 }
 
 void handleProcessTaskWakeup(Task* task) {
-    if (task->sched.state == WAIT_CHLD) {
+    if (task->sched._state == WAIT_CHLD) {
         basicProcessWait(task);
     }
 }

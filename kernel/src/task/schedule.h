@@ -18,4 +18,6 @@ void pushTaskToQueue(ScheduleQueue* queue, Task* task);
 
 Task* removeTaskFromQueue(ScheduleQueue* queue, Task* task);
 
+void moveTaskToState(Task* task, TaskState state);
+
 #endif

@@ -39,7 +39,7 @@ Task* createKernelTask(void* enter, size_t stack_size, Priority priority) {
         (uintptr_t)enter, 0, kernel_page_table
     );
     task->sched.priority = priority;
-    task->sched.state = ENQUABLE;
+    moveTaskToState(task, ENQUABLE);
     return task;
 }
 
@@ -52,7 +52,7 @@ void deallocTask(Task* task) {
 }
 
 void enterTask(Task* task) {
-    task->sched.state = RUNNING;
+    moveTaskToState(task, RUNNING);
     HartFrame* hart = getCurrentHartFrame();
     task->frame.hart = hart;
     if (hart != NULL) {

@@ -111,7 +111,7 @@ SyscallReturn exitSyscall(TrapFrame* frame) {
     if (task->process != NULL) {
         exitProcess(task->process, 0, SYSCALL_ARG(0));
     } else {
-        task->sched.state = TERMINATED;
+        moveTaskToState(task, TERMINATED);
     }
     enqueueTask(task);
     return WAIT;
@@ -120,7 +120,7 @@ SyscallReturn exitSyscall(TrapFrame* frame) {
 SyscallReturn pauseSyscall(TrapFrame* frame) {
     assert(frame->hart != NULL);
     Task* task = (Task*)frame;
-    task->sched.state = PAUSED;
+    moveTaskToState(task, PAUSED);
     enqueueTask(task);
     return WAIT;
 }

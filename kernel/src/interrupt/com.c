@@ -65,6 +65,10 @@ void handleMessage(MessageType type, void* data) {
     } else if (type == KERNEL_PANIC) {
         unlockUnsafeLock(&message_read_lock);
         silentPanic();
+    } else if (type == TASK_KILL) {
+        Task* task = (Task*)data;
+        unlockUnsafeLock(&message_read_lock);
+        moveTaskToState(task, TERMINATED);
     } else {
         panic();
     }

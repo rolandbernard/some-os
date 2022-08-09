@@ -133,7 +133,7 @@ SyscallReturn execveSyscall(TrapFrame* frame) {
     Task* task = (Task*)frame;
     char* string = copyPathFromSyscallArgs(task, SYSCALL_ARG(0));
     if (string != NULL) {
-        task->sched.state = WAITING;
+        moveTaskToState(task, WAITING);
         Error e = loadProgramInto(task, string, virtPtrForTask(SYSCALL_ARG(1), task), virtPtrForTask(SYSCALL_ARG(2), task));
         dealloc(string);
         if (isError(e)) {
