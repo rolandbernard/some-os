@@ -5,6 +5,7 @@
 
 #include "process/process.h"
 
+#include "interrupt/com.h"
 #include "error/log.h"
 #include "error/panic.h"
 #include "files/path.h"
@@ -200,19 +201,17 @@ void addTaskToProcess(Process* process, Task* task) {
 }
 
 static void terminateProcessTask(Task* task) {
-    // TODO: For adding multiple task for a process this must be implemented correctly.
-    // This fails for example if the task is running, is in a syscall, is waiting, etc.
     moveTaskToState(task, TERMINATED);
+    sendMessageToAll(YIELD_TASK, task);
 }
 
 void terminateAllProcessTasksBut(Process* process, Task* keep) {
     Task* current = process->tasks;
     while (current != NULL) {
-        Task* next = current->proc_next;
         if (current != keep) {
             terminateProcessTask(current);
         }
-        current = next;
+        current = current->proc_next;
     }
 }
 

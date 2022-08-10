@@ -6,7 +6,6 @@ typedef enum {
     INITIALIZE_HARTS,
     KERNEL_PANIC,
     YIELD_TASK,
-    TASK_KILL,
 } MessageType;
 
 void sendMachineSoftwareInterrupt(int hart);

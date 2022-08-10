@@ -103,7 +103,7 @@ bool testForkKillWait() {
     if (pid == 0) {
         while (true) {
             syscall0(2);
-        };
+        }
         exit(1);
     } else {
         ASSERT(kill(pid, SIGKILL) == 0);

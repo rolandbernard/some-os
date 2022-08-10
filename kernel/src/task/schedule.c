@@ -6,6 +6,7 @@
 #include "error/log.h"
 #include "interrupt/trap.h"
 #include "process/process.h"
+#include "process/signals.h"
 #include "task/harts.h"
 #include "task/spinlock.h"
 #include "task/task.h"
@@ -63,8 +64,8 @@ void enqueueTask(Task* task) {
                 unlockSpinLock(&task->sched.lock);
                 deallocTask(task);
                 break;
-            case UNKNOWN: // We don't know what to do
-                panic();  // These should not happen
+            default:        // We don't know what to do
+                panic();    // These should not happen
         }
     }
 }
@@ -94,50 +95,58 @@ static void awakenTasks() {
     Time time = getTime();
     Task** current = &sleeping;
     while (*current != NULL) {
-        lockSpinLock(&(*current)->sched.lock);
+        Task* task = *current;
+        lockSpinLock(&task->sched.lock);
         if (
-            ((*current)->sched._state == SLEEPING && (*current)->sched.sleeping_until <= time)
-            || ((*current)->process != NULL && shouldTaskWakeup(*current))
+            (task->sched._state == SLEEPING && task->sched.sleeping_until <= time)
+            || (task->process != NULL && shouldTaskWakeup(task))
+            || task->sched._state == TERMINATED
         ) {
-            Task* task = *current;
-            *current = (*current)->sched.sched_next;
-            unlockSpinLock(&(*current)->sched.lock);
+            unlockSpinLock(&task->sched.lock);
+            *current = task->sched.sched_next;
             awakenTask(task);
         } else {
-            unlockSpinLock(&(*current)->sched.lock);
-            current = &(*current)->sched.sched_next;
+            unlockSpinLock(&task->sched.lock);
+            current = &task->sched.sched_next;
         }
     }
     unlockSpinLock(&sleeping_lock);
 }
 
-void runNextTask() {
+noreturn void runNextTask() {
     awakenTasks();
     Task* current = NULL;
     current = getCurrentTask();
     if (current != NULL) {
         // If this is called from inside a process. Call exit syscall.
         syscall(SYSCALL_EXIT);
+        panic();
     } else {
         runNextTaskFrom(getCurrentHartFrame());
     }
 }
 
-void runNextTaskFrom(HartFrame* hart) {
-    Task* next = NULL;
-    while (next == NULL) {
-        next = pullTaskForHart(hart);
-        lockSpinLock(&next->sched.lock);
-        if (next->sched._state == TERMINATED) {
-            unlockSpinLock(&next->sched.lock);
-            deallocTask(next);
-            next = NULL;
+noreturn void runNextTaskFrom(HartFrame* hart) {
+    for (;;) {
+        Task* next = NULL;
+        while (next == NULL) {
+            next = pullTaskForHart(hart);
+            lockSpinLock(&next->sched.lock);
+            if (next->sched._state == TERMINATED) {
+                unlockSpinLock(&next->sched.lock);
+                deallocTask(next);
+                next = NULL;
+            } else {
+                unlockSpinLock(&next->sched.lock);
+            }
+        }
+        assert(next != NULL);
+        if (next->process == NULL || handlePendingSignals(next)) {
+            enterTask(next);
         } else {
-            unlockSpinLock(&next->sched.lock);
+            enqueueTask(next);
         }
     }
-    assert(next != NULL);
-    enterTask(next);
 }
 
 Task* pullTaskForHart(HartFrame* hart) {

@@ -8,7 +8,6 @@
 #include "memory/virtmem.h"
 #include "memory/virtptr.h"
 #include "process/process.h"
-#include "process/signals.h"
 #include "process/syscall.h"
 #include "task/harts.h"
 #include "task/schedule.h"
@@ -51,7 +50,7 @@ void deallocTask(Task* task) {
     dealloc(task);
 }
 
-void enterTask(Task* task) {
+noreturn void enterTask(Task* task) {
     moveTaskToState(task, RUNNING);
     HartFrame* hart = getCurrentHartFrame();
     task->frame.hart = hart;
@@ -63,11 +62,7 @@ void enterTask(Task* task) {
     if (task->process == NULL) {
         enterKernelMode(&task->frame);
     } else {
-        if (handlePendingSignals(task)) {
-            enterUserMode(&task->frame);
-        } else {
-            runNextTask();
-        }
+        enterUserMode(&task->frame);
     }
 }
 

@@ -1,14 +1,16 @@
 #ifndef _SCHEDULE_H_
 #define _SCHEDULE_H_
 
+#include <stdnoreturn.h>
+
 #include "task/types.h"
 
 // Enqueue the given process
 void enqueueTask(Task* task);
 
-void runNextTask();
+noreturn void runNextTask();
 
-void runNextTaskFrom(HartFrame* hart);
+noreturn void runNextTaskFrom(HartFrame* hart);
 
 Task* pullTaskForHart(HartFrame* hart);
 

@@ -64,6 +64,7 @@ int main(int argc, char* argv[], char* env[]) {
         USPACE_WARNING("Failed basic syscall tests");
     }
     setupSystem();
+    USPACE_SUCCESS("Finished system setup");
     idleLoop();
     // We should not return
     USPACE_WARNING("Init process exited");

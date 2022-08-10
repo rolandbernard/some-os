@@ -1,6 +1,8 @@
 #ifndef _INTERRUPT_H_
 #define _INTERRUPT_H_
 
+#include <stdnoreturn.h>
+
 #include "task/types.h"
 
 // Initialize CSRs for traps
@@ -13,9 +15,9 @@ void enableInterrupts();
 void waitForInterrupt();
 
 // Enter process at pc into user mode
-void enterUserMode(TrapFrame* process);
+noreturn void enterUserMode(TrapFrame* process);
 
 // Enter process at pc into supervisor mode
-void enterKernelMode(TrapFrame* process);
+noreturn void enterKernelMode(TrapFrame* process);
 
 #endif

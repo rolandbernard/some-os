@@ -31,8 +31,8 @@ void sendMessageTo(int hartid, MessageType type, void* data) {
     lockUnsafeLock(&message_write_lock);
     message_type = type;
     message_data = data;
-    sendMachineSoftwareInterrupt(hartid);
     lockUnsafeLock(&message_read_lock);
+    sendMachineSoftwareInterrupt(hartid);
     // Wait for the receiver to unlock the read lock
     lockUnsafeLock(&message_read_lock);
     unlockUnsafeLock(&message_read_lock);
@@ -65,10 +65,6 @@ void handleMessage(MessageType type, void* data) {
     } else if (type == KERNEL_PANIC) {
         unlockUnsafeLock(&message_read_lock);
         silentPanic();
-    } else if (type == TASK_KILL) {
-        Task* task = (Task*)data;
-        unlockUnsafeLock(&message_read_lock);
-        moveTaskToState(task, TERMINATED);
     } else {
         panic();
     }

@@ -23,7 +23,7 @@ static bool lockOrWaitTaskLock(TaskLock* lock, Task* self) {
     } else {
         result = false;
         moveTaskToState(self, WAITING);
-        self->proc_next = lock->wait_queue;
+        self->sched.sched_next = lock->wait_queue;
         lock->wait_queue = self;
     }
     unlockUnsafeLock(&lock->unsafelock);
@@ -77,7 +77,7 @@ void unlockTaskLock(TaskLock* lock) {
         lock->locked_by = NULL;
         while (lock->wait_queue != NULL) {
             Task* wakeup = lock->wait_queue;
-            lock->wait_queue = wakeup->proc_next;
+            lock->wait_queue = wakeup->sched.sched_next;
             moveTaskToState(wakeup, ENQUABLE);
             enqueueTask(wakeup);
         }
