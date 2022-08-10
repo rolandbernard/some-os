@@ -87,7 +87,7 @@ static bool testUsleep() {
     ASSERT(usleep(10000) == 0);
     clock_t t2 = times(NULL);
     ASSERT(t2 >= t1 + CLOCKS_PER_SEC / 100);
-    ASSERT(t2 <= t1 + CLOCKS_PER_SEC / 50);
+    ASSERT(t2 <= t1 + CLOCKS_PER_SEC / 10);
     return true;
 }
 
@@ -99,7 +99,7 @@ static bool testNanosleep() {
     ASSERT(nanosleep(&t, &t) == 0)
     clock_t t2 = times(NULL);
     ASSERT(t2 >= t1 + CLOCKS_PER_SEC / 100);
-    ASSERT(t2 <= t1 + CLOCKS_PER_SEC / 50);
+    ASSERT(t2 <= t1 + CLOCKS_PER_SEC / 10);
     return true;
 }
 
@@ -226,26 +226,81 @@ static bool testGetSetGid() {
 }
 
 static bool testPipe() {
+    int fds[2][2];
+    ASSERT(pipe(fds[0]) == 0);
+    ASSERT(pipe(fds[1]) == 0);
+    int pid = fork();
+    ASSERT(pid != -1);
+    if (pid == 0) {
+        char buffer[512] = "Hello world!";
+        ASSERT_CHILD(write(fds[0][1], buffer, 10) == 10);
+        ASSERT_CHILD(read(fds[1][0], buffer, 512) == 10);
+        ASSERT_CHILD(strncmp(buffer, "HELLO WORLD!", 10) == 0);
+        exit(0);
+    } else {
+        char buffer[512] = "BUFFER INIT";
+        ASSERT(read(fds[0][0], buffer, 512) == 10);
+        ASSERT(strncmp(buffer, "Hello world!", 10) == 0);
+        memcpy(buffer, "HELLO WORLD!", 10);
+        ASSERT(write(fds[1][1], buffer, 10) == 10);
+        int status;
+        int wait_pid = wait(&status);
+        return wait_pid == pid && WIFEXITED(status) && WEXITSTATUS(status) == 0;
+    }
+    close(fds[0][0]);
+    close(fds[0][1]);
+    close(fds[1][0]);
+    close(fds[1][1]);
+    return true;
+}
+
+static bool testPause() {
+    int pid = fork();
+    ASSERT(pid != -1);
+    if (pid == 0) {
+        pause();
+        exit(42);
+    } else {
+        ASSERT(kill(pid, SIGUSR1) == 0);
+        int status;
+        int wait_pid = wait(&status);
+        ASSERT(wait_pid == pid);
+        ASSERT(WIFEXITED(status));
+        ASSERT(!WIFSIGNALED(status));
+        ASSERT(WEXITSTATUS(status) == 42);
+    }
+    return true;
+}
+
+static bool testPipeDup() {
     int fds[2];
     ASSERT(pipe(fds) == 0);
     int pid = fork();
     ASSERT(pid != -1);
     if (pid == 0) {
-        char buffer[512] = "Hello world!";
-        ASSERT_CHILD(write(fds[1], buffer, 10) == 10);
-        ASSERT_CHILD(read(fds[0], buffer, 512) == 10);
-        ASSERT_CHILD(strncmp(buffer, "HELLO WORLD!", 10) == 0);
-        exit(0);
+        dup2(fds[1], 1);
+        execl("/bin/hello", "/bin/hello", NULL);
+        exit(1);
     } else {
         char buffer[512];
-        ASSERT(read(fds[0], buffer, 512) == 10);
-        ASSERT(strncmp(buffer, "Hello world!", 10) == 0);
-        memcpy(buffer, "HELLO WORLD!", 10);
-        ASSERT(write(fds[1], buffer, 512) == 10);
+        memset(buffer, 0, 512);
+        while (read(fds[0], buffer, 512) > 0) {
+            size_t i = 0;
+            while (buffer[i] != 0 && buffer[i] != '\n') {
+                i++;
+            }
+            if (buffer[i] == '\n') {
+                buffer[i] = 0;
+                break;
+            }
+        }
+        ASSERT(strcmp(buffer, "Hello world!") == 0);
         int status;
         int wait_pid = wait(&status);
         return wait_pid == pid && WIFEXITED(status) && WEXITSTATUS(status) == 0;
     }
+    close(fds[0]);
+    close(fds[1]);
     return true;
 }
 
@@ -275,6 +330,8 @@ bool runBasicSyscallTests() {
         TEST(testGetSetUid),
         TEST(testGetSetGid),
         TEST(testPipe),
+        TEST(testPause),
+        TEST(testPipeDup),
     };
     bool result = true;
     for (size_t i = 0; i < sizeof(tests) / sizeof(tests[0]); i++) {

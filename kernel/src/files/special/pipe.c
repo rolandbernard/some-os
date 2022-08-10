@@ -30,6 +30,7 @@ static void doOperationOnPipe(PipeSharedData* pipe) {
             }
             pipe->waiting_reads->size -= length;
             pipe->waiting_reads->written += length;
+            pipe->read_pos = (pipe->read_pos + length) % PIPE_BUFFER_CAPACITY;
             pipe->count -= length;
             if (pipe->waiting_reads->size == 0 || pipe->waiting_writes == NULL) {
                 WaitingPipeOperation* op = pipe->waiting_reads;
