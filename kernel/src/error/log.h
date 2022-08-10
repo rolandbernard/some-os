@@ -25,7 +25,7 @@ Error logKernelMessage(const char* fmt, ...);
     logKernelMessage(FMT "\e[m\n" STYLE_DEBUG_LOC " ∟<%s>\t" __FILE__ ":" STRINGX(__LINE__) "\e[m\n" __VA_OPT__(,) __VA_ARGS__, __PRETTY_FUNCTION__);
 #else
 #define KERNEL_INTERNAL_LOG(FMR, ...) \
-    logKernelMessage(FMT "\n" __VA_OPT__(,) __VA_ARGS__);
+    logKernelMessage(FMT "\e[m\n" __VA_OPT__(,) __VA_ARGS__);
 #endif
 
 #define KERNEL_ERROR(FMT, ...) KERNEL_INTERNAL_LOG(STYLE_ERROR "[!] " FMT __VA_OPT__(,) __VA_ARGS__)

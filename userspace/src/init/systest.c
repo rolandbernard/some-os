@@ -15,6 +15,12 @@
         return false;                               \
     }
 
+#define ASSERT_CHILD(COND)                          \
+    if (!(COND)) {                                  \
+        USPACE_ERROR("Failed assertion: " #COND);   \
+        exit(1);                                    \
+    }
+
 static inline intptr_t syscall0(uintptr_t _kind) {
     register uintptr_t kind asm("a0") = _kind;
     register uintptr_t result asm("a0");
@@ -27,13 +33,13 @@ static inline intptr_t syscall0(uintptr_t _kind) {
     return result;
 }
 
-bool testSyscallYield() {
+static bool testSyscallYield() {
     // Test that it does not crash.
     syscall0(2);
     return true;
 }
 
-bool testForkExitWait() {
+static bool testForkExitWait() {
     int pid = fork();
     int test = 42;
     ASSERT(pid != -1);
@@ -52,7 +58,7 @@ bool testForkExitWait() {
     return true;
 }
 
-bool testForkExecWait() {
+static bool testForkExecWait() {
     int pid = fork();
     ASSERT(pid != -1);
     if (pid == 0) {
@@ -69,14 +75,14 @@ bool testForkExecWait() {
     return true;
 }
 
-bool testClock() {
+static bool testClock() {
     clock_t t = clock();
     ASSERT(clock() >= t);
     ASSERT(clock() > t);
     return true;
 }
 
-bool testUsleep() {
+static bool testUsleep() {
     clock_t t1 = times(NULL);
     ASSERT(usleep(10000) == 0);
     clock_t t2 = times(NULL);
@@ -85,7 +91,7 @@ bool testUsleep() {
     return true;
 }
 
-bool testNanosleep() {
+static bool testNanosleep() {
     clock_t t1 = times(NULL);
     struct timespec t = {
         .tv_sec = 0, .tv_nsec = 10000000
@@ -97,7 +103,7 @@ bool testNanosleep() {
     return true;
 }
 
-bool testForkKillWait() {
+static bool testForkKillWait() {
     int pid = fork();
     ASSERT(pid != -1);
     if (pid == 0) {
@@ -113,6 +119,132 @@ bool testForkKillWait() {
         ASSERT(!WIFEXITED(status));
         ASSERT(WIFSIGNALED(status));
         ASSERT(WTERMSIG(status) == SIGKILL);
+    }
+    return true;
+}
+
+static bool testForkSleepKillWait() {
+    int pid = fork();
+    ASSERT(pid != -1);
+    if (pid == 0) {
+        sleep(1);
+        exit(1);
+    } else {
+        usleep(10000);
+        ASSERT(kill(pid, SIGKILL) == 0);
+        int status;
+        int wait_pid = wait(&status);
+        ASSERT(wait_pid == pid);
+        ASSERT(!WIFEXITED(status));
+        ASSERT(WIFSIGNALED(status));
+        ASSERT(WTERMSIG(status) == SIGKILL);
+    }
+    return true;
+}
+
+static void testSignalHandler(int sig) {
+    exit(sig == SIGUSR2 ? 42 : 0);
+}
+
+static bool testSignal() {
+    int pid = fork();
+    ASSERT(pid != -1);
+    if (pid == 0) {
+        signal(SIGUSR2, testSignalHandler);
+        sleep(1);
+        exit(1);
+    } else {
+        usleep(10000);
+        ASSERT(kill(pid, SIGUSR2) == 0);
+        int status;
+        int wait_pid = wait(&status);
+        ASSERT(wait_pid == pid);
+        ASSERT(WIFEXITED(status));
+        ASSERT(!WIFSIGNALED(status));
+        ASSERT(WEXITSTATUS(status) == 42);
+    }
+    return true;
+}
+
+static bool testGetpid() {
+    ASSERT(getpid() == 1);
+    return true;
+}
+
+static bool testGetppid() {
+    ASSERT(getppid() == 0);
+    return true;
+}
+
+static bool testMallocReallocFree() {
+    int* test = malloc(sizeof(int) * 100);
+    for (int i = 0; i < 100; i++) {
+        test[i] = i*i;
+    }
+    test = realloc(test, sizeof(int) * 200);
+    for (int i = 0; i < 100; i++) {
+        ASSERT(test[i] == i*i);
+    }
+    free(test);
+    return true;
+}
+
+static bool testGetSetUid() {
+    int pid = fork();
+    ASSERT(pid != -1);
+    if (pid == 0) {
+        ASSERT_CHILD(getuid() == 0);
+        ASSERT_CHILD(setuid(1000) == 0);
+        ASSERT_CHILD(getuid() == 1000);
+        ASSERT_CHILD(setgid(1000) == 0);
+        ASSERT_CHILD(setuid(1100) == -1);
+        exit(0);
+    } else {
+        int status;
+        int wait_pid = wait(&status);
+        return wait_pid == pid && WIFEXITED(status) && WEXITSTATUS(status) == 0;
+    }
+    return true;
+}
+
+static bool testGetSetGid() {
+    int pid = fork();
+    ASSERT(pid != -1);
+    if (pid == 0) {
+        ASSERT_CHILD(getgid() == 0);
+        ASSERT_CHILD(setgid(1000) == 0);
+        ASSERT_CHILD(getgid() == 1000);
+        ASSERT_CHILD(setuid(1000) == 0);
+        ASSERT_CHILD(setgid(1100) == -1);
+        exit(0);
+    } else {
+        int status;
+        int wait_pid = wait(&status);
+        return wait_pid == pid && WIFEXITED(status) && WEXITSTATUS(status) == 0;
+    }
+    return true;
+}
+
+static bool testPipe() {
+    int fds[2];
+    ASSERT(pipe(fds) == 0);
+    int pid = fork();
+    ASSERT(pid != -1);
+    if (pid == 0) {
+        char buffer[512] = "Hello world!";
+        ASSERT_CHILD(write(fds[1], buffer, 10) == 10);
+        ASSERT_CHILD(read(fds[0], buffer, 512) == 10);
+        ASSERT_CHILD(strncmp(buffer, "HELLO WORLD!", 10) == 0);
+        exit(0);
+    } else {
+        char buffer[512];
+        ASSERT(read(fds[0], buffer, 512) == 10);
+        ASSERT(strncmp(buffer, "Hello world!", 10) == 0);
+        memcpy(buffer, "HELLO WORLD!", 10);
+        ASSERT(write(fds[1], buffer, 512) == 10);
+        int status;
+        int wait_pid = wait(&status);
+        return wait_pid == pid && WIFEXITED(status) && WEXITSTATUS(status) == 0;
     }
     return true;
 }
@@ -135,11 +267,21 @@ bool runBasicSyscallTests() {
         TEST(testUsleep),
         TEST(testNanosleep),
         TEST(testForkKillWait),
+        TEST(testForkSleepKillWait),
+        TEST(testSignal),
+        TEST(testGetpid),
+        TEST(testGetppid),
+        TEST(testMallocReallocFree),
+        TEST(testGetSetUid),
+        TEST(testGetSetGid),
+        TEST(testPipe),
     };
     bool result = true;
     for (size_t i = 0; i < sizeof(tests) / sizeof(tests[0]); i++) {
         if (tests[i].func()) {
             USPACE_SUBSUCCESS("Passed %s", tests[i].name);
+        } else {
+            result = false;
         }
     }
     return result;

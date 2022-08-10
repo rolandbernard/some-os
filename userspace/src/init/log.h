@@ -29,14 +29,17 @@
         USPACE_LOG2(FMT __VA_OPT__(,) __VA_ARGS__);                             \
     }
 #else
-#define USPACE_INTERNAL_LOG(FMR, ...) \
-    fprintf(stderr, FMT "\n" __VA_OPT__(,) __VA_ARGS__);
+#define USPACE_INTERNAL_LOG(FMT, ...) \
+    fprintf(stderr, FMT "\e[m\n" __VA_OPT__(,) __VA_ARGS__);
 #endif
+
+#define USPACE_INTERNAL_LOG2(FMT, ...) \
+    fprintf(stderr, FMT "\e[m\n" __VA_OPT__(,) __VA_ARGS__);
 
 #define USPACE_ERROR(FMT, ...) USPACE_INTERNAL_LOG(STYLE_ERROR "[" PROGRAM_NAME "] " FMT __VA_OPT__(,) __VA_ARGS__)
 #define USPACE_WARNING(FMT, ...) USPACE_INTERNAL_LOG(STYLE_WARNING "[" PROGRAM_NAME "] " FMT __VA_OPT__(,) __VA_ARGS__)
 #define USPACE_SUCCESS(FMT, ...) USPACE_INTERNAL_LOG(STYLE_SUCCESS "[" PROGRAM_NAME "] " FMT __VA_OPT__(,) __VA_ARGS__)
-#define USPACE_SUBSUCCESS(FMT, ...) USPACE_INTERNAL_LOG(STYLE_SUB_SUCCESS "[" PROGRAM_NAME "] " FMT __VA_OPT__(,) __VA_ARGS__)
+#define USPACE_SUBSUCCESS(FMT, ...) USPACE_INTERNAL_LOG2(STYLE_SUB_SUCCESS "[" PROGRAM_NAME "] " FMT __VA_OPT__(,) __VA_ARGS__)
 #define USPACE_DEBUG(FMT, ...) USPACE_INTERNAL_LOG(STYLE_DEBUG "[" PROGRAM_NAME "] " FMT __VA_OPT__(,) __VA_ARGS__)
 #define USPACE_DEBUG_LOC(FMT, ...) USPACE_INTERNAL_LOG(STYLE_DEBUG_LOC "[" PROGRAM_NAME "] " FMT __VA_OPT__(,) __VA_ARGS__)
 
