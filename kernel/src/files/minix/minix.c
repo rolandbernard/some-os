@@ -261,7 +261,7 @@ static Error minixChangeInodeRefCount(MinixFilesystem* fs, Process* process, uin
     inode.nlinks += delta;
     if (inode.nlinks == 0) {
         VfsFile* file = (VfsFile*)createMinixFileForINode(fs, inodenum, true);
-        if (MODE_TYPE(inode.mode) != VFS_TYPE_DIR) {
+        if (MODE_TYPE(inode.mode) == VFS_TYPE_DIR) {
             CHECKED(minixCheckDirectoryCanBeRemoved(file, process, &inode), file->functions->close(file));
         }
         CHECKED(file->functions->trunc(file, process, 0), file->functions->close(file));
