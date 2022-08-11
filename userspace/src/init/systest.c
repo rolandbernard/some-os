@@ -1,7 +1,13 @@
 
+#include <dirent.h>
+#include <errno.h>
+#include <fcntl.h>
 #include <stdint.h>
 #include <stdlib.h>
+#include <sys/mman.h>
+#include <sys/stat.h>
 #include <sys/times.h>
+#include <sys/types.h>
 #include <sys/wait.h>
 #include <time.h>
 #include <unistd.h>
@@ -13,7 +19,8 @@
     if (!(COND)) {                                  \
         USPACE_ERROR("Failed assertion: " #COND);   \
         return false;                               \
-    }
+    }                                               \
+    errno = 0;
 
 #define ASSERT_CHILD(COND)                          \
     if (!(COND)) {                                  \
@@ -304,6 +311,319 @@ static bool testPipeDup() {
     return true;
 }
 
+static bool testAccess() {
+    ASSERT(access("/bin/hello", F_OK) == 0);
+    ASSERT(access("/bin/does_not_exist", F_OK) != 0);
+    ASSERT(access("/bin/hello", R_OK | W_OK | X_OK) == 0);
+    ASSERT(access("/include/stdlib.h", X_OK) != 0);
+    return true;
+}
+
+static int testFunction(int a) {
+    return 2 * a;
+}
+
+static bool testProtect() {
+    uint32_t* buffer = malloc(1 << 12);
+    ASSERT(mprotect(buffer, 1 << 12, PROT_EXEC | PROT_READ | PROT_WRITE) == 0);
+    buffer[0] = 0xff010113;
+    buffer[1] = 0x00113423;
+    buffer[2] = 0x00050613;
+    buffer[3] = 0x00058513;
+    buffer[4] = 0x000600e7;
+    buffer[5] = 0x0015159b;
+    buffer[6] = 0x00a5853b;
+    buffer[7] = 0x00813083;
+    buffer[8] = 0x01010113;
+    buffer[9] = 0x00008067;
+    asm volatile("fence.i");
+    ASSERT(((int(*)(int(*)(int), int))buffer)(testFunction, 7) == 42)
+    free(buffer);
+    return true;
+}
+
+static bool testForkSegvWait() {
+    int pid = fork();
+    ASSERT(pid != -1);
+    if (pid == 0) {
+        uint32_t* buffer = malloc(1 << 12);
+        ASSERT(mprotect(buffer, 1 << 12, PROT_READ) == 0);
+        buffer[0] = 42;
+        exit(0);
+    } else {
+        int status;
+        int wait_pid = wait(&status);
+        ASSERT(wait_pid == pid);
+        ASSERT(!WIFEXITED(status));
+        ASSERT(WIFSIGNALED(status));
+        ASSERT(WTERMSIG(status) == SIGSEGV);
+    }
+    return true;
+}
+
+static bool testMkdir() {
+    ASSERT(mkdir("tmp", 0777) == 0);
+    ASSERT(access("tmp", F_OK) == 0);
+    return true;
+}
+
+static bool testOpenWriteClose() {
+    int fd = open("tmp/test.txt", O_CREAT | O_WRONLY | O_EXCL);
+    ASSERT(fd != -1);
+    char buffer[512] = "Hello world!";
+    ASSERT(write(fd, buffer, 12) == 12);
+    close(fd);
+    return true;
+}
+
+static bool testOpenReadClose() {
+    int fd = open("/tmp/test.txt", O_RDONLY);
+    ASSERT(fd != -1);
+    char buffer[512] = "????????????";
+    ASSERT(read(fd, buffer, 512) == 12);
+    buffer[12] = 0;
+    ASSERT(strcmp(buffer, "Hello world!") == 0)
+    close(fd);
+    return true;
+}
+
+static bool testOpenExcl() {
+    ASSERT(open("/tmp/test.txt", O_CREAT | O_EXCL) == -1);
+    return true;
+}
+
+static bool testLink() {
+    ASSERT(link("/tmp/test.txt", "/tmp/test2.txt") == 0);
+    int fd = open("/tmp/test2.txt", O_RDONLY);
+    ASSERT(fd != -1);
+    char buffer[512] = "????????????";
+    ASSERT(read(fd, buffer, 512) == 12);
+    buffer[12] = 0;
+    ASSERT(strcmp(buffer, "Hello world!") == 0)
+    close(fd);
+    return true;
+}
+
+static bool testReadDir() {
+    DIR* dir = opendir("tmp");
+    ASSERT(dir != NULL);
+    struct dirent* entr = readdir(dir);
+    ASSERT(entr != NULL);
+    ASSERT(strcmp(entr->d_name, "test.txt") == 0);
+    entr = readdir(dir);
+    ASSERT(entr != NULL);
+    ASSERT(strcmp(entr->d_name, "test2.txt") == 0);
+    entr = readdir(dir);
+    ASSERT(entr == NULL);
+    closedir(dir);
+    return true;
+}
+
+static bool testRename() {
+    ASSERT(rename("/tmp/test.txt", "/tmp/test3.txt") == 0);
+    int fd = open("/tmp/test3.txt", O_RDONLY);
+    ASSERT(fd != -1);
+    char buffer[512] = "????????????";
+    ASSERT(read(fd, buffer, 512) == 12);
+    buffer[12] = 0;
+    ASSERT(strcmp(buffer, "Hello world!") == 0)
+    close(fd);
+    return true;
+}
+
+static bool testReadDir2() {
+    DIR* dir = opendir("tmp");
+    ASSERT(dir != NULL);
+    struct dirent* entr = readdir(dir);
+    ASSERT(entr != NULL);
+    ASSERT(strcmp(entr->d_name, "test3.txt") == 0);
+    entr = readdir(dir);
+    ASSERT(entr != NULL);
+    ASSERT(strcmp(entr->d_name, "test2.txt") == 0);
+    entr = readdir(dir);
+    ASSERT(entr == NULL);
+    closedir(dir);
+    return true;
+}
+
+static bool testGetSetCwd() {
+    char buffer[512];
+    ASSERT(chdir("./tmp") == 0);
+    ASSERT(getcwd(buffer, 512) != (void*)-1)
+    ASSERT(strcmp(buffer, "/tmp") == 0);
+    return true;
+}
+
+static bool testOpenRelative() {
+    char buffer[512] = "????????????";
+    int fd = open("./test3.txt", O_RDONLY);
+    ASSERT(fd != -1);
+    ASSERT(read(fd, buffer, 512) == 12);
+    buffer[12] = 0;
+    ASSERT(strcmp(buffer, "Hello world!") == 0)
+    close(fd);
+    return true;
+}
+
+static bool testOpenAbsolute() {
+    char buffer[512] = "????????????";
+    int fd = open("/tmp/test3.txt", O_RDONLY);
+    ASSERT(fd != -1);
+    ASSERT(read(fd, buffer, 512) == 12);
+    buffer[12] = 0;
+    ASSERT(strcmp(buffer, "Hello world!") == 0)
+    close(fd);
+    return true;
+}
+
+static bool testGetSetCwd2() {
+    char buffer[512];
+    ASSERT(chdir("/") == 0);
+    ASSERT(getcwd(buffer, 512) != (void*)-1)
+    ASSERT(strcmp(buffer, "/") == 0);
+    ASSERT(open("./test3.txt", O_RDONLY) == -1);
+    return true;
+}
+
+static bool testUnlinkDirFail() {
+    ASSERT(unlink("/tmp") == -1);
+    ASSERT(access("/tmp", F_OK) == 0);
+    return true;
+}
+
+static bool testOpenSeekWriteClose() {
+    int fd = open("/tmp/test3.txt", O_WRONLY);
+    ASSERT(fd != -1);
+    ASSERT(lseek(fd, 6, SEEK_SET) == 6);
+    ASSERT(write(fd, "WORLD", 5) == 5);
+    close(fd);
+    char buffer[512] = "????????????";
+    fd = open("/tmp/test2.txt", O_RDONLY);
+    ASSERT(fd != -1);
+    ASSERT(read(fd, buffer, 512) == 12);
+    buffer[12] = 0;
+    ASSERT(strcmp(buffer, "Hello WORLD!") == 0)
+    close(fd);
+    return true;
+}
+
+static bool testOpenAppendWriteClose() {
+    int fd = open("/tmp/test2.txt", O_WRONLY | O_APPEND);
+    ASSERT(fd != -1);
+    ASSERT(write(fd, " Roland.", 8) == 8);
+    close(fd);
+    char buffer[512] = "????????????";
+    fd = open("/tmp/test3.txt", O_RDONLY);
+    ASSERT(fd != -1);
+    ASSERT(read(fd, buffer, 512) == 20);
+    buffer[20] = 0;
+    ASSERT(strcmp(buffer, "Hello WORLD! Roland.") == 0)
+    close(fd);
+    return true;
+}
+
+static bool testOpenWriteReadClose() {
+    char buffer[512] = "????????????";
+    int fd = open("/tmp/test2.txt", O_RDWR);
+    ASSERT(fd != -1);
+    ASSERT(write(fd, "HELLO", 5) == 5);
+    ASSERT(read(fd, buffer, 512) == 15);
+    buffer[15] = 0;
+    ASSERT(strcmp(buffer, " WORLD! Roland.") == 0);
+    ASSERT(lseek(fd, 0, SEEK_SET) == 0);
+    ASSERT(read(fd, buffer, 512) == 20);
+    buffer[20] = 0;
+    ASSERT(strcmp(buffer, "HELLO WORLD! Roland.") == 0);
+    close(fd);
+    return true;
+}
+
+static bool testOpenTruncWriteClose() {
+    int fd = open("/tmp/test2.txt", O_WRONLY | O_TRUNC);
+    ASSERT(fd != -1);
+    ASSERT(write(fd, "Hello world!", 12) == 12);
+    close(fd);
+    char buffer[512] = "????????????";
+    fd = open("/tmp/test3.txt", O_RDONLY);
+    ASSERT(fd != -1);
+    ASSERT(read(fd, buffer, 512) == 12);
+    buffer[12] = 0;
+    ASSERT(strcmp(buffer, "Hello world!") == 0)
+    close(fd);
+    return true;
+}
+
+static bool testStatReg() {
+    struct stat stats;
+    ASSERT(stat("/tmp/test2.txt", &stats) == 0);
+    ASSERT((stats.st_mode & S_IFMT) == S_IFREG);
+    ASSERT(stats.st_nlink == 2);
+    ASSERT(stats.st_size == 12);
+    return true;
+}
+
+static bool testStatDir() {
+    struct stat stats;
+    ASSERT(stat("/tmp", &stats) == 0);
+    ASSERT((stats.st_mode & S_IFMT) == S_IFDIR);
+    return true;
+}
+
+static bool testStatChr() {
+    struct stat stats;
+    ASSERT(stat("/dev/tty0", &stats) == 0);
+    ASSERT((stats.st_mode & S_IFMT) == S_IFCHR);
+    return true;
+}
+
+static bool testStatBlk() {
+    struct stat stats;
+    ASSERT(stat("/dev/blk0", &stats) == 0);
+    ASSERT((stats.st_mode & S_IFMT) == S_IFBLK);
+    return true;
+}
+
+static bool testDup() {
+    // TOFIX: Read man for dup/dup2/dup3. This is the wrong behavior.
+    char buffer[512] = "????????????";
+    int fd = open("/tmp/test3.txt", O_RDONLY);
+    ASSERT(fd != -1);
+    int fd2 = dup(fd);
+    ASSERT(fd2 != -1);
+    ASSERT(read(fd, buffer, 512) == 12);
+    buffer[12] = 0;
+    ASSERT(strcmp(buffer, "Hello world!") == 0)
+    close(fd);
+    memset(buffer, '?', 12);
+    ASSERT(read(fd2, buffer, 512) == 12);
+    buffer[12] = 0;
+    ASSERT(strcmp(buffer, "Hello world!") == 0)
+    close(fd2);
+    return true;
+}
+
+static bool testUnlinkFile() {
+    char buffer[512] = "????????????";
+    ASSERT(unlink("/tmp/test2.txt") == 0);
+    ASSERT(access("/tmp/test2.txt", F_OK) == -1);
+    int fd = open("/tmp/test3.txt", O_RDONLY);
+    ASSERT(fd != -1);
+    ASSERT(read(fd, buffer, 512) == 12);
+    buffer[12] = 0;
+    ASSERT(strcmp(buffer, "Hello world!") == 0)
+    close(fd);
+    ASSERT(unlink("/tmp/test3.txt") == 0);
+    ASSERT(access("/tmp/test2.txt", F_OK) == -1);
+    ASSERT(open("/tmp/test3.txt", O_RDONLY) == -1);
+    return true;
+}
+
+static bool testUnlinkDir() {
+    ASSERT(unlink("/tmp") == 0);
+    ASSERT(access("/tmp", F_OK) == -1);
+    return true;
+}
+
 typedef bool (*TestFunction)();
 
 typedef struct {
@@ -332,6 +652,33 @@ bool runBasicSyscallTests() {
         TEST(testPipe),
         TEST(testPause),
         TEST(testPipeDup),
+        TEST(testAccess),
+        TEST(testProtect),
+        TEST(testForkSegvWait),
+        TEST(testMkdir),
+        TEST(testOpenWriteClose),
+        TEST(testOpenReadClose),
+        TEST(testOpenExcl),
+        TEST(testLink),
+        TEST(testReadDir),
+        TEST(testRename),
+        TEST(testReadDir2),
+        TEST(testGetSetCwd),
+        TEST(testOpenRelative),
+        TEST(testOpenAbsolute),
+        TEST(testGetSetCwd2),
+        TEST(testUnlinkDirFail),
+        TEST(testOpenSeekWriteClose),
+        TEST(testOpenAppendWriteClose),
+        TEST(testOpenWriteReadClose),
+        TEST(testOpenTruncWriteClose),
+        TEST(testStatReg),
+        TEST(testStatDir),
+        TEST(testStatChr),
+        TEST(testStatBlk),
+        TEST(testDup),
+        TEST(testUnlinkFile),
+        TEST(testUnlinkDir),
     };
     bool result = true;
     for (size_t i = 0; i < sizeof(tests) / sizeof(tests[0]); i++) {

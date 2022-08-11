@@ -21,12 +21,12 @@
 #define USPACE_LOG2(FMT, ...) \
     fprintf(stderr, FMT "\e[m\n" STYLE_DEBUG_LOC " ∟<%s>\t" __FILE__ ":" STRINGX(__LINE__) "\e[m\n" __VA_OPT__(,) __VA_ARGS__, __PRETTY_FUNCTION__);
 
-#define USPACE_INTERNAL_LOG(FMT, ...)                                           \
-    if (errno != 0) {                                                           \
-        USPACE_LOG2(FMT ": %s" __VA_OPT__(,) __VA_ARGS__, strerror(errno));     \
-        errno = 0;                                                              \
-    } else {                                                                    \
-        USPACE_LOG2(FMT __VA_OPT__(,) __VA_ARGS__);                             \
+#define USPACE_INTERNAL_LOG(FMT, ...)                                                   \
+    if (errno != 0) {                                                                   \
+        USPACE_LOG2(FMT ": %i %s" __VA_OPT__(,) __VA_ARGS__, errno, strerror(errno));   \
+        errno = 0;                                                                      \
+    } else {                                                                            \
+        USPACE_LOG2(FMT __VA_OPT__(,) __VA_ARGS__);                                     \
     }
 #else
 #define USPACE_INTERNAL_LOG(FMT, ...) \
