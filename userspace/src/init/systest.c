@@ -9,6 +9,7 @@
 #include <sys/times.h>
 #include <sys/types.h>
 #include <sys/wait.h>
+#include <sys/mount.h>
 #include <time.h>
 #include <unistd.h>
 
@@ -538,6 +539,30 @@ static bool testOpenWriteReadClose() {
     return true;
 }
 
+static bool testTruncOpenReadClose() {
+    char buffer[512] = "????????????";
+    ASSERT(truncate("/tmp/test2.txt", 12) == 0);
+    int fd = open("/tmp/test2.txt", O_RDONLY);
+    ASSERT(fd != -1);
+    ASSERT(read(fd, buffer, 512) == 12);
+    buffer[12] = 0;
+    ASSERT(strcmp(buffer, "HELLO WORLD!") == 0);
+    close(fd);
+    return true;
+}
+
+static bool testOpenTruncReadClose() {
+    char buffer[512] = "????????????";
+    int fd = open("/tmp/test2.txt", O_RDWR);
+    ASSERT(fd != -1);
+    ASSERT(ftruncate(fd, 5) == 0);
+    ASSERT(read(fd, buffer, 512) == 5);
+    buffer[5] = 0;
+    ASSERT(strcmp(buffer, "HELLO") == 0);
+    close(fd);
+    return true;
+}
+
 static bool testOpenTruncWriteClose() {
     int fd = open("/tmp/test2.txt", O_WRONLY | O_TRUNC);
     ASSERT(fd != -1);
@@ -583,6 +608,26 @@ static bool testStatBlk() {
     return true;
 }
 
+static bool testChmodStat() {
+    ASSERT(chmod("/tmp/test2.txt", 0777) == 0);
+    struct stat stats;
+    ASSERT(stat("/tmp/test2.txt", &stats) == 0);
+    ASSERT((stats.st_mode & S_IFMT) == S_IFREG);
+    ASSERT((stats.st_mode & S_IRWXU) == S_IRWXU);
+    ASSERT((stats.st_mode & S_IRWXG) == S_IRWXG);
+    ASSERT((stats.st_mode & S_IRWXO) == S_IRWXO);
+    return true;
+}
+
+static bool testChownStat() {
+    ASSERT(chown("/tmp/test2.txt", 1000, 1100) == 0);
+    struct stat stats;
+    ASSERT(stat("/tmp/test2.txt", &stats) == 0);
+    ASSERT(stats.st_uid == 1000);
+    ASSERT(stats.st_gid == 1100);
+    return true;
+}
+
 static bool testDup() {
     // TOFIX: Read man for dup/dup2/dup3. This is the wrong behavior.
     char buffer[512] = "????????????";
@@ -615,6 +660,18 @@ static bool testUnlinkFile() {
     ASSERT(unlink("/tmp/test3.txt") == 0);
     ASSERT(access("/tmp/test2.txt", F_OK) == -1);
     ASSERT(open("/tmp/test3.txt", O_RDONLY) == -1);
+    return true;
+}
+
+static bool testMount() {
+    ASSERT(mount("/dev/blk0", "/tmp", "minix", 0, NULL) == 0);
+    ASSERT(access("/tmp/bin/hello", F_OK) == 0);
+    return true;
+}
+
+static bool testUmount() {
+    ASSERT(umount("/tmp") == 0);
+    ASSERT(access("/tmp/bin/hello", F_OK) != 0);
     return true;
 }
 
@@ -671,13 +728,19 @@ bool runBasicSyscallTests() {
         TEST(testOpenSeekWriteClose),
         TEST(testOpenAppendWriteClose),
         TEST(testOpenWriteReadClose),
+        TEST(testTruncOpenReadClose),
+        TEST(testOpenTruncReadClose),
         TEST(testOpenTruncWriteClose),
         TEST(testStatReg),
         TEST(testStatDir),
         TEST(testStatChr),
         TEST(testStatBlk),
+        TEST(testChmodStat),
+        TEST(testChownStat),
         TEST(testDup),
         TEST(testUnlinkFile),
+        TEST(testMount),
+        TEST(testUmount),
         TEST(testUnlinkDir),
     };
     bool result = true;
