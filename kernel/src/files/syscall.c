@@ -215,15 +215,9 @@ SyscallReturn dupSyscall(TrapFrame* frame) {
         if (isError(err)) {
             SYSCALL_RETURN(-err.kind);
         } else {
-            int flags = 0;
+            int flags = file->flags & ~VFS_FILE_CLOEXEC;
             if ((SYSCALL_ARG(2) & VFS_OPEN_CLOEXEC) != 0) {
                 flags |= VFS_FILE_CLOEXEC;
-            }
-            if ((SYSCALL_ARG(2) & VFS_OPEN_RDONLY) != 0) {
-                flags |= VFS_FILE_RDONLY;
-            }
-            if ((SYSCALL_ARG(2) & VFS_OPEN_WRONLY) != 0) {
-                flags |= VFS_FILE_WRONLY;
             }
             int fd = SYSCALL_ARG(1);
             if (fd < 0) {
