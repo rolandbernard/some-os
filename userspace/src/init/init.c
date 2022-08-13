@@ -6,7 +6,7 @@
 #include <sys/wait.h>
 #include <unistd.h>
 
-#include "systest.h"
+#define PROGRAM_NAME "init"
 #include "log.h"
 #include "util.h"
 
@@ -58,7 +58,7 @@ noreturn void idleLoop() {
 int main(int argc, char* argv[], char* env[]) {
     setupTty();
     USPACE_SUCCESS("Started init process");
-    if (runBasicSyscallTests()) {
+    if (runProgram("/bin/test") == 0) {
         USPACE_SUCCESS("Finished basic syscall tests");
     } else {
         USPACE_WARNING("Failed basic syscall tests");

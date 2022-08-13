@@ -3,4 +3,6 @@
 
 void startProgram(const char* name);
 
+int runProgram(const char* name);
+
 #endif

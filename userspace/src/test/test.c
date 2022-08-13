@@ -2,18 +2,19 @@
 #include <dirent.h>
 #include <errno.h>
 #include <fcntl.h>
+#include <stdbool.h>
 #include <stdint.h>
 #include <stdlib.h>
 #include <sys/mman.h>
+#include <sys/mount.h>
 #include <sys/stat.h>
 #include <sys/times.h>
 #include <sys/types.h>
 #include <sys/wait.h>
-#include <sys/mount.h>
 #include <time.h>
 #include <unistd.h>
 
-#include "systest.h"
+#define PROGRAM_NAME "test"
 #include "log.h"
 
 #define ASSERT(COND)                                \
@@ -175,12 +176,14 @@ static bool testSignal() {
 }
 
 static bool testGetpid() {
-    ASSERT(getpid() == 1);
+    // Note: This is run as the first child of init.
+    ASSERT(getpid() == 2);
     return true;
 }
 
 static bool testGetppid() {
-    ASSERT(getppid() == 0);
+    // Note: This is run as a child of init.
+    ASSERT(getppid() == 1);
     return true;
 }
 
@@ -690,7 +693,7 @@ typedef struct {
 
 #define TEST(FUNC) { .name = #FUNC, .func = FUNC }
 
-bool runBasicSyscallTests() {
+static bool runBasicSyscallTests() {
     static const TestCase tests[] = {
         TEST(testSyscallYield),
         TEST(testForkExitWait),
@@ -752,5 +755,13 @@ bool runBasicSyscallTests() {
         }
     }
     return result;
+}
+
+int main() {
+    if (runBasicSyscallTests()) {
+        return EXIT_SUCCESS;
+    } else {
+        return EXIT_FAILURE;
+    }
 }
 

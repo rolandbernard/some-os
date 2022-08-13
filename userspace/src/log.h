@@ -5,8 +5,6 @@
 #include <string.h>
 #include <errno.h>
 
-#define PROGRAM_NAME "init"
-
 #define STYLE_ERROR "\e[1;91m"
 #define STYLE_WARNING "\e[1;93m"
 #define STYLE_SUCCESS "\e[92m"
