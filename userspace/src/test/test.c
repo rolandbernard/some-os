@@ -632,7 +632,6 @@ static bool testChownStat() {
 }
 
 static bool testDup() {
-    // TOFIX: Read man for dup/dup2/dup3. This is the wrong behavior.
     char buffer[512] = "????????????";
     int fd = open("/tmp/test3.txt", O_RDONLY);
     ASSERT(fd != -1);
@@ -641,8 +640,10 @@ static bool testDup() {
     ASSERT(read(fd, buffer, 512) == 12);
     buffer[12] = 0;
     ASSERT(strcmp(buffer, "Hello world!") == 0)
-    close(fd);
     memset(buffer, '?', 12);
+    ASSERT(read(fd2, buffer, 512) == 0);
+    ASSERT(lseek(fd, 0, SEEK_SET) == 0);
+    close(fd);
     ASSERT(read(fd2, buffer, 512) == 12);
     buffer[12] = 0;
     ASSERT(strcmp(buffer, "Hello world!") == 0)
