@@ -254,17 +254,17 @@ static Error minixStatFunction(MinixFile* file, Process* process, VirtPtr stat) 
 }
 
 static void minixFreeFunction(MinixFile* file) {
-    lockTaskLock(&file->fs->lock);
+    lockSpinLock(&file->fs->base.lock);
     file->fs->base.open_files--;
-    unlockTaskLock(&file->fs->lock);
+    unlockSpinLock(&file->fs->base.lock);
     dealloc(file);
 }
 
 static Error minixCopyFunction(MinixFile* file, Process* process, VfsFile** ret) {
     MinixFile* copy = kalloc(sizeof(MinixFile));
-    lockTaskLock(&file->fs->lock);
+    lockSpinLock(&file->fs->base.lock);
     file->fs->base.open_files++;
-    unlockTaskLock(&file->fs->lock);
+    unlockSpinLock(&file->fs->base.lock);
     lockTaskLock(&file->lock);
     memcpy(copy, file, sizeof(MinixFile));
     unlockTaskLock(&file->lock);
@@ -451,7 +451,9 @@ static VfsFileVtable functions_directory = {
 };
 
 MinixFile* createMinixFileForINode(MinixFilesystem* fs, uint32_t inode, bool dir) {
+    lockSpinLock(&fs->base.lock);
     fs->base.open_files++;
+    unlockSpinLock(&fs->base.lock);
     MinixFile* file = zalloc(sizeof(MinixFile));
     if (dir) {
         file->base.functions = &functions_directory;

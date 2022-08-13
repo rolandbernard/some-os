@@ -5,24 +5,30 @@
 #include "task/spinlock.h"
 
 int allocateNewFileDescriptorId(Process* process) {
+    lockSpinLock(&process->resources.lock);
     int fd = process->resources.next_fd;
     process->resources.next_fd++;
+    unlockSpinLock(&process->resources.lock);
     return fd;
 }
 
 FileDescriptor* getFileDescriptor(Process* process, int fd) {
+    lockSpinLock(&process->resources.lock);
     FileDescriptor* current = process->resources.files;
     while (current != NULL) {
         if (current->id == fd) {
+            unlockSpinLock(&process->resources.lock);
             return current;
         } else {
             current = current->next;
         }
     }
+    unlockSpinLock(&process->resources.lock);
     return NULL;
 }
 
 void putNewFileDescriptor(Process* process, int fd, int flags, VfsFile* file) {
+    lockSpinLock(&process->resources.lock);
     lockSpinLock(&file->ref_lock);
     file->ref_count++;
     unlockSpinLock(&file->ref_lock);
@@ -32,6 +38,7 @@ void putNewFileDescriptor(Process* process, int fd, int flags, VfsFile* file) {
     desc->file = file;
     desc->next = process->resources.files;
     process->resources.files = desc;
+    unlockSpinLock(&process->resources.lock);
 }
 
 static void removeFileDescriptor(FileDescriptor* desc) {
@@ -48,6 +55,7 @@ static void removeFileDescriptor(FileDescriptor* desc) {
 }
 
 void closeFileDescriptor(Process* process, int fd) {
+    lockSpinLock(&process->resources.lock);
     FileDescriptor** current = &process->resources.files;
     while (*current != NULL) {
         if ((*current)->id == fd) {
@@ -59,9 +67,11 @@ void closeFileDescriptor(Process* process, int fd) {
             current = &(*current)->next;
         }
     }
+    unlockSpinLock(&process->resources.lock);
 }
 
 void closeAllProcessFiles(Process* process) {
+    lockSpinLock(&process->resources.lock);
     FileDescriptor* current = process->resources.files;
     while (current != NULL) {
         FileDescriptor* to_remove = current;
@@ -70,11 +80,13 @@ void closeAllProcessFiles(Process* process) {
     }
     process->resources.files = NULL;
     process->resources.next_fd = 0;
+    unlockSpinLock(&process->resources.lock);
 }
 
 void closeExecProcessFiles(Process* process) {
+    lockSpinLock(&process->resources.lock);
     FileDescriptor** current = &process->resources.files;
-    while (current != NULL) {
+    while (*current != NULL) {
         if (((*current)->flags & VFS_FILE_CLOEXEC) != 0) {
             FileDescriptor* to_remove = *current;
             *current = to_remove->next;
@@ -83,23 +95,16 @@ void closeExecProcessFiles(Process* process) {
             current = &(*current)->next;
         }
     }
+    unlockSpinLock(&process->resources.lock);
 }
 
 void forkFileDescriptors(Process* new_process, Process* old_process) {
-    VfsFile* files = task->process->resources.files;
-    while (files != NULL) {
-        VfsFile* copy = NULL;
-        Error err = files->functions->dup(files, NULL, &copy);
-        if (isError(err)) {
-            deallocTask(new_task);
-            deallocProcess(new_process);
-            SYSCALL_RETURN(-err.kind);
-        }
-        copy->fd = files->fd;
-        copy->flags = files->flags;
-        copy->next = new_process->resources.files;
-        new_process->resources.files = copy;
-        files = files->next;
+    lockSpinLock(&old_process->resources.lock);
+    FileDescriptor* current = old_process->resources.files;
+    while (current != NULL) {
+        putNewFileDescriptor(new_process, current->id, current->flags, current->file);
+        current = current->next;
     }
+    unlockSpinLock(&old_process->resources.lock);
 }
 

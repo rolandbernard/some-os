@@ -30,6 +30,7 @@ typedef struct {
     int next_fd;
     FileDescriptor* files;
     char* cwd;
+    SpinLock lock;
 } ProcessResources;
 
 typedef struct ProcessWaitResult_s {

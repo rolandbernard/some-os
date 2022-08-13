@@ -34,9 +34,12 @@ static Error freeFilesystemMount(FilesystemMount* mount, bool force) {
         }
         case MOUNT_TYPE_FS: {
             VfsFilesystem* filesystem = (VfsFilesystem*)mount->data;
+            lockSpinLock(&filesystem->lock);
             if (!force && filesystem->open_files != 0) {
+                unlockSpinLock(&filesystem->lock);
                 return simpleError(EBUSY);
             } else {
+                unlockSpinLock(&filesystem->lock);
                 filesystem->functions->free(filesystem);
                 return simpleError(SUCCESS);
             }

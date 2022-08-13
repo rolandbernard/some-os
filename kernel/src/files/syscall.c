@@ -176,23 +176,19 @@ SyscallReturn statSyscall(TrapFrame* frame) {
 }
 
 SyscallReturn dupSyscall(TrapFrame* frame) {
-    // TODO: This is not the correct behavior. Files should share locks and offset.
     FILE_SYSCALL_OP_DESC(false, false, {
         int flags = desc->flags & ~VFS_FILE_CLOEXEC;
         if ((SYSCALL_ARG(2) & VFS_OPEN_CLOEXEC) != 0) {
             flags |= VFS_FILE_CLOEXEC;
         }
-        int fd = SYSCALL_ARG(1);
-        if (fd < 0) {
-            fd = allocateNewFileDescriptorId(task->process);
+        int id = SYSCALL_ARG(1);
+        if (id < 0) {
+            id = allocateNewFileDescriptorId(task->process);
         } else {
-            VfsFile* existing = removeFileDescriptor(task->process, fd);
-            if (existing != NULL) {
-                existing->functions->close(existing);
-            }
+            closeFileDescriptor(task->process, id);
         }
-        putNewFileDescriptor(task->process, fd, flags, new_file);
-        SYSCALL_RETURN(fd);
+        putNewFileDescriptor(task->process, id, flags, desc->file);
+        SYSCALL_RETURN(id);
     });
 }
 
@@ -356,7 +352,7 @@ SyscallReturn pipeSyscall(TrapFrame* frame) {
     if (file_read != NULL) {
         PipeFile* file_write = duplicatePipeFile(file_read);
         if (file_write == NULL) {
-            file_read->base.functions->close((VfsFile*)file_read);
+            file_read->base.functions->free((VfsFile*)file_read);
             SYSCALL_RETURN(-ENOMEM);
         } else {
             int pipe_read = allocateNewFileDescriptorId(task->process);

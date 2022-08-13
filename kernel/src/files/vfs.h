@@ -189,6 +189,7 @@ typedef struct {
 typedef struct VfsFilesystem_s {
     const VfsFilesystemVtable* functions;
     size_t open_files;
+    SpinLock lock;
 } VfsFilesystem;
 
 typedef enum {
