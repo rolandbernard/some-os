@@ -21,7 +21,7 @@ static size_t countAllDeviceFiles() {
     return count;
 }
 
-static Error deviceSeekFunction(DeviceDirectoryFile* file, Process* process, size_t offset, VfsSeekWhence whence, size_t* ret) {
+static Error deviceDirSeekFunction(DeviceDirectoryFile* file, Process* process, size_t offset, VfsSeekWhence whence, size_t* ret) {
     lockSpinLock(&file->lock);
     size_t new_position = 0;
     switch (whence) {
@@ -41,7 +41,7 @@ static Error deviceSeekFunction(DeviceDirectoryFile* file, Process* process, siz
     return simpleError(SUCCESS);
 }
 
-static Error deviceStatFunction(DeviceDirectoryFile* file, Process* process, VirtPtr stat) {
+static Error deviceDirStatFunction(DeviceDirectoryFile* file, Process* process, VirtPtr stat) {
     lockSpinLock(&file->lock);
     VfsStat ret = {
         .id = 1,
@@ -61,14 +61,14 @@ static Error deviceStatFunction(DeviceDirectoryFile* file, Process* process, Vir
     return simpleError(SUCCESS);
 }
 
-static void deviceCloseFunction(DeviceDirectoryFile* file) {
+static void deviceDirFreeFunction(DeviceDirectoryFile* file) {
     TrapFrame* lock = criticalEnter();
     lockSpinLock(&file->lock);
     dealloc(file);
     criticalReturn(lock);
 }
 
-static Error deviceDupFunction(DeviceDirectoryFile* file, Process* process, VfsFile** ret) {
+static Error deviceDirCopyFunction(DeviceDirectoryFile* file, Process* process, VfsFile** ret) {
     TrapFrame* lock = criticalEnter();
     lockSpinLock(&file->lock);
     DeviceDirectoryFile* copy = kalloc(sizeof(DeviceDirectoryFile));
@@ -93,7 +93,7 @@ static size_t writeDirectoryEntryNamed(size_t ino, char* name, VfsFileType type,
     return umin(entry_size, size);
 }
 
-static Error deviceReaddirFunction(DeviceDirectoryFile* file, Process* process, VirtPtr buff, size_t size, size_t* ret) {
+static Error deviceDirReaddirFunction(DeviceDirectoryFile* file, Process* process, VirtPtr buff, size_t size, size_t* ret) {
     lockSpinLock(&file->lock);
     size_t written = 0;
     size_t position = file->entry;
@@ -131,11 +131,11 @@ static Error deviceReaddirFunction(DeviceDirectoryFile* file, Process* process, 
 }
 
 static const VfsFileVtable file_functions = {
-    .seek = (SeekFunction)deviceSeekFunction,
-    .stat = (StatFunction)deviceStatFunction,
-    .close = (CloseFunction)deviceCloseFunction,
-    .dup = (DupFunction)deviceDupFunction,
-    .readdir = (ReaddirFunction)deviceReaddirFunction,
+    .seek = (SeekFunction)deviceDirSeekFunction,
+    .stat = (StatFunction)deviceDirStatFunction,
+    .free = (FileFreeFunction)deviceDirFreeFunction,
+    .copy = (CopyFunction)deviceDirCopyFunction,
+    .readdir = (ReaddirFunction)deviceDirReaddirFunction,
 };
 
 DeviceDirectoryFile* createDeviceDirectoryFile() {
@@ -199,7 +199,7 @@ static Error deviceInitFunction(DeviceFilesystem* fs, Process* process) {
 
 static const VfsFilesystemVtable fs_functions = {
     .open = (OpenFunction)deviceOpenFunction,
-    .free = (FreeFunction)deviceFreeFunction,
+    .free = (FsFreeFunction)deviceFreeFunction,
     .init = (InitFunction)deviceInitFunction,
 };
 

@@ -4,6 +4,7 @@
 
 #include "loader/loader.h"
 
+#include "files/process.h"
 #include "files/syscall.h"
 #include "files/vfs.h"
 #include "loader/elf.h"
@@ -74,14 +75,14 @@ Error loadProgramInto(Task* task, const char* path, VirtPtr args, VirtPtr envs) 
     VfsFile* file;
     CHECKED(vfsOpen(&global_file_system, task->process, path, VFS_OPEN_EXECUTE, 0, &file));
     VfsStat stat;
-    CHECKED(file->functions->stat(file, task->process, virtPtrForKernel(&stat)), file->functions->close(file));
+    CHECKED(file->functions->stat(file, task->process, virtPtrForKernel(&stat)), file->functions->free(file));
     MemorySpace* memory = createMemorySpace();
     uintptr_t entry;
     CHECKED(loadProgramFromElfFile(memory, file, &entry), {
         deallocMemorySpace(memory);
-        file->functions->close(file);
+        file->functions->free(file);
     });
-    file->functions->close(file);
+    file->functions->free(file);
     // Find the start_brk in the memory
     uintptr_t start_brk = findStartBrk(memory);
     // Allocate stack
@@ -115,16 +116,7 @@ Error loadProgramInto(Task* task, const char* path, VirtPtr args, VirtPtr envs) 
     task->frame.regs[REG_ARGUMENT_1] = args_addr;
     task->frame.regs[REG_ARGUMENT_2] = envs_addr;
     // Close files with CLOEXEC flag
-    VfsFile** current = &task->process->resources.files;
-    while (*current != NULL) {
-        if (((*current)->flags & VFS_FILE_CLOEXEC) != 0) {
-            VfsFile* to_remove = *current;
-            *current = to_remove->next;
-            to_remove->functions->close(to_remove);
-        } else {
-            current = &(*current)->next;
-        }
-    }
+    closeExecProcessFiles(task->process);
     return simpleError(SUCCESS);
 }
 

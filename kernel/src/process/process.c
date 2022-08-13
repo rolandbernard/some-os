@@ -5,27 +5,28 @@
 
 #include "process/process.h"
 
-#include "interrupt/com.h"
 #include "error/log.h"
 #include "error/panic.h"
 #include "files/path.h"
+#include "files/process.h"
+#include "interrupt/com.h"
 #include "interrupt/syscall.h"
 #include "interrupt/timer.h"
 #include "interrupt/trap.h"
 #include "memory/kalloc.h"
 #include "memory/memspace.h"
-#include "memory/pagetable.h"
 #include "memory/pagealloc.h"
+#include "memory/pagetable.h"
 #include "memory/virtmem.h"
 #include "memory/virtptr.h"
-#include "task/harts.h"
-#include "task/schedule.h"
 #include "process/signals.h"
 #include "process/syscall.h"
 #include "process/types.h"
+#include "task/harts.h"
+#include "task/schedule.h"
+#include "task/spinlock.h"
 #include "task/syscall.h"
 #include "task/types.h"
-#include "task/spinlock.h"
 #include "util/util.h"
 
 extern void kernelTrapVector;
@@ -219,19 +220,9 @@ void terminateAllProcessTasks(Process* process) {
     terminateAllProcessTasksBut(process, NULL);
 }
 
-static void freeProcessFiles(Process* process) {
-    VfsFile* current = process->resources.files;
-    while (current != NULL) {
-        VfsFile* to_remove = current;
-        current = current->next;
-        to_remove->functions->close(to_remove);
-    }
-    process->resources.next_fd = 0;
-}
-
 void deallocProcess(Process* process) {
     unregisterProcess(process);
-    freeProcessFiles(process);
+    closeAllProcessFiles(process);
     if (process->pid != 0) {
         deallocMemorySpace(process->memory.mem);
     }

@@ -130,11 +130,11 @@ static Error blockStatFunction(BlockDeviceFile* file, Process* process, VirtPtr 
     return simpleError(SUCCESS);
 }
 
-static void blockCloseFunction(BlockDeviceFile* file) {
+static void blockFreeFunction(BlockDeviceFile* file) {
     dealloc(file);
 }
 
-static Error blockDupFunction(BlockDeviceFile* file, Process* process, VfsFile** ret) {
+static Error blockCopyFunction(BlockDeviceFile* file, Process* process, VfsFile** ret) {
     BlockDeviceFile* copy = kalloc(sizeof(BlockDeviceFile));
     lockSpinLock(&file->lock);
     memcpy(copy, file, sizeof(BlockDeviceFile));
@@ -151,8 +151,8 @@ static const VfsFileVtable functions = {
     .read_at = (ReadAtFunction)blockReadAtFunction,
     .write_at = (WriteAtFunction)blockWriteAtFunction,
     .stat = (StatFunction)blockStatFunction,
-    .close = (CloseFunction)blockCloseFunction,
-    .dup = (DupFunction)blockDupFunction,
+    .free = (FileFreeFunction)blockFreeFunction,
+    .copy = (CopyFunction)blockCopyFunction,
 };
 
 BlockDeviceFile* createBlockDeviceFile(size_t ino, void* block_dev, size_t block_size, size_t size, BlockOperationFunction block_op) {

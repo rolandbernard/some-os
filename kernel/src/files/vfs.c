@@ -29,7 +29,7 @@ static Error freeFilesystemMount(FilesystemMount* mount, bool force) {
     switch (mount->type) {
         case MOUNT_TYPE_FILE: {
             VfsFile* file = (VfsFile*)mount->data;
-            file->functions->close(file);
+            file->functions->free(file);
             return simpleError(SUCCESS);
         }
         case MOUNT_TYPE_FS: {
@@ -194,14 +194,12 @@ static Error postOpenOperations(const char* path, VfsFile** ret) {
     if (MODE_TYPE(file->mode) == VFS_TYPE_FIFO) {
         // This is a fifo, we have to create one
         *ret = (VfsFile*)createFifoFile(path, file->mode, file->uid, file->gid);
-        file->functions->close(file);
-        if (*ret != NULL) {
-            return simpleError(SUCCESS);
-        } else {
-            return simpleError(ENOMEM);
-        }
-    } else {
+        file->functions->free(file);
+    }
+    if (*ret != NULL) {
         return simpleError(SUCCESS);
+    } else {
+        return simpleError(ENOMEM);
     }
 }
 
@@ -213,7 +211,7 @@ Error vfsOpen(VirtualFilesystem* fs, struct Process_s* process, const char* path
             case MOUNT_TYPE_FILE: {
                 VfsFile* file = (VfsFile*)mount->data;
                 unlockSpinLock(&fs->lock);
-                CHECKED(file->functions->dup(file, process, ret));
+                CHECKED(file->functions->copy(file, process, ret));
                 return postOpenOperations(path, ret);
             }
             case MOUNT_TYPE_FS: {
@@ -224,6 +222,7 @@ Error vfsOpen(VirtualFilesystem* fs, struct Process_s* process, const char* path
                     CHECKED(filesystem->functions->open(filesystem, process, path_copy, flags, mode, ret), {
                         dealloc(path_copy);
                     });
+                    dealloc(path_copy);
                     return postOpenOperations(path, ret);
                 } else {
                     unlockSpinLock(&fs->lock);
@@ -447,7 +446,7 @@ Error createFilesystemFrom(VirtualFilesystem* fs, const char* path, const char* 
         *ret = fs;
         return simpleError(SUCCESS);
     } else {
-        file->functions->close(file);
+        file->functions->free(file);
         return simpleError(EINVAL);
     }
 }

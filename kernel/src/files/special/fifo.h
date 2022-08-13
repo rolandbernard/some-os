@@ -8,8 +8,6 @@
 typedef struct {
     VfsFile base;
     const char* name;
-    Uid uid;
-    Gid gid;
     PipeSharedData* data;
 } FifoFile;
 

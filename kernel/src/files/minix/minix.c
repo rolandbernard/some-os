@@ -82,7 +82,7 @@ static Error minixFindINodeForPath(MinixFilesystem* fs, Process* process, const 
         CHECKED(minixFindINodeForNameIn(current_dir, process, segment, &current_inodenum, &tmp_offset, &tmp_dir_size), {
             dealloc(path_clone);
         });
-        current_dir->base.functions->close((VfsFile*)current_dir);
+        current_dir->base.functions->free((VfsFile*)current_dir);
     }
     dealloc(path_clone);
     *inodenum = current_inodenum;
@@ -108,15 +108,15 @@ static Error minixOpenInode(MinixFilesystem* fs, Process* process, uint32_t inod
         file->base.gid = inode.gid;
         if ((flags & VFS_OPEN_APPEND) != 0) {
             CHECKED(file->base.functions->seek((VfsFile*)file, process, inode.size, VFS_SEEK_SET, &tmp_size), {
-                file->base.functions->close((VfsFile*)file);
+                file->base.functions->free((VfsFile*)file);
             });
             if (tmp_size != inode.size) {
-                file->base.functions->close((VfsFile*)file);
+                file->base.functions->free((VfsFile*)file);
                 return simpleError(EIO);
             }
         } else if ((flags & VFS_OPEN_TRUNC) != 0) {
             CHECKED(file->base.functions->trunc((VfsFile*)file, process, 0), {
-                file->base.functions->close((VfsFile*)file);
+                file->base.functions->free((VfsFile*)file);
             });
         }
         *ret = (VfsFile*)file;
@@ -173,12 +173,12 @@ static Error minixCreateNewNodeAt(MinixFilesystem* fs, Process* process, const c
     });
     dealloc(parent_path);
     CHECKED(minixCreateNewInode(fs, process, mode, inodenum), {
-        parent->functions->close(parent);
+        parent->functions->free(parent);
     });
     CHECKED(minixAppendDirEntryInto(parent, process, *inodenum, getBaseFilename(path)), {
-        parent->functions->close(parent);
+        parent->functions->free(parent);
     });
-    parent->functions->close(parent);
+    parent->functions->free(parent);
     return simpleError(SUCCESS);
 }
 
@@ -262,10 +262,10 @@ static Error minixChangeInodeRefCount(MinixFilesystem* fs, Process* process, uin
     if (inode.nlinks == 0) {
         VfsFile* file = (VfsFile*)createMinixFileForINode(fs, inodenum, true);
         if (MODE_TYPE(inode.mode) == VFS_TYPE_DIR) {
-            CHECKED(minixCheckDirectoryCanBeRemoved(file, process, &inode), file->functions->close(file));
+            CHECKED(minixCheckDirectoryCanBeRemoved(file, process, &inode), file->functions->free(file));
         }
-        CHECKED(file->functions->trunc(file, process, 0), file->functions->close(file));
-        file->functions->close(file);
+        CHECKED(file->functions->trunc(file, process, 0), file->functions->free(file));
+        file->functions->free(file);
         CHECKED(freeMinixInode(fs, inodenum));
         return simpleError(SUCCESS);
     } else {
@@ -308,10 +308,10 @@ static Error minixUnlinkFunction(MinixFilesystem* fs, Process* process, const ch
     });
     dealloc(parent_path);
     CHECKED(minixRemoveDirectoryEntry(fs, process, parent, getBaseFilename(path)), {
-        parent->functions->close(parent);
+        parent->functions->free(parent);
         unlockTaskLock(&fs->lock);
     });
-    parent->functions->close(parent);
+    parent->functions->free(parent);
     unlockTaskLock(&fs->lock);
     return simpleError(SUCCESS);
 }
@@ -333,14 +333,14 @@ static Error minixLinkFunction(MinixFilesystem* fs, Process* process, const char
         });
         dealloc(parent_path);
         CHECKED(minixChangeInodeRefCount(fs, process, inodenum, 1), {
-            parent->functions->close(parent);
+            parent->functions->free(parent);
             unlockTaskLock(&fs->lock);
         });
         CHECKED(minixAppendDirEntryInto(parent, process, inodenum, getBaseFilename(new)), {
-            parent->functions->close(parent);
+            parent->functions->free(parent);
             unlockTaskLock(&fs->lock);
         });
-        parent->functions->close(parent);
+        parent->functions->free(parent);
         unlockTaskLock(&fs->lock);
         return simpleError(SUCCESS);
     } else {
@@ -362,7 +362,7 @@ static Error minixRenameFunction(MinixFilesystem* fs, Process* process, const ch
 
 static void minixFreeFunction(MinixFilesystem* fs) {
     // We don't do any caching. Otherwise write it to disk here.
-    fs->block_device->functions->close(fs->block_device);
+    fs->block_device->functions->free(fs->block_device);
     dealloc(fs);
 }
 
@@ -388,7 +388,7 @@ static const VfsFilesystemVtable functions = {
     .unlink = (UnlinkFunction)minixUnlinkFunction,
     .link = (LinkFunction)minixLinkFunction,
     .rename = (RenameFunction)minixRenameFunction,
-    .free = (FreeFunction)minixFreeFunction,
+    .free = (FsFreeFunction)minixFreeFunction,
     .init = (InitFunction)minixInitFunction,
 };
 

@@ -5,6 +5,7 @@
 #include <string.h>
 
 #include "files/vfs.h"
+#include "files/process.h"
 #include "interrupt/syscall.h"
 #include "interrupt/timer.h"
 #include "memory/kalloc.h"
@@ -79,21 +80,7 @@ SyscallReturn forkSyscall(TrapFrame* frame) {
             new_process->memory.start_brk = task->process->memory.start_brk;
             new_process->memory.brk = task->process->memory.brk;
             // Copy files
-            VfsFile* files = task->process->resources.files;
-            while (files != NULL) {
-                VfsFile* copy = NULL;
-                Error err = files->functions->dup(files, NULL, &copy);
-                if (isError(err)) {
-                    deallocTask(new_task);
-                    deallocProcess(new_process);
-                    SYSCALL_RETURN(-err.kind);
-                }
-                copy->fd = files->fd;
-                copy->flags = files->flags;
-                copy->next = new_process->resources.files;
-                new_process->resources.files = copy;
-                files = files->next;
-            }
+            forkFileDescriptors(new_process, task->process);
             new_task->frame.regs[REG_ARGUMENT_0] = 0;
             enqueueTask(new_task);
             SYSCALL_RETURN(new_process->pid);

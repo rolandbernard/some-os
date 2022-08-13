@@ -28,7 +28,7 @@ typedef struct {
     Uid uid;
     Gid gid;
     int next_fd;
-    VfsFile* files;
+    FileDescriptor* files;
     char* cwd;
 } ProcessResources;
 

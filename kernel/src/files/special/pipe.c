@@ -122,8 +122,8 @@ static Error pipeStatFunction(PipeFile* file, Process* process, VirtPtr stat) {
         .id = file->base.ino,
         .mode = TYPE_MODE(VFS_TYPE_CHAR) | VFS_MODE_OGA_RW,
         .nlinks = file->data->ref_count,
-        .uid = process->resources.uid,
-        .gid = process->resources.gid,
+        .uid = file->base.uid,
+        .gid = file->base.gid,
         .size = file->data->count,
         .block_size = 0,
         .st_atime = getNanoseconds(),
@@ -135,7 +135,7 @@ static Error pipeStatFunction(PipeFile* file, Process* process, VirtPtr stat) {
     return simpleError(SUCCESS);
 }
 
-static void pipeCloseFunction(PipeFile* file) {
+static void pipeFreeFunction(PipeFile* file) {
     TrapFrame* lock = criticalEnter();
     lockSpinLock(&file->data->lock);
     file->data->ref_count--;
@@ -163,7 +163,7 @@ PipeFile* duplicatePipeFile(PipeFile* file) {
     }
 }
 
-static Error pipeDupFunction(PipeFile* file, Process* process, VfsFile** ret) {
+static Error pipeCopyFunction(PipeFile* file, Process* process, VfsFile** ret) {
     *ret = (VfsFile*)duplicatePipeFile(file);
     return simpleError(SUCCESS);
 }
@@ -172,8 +172,8 @@ static const VfsFileVtable functions = {
     .read = (ReadFunction)pipeReadFunction,
     .write = (WriteFunction)pipeWriteFunction,
     .stat = (StatFunction)pipeStatFunction,
-    .close = (CloseFunction)pipeCloseFunction,
-    .dup = (DupFunction)pipeDupFunction,
+    .free = (FileFreeFunction)pipeFreeFunction,
+    .copy = (CopyFunction)pipeCopyFunction,
 };
 
 PipeSharedData* createPipeSharedData() {

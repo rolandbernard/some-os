@@ -6,6 +6,7 @@
 
 #include "error/error.h"
 #include "memory/virtptr.h"
+#include "task/spinlock.h"
 #include "task/tasklock.h"
 #include "interrupt/timer.h"
 
@@ -119,13 +120,13 @@ typedef Error (*WriteFunction)(struct VfsFile_s* file, struct Process_s* process
 typedef Error (*ReadAtFunction)(struct VfsFile_s* file, struct Process_s* process, VirtPtr buffer, size_t size, size_t offset, size_t* ret);
 typedef Error (*WriteAtFunction)(struct VfsFile_s* file, struct Process_s* process, VirtPtr buffer, size_t size, size_t offset, size_t* ret);
 typedef Error (*StatFunction)(struct VfsFile_s* file, struct Process_s* process, VirtPtr stat_ret);
-typedef Error (*DupFunction)(struct VfsFile_s* file, struct Process_s* process, struct VfsFile_s** ret);
+typedef Error (*CopyFunction)(struct VfsFile_s* file, struct Process_s* process, struct VfsFile_s** ret);
 typedef Error (*TruncFunction)(struct VfsFile_s* file, struct Process_s* process, size_t size);
 typedef Error (*ChmodFunction)(struct VfsFile_s* file, struct Process_s* process, VfsMode mode);
 typedef Error (*ChownFunction)(struct VfsFile_s* file, struct Process_s* process, Uid new_uid, Gid new_gid);
 typedef Error (*ReaddirFunction)(struct VfsFile_s* file, struct Process_s* process, VirtPtr buff, size_t size, size_t* ret);
-// Note: Close must not fail.
-typedef void (*CloseFunction)(struct VfsFile_s* file);
+// Note: Free must not fail.
+typedef void (*FileFreeFunction)(struct VfsFile_s* file);
 // Note: Lock and Unlock must be TaskLocks. They are used for generic ReadAt and WriteAt implementation.
 typedef void (*LockFunction)(struct VfsFile_s* file);
 typedef void (*UnlockFunction)(struct VfsFile_s* file);
@@ -137,27 +138,32 @@ typedef struct {
     ReadAtFunction read_at;
     WriteAtFunction write_at;
     StatFunction stat;
-    DupFunction dup;
+    CopyFunction copy;
     TruncFunction trunc;
     ChmodFunction chmod;
     ChownFunction chown;
     ReaddirFunction readdir;
-    CloseFunction close;
+    FileFreeFunction free;
     LockFunction lock;
     UnlockFunction unlock;
 } VfsFileVtable;
 
 typedef struct VfsFile_s {
-    struct VfsFile_s* next;
     const VfsFileVtable* functions;
-    int fd;
-    int flags;
+    SpinLock ref_lock;
+    size_t ref_count;
     size_t ino;
     VfsMode mode;
     Uid uid;
     Gid gid;
-    char* path;
 } VfsFile;
+
+typedef struct FileDescriptor_s {
+    struct FileDescriptor_s* next;
+    VfsFile* file;
+    int id;
+    int flags;
+} FileDescriptor;
 
 typedef uint64_t DeviceId;
 
@@ -168,7 +174,7 @@ typedef Error (*LinkFunction)(struct VfsFilesystem_s* fs, struct Process_s* proc
 typedef Error (*RenameFunction)(struct VfsFilesystem_s* fs, struct Process_s* process, const char* old, const char* new);
 typedef Error (*InitFunction)(struct VfsFilesystem_s* fs, struct Process_s* process);
 // Free must not fail.
-typedef void (*FreeFunction)(struct VfsFilesystem_s* fs);
+typedef void (*FsFreeFunction)(struct VfsFilesystem_s* fs);
 
 typedef struct {
     OpenFunction open;
@@ -176,7 +182,7 @@ typedef struct {
     UnlinkFunction unlink;
     LinkFunction link;
     RenameFunction rename;
-    FreeFunction free;
+    FsFreeFunction free;
     InitFunction init;
 } VfsFilesystemVtable;
 

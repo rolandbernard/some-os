@@ -59,11 +59,11 @@ static Error serialStatFunction(SerialDeviceFile* file, Process* process, VirtPt
     return simpleError(SUCCESS);
 }
 
-static void serialCloseFunction(SerialDeviceFile* file) {
+static void serialFreeFunction(SerialDeviceFile* file) {
     dealloc(file);
 }
 
-static Error serialDupFunction(SerialDeviceFile* file, Process* process, VfsFile** ret) {
+static Error serialCopyFunction(SerialDeviceFile* file, Process* process, VfsFile** ret) {
     SerialDeviceFile* copy = kalloc(sizeof(SerialDeviceFile));
     lockSpinLock(&file->lock);
     memcpy(copy, file, sizeof(SerialDeviceFile));
@@ -77,8 +77,8 @@ static const VfsFileVtable functions = {
     .read = (ReadFunction)serialReadFunction,
     .write = (WriteFunction)serialWriteFunction,
     .stat = (StatFunction)serialStatFunction,
-    .close = (CloseFunction)serialCloseFunction,
-    .dup = (DupFunction)serialDupFunction,
+    .free = (FileFreeFunction)serialFreeFunction,
+    .copy = (CopyFunction)serialCopyFunction,
 };
 
 SerialDeviceFile* createSerialDeviceFile(size_t ino, Serial serial) {

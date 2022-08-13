@@ -58,7 +58,7 @@ static void decreaseReferenceFor(const char* name) {
 }
 
 static Error fifoReadFunction(FifoFile* file, Process* process, VirtPtr buffer, size_t size, size_t* ret) {
-    if (canAccess(file->base.mode, file->uid, file->gid, process, VFS_ACCESS_R)) {
+    if (canAccess(file->base.mode, file->base.uid, file->base.gid, process, VFS_ACCESS_R)) {
         return executePipeOperation(file->data, process, buffer, size, false, ret);
     } else {
         return simpleError(EACCES);
@@ -66,7 +66,7 @@ static Error fifoReadFunction(FifoFile* file, Process* process, VirtPtr buffer, 
 }
 
 static Error fifoWriteFunction(FifoFile* file, Process* process, VirtPtr buffer, size_t size, size_t* ret) {
-    if (canAccess(file->base.mode, file->uid, file->gid, process, VFS_ACCESS_W)) {
+    if (canAccess(file->base.mode, file->base.uid, file->base.gid, process, VFS_ACCESS_W)) {
         return executePipeOperation(file->data, process, buffer, size, true, ret);
     } else {
         return simpleError(EACCES);
@@ -78,8 +78,8 @@ static Error fifoStatFunction(FifoFile* file, Process* process, VirtPtr stat) {
         .id = file->base.ino,
         .mode = file->base.mode,
         .nlinks = file->data->ref_count,
-        .uid = file->uid,
-        .gid = file->gid,
+        .uid = file->base.uid,
+        .gid = file->base.gid,
         .size = file->data->count,
         .block_size = 0,
         .st_atime = getNanoseconds(),
@@ -91,12 +91,12 @@ static Error fifoStatFunction(FifoFile* file, Process* process, VirtPtr stat) {
     return simpleError(SUCCESS);
 }
 
-static void fifoCloseFunction(FifoFile* file) {
+static void fifoFreeFunction(FifoFile* file) {
     decreaseReferenceFor(file->name);
     dealloc(file);
 }
 
-static Error fifoDupFunction(FifoFile* file, Process* process, VfsFile** ret) {
+static Error fifoCopyFunction(FifoFile* file, Process* process, VfsFile** ret) {
     increaseReferenceFor(file->name);
     FifoFile* copy = kalloc(sizeof(FifoFile));
     memcpy(copy, file, sizeof(FifoFile));
@@ -108,8 +108,8 @@ static const VfsFileVtable functions = {
     .read = (ReadFunction)fifoReadFunction,
     .write = (WriteFunction)fifoWriteFunction,
     .stat = (StatFunction)fifoStatFunction,
-    .close = (CloseFunction)fifoCloseFunction,
-    .dup = (DupFunction)fifoDupFunction,
+    .free = (FileFreeFunction)fifoFreeFunction,
+    .copy = (CopyFunction)fifoCopyFunction,
 };
 
 FifoFile* createFifoFile(const char* path, VfsMode mode, Uid uid, Gid gid) {
@@ -126,9 +126,9 @@ FifoFile* createFifoFile(const char* path, VfsMode mode, Uid uid, Gid gid) {
     file->base.functions = &functions;
     file->base.mode = mode;
     file->base.ino = 0;
+    file->base.gid = gid;
+    file->base.uid = uid;
     file->name = name;
-    file->gid = gid;
-    file->uid = uid;
     file->data = data;
     return file;
 }

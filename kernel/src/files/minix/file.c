@@ -253,14 +253,14 @@ static Error minixStatFunction(MinixFile* file, Process* process, VirtPtr stat) 
     return simpleError(SUCCESS);
 }
 
-static void minixCloseFunction(MinixFile* file) {
+static void minixFreeFunction(MinixFile* file) {
     lockTaskLock(&file->fs->lock);
     file->fs->base.open_files--;
     unlockTaskLock(&file->fs->lock);
     dealloc(file);
 }
 
-static Error minixDupFunction(MinixFile* file, Process* process, VfsFile** ret) {
+static Error minixCopyFunction(MinixFile* file, Process* process, VfsFile** ret) {
     MinixFile* copy = kalloc(sizeof(MinixFile));
     lockTaskLock(&file->fs->lock);
     file->fs->base.open_files++;
@@ -426,8 +426,8 @@ static VfsFileVtable functions_file = {
     .read = (ReadFunction)minixReadFunction,
     .write = (WriteFunction)minixWriteFunction,
     .stat = (StatFunction)minixStatFunction,
-    .close = (CloseFunction)minixCloseFunction,
-    .dup = (DupFunction)minixDupFunction,
+    .free = (FileFreeFunction)minixFreeFunction,
+    .copy = (CopyFunction)minixCopyFunction,
     .trunc = (TruncFunction)minixTruncFunction,
     .chmod = (ChmodFunction)minixChmodFunction,
     .chown = (ChownFunction)minixChownFunction,
@@ -440,8 +440,8 @@ static VfsFileVtable functions_directory = {
     .read = (ReadFunction)minixReadFunction,
     .write = (WriteFunction)minixWriteFunction,
     .stat = (StatFunction)minixStatFunction,
-    .close = (CloseFunction)minixCloseFunction,
-    .dup = (DupFunction)minixDupFunction,
+    .free = (FileFreeFunction)minixFreeFunction,
+    .copy = (CopyFunction)minixCopyFunction,
     .trunc = (TruncFunction)minixTruncFunction,
     .chmod = (ChmodFunction)minixChmodFunction,
     .chown = (ChownFunction)minixChownFunction,
