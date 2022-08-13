@@ -3,9 +3,9 @@
 #include <assert.h>
 #include <string.h>
 
-#include "interrupt/com.h"
 #include "process/process.h"
 
+#include "interrupt/com.h"
 #include "error/log.h"
 #include "error/panic.h"
 #include "files/path.h"
@@ -23,6 +23,7 @@
 #include "process/signals.h"
 #include "process/syscall.h"
 #include "process/types.h"
+#include "task/syscall.h"
 #include "task/types.h"
 #include "task/spinlock.h"
 #include "util/util.h"
@@ -58,16 +59,11 @@ static bool basicProcessWait(Task* task) {
     return false;
 }
 
-void finalProcessWait(Task* task) {
-    // Called before waking up the task
-    basicProcessWait(task);
-}
-
 void executeProcessWait(Task* task) {
     lockSpinLock(&process_lock); 
     if (basicProcessWait(task)) {
         unlockSpinLock(&process_lock); 
-        task->sched.state = ENQUABLE;
+        moveTaskToState(task, ENQUABLE);
     } else {
         bool has_child = false;
         Pid wait_pid = task->frame.regs[REG_ARGUMENT_1];
@@ -85,10 +81,10 @@ void executeProcessWait(Task* task) {
         unlockSpinLock(&process_lock); 
         if (has_child) {
             task->frame.regs[REG_ARGUMENT_0] = -EINTR;
-            task->sched.state = WAIT_CHLD;
+            moveTaskToState(task, WAIT_CHLD);
         } else {
             task->frame.regs[REG_ARGUMENT_0] = -ECHILD;
-            task->sched.state = ENQUABLE;
+            moveTaskToState(task, ENQUABLE);
         }
     }
 }
@@ -189,7 +185,7 @@ Task* createTaskInProcess(Process* process, uintptr_t sp, uintptr_t gp, uintptr_
     if (task != NULL) {
         task->process = process;
         task->sched.priority = priority;
-        task->sched.state = ENQUABLE;
+        moveTaskToState(task, ENQUABLE);
         initTrapFrame(&task->frame, sp, gp, pc, process->pid, process->memory.mem);
         addTaskToProcess(process, task);
     }
@@ -205,28 +201,17 @@ void addTaskToProcess(Process* process, Task* task) {
 }
 
 static void terminateProcessTask(Task* task) {
-    // TODO: For adding multiple task for a process this must be implemented correctly.
-    // This fails for example if the task is running, is in a syscall, is waiting, etc.
-    task->process->times.user_time += task->times.user_time;
-    task->process->times.system_time += task->times.system_time;
-    task->process->times.user_child_time += task->times.user_child_time;
-    task->process->times.system_child_time += task->times.system_child_time;
-    task->sched.state = TERMINATED;
-    task->process = NULL;
+    moveTaskToState(task, TERMINATED);
+    sendMessageToAll(YIELD_TASK, task);
 }
 
 void terminateAllProcessTasksBut(Process* process, Task* keep) {
     Task* current = process->tasks;
     while (current != NULL) {
-        Task* next = current->proc_next;
         if (current != keep) {
             terminateProcessTask(current);
         }
-        current = next;
-    }
-    process->tasks = keep;
-    if (keep != NULL) {
-        keep->proc_next = NULL;
+        current = current->proc_next;
     }
 }
 
@@ -256,7 +241,31 @@ void deallocProcess(Process* process) {
 void exitProcess(Process* process, Signal signal, int exit) {
     process->status = (exit & 0xff) | (signal << 8);
     terminateAllProcessTasks(process);
-    deallocProcess(process);
+}
+
+void removeProcessTask(Task* task) {
+    assert(task->process != NULL);
+    Process* process = task->process;
+    lockSpinLock(&process->lock);
+    Task** curr = &process->tasks;
+    while (*curr != NULL) {
+        if (*curr == task) {
+            *curr = task->proc_next;
+        } else {
+            curr = &(*curr)->proc_next;
+        }
+    }
+    process->times.user_time += task->times.user_time;
+    process->times.system_time += task->times.system_time;
+    process->times.user_child_time += task->times.user_child_time;
+    process->times.system_child_time += task->times.system_child_time;
+    task->process = NULL;
+    if (process->tasks == NULL) {
+        unlockSpinLock(&process->lock);
+        deallocProcess(process);
+    } else {
+        unlockSpinLock(&process->lock);
+    }
 }
 
 int doForProcessWithPid(int pid, ProcessFindCallback callback, void* udata) {
@@ -273,11 +282,9 @@ int doForProcessWithPid(int pid, ProcessFindCallback callback, void* udata) {
     return -ESRCH;
 }
 
-void handleTaskWakeup(Task* task) {
-    if (task->sched.state == WAIT_CHLD) {
-        finalProcessWait(task);
-    } else {
-        task->frame.regs[REG_ARGUMENT_0] = -EINTR;
+void handleProcessTaskWakeup(Task* task) {
+    if (task->sched._state == WAIT_CHLD) {
+        basicProcessWait(task);
     }
 }
 

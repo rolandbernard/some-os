@@ -25,7 +25,7 @@ SyscallReturn sleepSyscall(TrapFrame* frame) {
         // This is a task. We can put it into wait.
         Task* task = (Task*)frame;
         task->sched.sleeping_until = end;
-        task->sched.state = SLEEPING;
+        moveTaskToState(task, SLEEPING);
         enqueueTask(task);
         return WAIT;
     }

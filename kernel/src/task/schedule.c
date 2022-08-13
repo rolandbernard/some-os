@@ -6,6 +6,7 @@
 #include "error/log.h"
 #include "interrupt/trap.h"
 #include "process/process.h"
+#include "process/signals.h"
 #include "task/harts.h"
 #include "task/spinlock.h"
 #include "task/task.h"
@@ -33,14 +34,16 @@ void enqueueTask(Task* task) {
     assert(hart != NULL);
     ScheduleQueue* queue = &hart->queue;
     if (hart->idle_task != task) { // Ignore the idle process
-        switch (task->sched.state) {
+        lockSpinLock(&task->sched.lock);
+        switch (task->sched._state) {
             case SLEEPING:
             case PAUSED:
             case WAIT_CHLD:
                 addSleepingTask(task);
+                unlockSpinLock(&task->sched.lock);
                 break;
             case ENQUABLE:
-                task->sched.state = READY;
+                moveTaskToState(task, READY);
                 if (task->sched.run_for > PRIORITY_DECREASE) {
                     // Lower priority to not starve other processes
                     task->sched.queue_priority =
@@ -50,36 +53,40 @@ void enqueueTask(Task* task) {
                     task->sched.queue_priority = task->sched.priority;
                 }
                 pushTaskToQueue(queue, task);
+                unlockSpinLock(&task->sched.lock);
                 break;
             case READY: // Task has already been enqueued
             case RUNNING: // It is currently running
             case WAITING: // Task is already handled somewhere else
+                unlockSpinLock(&task->sched.lock);
                 break;
             case TERMINATED: // Task can not be enqueue, it is only waiting to be freed.
+                unlockSpinLock(&task->sched.lock);
                 deallocTask(task);
                 break;
-            case UNKNOWN: // We don't know what to do
-                panic();  // These should not happen
+            default:        // We don't know what to do
+                panic();    // These should not happen
         }
     }
 }
 
 static void awakenTask(Task* task) {
-    if (task->sched.state == SLEEPING) {
+    lockSpinLock(&task->sched.lock);
+    if (task->sched._state == SLEEPING) {
         Time time = getTime();
         if (time >= task->sched.sleeping_until) {
             task->frame.regs[REG_ARGUMENT_0] = 0;
         } else {
             task->frame.regs[REG_ARGUMENT_0] = task->sched.sleeping_until - time;
         }
-    } else if (task->sched.state == PAUSED) {
-        if (task->process != NULL) {
-            handleTaskWakeup(task);
-        } else {
-            task->frame.regs[REG_ARGUMENT_0] = -EINTR;
-        }
+    } else {
+        task->frame.regs[REG_ARGUMENT_0] = -EINTR;
     }
-    task->sched.state = ENQUABLE;
+    if (task->process != NULL) {
+        handleProcessTaskWakeup(task);
+    }
+    unlockSpinLock(&task->sched.lock);
+    moveTaskToState(task, ENQUABLE);
     enqueueTask(task);
 }
 
@@ -88,43 +95,58 @@ static void awakenTasks() {
     Time time = getTime();
     Task** current = &sleeping;
     while (*current != NULL) {
+        Task* task = *current;
+        lockSpinLock(&task->sched.lock);
         if (
-            ((*current)->sched.state == SLEEPING && (*current)->sched.sleeping_until <= time)
-            || ((*current)->process != NULL && shouldTaskWakeup(*current))
+            (task->sched._state == SLEEPING && task->sched.sleeping_until <= time)
+            || (task->process != NULL && shouldTaskWakeup(task))
+            || task->sched._state == TERMINATED
         ) {
-            Task* task = *current;
-            *current = (*current)->sched.sched_next;
+            unlockSpinLock(&task->sched.lock);
+            *current = task->sched.sched_next;
             awakenTask(task);
         } else {
-            current = &(*current)->sched.sched_next;
+            unlockSpinLock(&task->sched.lock);
+            current = &task->sched.sched_next;
         }
     }
     unlockSpinLock(&sleeping_lock);
 }
 
-void runNextTask() {
+noreturn void runNextTask() {
     awakenTasks();
     Task* current = NULL;
     current = getCurrentTask();
     if (current != NULL) {
         // If this is called from inside a process. Call exit syscall.
         syscall(SYSCALL_EXIT);
+        panic();
     } else {
         runNextTaskFrom(getCurrentHartFrame());
     }
 }
 
-void runNextTaskFrom(HartFrame* hart) {
-    Task* next = NULL;
-    while (next == NULL) {
-        next = pullTaskForHart(hart);
-        if (next->sched.state == TERMINATED) {
-            deallocTask(next);
-            next = NULL;
+noreturn void runNextTaskFrom(HartFrame* hart) {
+    for (;;) {
+        Task* next = NULL;
+        while (next == NULL) {
+            next = pullTaskForHart(hart);
+            lockSpinLock(&next->sched.lock);
+            if (next->sched._state == TERMINATED) {
+                unlockSpinLock(&next->sched.lock);
+                deallocTask(next);
+                next = NULL;
+            } else {
+                unlockSpinLock(&next->sched.lock);
+            }
+        }
+        assert(next != NULL);
+        if (next->process == NULL || handlePendingSignals(next)) {
+            enterTask(next);
+        } else {
+            enqueueTask(next);
         }
     }
-    assert(next != NULL);
-    enterTask(next);
 }
 
 Task* pullTaskForHart(HartFrame* hart) {
@@ -196,5 +218,13 @@ Task* removeTaskFromQueue(ScheduleQueue* queue, Task* task) {
     }
     unlockSpinLock(&queue->lock);
     return NULL;
+}
+
+void moveTaskToState(Task* task, TaskState state) {
+    lockSpinLock(&task->sched.lock);
+    if (task->sched._state != TERMINATED) {
+        task->sched._state = state;
+    }
+    unlockSpinLock(&task->sched.lock);
 }
 

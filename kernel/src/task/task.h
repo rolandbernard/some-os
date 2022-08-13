@@ -3,6 +3,7 @@
 
 #include <stdint.h>
 #include <stddef.h>
+#include <stdnoreturn.h>
 
 #include "error/error.h"
 #include "memory/virtptr.h"
@@ -17,7 +18,7 @@ Task* createKernelTask(void* enter, size_t stack_size, Priority priority);
 
 void deallocTask(Task* task);
 
-void enterTask(Task* task);
+noreturn void enterTask(Task* task);
 
 Task* getCurrentTask();
 

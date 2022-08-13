@@ -1,23 +1,26 @@
 
-#include <assert.h>
-#include <errno.h>
 #include <fcntl.h>
 #include <signal.h>
-#include <stdio.h>
 #include <stdlib.h>
 #include <stdnoreturn.h>
-#include <string.h>
 #include <sys/wait.h>
-#include <sys/stat.h>
 #include <unistd.h>
 
+#define PROGRAM_NAME "init"
+#include "log.h"
+#include "util.h"
+
 void signalHandler(int signal) {
-    fprintf(stderr, "[?] Signal handler\n");
+    USPACE_DEBUG("Signal handler");
     if (signal == SIGCHLD) {
-        fprintf(stderr, "[?] Child exited. Waiting...\n");
+        USPACE_DEBUG("Child signal. Waiting...");
         int status = 0;
         wait(&status);
-        fprintf(stderr, "[?] Child exited with %i\n", WEXITSTATUS(status));
+        if (WIFEXITED(status)) {
+            USPACE_DEBUG("Child exited with %i", WEXITSTATUS(status));
+        } else if (WIFSIGNALED(status)) {
+            USPACE_DEBUG("Child signaled with %i", WSTOPSIG(status));
+        }
     }
 }
 
@@ -27,8 +30,8 @@ void setupTty() {
         // 0 -> stdin, 1 -> stdout, 2 -> stderr
         int fd = open("/dev/tty0", i == 0 ? O_RDONLY : O_WRONLY);
         if (fd != i) {
-            fprintf(
-                stderr, "[!] Failed to open %s file: %s",
+            USPACE_ERROR(
+                "Failed to open %s file: %s",
                 i == 0   ? "stdin"
                 : i == 1 ? "stdout"
                          : "stderr",
@@ -39,43 +42,32 @@ void setupTty() {
     }
 }
 
-void startProgram(const char* name) {
-    int pid = fork();
-    if (pid == 0) {
-        fprintf(stderr, "[?] Forked\n");
-        execl(name, name, NULL);
-        fprintf(stderr, "Failed to start `%s`: %s\n", name, strerror(errno));
-        exit(1);
-    } else {
-        // Process started
-        return;
-    }
-}
-
 void setupSystem() {
     signal(SIGCHLD, signalHandler);
-    startProgram("/bin/hello");
+    // TO DO
 }
 
 noreturn void idleLoop() {
     // After setting up the system, for now we only wait for children
     for (;;) {
         pause();
-        fprintf(stderr, "[?] Unpaused\n");
+        USPACE_DEBUG("Unpaused");
     }
 }
 
 int main(int argc, char* argv[], char* env[]) {
     setupTty();
-    fprintf(stderr, "[+] Started init process\n");
-    mkfifo("/fifo", S_IRWXU | S_IRWXG | S_IRWXO);
+    USPACE_SUCCESS("Started init process");
+    if (runProgram("/bin/test") == 0) {
+        USPACE_SUCCESS("Finished basic syscall tests");
+    } else {
+        USPACE_WARNING("Failed basic syscall tests");
+    }
     setupSystem();
-    int fd = open("/fifo", O_RDWR);
-    const char* msg = "Test message";
-    write(fd, msg, strlen(msg));
+    USPACE_SUCCESS("Finished system setup");
     idleLoop();
     // We should not return
-    fprintf(stderr, "[!] Init process exited\n");
+    USPACE_WARNING("Init process exited");
     return 1;
 }
 

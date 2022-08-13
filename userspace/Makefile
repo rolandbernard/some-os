@@ -2,7 +2,7 @@
 include ../config.mk
 
 # == Config
-TARGETS := init hello
+TARGETS := init hello test
 # ==
 
 # == Tools

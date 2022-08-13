@@ -7,7 +7,7 @@
 #include "memory/kalloc.h"
 #include "memory/virtmem.h"
 #include "memory/virtptr.h"
-#include "process/signals.h"
+#include "process/process.h"
 #include "process/syscall.h"
 #include "task/harts.h"
 #include "task/schedule.h"
@@ -38,17 +38,20 @@ Task* createKernelTask(void* enter, size_t stack_size, Priority priority) {
         (uintptr_t)enter, 0, kernel_page_table
     );
     task->sched.priority = priority;
-    task->sched.state = ENQUABLE;
+    moveTaskToState(task, ENQUABLE);
     return task;
 }
 
 void deallocTask(Task* task) {
+    if (task->process != NULL) {
+        removeProcessTask(task);
+    }
     dealloc(task->stack);
     dealloc(task);
 }
 
-void enterTask(Task* task) {
-    task->sched.state = RUNNING;
+noreturn void enterTask(Task* task) {
+    moveTaskToState(task, RUNNING);
     HartFrame* hart = getCurrentHartFrame();
     task->frame.hart = hart;
     if (hart != NULL) {
@@ -59,11 +62,7 @@ void enterTask(Task* task) {
     if (task->process == NULL) {
         enterKernelMode(&task->frame);
     } else {
-        if (handlePendingSignals(task)) {
-            enterUserMode(&task->frame);
-        } else {
-            runNextTask();
-        }
+        enterUserMode(&task->frame);
     }
 }
 

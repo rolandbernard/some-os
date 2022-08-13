@@ -12,7 +12,6 @@
 #include "util/util.h"
 
 #define KALLOC_MIN_PAGES_TO_FREE 8
-#define KALLOC_MEM_START 0x100000000
 #define KALLOC_MEM_ALIGN 8
 #define KALLOC_MIN_FREE_MEM sizeof(FreeMemory)
 
@@ -69,28 +68,35 @@ static FreeMemory** findFreeMemoryThatFits(size_t size) {
     return NULL;
 }
 
+static size_t kallocActualSizeFor(size_t user_size) {
+    return umax(
+        (user_size + sizeof(AllocatedMemory) + KALLOC_MEM_ALIGN - 1) & -KALLOC_MEM_ALIGN,
+        KALLOC_MIN_FREE_MEM
+    );
+}
+
 void* kalloc(size_t size) {
     if (size == 0) {
         return NULL;
     } else {
         lockSpinLock(&kalloc_lock);
-        size_t length = (size + sizeof(AllocatedMemory) + KALLOC_MEM_ALIGN - 1) & -KALLOC_MEM_ALIGN;
-        FreeMemory** memory = findFreeMemoryThatFits(length);
+        size_t alloc_size = kallocActualSizeFor(size);
+        FreeMemory** memory = findFreeMemoryThatFits(alloc_size);
         if (memory == NULL) {
-            addNewMemory(length);
-            memory = findFreeMemoryThatFits(length);
+            addNewMemory(alloc_size);
+            memory = findFreeMemoryThatFits(alloc_size);
         }
         void* ret = NULL;
         if (memory != NULL) {
             AllocatedMemory* mem = (AllocatedMemory*)*memory;
-            if ((*memory)->size < length + KALLOC_MIN_FREE_MEM) {
+            if ((*memory)->size < alloc_size + KALLOC_MIN_FREE_MEM) {
                 *memory = (*memory)->next;
             } else {
-                FreeMemory* next = (FreeMemory*)((uintptr_t)*memory + length);
+                FreeMemory* next = (FreeMemory*)((uintptr_t)*memory + alloc_size);
                 next->next = (*memory)->next;
-                next->size = (*memory)->size - length;
+                next->size = (*memory)->size - alloc_size;
                 *memory = next;
-                mem->size = length;
+                mem->size = alloc_size;
             }
             ret = mem->bytes;
         }
@@ -200,19 +206,19 @@ void* krealloc(void* ptr, size_t size) {
     } else if (ptr == NULL) {
         return kalloc(size);
     } else {
-        size_t size_with_header = (size + sizeof(AllocatedMemory) + KALLOC_MEM_ALIGN - 1) & -KALLOC_MEM_ALIGN;
+        size_t alloc_size = kallocActualSizeFor(size);
         lockSpinLock(&kalloc_lock);
         AllocatedMemory* mem = (AllocatedMemory*)(ptr - sizeof(AllocatedMemory));
         FreeMemory** before = findFreeMemoryBefore(mem);
         FreeMemory** after = findFreeMemoryAfter(mem);
-        size_t length = mem->size;
+        size_t old_size = mem->size;
         if (before != NULL) {
-            length += (*before)->size;
+            old_size += (*before)->size;
         }
         if (after != NULL) {
-            length += (*after)->size;
+            old_size += (*after)->size;
         }
-        if (length >= size_with_header) {
+        if (old_size >= alloc_size) {
             AllocatedMemory* start = mem;
             if (before != NULL) {
                 start = (AllocatedMemory*)*before;
@@ -230,14 +236,14 @@ void* krealloc(void* ptr, size_t size) {
                 }
             }
             memmove(start->bytes, ptr, umin(mem->size - sizeof(AllocatedMemory), size));
-            if (length < size_with_header + KALLOC_MIN_FREE_MEM) {
-                start->size = length;
+            if (old_size < alloc_size + KALLOC_MIN_FREE_MEM) {
+                start->size = old_size;
             } else {
-                FreeMemory* next = (FreeMemory*)((uintptr_t)start + size_with_header);
+                FreeMemory* next = (FreeMemory*)((uintptr_t)start + alloc_size);
                 next->next = first_free;
-                next->size = length - size_with_header;
+                next->size = old_size - alloc_size;
                 first_free = next;
-                start->size = size_with_header;
+                start->size = alloc_size;
             }
             tryFreeingOldMemory();
             unlockSpinLock(&kalloc_lock);

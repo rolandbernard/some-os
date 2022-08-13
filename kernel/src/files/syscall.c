@@ -208,21 +208,16 @@ SyscallReturn statSyscall(TrapFrame* frame) {
 }
 
 SyscallReturn dupSyscall(TrapFrame* frame) {
+    // TODO: This is not the correct behavior. Files should share locks and offset.
     FILE_SYSCALL_OP(false, false, dup, {
         VfsFile* new_file;
         Error err = file->functions->dup(file, task->process, &new_file);
         if (isError(err)) {
             SYSCALL_RETURN(-err.kind);
         } else {
-            int flags = 0;
+            int flags = file->flags & ~VFS_FILE_CLOEXEC;
             if ((SYSCALL_ARG(2) & VFS_OPEN_CLOEXEC) != 0) {
                 flags |= VFS_FILE_CLOEXEC;
-            }
-            if ((SYSCALL_ARG(2) & VFS_OPEN_RDONLY) != 0) {
-                flags |= VFS_FILE_RDONLY;
-            }
-            if ((SYSCALL_ARG(2) & VFS_OPEN_WRONLY) != 0) {
-                flags |= VFS_FILE_WRONLY;
             }
             int fd = SYSCALL_ARG(1);
             if (fd < 0) {
@@ -357,7 +352,7 @@ SyscallReturn getcwdSyscall(TrapFrame* frame) {
     memcpyBetweenVirtPtr(
         buff, virtPtrForKernel(task->process->resources.cwd), umin(length, cwd_length + 1)
     );
-    SYSCALL_RETURN(SYSCALL_ARG(0));
+    SYSCALL_RETURN(-SUCCESS);
 }
 
 char* copyPathFromSyscallArgs(Task* task, uintptr_t ptr) {

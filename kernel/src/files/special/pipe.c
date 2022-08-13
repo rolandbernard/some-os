@@ -30,6 +30,7 @@ static void doOperationOnPipe(PipeSharedData* pipe) {
             }
             pipe->waiting_reads->size -= length;
             pipe->waiting_reads->written += length;
+            pipe->read_pos = (pipe->read_pos + length) % PIPE_BUFFER_CAPACITY;
             pipe->count -= length;
             if (pipe->waiting_reads->size == 0 || pipe->waiting_writes == NULL) {
                 WaitingPipeOperation* op = pipe->waiting_reads;
@@ -37,7 +38,7 @@ static void doOperationOnPipe(PipeSharedData* pipe) {
                 if (pipe->waiting_reads == NULL) {
                     pipe->waiting_reads_tail = NULL;
                 }
-                op->wakeup->sched.state = ENQUABLE;
+                moveTaskToState(op->wakeup, ENQUABLE);
                 enqueueTask(op->wakeup);
             }
         } else if (pipe->waiting_writes != NULL && pipe->count < PIPE_BUFFER_CAPACITY) {
@@ -65,7 +66,7 @@ static void doOperationOnPipe(PipeSharedData* pipe) {
                 if (pipe->waiting_writes == NULL) {
                     pipe->waiting_writes_tail = NULL;
                 }
-                op->wakeup->sched.state = ENQUABLE;
+                moveTaskToState(op->wakeup, ENQUABLE);
                 enqueueTask(op->wakeup);
             }
         } else {
@@ -84,7 +85,7 @@ Error executePipeOperation(PipeSharedData* data, Process* process, VirtPtr buffe
     op.wakeup = self;
     op.next = NULL;
     TrapFrame* lock = criticalEnter();
-    self->sched.state = WAITING;
+    moveTaskToState(self, WAITING);
     lockSpinLock(&data->lock);
     if (write) {
         if (data->waiting_writes == NULL) {

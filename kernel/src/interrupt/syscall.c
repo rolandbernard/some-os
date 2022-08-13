@@ -115,11 +115,10 @@ static void syscallTaskEntry(SyscallFunction func, TrapFrame* frame) {
     task->times.system_time += self->times.user_time + self->times.system_time;
     task->times.system_time += self->times.user_child_time + self->times.system_child_time;
     if (ret == CONTINUE) {
-        assert(task->sched.state == WAITING); // If this fails, don't return continue.
-        task->sched.state = ENQUABLE;
+        moveTaskToState(task, ENQUABLE);
         enqueueTask(task);
     }
-    self->sched.state = TERMINATED;
+    moveTaskToState(self, TERMINATED);
     criticalReturn(lock);
     panic();
 }
@@ -150,7 +149,7 @@ void runSyscall(TrapFrame* frame, bool is_kernel) {
         } else {
             assert(frame->hart != NULL); // Only tasks can wait for async syscalls
             Task* task = (Task*)frame;
-            task->sched.state = WAITING;
+            moveTaskToState(task, WAITING);
             Task* syscall_task = createKernelTask(syscallTaskEntry, SYSCALL_STACK_SIZE, task->sched.priority);
             syscall_task->frame.regs[REG_ARGUMENT_0] = (uintptr_t)func;
             syscall_task->frame.regs[REG_ARGUMENT_1] = (uintptr_t)frame;
