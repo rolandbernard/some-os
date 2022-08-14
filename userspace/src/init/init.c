@@ -44,7 +44,7 @@ void setupTty() {
 
 void setupSystem() {
     signal(SIGCHLD, signalHandler);
-    // TO DO
+    startProgram("/bin/bash");
 }
 
 noreturn void idleLoop() {

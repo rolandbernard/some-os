@@ -73,7 +73,7 @@ typedef enum {
     VFS_FILE_CLOEXEC = (1 << 0),
     VFS_FILE_RDONLY = (1 << 1),
     VFS_FILE_WRONLY = (1 << 2),
-} VfsFileFlags;
+} VfsFileDescFlags;
 
 #define VFS_MODE_A_RW (VFS_MODE_A_R | VFS_MODE_A_W)
 #define VFS_MODE_G_RW (VFS_MODE_G_R | VFS_MODE_G_W)
@@ -162,7 +162,7 @@ typedef struct FileDescriptor_s {
     struct FileDescriptor_s* next;
     VfsFile* file;
     int id;
-    int flags;
+    VfsFileDescFlags flags;
 } FileDescriptor;
 
 typedef uint64_t DeviceId;
