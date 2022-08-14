@@ -109,8 +109,8 @@ static void registerProcess(Process* process) {
 
 static void unregisterProcess(Process* process) {
     lockSpinLock(&process_lock); 
-    // Add wait information to the parent
     if (process->tree.parent != NULL) {
+        // Add wait information to the parent
         Process* parent = process->tree.parent;
         ProcessWaitResult* current = process->tree.waits;
         while (current != NULL) {
@@ -127,6 +127,12 @@ static void unregisterProcess(Process* process) {
         new_entry->next = parent->tree.waits;
         parent->tree.waits = new_entry;
         addSignalToProcess(parent, SIGCHLD);
+        // Remove child from parent
+        if (process->tree.child_prev == NULL) {
+            parent->tree.children = process->tree.child_next;
+        } else {
+            process->tree.child_prev->tree.child_next = process->tree.child_next;
+        }
     } else {
         // Free pending waits
         ProcessWaitResult* current = process->tree.waits;
