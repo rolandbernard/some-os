@@ -5,18 +5,17 @@
 #include <string.h>
 
 #include "files/vfs.h"
-#include "files/process.h"
 #include "interrupt/syscall.h"
 #include "interrupt/timer.h"
 #include "memory/kalloc.h"
 #include "memory/virtmem.h"
 #include "memory/virtptr.h"
+#include "process/process.h"
+#include "process/signals.h"
+#include "process/syscall.h"
+#include "process/types.h"
 #include "task/harts.h"
 #include "task/schedule.h"
-#include "process/process.h"
-#include "process/syscall.h"
-#include "process/signals.h"
-#include "process/types.h"
 #include "task/types.h"
 #include "util/util.h"
 
@@ -66,26 +65,10 @@ SyscallReturn forkSyscall(TrapFrame* frame) {
             new_task->frame.pc = task->frame.pc;
             memcpy(&new_task->frame.regs, &task->frame.regs, sizeof(task->frame.regs));
             memcpy(&new_task->frame.fregs, &task->frame.fregs, sizeof(task->frame.fregs));
-            // Copy signal handler data, but not pending signals
-            new_process->signals.current_signal = task->process->signals.current_signal;
-            new_process->signals.restore_frame = task->process->signals.restore_frame;
-            memcpy(
-                new_process->signals.handlers, task->process->signals.handlers,
-                sizeof(task->process->signals.handlers)
-            );
-            // Copy resource information
-            new_process->resources.uid = task->process->resources.uid;
-            new_process->resources.gid = task->process->resources.gid;
-            new_process->resources.next_fd = task->process->resources.next_fd;
-            new_process->memory.start_brk = task->process->memory.start_brk;
-            new_process->memory.brk = task->process->memory.brk;
-            // Copy files
-            forkFileDescriptors(new_process, task->process);
             new_task->frame.regs[REG_ARGUMENT_0] = 0;
             enqueueTask(new_task);
             SYSCALL_RETURN(new_process->pid);
         } else {
-            deallocTask(new_task);
             deallocProcess(new_process);
             SYSCALL_RETURN(-ENOMEM);
         }

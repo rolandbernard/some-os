@@ -62,10 +62,7 @@ static Error deviceDirStatFunction(DeviceDirectoryFile* file, Process* process, 
 }
 
 static void deviceDirFreeFunction(DeviceDirectoryFile* file) {
-    TrapFrame* lock = criticalEnter();
-    lockSpinLock(&file->lock);
     dealloc(file);
-    criticalReturn(lock);
 }
 
 static Error deviceDirCopyFunction(DeviceDirectoryFile* file, Process* process, VfsFile** ret) {

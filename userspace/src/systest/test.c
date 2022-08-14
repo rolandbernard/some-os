@@ -452,6 +452,8 @@ static bool testReadDir2() {
 
 static bool testGetSetCwd() {
     char buffer[512];
+    ASSERT(getcwd(buffer, 512) != (void*)-1)
+    ASSERT(strcmp(buffer, "/") == 0);
     ASSERT(chdir("./tmp") == 0);
     ASSERT(getcwd(buffer, 512) != (void*)-1)
     ASSERT(strcmp(buffer, "/tmp") == 0);

@@ -174,14 +174,30 @@ Pid allocateNewPid() {
 Process* createUserProcess(Process* parent) {
     Process* process = zalloc(sizeof(Process));
     if (process != NULL) {
-        process->pid = allocateNewPid();
-        if (parent == NULL) {
-            process->memory.mem = createMemorySpace();
-        } else {
+        if (parent != NULL) {
+            // Copy signal handler data, but not pending signals
+            process->signals.current_signal = parent->signals.current_signal;
+            process->signals.restore_frame = parent->signals.restore_frame;
+            memcpy(
+                process->signals.handlers, parent->signals.handlers,
+                sizeof(parent->signals.handlers)
+            );
+            // Copy resource information
+            process->resources.uid = parent->resources.uid;
+            process->resources.gid = parent->resources.gid;
+            process->resources.next_fd = parent->resources.next_fd;
+            process->resources.cwd = stringClone(parent->resources.cwd);
+            process->memory.start_brk = parent->memory.start_brk;
+            process->memory.brk = parent->memory.brk;
             process->memory.mem = cloneMemorySpace(parent->memory.mem);
+            // Copy files
+            forkFileDescriptors(process, parent);
+        } else {
+            process->memory.mem = createMemorySpace();
+            process->resources.cwd = stringClone("/");
         }
+        process->pid = allocateNewPid();
         process->tree.parent = parent;
-        process->resources.cwd = stringClone(process->resources.cwd);
         registerProcess(process);
     }
     return process;

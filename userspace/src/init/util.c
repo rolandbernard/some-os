@@ -11,11 +11,11 @@
 void startProgram(const char* name) {
     int pid = fork();
     if (pid == 0) {
-        USPACE_DEBUG("Forked");
         execl(name, name, NULL);
         USPACE_ERROR("Failed to start `%s`: %s", name, strerror(errno));
         exit(1);
     } else {
+        USPACE_DEBUG("Forked");
         // Process started
         return;
     }
@@ -24,11 +24,11 @@ void startProgram(const char* name) {
 int runProgram(const char* name) {
     int pid = fork();
     if (pid == 0) {
-        USPACE_DEBUG("Forked");
         execl(name, name, NULL);
         USPACE_ERROR("Failed to start `%s`: %s", name, strerror(errno));
         exit(1);
     } else {
+        USPACE_DEBUG("Forked");
         int status;
         while (waitpid(pid, &status, 0) != pid);
         return WIFEXITED(status) ? WEXITSTATUS(status) : -1;
