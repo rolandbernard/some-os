@@ -44,6 +44,10 @@ typedef enum {
     VFS_OPEN_NOFOLLOW = (1 << 12), // TODO: implement symbolic links
 } VfsOpenFlags;
 
+typedef enum {
+    VFS_UNLINK_REMOVEDIR = (1 << 0),
+} VfsUnlinkFlags;
+
 #define OPEN_ACCESS(open_flags) ((open_flags >> 4) & 0b111)
 
 typedef enum {
@@ -136,7 +140,7 @@ typedef struct VfsSuperblock_s {
     struct VfsNode_s* mount_point;
     struct VfsNode_s* root_node;
     size_t id;
-    size_t open_files;
+    size_t ref_count;
     SpinLock lock;
 } VfsSuperblock;
 
@@ -180,6 +184,7 @@ typedef struct VfsNode_s {
 
 typedef struct VfsFile_s {
     VfsNode* node;
+    char* path;
     size_t offset;
     size_t ref_count;
     SpinLock lock;
@@ -192,14 +197,9 @@ typedef struct VfsFileDescriptor_s {
     VfsFileDescFlags flags;
 } VfsFileDescriptor;
 
-typedef struct VfsRootMount_s {
-    struct VfsRootMount_s* next;
-    char* path;
-    VfsSuperblock* mounted;
-} VfsRootMount;
-
 typedef struct {
-    VfsRootMount* root_mounts;
+    VfsSuperblock* root_mounted;
+    SpinLock lock;
 } VirtualFilesystem;
 
 #endif

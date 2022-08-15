@@ -6,15 +6,13 @@
 
 extern VirtualFilesystem global_file_system;
 
-Error vfsOpen(VirtualFilesystem* fs, Process* process, const char* path, VfsOpenFlags flags, VfsMode mode, VfsFile** ret);
+Error vfsOpenAt(VirtualFilesystem* fs, Process* process, VfsFile* file, const char* path, VfsOpenFlags flags, VfsMode mode, VfsFile** ret);
 
-Error vfsMknod(VirtualFilesystem* fs, Process* process, const char* path, VfsMode mode, DeviceId id);
+Error vfsMknodAt(VirtualFilesystem* fs, Process* process, VfsFile* file, const char* path, VfsMode mode, DeviceId id);
 
-Error vfsUnlink(VirtualFilesystem* fs, Process* process, const char* path);
+Error vfsUnlinkAt(VirtualFilesystem* fs, Process* process, VfsFile* file, const char* path, VfsUnlinkFlags flags);
 
-Error vfsLink(VirtualFilesystem* fs, Process* process, const char* old, const char* new);
-
-Error vfsRootMount(VirtualFilesystem* fs, const char* path, VfsSuperblock* sb);
+Error vfsLinkAt(VirtualFilesystem* fs, Process* process, VfsFile* old_file, const char* old, VfsFile* new_file, const char* new);
 
 Error vfsMount(VirtualFilesystem* fs, const char* path, VfsSuperblock* sb);
 
