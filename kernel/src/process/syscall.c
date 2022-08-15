@@ -257,7 +257,7 @@ SyscallReturn setUidSyscall(TrapFrame* frame) {
     assert(frame->hart != NULL);
     Task* task = (Task*)frame;
     assert(task->process != NULL);
-    if (task->process->resources.uid == 0 || task->process->resources.gid == 0) {
+    if (task->process->resources.uid == 0) {
         task->process->resources.uid = SYSCALL_ARG(0);
         SYSCALL_RETURN(-SUCCESS);
     } else {
@@ -269,7 +269,7 @@ SyscallReturn setGidSyscall(TrapFrame* frame) {
     assert(frame->hart != NULL);
     Task* task = (Task*)frame;
     assert(task->process != NULL);
-    if (task->process->resources.uid == 0 || task->process->resources.gid == 0) {
+    if (task->process->resources.uid == 0) {
         task->process->resources.gid = SYSCALL_ARG(0);
         SYSCALL_RETURN(-SUCCESS);
     } else {

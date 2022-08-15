@@ -38,6 +38,7 @@ Error initVirtIOBlockDevice(int id, volatile VirtIODeviceLayout* base, VirtIODev
     *output = (VirtIODevice*)device;
     setInterruptFunction(id + 1, handleInterrupt, device);
     setInterruptPriority(id + 1, 1);
+    registerVirtIOBlockDevice(device);
     return simpleError(SUCCESS);
 }
 

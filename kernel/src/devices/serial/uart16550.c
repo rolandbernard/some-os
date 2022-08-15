@@ -27,6 +27,7 @@ Error initUart16550(Uart16550* uart) {
         uart->initialized = true;
 
         unlockSpinLock(&uart->lock);
+        registerUart16550(uart);
         KERNEL_SUBSUCCESS("Initialized UART device");
     } else {
         unlockSpinLock(&uart->lock);

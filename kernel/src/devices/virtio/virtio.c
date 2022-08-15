@@ -13,14 +13,12 @@ typedef Error (*VirtIORegisterFunction)(VirtIODevice* dev);
 
 typedef struct {
     VirtIOInitFunction init;
-    VirtIORegisterFunction regist;
     const char* name;
 } VirtIODeviceInitEntry;
 
 static const VirtIODeviceInitEntry device_inits[VIRTIO_DEVICE_TYPE_END] = {
     [VIRTIO_BLOCK] = {
         .init = initVirtIOBlockDevice,
-        .regist = (VirtIORegisterFunction)registerVirtIOBlockDevice,
         .name = "block",
     },
 };
