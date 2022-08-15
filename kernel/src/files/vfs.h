@@ -165,10 +165,10 @@ typedef struct FileDescriptor_s {
     VfsFileDescFlags flags;
 } FileDescriptor;
 
-typedef uint64_t DeviceId;
+typedef uint64_t VfsDeviceId;
 
 typedef Error (*OpenFunction)(struct VfsFilesystem_s* fs, struct Process_s* process, const char* path, VfsOpenFlags flags, VfsMode mode, VfsFile** ret);
-typedef Error (*MknodFunction)(struct VfsFilesystem_s* fs, struct Process_s* process, const char* path, VfsMode mode, DeviceId dev);
+typedef Error (*MknodFunction)(struct VfsFilesystem_s* fs, struct Process_s* process, const char* path, VfsMode mode, VfsDeviceId dev);
 typedef Error (*UnlinkFunction)(struct VfsFilesystem_s* fs, struct Process_s* process, const char* path);
 typedef Error (*LinkFunction)(struct VfsFilesystem_s* fs, struct Process_s* process, const char* old, const char* new);
 typedef Error (*RenameFunction)(struct VfsFilesystem_s* fs, struct Process_s* process, const char* old, const char* new);
@@ -229,7 +229,7 @@ Error umount(VirtualFilesystem* fs, const char* from);
 
 Error vfsOpen(VirtualFilesystem* fs, struct Process_s* process, const char* path, VfsOpenFlags flags, VfsMode mode, VfsFile** ret);
 
-Error vfsMknod(VirtualFilesystem* fs, struct Process_s* process, const char* path, VfsMode mode, DeviceId dev);
+Error vfsMknod(VirtualFilesystem* fs, struct Process_s* process, const char* path, VfsMode mode, VfsDeviceId dev);
 
 Error vfsUnlink(VirtualFilesystem* fs, struct Process_s* process, const char* path);
 

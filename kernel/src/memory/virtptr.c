@@ -10,7 +10,7 @@
 #include "memory/virtmem.h"
 #include "error/log.h"
 
-VirtPtr virtPtrForKernel(void* addr) {
+VirtPtr virtPtrForKernel(const void* addr) {
     return virtPtrFor((uintptr_t)addr, kernel_page_table);
 }
 

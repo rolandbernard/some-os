@@ -240,7 +240,7 @@ Error vfsOpen(VirtualFilesystem* fs, struct Process_s* process, const char* path
     }
 }
 
-Error vfsMknod(VirtualFilesystem* fs, struct Process_s* process, const char* path, VfsMode mode, DeviceId dev) {
+Error vfsMknod(VirtualFilesystem* fs, struct Process_s* process, const char* path, VfsMode mode, VfsDeviceId dev) {
     lockSpinLock(&fs->lock);
     FilesystemMount* mount = findMountHandling(fs, stringClone(path));
     if (mount != NULL) {

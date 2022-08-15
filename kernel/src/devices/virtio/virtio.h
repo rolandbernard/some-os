@@ -148,16 +148,6 @@ typedef struct {
 
 Error initVirtIODevices();
 
-VirtIODevice* getDeviceWithId(int id);
-
-VirtIODevice* getAnyDeviceOfType(VirtIODeviceType type);
-
-VirtIODevice* getDeviceOfType(VirtIODeviceType type, size_t n);
-
-size_t getDeviceCountOfType(VirtIODeviceType type);
-
-void getDevicesOfType(VirtIODeviceType type, VirtIODevice** devices);
-
 Error setupVirtIOQueue(VirtIODevice* device);
 
 uint16_t fillNextDescriptor(VirtIODevice* device, VirtIODescriptor descriptor);

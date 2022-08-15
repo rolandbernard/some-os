@@ -6,7 +6,6 @@
 
 #include "error/error.h"
 #include "task/spinlock.h"
-#include "devices/serial/serial.h"
 
 typedef struct {
     volatile uint8_t* base_address;
@@ -23,7 +22,6 @@ Error writeUart16550(Uart16550* uart, char value);
 // Read a single character from the device, return NO_DATA if no data is available
 Error readUart16550(Uart16550* uart, char* value);
 
-// Convert UART device into a Serial interface struct
-Serial serialUart16550(Uart16550* uart);
+Error registerUart16550(Uart16550* uart);
 
 #endif

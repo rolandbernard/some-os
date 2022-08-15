@@ -209,7 +209,7 @@ static Error minixOpenFunction(
     }
 }
 
-static Error minixMknodFunction(MinixFilesystem* fs, Process* process, const char* path, VfsMode mode, DeviceId dev) {
+static Error minixMknodFunction(MinixFilesystem* fs, Process* process, const char* path, VfsMode mode, VfsDeviceId dev) {
     lockTaskLock(&fs->lock);
     uint32_t inodenum;
     Error err = minixFindINodeForPath(fs, process, path, &inodenum);

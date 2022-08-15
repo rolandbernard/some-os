@@ -1,8 +1,11 @@
 
 #include "devices/virtio/block.h"
+
+#include "devices/devices.h"
 #include "error/error.h"
 #include "interrupt/plic.h"
 #include "memory/kalloc.h"
+#include "task/schedule.h"
 #include "task/spinlock.h"
 
 static void handleInterrupt(ExternalInterrupt id, void* udata) {
@@ -38,36 +41,35 @@ Error initVirtIOBlockDevice(int id, volatile VirtIODeviceLayout* base, VirtIODev
     return simpleError(SUCCESS);
 }
 
-void virtIOBlockDeviceOperation(
-    VirtIOBlockDevice* device, VirtPtr buffer, size_t offset, size_t size, bool write, VirtIOBlockCallback callback, void* udata
-) {
+Error virtIOBlockDeviceOperation(VirtIOBlockDevice* device, VirtPtr buffer, size_t offset, size_t size, bool write) {
     assert(size % BLOCK_SECTOR_SIZE == 0);
+    assert(offset % BLOCK_SECTOR_SIZE == 0);
     if (write && device->read_only) {
-        callback(someError(EINVAL, "Read-only device write attempt"), udata);
+        return someError(EINVAL, "Read-only device write attempt");
     }
+    VirtIOBlockRequest request;
+    request.wakeup = getCurrentTask();
+    assert(request.wakeup != NULL);
     lockSpinLock(&device->lock);
     if (device->virtio.queue->available.index - device->virtio.ack_index >= VIRTIO_RING_SIZE) {
         unlockSpinLock(&device->lock);
-        callback(someError(EBUSY, "Queue is full"), udata);
-        return;
+        return someError(EBUSY, "Queue is full");
     }
     uint32_t sector = offset / BLOCK_SECTOR_SIZE;
-    VirtIOBlockRequest* request = kalloc(sizeof(VirtIOBlockRequest));
-    assert(request != NULL);
-    request->header.sector = sector;
-    request->header.reserved = 0;
-    request->header.blk_type = write ? VIRTIO_BLOCK_T_OUT : VIRTIO_BLOCK_T_IN;
-    request->data.data = buffer;
-    request->status.status = VIRTIO_BLOCK_S_UNKNOWN;
-    request->head = addDescriptorsFor(&device->virtio, virtPtrForKernel(&request->header), sizeof(VirtIOBlockRequestHeader), VIRTIO_DESC_NEXT, true);
+    request.header.sector = sector;
+    request.header.reserved = 0;
+    request.header.blk_type = write ? VIRTIO_BLOCK_T_OUT : VIRTIO_BLOCK_T_IN;
+    request.data.data = buffer;
+    request.status.status = VIRTIO_BLOCK_S_UNKNOWN;
+    request.head = addDescriptorsFor(&device->virtio, virtPtrForKernel(&request.header), sizeof(VirtIOBlockRequestHeader), VIRTIO_DESC_NEXT, true);
     addDescriptorsFor(&device->virtio, buffer, size, VIRTIO_DESC_NEXT | (write ? 0 : VIRTIO_DESC_WRITE), write);
-    addDescriptorsFor(&device->virtio, virtPtrForKernel(&request->status), sizeof(VirtIOBlockRequestStatus), VIRTIO_DESC_WRITE, true);
-    sendRequestAt(&device->virtio, request->head);
-    request->callback = callback;
-    request->udata = udata;
-    request->next = device->requests;
-    device->requests = request;
+    addDescriptorsFor(&device->virtio, virtPtrForKernel(&request.status), sizeof(VirtIOBlockRequestStatus), VIRTIO_DESC_WRITE, true);
+    request.next = device->requests;
+    device->requests = &request;
+    moveTaskToState(request.wakeup, WAITING);
+    sendRequestAt(&device->virtio, request.head);
     unlockSpinLock(&device->lock);
+    return request.result;
 }
 
 void virtIOBlockFreePendingRequests(VirtIOBlockDevice* device) {
@@ -92,23 +94,50 @@ void virtIOBlockFreePendingRequests(VirtIOBlockDevice* device) {
     while (requests != NULL) {
         VirtIOBlockRequest* request = requests;
         requests = request->next;
-        Error error;
         switch (request->status.status) {
             case VIRTIO_BLOCK_S_OK:
-                error = simpleError(SUCCESS);
+                request->result = simpleError(SUCCESS);
                 break;
             case VIRTIO_BLOCK_S_IOERR:
-                error = simpleError(EIO);
+                request->result = simpleError(EIO);
                 break;
             case VIRTIO_BLOCK_S_UNSUPP:
-                error = simpleError(EUNSUP);
+                request->result = simpleError(EUNSUP);
                 break;
             case VIRTIO_BLOCK_S_UNKNOWN:
-                error = simpleError(EIO);
+                request->result = simpleError(EIO);
                 break;
         }
-        request->callback(error, request->udata);
-        dealloc(request);
+        moveTaskToState(request->wakeup, ENQUABLE);
+        enqueueTask(request->wakeup);
     }
+}
+
+typedef struct {
+    BlockDevice base;
+    VirtIOBlockDevice* virtio_device;
+} VirtIORegisteredBlockDevice;
+
+static Error readFunction(VirtIORegisteredBlockDevice* dev, VirtPtr buff, size_t offset, size_t size) {
+    return virtIOBlockDeviceOperation(dev->virtio_device, buff, offset, size, false);
+}
+
+static Error writeFunction(VirtIORegisteredBlockDevice* dev, VirtPtr buff, size_t offset, size_t size) {
+    return virtIOBlockDeviceOperation(dev->virtio_device, buff, offset, size, true);
+}
+
+static BlockDeviceFunctions funcs = {
+    .read = (BlockDeviceReadFunction)readFunction,
+    .write = (BlockDeviceWriteFunction)writeFunction,
+};
+
+Error registerVirtIOBlockDevice(VirtIOBlockDevice* dev) {
+    VirtIORegisteredBlockDevice* reg = kalloc(sizeof(VirtIORegisteredBlockDevice));
+    reg->base.block_size = BLOCK_SECTOR_SIZE;
+    reg->base.base.type = DEVICE_BLOCK;
+    reg->base.functions = &funcs;
+    reg->virtio_device = dev;
+    registerDevice((Device*)reg);
+    return simpleError(SUCCESS);
 }
 
