@@ -16,7 +16,7 @@ Error vfsNodeLookup(VfsNode* node, Process* process, const char* name, VfsNode**
 
 Error vfsNodeUnlink(VfsNode* node, Process* process, const char* name);
 
-Error vfsNodeLink(VfsNode* node, Process* process, const char* name, VfsNode** entry);
+Error vfsNodeLink(VfsNode* node, Process* process, const char* name, VfsNode* entry);
 
 void vfsNodeCopy(VfsNode* node);
 

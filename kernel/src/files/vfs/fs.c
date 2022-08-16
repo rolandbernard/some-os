@@ -8,6 +8,7 @@
 #include "files/vfs/file.h"
 #include "files/vfs/node.h"
 #include "files/vfs/super.h"
+#include "kernel/time.h"
 #include "memory/kalloc.h"
 #include "util/util.h"
 
@@ -33,7 +34,7 @@ static Error vfsLookupNode(Process* process, VfsNode* curr, const char* path, Vf
     size_t dirs_capacity = 64;
     size_t dirs_count = 1;
     VfsNode** dirs = kalloc(dirs_capacity * sizeof(VfsNode*));
-    const char** segs = kalloc(dirs_capacity * sizeof(const char*));
+    const char** segs = real_path != NULL ? kalloc(dirs_capacity * sizeof(const char*)) : NULL;
     dirs[0] = curr;
     vfsNodeCopy(curr);
     char* path_clone = stringClone(path);
@@ -61,6 +62,7 @@ static Error vfsLookupNode(Process* process, VfsNode* curr, const char* path, Vf
             }
         } else {
             curr = vfsFollowMounts(curr);
+            // if curr == symbolic link -> Do magic
             VfsNode* next;
             err = vfsNodeLookup(curr, process, segment, &next);
             if (isError(err)) {
@@ -69,10 +71,12 @@ static Error vfsLookupNode(Process* process, VfsNode* curr, const char* path, Vf
             if (dirs_count == dirs_capacity) {
                 dirs_capacity = dirs_capacity * 3 / 2;
                 dirs = krealloc(dirs, dirs_capacity * sizeof(VfsNode*));
-                segs = krealloc(segs, dirs_capacity * sizeof(const char*));
+                segs = real_path != NULL ? krealloc(segs, dirs_capacity * sizeof(const char*)) : NULL;
             }
             dirs[dirs_count] = curr;
-            segs[dirs_count - 1] = segment;
+            if (real_path != NULL) {
+                segs[dirs_count - 1] = segment;
+            }
             dirs_count++;
             curr = next;
         }
@@ -86,34 +90,81 @@ static Error vfsLookupNode(Process* process, VfsNode* curr, const char* path, Vf
         dealloc(path_clone);
         vfsNodeClose(curr);
     } else {
-        size_t path_length = 0;
-        for (size_t i = 0; i < dirs_count - 1; i++) {
-            path_length += 1 + strlen(segs[i]);
-        }
-        char* path = kalloc(umax(1, path_length) + 1);
-        path[0] = '/';
-        path[umax(1, path_length)] = 0;
-        path_length = 0;
-        for (size_t i = 0; i < dirs_count - 1; i++) {
-            path[path_length] = '/';
-            memcpy(path + 1 + path_length, segs, strlen(segs[i]));
-            path_length += 1 + strlen(segs[i]);
+        if (real_path != NULL) {
+            size_t path_length = 0;
+            for (size_t i = 0; i < dirs_count - 1; i++) {
+                path_length += 1 + strlen(segs[i]);
+            }
+            char* path = kalloc(umax(1, path_length) + 1);
+            path[0] = '/';
+            path[umax(1, path_length)] = 0;
+            path_length = 0;
+            for (size_t i = 0; i < dirs_count - 1; i++) {
+                path[path_length] = '/';
+                memcpy(path + 1 + path_length, segs, strlen(segs[i]));
+                path_length += 1 + strlen(segs[i]);
+            }
+            *real_path = path;
         }
         dealloc(segs);
         dealloc(path_clone);
-        *real_path = path;
         *ret = curr;
     }
     return err;
 }
 
+static Error vfsCreateDirectoryDotAndDotDot(VfsNode* dir_node, VfsNode* parent) {
+    // TODO: Should this be handled by the concrete filesystem?
+    // TODO
+    return simpleError(SUCCESS);
+}
+
 static Error vfsCreateNewNode(Process* process, VfsNode* root, const char* path, VfsMode mode, VfsNode** ret, char** real_path) {
     char* parent_path = getParentPath(path);
     VfsNode* parent;
-    char* real_parent_path;
-    CHECKED(vfsLookupNode(process, root, parent_path, &parent, &real_parent_path), dealloc(parent_path))
+    char* real_parent_path = NULL;
+    CHECKED(vfsLookupNode(process, root, parent_path, &parent, real_path != NULL ? &real_parent_path : NULL), dealloc(parent_path))
     dealloc(parent_path);
-    // TODO
+    VfsNode* new;
+    CHECKED(vfsSuperNewNode(parent->superblock, &new), {
+        vfsNodeClose(parent);
+        dealloc(real_parent_path);
+    });
+    new->mode = mode;
+    new->uid = process != NULL ? process->resources.uid : 0;
+    new->gid = process != NULL ? process->resources.gid : 0;
+    new->st_atime = getNanoseconds();
+    new->st_ctime = getNanoseconds();
+    new->st_mtime = getNanoseconds();
+    const char* filename = getBaseFilename(path);
+    CHECKED(vfsNodeLink(parent, process, filename, new), {
+        vfsNodeClose(parent);
+        vfsNodeClose(new);
+        dealloc(real_parent_path);
+    });
+    if (MODE_TYPE(mode) == VFS_TYPE_DIR) {
+        CHECKED(vfsCreateDirectoryDotAndDotDot(new, parent), {
+            vfsNodeClose(parent);
+            vfsNodeClose(new);
+            dealloc(real_parent_path);
+        });
+    }
+    vfsNodeClose(parent);
+    *ret = new;
+    if (real_path != NULL) {
+        size_t parent_path_length = strlen(real_parent_path);
+        size_t filename_length = strlen(filename);
+        *real_path = kalloc(parent_path_length + 1 + filename_length);
+        memcpy(*real_path, real_parent_path, parent_path_length);
+        if (parent_path_length == 1) {
+            memcpy(*real_path + 1, filename, filename_length);
+        } else {
+            (*real_path)[parent_path_length] = '/';
+            memcpy(*real_path + parent_path_length + 1, filename, filename_length);
+        }
+    }
+    dealloc(real_parent_path);
+    return simpleError(SUCCESS);
 }
 
 static Error vfsOpenNode(Process* process, VfsNode* node, char* path, VfsOpenFlags flags, VfsFile** ret) {
