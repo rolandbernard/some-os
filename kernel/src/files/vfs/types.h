@@ -142,6 +142,7 @@ typedef struct VfsSuperblock_s {
     size_t id;
     size_t ref_count;
     SpinLock lock;
+    // TODO: Node cache
 } VfsSuperblock;
 
 typedef void (*VfsNodeFreeFunction)(struct VfsNode_s* node);

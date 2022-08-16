@@ -2,9 +2,24 @@
 #define _VFS_NODE_H_
 
 #include "files/vfs/types.h"
+#include "process/types.h"
 
-void vfsNodeCopy(VfsNode* file);
+Error vfsNodeReadAt(VfsNode* node, Process* process, VirtPtr buff, size_t offset, size_t length, size_t* read);
 
-void vfsNodeClose(VfsNode* file);
+Error vfsNodeWriteAt(VfsNode* node, Process* process, VirtPtr buff, size_t offset, size_t length, size_t* written);
+
+Error vfsNodeReaddirAt(VfsNode* node, Process* process, VirtPtr buff, size_t offset, size_t length, size_t* read);
+
+Error vfsNodeTrunc(VfsNode* node, Process* process, size_t length);
+
+Error vfsNodeLookup(VfsNode* node, Process* process, const char* name, VfsNode** ret);
+
+Error vfsNodeUnlink(VfsNode* node, Process* process, const char* name);
+
+Error vfsNodeLink(VfsNode* node, Process* process, const char* name, VfsNode** entry);
+
+void vfsNodeCopy(VfsNode* node);
+
+void vfsNodeClose(VfsNode* node);
 
 #endif

@@ -3,8 +3,16 @@
 
 #include "files/vfs/types.h"
 
-void vfsSuperCopy(VfsSuperblock* file);
+Error vfsSuperReadNode(VfsSuperblock* sb, size_t id, VfsNode** ret);
 
-void vfsSuperClose(VfsSuperblock* file);
+Error vfsSuperWriteNode(VfsNode* write);
+
+Error vfsSuperNewNode(VfsSuperblock* sb, VfsNode** ret);
+
+Error vfsSuperFreeNode(VfsNode* node);
+
+void vfsSuperCopy(VfsSuperblock* sb);
+
+void vfsSuperClose(VfsSuperblock* sb);
 
 #endif

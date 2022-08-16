@@ -1,4 +1,5 @@
 
+#include <assert.h>
 #include <string.h>
 
 #include "files/vfs/fs.h"
@@ -8,6 +9,7 @@
 #include "files/vfs/node.h"
 #include "files/vfs/super.h"
 #include "memory/kalloc.h"
+#include "util/util.h"
 
 static VfsNode* vfsFollowMounts(VfsNode* curr) {
     lockSpinLock(&curr->lock);
@@ -16,20 +18,22 @@ static VfsNode* vfsFollowMounts(VfsNode* curr) {
         VfsNode* ret = curr->mounted->root_node;
         vfsNodeCopy(ret);
         unlockSpinLock(&curr->mounted->lock);
+        unlockSpinLock(&curr->lock);
         vfsNodeClose(curr);
-        return ret;
+        return vfsFollowMounts(ret);
     } else {
         unlockSpinLock(&curr->lock);
         return curr;
     }
 }
 
-static Error vfsLookupNode(Process* process, VfsNode* curr, const char* path, VfsNode** ret) {
+static Error vfsLookupNode(Process* process, VfsNode* curr, const char* path, VfsNode** ret, char** real_path) {
     Error err = simpleError(SUCCESS);
     vfsNodeCopy(curr);
     size_t dirs_capacity = 64;
     size_t dirs_count = 1;
     VfsNode** dirs = kalloc(dirs_capacity * sizeof(VfsNode*));
+    const char** segs = kalloc(dirs_capacity * sizeof(const char*));
     dirs[0] = curr;
     vfsNodeCopy(curr);
     char* path_clone = stringClone(path);
@@ -49,6 +53,7 @@ static Error vfsLookupNode(Process* process, VfsNode* curr, const char* path, Vf
         if (strcmp(segment, ".") == 0) {
             // Noop?
         } else if (strcmp(segment, "..") == 0) {
+            // TODO: Maybe lookup the '..' entry instead?
             if (dirs_count > 1) {
                 vfsNodeClose(curr);
                 dirs_count--;
@@ -56,11 +61,20 @@ static Error vfsLookupNode(Process* process, VfsNode* curr, const char* path, Vf
             }
         } else {
             curr = vfsFollowMounts(curr);
-            size_t node_id;
-            err = curr->functions->lookup(curr, segment, &node_id);
+            VfsNode* next;
+            err = vfsNodeLookup(curr, process, segment, &next);
             if (isError(err)) {
                 break;
             }
+            if (dirs_count == dirs_capacity) {
+                dirs_capacity = dirs_capacity * 3 / 2;
+                dirs = krealloc(dirs, dirs_capacity * sizeof(VfsNode*));
+                segs = krealloc(segs, dirs_capacity * sizeof(const char*));
+            }
+            dirs[dirs_count] = curr;
+            segs[dirs_count - 1] = segment;
+            dirs_count++;
+            curr = next;
         }
     }
     for (size_t i = 0; i < dirs_count; i++) {
@@ -68,15 +82,46 @@ static Error vfsLookupNode(Process* process, VfsNode* curr, const char* path, Vf
     }
     dealloc(dirs);
     if (isError(err)) {
+        dealloc(segs);
+        dealloc(path_clone);
         vfsNodeClose(curr);
     } else {
+        size_t path_length = 0;
+        for (size_t i = 0; i < dirs_count - 1; i++) {
+            path_length += 1 + strlen(segs[i]);
+        }
+        char* path = kalloc(umax(1, path_length) + 1);
+        path[0] = '/';
+        path[umax(1, path_length)] = 0;
+        path_length = 0;
+        for (size_t i = 0; i < dirs_count - 1; i++) {
+            path[path_length] = '/';
+            memcpy(path + 1 + path_length, segs, strlen(segs[i]));
+            path_length += 1 + strlen(segs[i]);
+        }
+        dealloc(segs);
+        dealloc(path_clone);
+        *real_path = path;
         *ret = curr;
     }
     return err;
 }
 
+static Error vfsCreateNewNode(Process* process, VfsNode* root, const char* path, VfsMode mode, VfsNode** ret, char** real_path) {
+    char* parent_path = getParentPath(path);
+    VfsNode* parent;
+    char* real_parent_path;
+    CHECKED(vfsLookupNode(process, root, parent_path, &parent, &real_parent_path), dealloc(parent_path))
+    dealloc(parent_path);
+    // TODO
+}
+
+static Error vfsOpenNode(Process* process, VfsNode* node, char* path, VfsOpenFlags flags, VfsFile** ret) {
+    // TODO
+}
+
 static Error vfsOpen(VirtualFilesystem* fs, Process* process, const char* path, VfsOpenFlags flags, VfsMode mode, VfsFile** ret) {
-    // This is an absolute path
+    assert(path[0] == '/');
     lockSpinLock(&fs->lock);
     VfsSuperblock* root_mount = fs->root_mounted;
     if (root_mount != NULL) {
@@ -86,14 +131,33 @@ static Error vfsOpen(VirtualFilesystem* fs, Process* process, const char* path, 
         vfsNodeCopy(root);
         vfsSuperClose(root_mount);
         VfsNode* node;
-        Error err = vfsLookupNode(process, root, path, &node);
-        vfsNodeClose(root);
+        char* real_path;
+        Error err = vfsLookupNode(process, root, path, &node, &real_path);
         if (err.kind == ENOENT && (flags & VFS_OPEN_CREATE) != 0) {
-        } else if (isError(err)) {
-        } else if ((flags & VFS_OPEN_EXCL) != 0) {
-            return simpleError(EEXIST);
+            // Open can open special files but not create them.
+            VfsMode file_mode = (mode & ~VFS_MODE_TYPE) | TYPE_MODE(VFS_TYPE_REG);
+            Error err = vfsCreateNewNode(process, root, path, file_mode, &node, &real_path);
+            vfsNodeClose(root);
+            if (isError(err)) {
+                vfsNodeClose(node);
+                dealloc(real_path);
+                return err;
+            } else {
+                return vfsOpenNode(process, node, real_path, flags, ret);
+            }
         } else {
-            return simpleError(SUCCESS);
+            vfsNodeClose(root);
+            if (isError(err)) {
+                vfsNodeClose(node);
+                dealloc(real_path);
+                return err;
+            } else if ((flags & VFS_OPEN_EXCL) != 0) {
+                vfsNodeClose(node);
+                dealloc(real_path);
+                return simpleError(EEXIST);
+            } else {
+                return vfsOpenNode(process, node, real_path, flags, ret);
+            }
         }
     } else {
         unlockSpinLock(&fs->lock);
