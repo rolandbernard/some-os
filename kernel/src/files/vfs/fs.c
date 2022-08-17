@@ -5,6 +5,10 @@
 #include "files/vfs/fs.h"
 
 #include "files/path.h"
+#include "files/special/blkfile.h"
+#include "files/special/fifo.h"
+#include "files/special/pipe.h"
+#include "files/special/ttyfile.h"
 #include "files/vfs/file.h"
 #include "files/vfs/node.h"
 #include "files/vfs/super.h"
@@ -49,6 +53,9 @@ static Error vfsLookupNode(Process* process, VfsNode* curr, const char* path, Vf
         }
         if (segments[0] == '/') {
             segments[0] = 0;
+            segments++;
+        }
+        while (segments[0] == '/') {
             segments++;
         }
         if (strcmp(segment, ".") == 0) {
@@ -115,7 +122,9 @@ static Error vfsLookupNode(Process* process, VfsNode* curr, const char* path, Vf
 
 static Error vfsCreateDirectoryDotAndDotDot(VfsNode* dir_node, VfsNode* parent) {
     // TODO: Should this be handled by the concrete filesystem?
-    // TODO
+    // These links are created by the system regardless of user permissions.
+    CHECKED(vfsNodeLink(dir_node, NULL, ".", dir_node));
+    CHECKED(vfsNodeLink(dir_node, NULL, "..", parent));
     return simpleError(SUCCESS);
 }
 
@@ -142,13 +151,6 @@ static Error vfsCreateNewNode(Process* process, VfsNode* root, const char* path,
         vfsNodeClose(new);
         dealloc(real_parent_path);
     });
-    if (MODE_TYPE(mode) == VFS_TYPE_DIR) {
-        CHECKED(vfsCreateDirectoryDotAndDotDot(new, parent), {
-            vfsNodeClose(parent);
-            vfsNodeClose(new);
-            dealloc(real_parent_path);
-        });
-    }
     vfsNodeClose(parent);
     *ret = new;
     if (real_path != NULL) {
@@ -167,8 +169,57 @@ static Error vfsCreateNewNode(Process* process, VfsNode* root, const char* path,
     return simpleError(SUCCESS);
 }
 
+static VfsFile* vfsCreateFile(VfsNode* node, char* path, size_t offset) {
+    VfsFile* file = kalloc(sizeof(VfsFile));
+    file->kind = VFS_FILE_NORMAL;
+    file->node = node;
+    file->path = path;
+    file->offset = offset;
+    initSpinLock(&file->lock);
+    file->ref_count = 1;
+    return file;
+}
+
 static Error vfsOpenNode(Process* process, VfsNode* node, char* path, VfsOpenFlags flags, VfsFile** ret) {
-    // TODO
+    if ((flags & VFS_OPEN_DIRECTORY) != 0 && MODE_TYPE(node->mode) != VFS_TYPE_DIR) {
+        vfsNodeClose(node);
+        dealloc(path);
+        return simpleError(ENOTDIR);
+    } else if ((flags & VFS_OPEN_REGULAR) != 0 && MODE_TYPE(node->mode) != VFS_TYPE_REG) {
+        vfsNodeClose(node);
+        dealloc(path);
+        return simpleError(EISDIR);
+    } else if (!canAccess(node->mode, node->uid, node->gid, process, OPEN_ACCESS(flags))) {
+        vfsNodeClose(node);
+        dealloc(path);
+        return simpleError(EACCES);
+    } else if (MODE_TYPE(node->mode) == VFS_TYPE_FIFO) {
+        *ret = createFifoFile(node, path);
+        return simpleError(SUCCESS);
+    } else if (MODE_TYPE(node->mode) == VFS_TYPE_CHAR || MODE_TYPE(node->mode) == VFS_TYPE_BLOCK) {
+        if (node->device != NULL && node->device->type == DEVICE_BLOCK && MODE_TYPE(node->mode) == VFS_TYPE_BLOCK) {
+            BlockDevice* dev = (BlockDevice*)node->device;
+            *ret = createBlockDeviceFile(node, dev, path, (flags & VFS_OPEN_APPEND) != 0 ? node->size : 0);
+            return simpleError(SUCCESS);
+        } else if (node->device != NULL && node->device->type == DEVICE_BLOCK && MODE_TYPE(node->mode) == VFS_TYPE_CHAR) {
+            TtyDevice* dev = (TtyDevice*)node->device;
+            *ret = createTtyDeviceFile(node, dev, path);
+            return simpleError(SUCCESS);
+        } else {
+            vfsNodeClose(node);
+            dealloc(path);
+            return simpleError(ENXIO);
+        }
+    } else {
+        if ((flags & VFS_OPEN_TRUNC) != 0 && (flags & VFS_OPEN_WRITE) != 0) {
+            CHECKED(vfsNodeTrunc(node, process, 0), {
+                vfsNodeClose(node);
+                dealloc(path);
+            });
+        }
+        *ret = vfsCreateFile(node, path, (flags & VFS_OPEN_APPEND) != 0 ? node->size : 0);
+        return simpleError(SUCCESS);
+    }
 }
 
 static Error vfsOpen(VirtualFilesystem* fs, Process* process, const char* path, VfsOpenFlags flags, VfsMode mode, VfsFile** ret) {
@@ -242,6 +293,13 @@ Error vfsOpenAt(VirtualFilesystem* fs, Process* process, VfsFile* file, const ch
         return err;
     }
 }
+/* if (MODE_TYPE(mode) == VFS_TYPE_DIR) { */
+/*     CHECKED(vfsCreateDirectoryDotAndDotDot(new, parent), { */
+/*         vfsNodeClose(parent); */
+/*         vfsNodeClose(new); */
+/*         dealloc(real_parent_path); */
+/*     }); */
+/* } */
 
 bool canAccess(VfsMode mode, Uid file_uid, Gid file_gid, struct Process_s* process, VfsAccessFlags flags) {
     if (process == NULL || process->resources.uid == 0) {
