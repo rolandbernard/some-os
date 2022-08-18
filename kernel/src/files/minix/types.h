@@ -1,11 +1,11 @@
-#ifndef _FILES_MINIX_H_
-#define _FILES_MINIX_H_
+#ifndef _FILES_MINIX_TYPES_H_
+#define _FILES_MINIX_TYPES_H_
 
 #include <stdint.h>
 
-#include "files/vfs.h"
-#include "memory/virtptr.h"
+#include "files/vfs/types.h"
 #include "task/spinlock.h"
+#include "task/tasklock.h"
 
 #define MINIX3_MAGIC 0x4d5a
 #define MINIX_BLOCK_SIZE 1024
@@ -46,17 +46,17 @@ typedef struct {
 } MinixDirEntry;
 
 typedef struct {
-    VfsFilesystem base;
+    VfsSuperblock base;
     Minix3Superblock superblock;
     VfsFile* block_device;
     TaskLock lock;
     TaskLock maps_lock;
-} MinixFilesystem;
+} MinixVfsSuperblock;
 
-MinixFilesystem* createMinixFilesystem(VfsFile* block_device, VirtPtr data);
-
-size_t offsetForINode(const MinixFilesystem* fs, uint32_t inode);
-
-size_t offsetForZone(size_t zone);
+typedef struct {
+    VfsNode base;
+    TaskLock lock;
+    uint32_t inodenum;
+} MinixVfsNode;
 
 #endif

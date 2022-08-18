@@ -14,11 +14,11 @@ Error vfsUnlinkAt(VirtualFilesystem* fs, Process* process, VfsFile* file, const 
 
 Error vfsLinkAt(VirtualFilesystem* fs, Process* process, VfsFile* old_file, const char* old, VfsFile* new_file, const char* new);
 
-Error vfsMount(VirtualFilesystem* fs, const char* path, VfsSuperblock* sb);
+Error vfsMount(VirtualFilesystem* fs, Process* process, const char* path, VfsSuperblock* sb);
 
-Error vfsUmount(VirtualFilesystem* fs, const char* path);
+Error vfsUmount(VirtualFilesystem* fs, Process* process, const char* path);
 
-Error vfsCreateSuperblock(VirtualFilesystem* fs, const char* path, const char* type, VirtPtr data, VfsSuperblock** ret);
+Error vfsCreateSuperblock(VirtualFilesystem* fs, Process* process, const char* path, const char* type, VirtPtr data, VfsSuperblock** ret);
 
 bool canAccess(VfsMode mode, Uid file_uid, Gid file_gid, struct Process_s* process, VfsAccessFlags flags);
 
