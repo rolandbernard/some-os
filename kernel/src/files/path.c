@@ -95,7 +95,10 @@ char* getParentPath(const char* path) {
     while (len > 0 && path_copy[len] != '/') {
         len--;
     }
-    if (len == 0) {
+    while (len > 0 && path_copy[len] == '/') {
+        len--;
+    }
+    if (len == 0 && path_copy[0] == '/') {
         len++;
     }
     path_copy[len] = 0;

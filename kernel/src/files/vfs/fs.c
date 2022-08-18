@@ -47,6 +47,7 @@ static Error vfsLookupNode(Process* process, VfsNode* curr, const char* path, Vf
         segments++;
     }
     while (segments[0] != 0) {
+        // TODO: if curr == symbolic link -> Do magic
         const char* segment = segments;
         while (segments[0] != 0 && segments[0] != '/') {
             segments++;
@@ -68,23 +69,24 @@ static Error vfsLookupNode(Process* process, VfsNode* curr, const char* path, Vf
                 curr = dirs[dirs_count];
             }
         } else {
-            curr = vfsFollowMounts(curr);
-            // if curr == symbolic link -> Do magic
-            VfsNode* next;
-            err = vfsNodeLookup(curr, process, segment, &next);
-            if (isError(err)) {
-                break;
-            }
             if (dirs_count == dirs_capacity) {
                 dirs_capacity = dirs_capacity * 3 / 2;
                 dirs = krealloc(dirs, dirs_capacity * sizeof(VfsNode*));
                 segs = real_path != NULL ? krealloc(segs, dirs_capacity * sizeof(const char*)) : NULL;
             }
+            vfsNodeCopy(curr);
             dirs[dirs_count] = curr;
             if (real_path != NULL) {
                 segs[dirs_count - 1] = segment;
             }
             dirs_count++;
+            curr = vfsFollowMounts(curr);
+            VfsNode* next;
+            err = vfsNodeLookup(curr, process, segment, &next);
+            if (isError(err)) {
+                break;
+            }
+            vfsNodeClose(curr);
             curr = next;
         }
     }
@@ -97,6 +99,7 @@ static Error vfsLookupNode(Process* process, VfsNode* curr, const char* path, Vf
         dealloc(path_clone);
         vfsNodeClose(curr);
     } else {
+        curr = vfsFollowMounts(curr);
         if (real_path != NULL) {
             size_t path_length = 0;
             for (size_t i = 0; i < dirs_count - 1; i++) {
@@ -120,7 +123,7 @@ static Error vfsLookupNode(Process* process, VfsNode* curr, const char* path, Vf
     return err;
 }
 
-static Error vfsLookupNodeAtAbs(
+static Error vfsLookupNodeAtExactAbs(
     VirtualFilesystem* fs, Process* process, const char* path, VfsNode** ret, char** real_path
 ) {
     lockSpinLock(&fs->lock);
@@ -140,11 +143,24 @@ static Error vfsLookupNodeAtAbs(
     }
 }
 
+static Error vfsLookupNodeAtAbs(
+    VirtualFilesystem* fs, Process* process, const char* path, bool parent, VfsNode** ret, char** real_path
+) {
+    if (parent) {
+        char* parent_path = getParentPath(path);
+        Error err = vfsLookupNodeAtExactAbs(fs, process, path, ret, real_path);
+        dealloc(parent_path);
+        return err;
+    } else {
+        return vfsLookupNodeAtExactAbs(fs, process, path, ret, real_path);
+    }
+}
+
 static Error vfsLookupNodeAt(
-    VirtualFilesystem* fs, Process* process, VfsFile* file, const char* path, VfsNode** ret, char** real_path
+    VirtualFilesystem* fs, Process* process, VfsFile* file, const char* path, bool parent, VfsNode** ret, char** real_path
 ) {
     if (path[0] == '/') {
-        return vfsLookupNodeAtAbs(fs, process, path, ret, real_path);
+        return vfsLookupNodeAtAbs(fs, process, path, parent, ret, real_path);
     } else {
         char* absolute_path;
         size_t cwd_length;
@@ -163,7 +179,7 @@ static Error vfsLookupNodeAt(
         absolute_path[cwd_length] = '/';
         memcpy(absolute_path + cwd_length + 1, path, path_length);
         absolute_path[cwd_length + path_length + 1] = 0;
-        Error err = vfsLookupNodeAtAbs(fs, process, absolute_path, ret, real_path);
+        Error err = vfsLookupNodeAtAbs(fs, process, absolute_path, parent, ret, real_path);
         dealloc(absolute_path);
         return err;
     }
@@ -178,13 +194,9 @@ static Error vfsCreateDirectoryDotAndDotDot(VfsNode* dir_node, VfsNode* parent) 
 }
 
 static Error vfsCreateNewNode(VirtualFilesystem* fs, Process* process, VfsFile* file, const char* path, VfsMode mode, VfsNode** ret, char** real_path) {
-    char* parent_path = getParentPath(path);
     VfsNode* parent;
     char* real_parent_path = NULL;
-    CHECKED(vfsLookupNodeAt(fs, process, file, parent_path, &parent, real_path != NULL ? &real_parent_path : NULL), {
-        dealloc(parent_path);
-    });
-    dealloc(parent_path);
+    CHECKED(vfsLookupNodeAt(fs, process, file, path, true, &parent, real_path != NULL ? &real_parent_path : NULL));
     VfsNode* new;
     CHECKED(vfsSuperNewNode(parent->superblock, &new), {
         vfsNodeClose(parent);
@@ -283,7 +295,7 @@ static Error vfsOpenNode(Process* process, VfsNode* node, char* path, VfsOpenFla
 Error vfsOpenAt(VirtualFilesystem* fs, Process* process, VfsFile* file, const char* path, VfsOpenFlags flags, VfsMode mode, VfsFile** ret) {
     VfsNode* node;
     char* real_path;
-    Error err = vfsLookupNodeAt(fs, process, file, path, &node, &real_path);
+    Error err = vfsLookupNodeAt(fs, process, file, path, false, &node, &real_path);
     if (err.kind == ENOENT && (flags & VFS_OPEN_CREATE) != 0) {
         // Open can open special files but not create them.
         VfsMode file_mode = (mode & ~VFS_MODE_TYPE) | TYPE_MODE(VFS_TYPE_REG);
@@ -314,7 +326,7 @@ Error vfsMknodAt(VirtualFilesystem* fs, Process* process, VfsFile* file, const c
         return simpleError(EINVAL);
     } else {
         VfsNode* node;
-        Error err = vfsLookupNodeAt(fs, process, file, path, &node, NULL);
+        Error err = vfsLookupNodeAt(fs, process, file, path, false, &node, NULL);
         if (err.kind == ENOENT) {
             Error err = vfsCreateNewNode(fs, process, file, path, mode, &node, NULL);
             if (isError(err)) {
@@ -379,10 +391,8 @@ Error vfsUnlinkFrom(Process* process, VfsNode* parent, const char* filename, Vfs
 }
 
 Error vfsUnlinkAt(VirtualFilesystem* fs, Process* process, VfsFile* file, const char* path, VfsUnlinkFlags flags) {
-    char* parent_path = getParentPath(path);
     VfsNode* parent;
-    CHECKED(vfsLookupNodeAt(fs, process, file, parent_path, &parent, NULL), dealloc(parent_path));
-    dealloc(parent_path);
+    CHECKED(vfsLookupNodeAt(fs, process, file, path, true, &parent, NULL));
     const char* filename = getBaseFilename(path);
     VfsNode* node;
     CHECKED(vfsNodeLookup(parent, process, filename, &node), vfsNodeClose(parent));
@@ -393,6 +403,7 @@ Error vfsUnlinkAt(VirtualFilesystem* fs, Process* process, VfsFile* file, const 
 }
 
 Error vfsLinkAt(VirtualFilesystem* fs, Process* process, VfsFile* old_file, const char* old, VfsFile* new_file, const char* new) {
+
 }
 
 Error vfsMount(VirtualFilesystem* fs, const char* path, VfsSuperblock* sb) {
