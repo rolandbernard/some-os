@@ -403,7 +403,26 @@ Error vfsUnlinkAt(VirtualFilesystem* fs, Process* process, VfsFile* file, const 
 }
 
 Error vfsLinkAt(VirtualFilesystem* fs, Process* process, VfsFile* old_file, const char* old, VfsFile* new_file, const char* new) {
-
+    VfsNode* parent;
+    CHECKED(vfsLookupNodeAt(fs, process, new_file, new, true, &parent, NULL));
+    const char* filename = getBaseFilename(new);
+    VfsNode* new_node;
+    Error err = vfsNodeLookup(parent, process, filename, &new_node);
+    if (err.kind == ENOENT) {
+        VfsNode* old_node;
+        CHECKED(vfsLookupNodeAt(fs, process, old_file, old, false, &old_node, NULL), vfsNodeClose(parent));
+        Error err = vfsNodeLink(parent, process, filename, old_node);
+        vfsNodeClose(old_node);
+        vfsNodeClose(parent);
+        return err;
+    } else if (isError(err)) {
+        vfsNodeClose(parent);
+        return err;
+    } else {
+        vfsNodeClose(parent);
+        vfsNodeClose(new_node);
+        return simpleError(EEXIST);
+    }
 }
 
 Error vfsMount(VirtualFilesystem* fs, const char* path, VfsSuperblock* sb) {
