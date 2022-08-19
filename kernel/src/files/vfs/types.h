@@ -48,14 +48,16 @@ typedef enum {
     VFS_UNLINK_REMOVEDIR = (1 << 0),
 } VfsUnlinkFlags;
 
-#define OPEN_ACCESS(open_flags) ((open_flags >> 4) & 0b111)
+#define OPEN_ACCESS(open_flags) ((open_flags >> 3) & 0b11111)
 
 typedef enum {
-    VFS_ACCESS_R = (1 << 0),
-    VFS_ACCESS_W = (1 << 1),
-    VFS_ACCESS_X = (1 << 2),
-    VFS_ACCESS_REG = (1 << 3),
-    VFS_ACCESS_DIR = (1 << 4),
+    VFS_ACCESS_DIR = (1 << 0),
+    VFS_ACCESS_R = (1 << 1),
+    VFS_ACCESS_W = (1 << 2),
+    VFS_ACCESS_X = (1 << 3),
+    VFS_ACCESS_REG = (1 << 4),
+    VFS_ACCESS_CHMOD = (1 << 5),
+    VFS_ACCESS_CHOWN = (1 << 6),
 } VfsAccessFlags;
 
 typedef enum {
@@ -96,17 +98,19 @@ typedef int Uid;
 typedef int Gid;
 
 typedef struct {
+    size_t dev;
     size_t id;
     VfsMode mode;
     size_t nlinks;
     Uid uid;
     Gid gid;
+    size_t rdev;
     size_t size;
     size_t block_size;
-    Time st_atime;
-    Time st_mtime;
-    Time st_ctime;
-    size_t dev;
+    size_t blocks;
+    Time atime;
+    Time mtime;
+    Time ctime;
 } VfsStat;
 
 typedef struct {
@@ -168,18 +172,9 @@ typedef struct {
 typedef struct VfsNode_s {
     VfsNodeFunctions* functions;
     VfsSuperblock* superblock;
-    size_t id;
-    size_t nlinks;
-    VfsMode mode;
-    Uid uid;
-    Gid gid;
-    size_t size;
-    Time st_atime;
-    Time st_mtime;
-    Time st_ctime;
+    VfsStat stat;
     size_t ref_count;
     TaskLock lock;
-    Device* device;         // If this node represents a device, this is not NULL. (Also, functions should be changed.)
     VfsSuperblock* mounted; // If a filesystem is mounted at this node, this is not NULL.
 } VfsNode;
 

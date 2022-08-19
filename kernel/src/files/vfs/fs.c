@@ -214,7 +214,10 @@ static Error vfsCreateDirectoryDotAndDotDot(VfsNode* dir_node, VfsNode* parent) 
     return simpleError(SUCCESS);
 }
 
-static Error vfsCreateNewNode(VirtualFilesystem* fs, Process* process, VfsFile* file, const char* path, VfsMode mode, VfsNode** ret, char** real_path) {
+static Error vfsCreateNewNode(
+    VirtualFilesystem* fs, Process* process, VfsFile* file, const char* path, VfsMode mode,
+    DeviceId device, VfsNode** ret, char** real_path
+) {
     VfsNode* parent;
     char* real_parent_path = NULL;
     CHECKED(vfsLookupNodeAt(
@@ -226,12 +229,18 @@ static Error vfsCreateNewNode(VirtualFilesystem* fs, Process* process, VfsFile* 
         vfsNodeClose(parent);
         dealloc(real_parent_path);
     });
-    new->mode = mode;
-    new->uid = process != NULL ? process->resources.uid : 0;
-    new->gid = process != NULL ? process->resources.gid : 0;
-    new->st_atime = getNanoseconds();
-    new->st_ctime = getNanoseconds();
-    new->st_mtime = getNanoseconds();
+    new->stat.mode = mode;
+    new->stat.nlinks = 0;
+    new->stat.uid = process != NULL ? process->resources.uid : 0;
+    new->stat.gid = process != NULL ? process->resources.gid : 0;
+    new->stat.rdev = device;
+    new->stat.size = 0;
+    Time time = getNanoseconds();
+    new->stat.atime = time;
+    new->stat.mtime = time;
+    new->stat.ctime = time;
+    // dev, id, block_size, and blocks must be initialized by the concrete implementation.
+    // We don't have to write the node data, it will be written when linking.
     const char* filename = getBaseFilename(path);
     CHECKED(vfsNodeLink(parent, process, filename, new), {
         vfsNodeClose(parent);
@@ -274,28 +283,21 @@ static VfsFile* vfsCreateFile(VfsNode* node, char* path, size_t offset) {
 }
 
 static Error vfsOpenNode(Process* process, VfsNode* node, char* path, VfsOpenFlags flags, VfsFile** ret) {
-    if ((flags & VFS_OPEN_DIRECTORY) != 0 && MODE_TYPE(node->mode) != VFS_TYPE_DIR) {
+    CHECKED(canAccess(&node->stat, process, OPEN_ACCESS(flags)), {
         vfsNodeClose(node);
         dealloc(path);
-        return simpleError(ENOTDIR);
-    } else if ((flags & VFS_OPEN_REGULAR) != 0 && MODE_TYPE(node->mode) != VFS_TYPE_REG) {
-        vfsNodeClose(node);
-        dealloc(path);
-        return simpleError(EISDIR);
-    } else if (!canAccess(node->mode, node->uid, node->gid, process, OPEN_ACCESS(flags))) {
-        vfsNodeClose(node);
-        dealloc(path);
-        return simpleError(EACCES);
-    } else if (MODE_TYPE(node->mode) == VFS_TYPE_FIFO) {
+    });
+    if (MODE_TYPE(node->stat.mode) == VFS_TYPE_FIFO) {
         *ret = createFifoFile(node, path);
         return simpleError(SUCCESS);
-    } else if (MODE_TYPE(node->mode) == VFS_TYPE_CHAR || MODE_TYPE(node->mode) == VFS_TYPE_BLOCK) {
-        if (node->device != NULL && node->device->type == DEVICE_BLOCK && MODE_TYPE(node->mode) == VFS_TYPE_BLOCK) {
-            BlockDevice* dev = (BlockDevice*)node->device;
-            *ret = createBlockDeviceFile(node, dev, path, (flags & VFS_OPEN_APPEND) != 0 ? node->size : 0);
+    } else if (MODE_TYPE(node->stat.mode) == VFS_TYPE_CHAR || MODE_TYPE(node->stat.mode) == VFS_TYPE_BLOCK) {
+        Device* device = getDeviceWithId(node->stat.rdev);
+        if (device != NULL && device->type == DEVICE_BLOCK && MODE_TYPE(node->stat.mode) == VFS_TYPE_BLOCK) {
+            BlockDevice* dev = (BlockDevice*)device;
+            *ret = createBlockDeviceFile(node, dev, path, (flags & VFS_OPEN_APPEND) != 0 ? node->stat.size : 0);
             return simpleError(SUCCESS);
-        } else if (node->device != NULL && node->device->type == DEVICE_BLOCK && MODE_TYPE(node->mode) == VFS_TYPE_CHAR) {
-            TtyDevice* dev = (TtyDevice*)node->device;
+        } else if (device != NULL && device->type == DEVICE_BLOCK && MODE_TYPE(node->stat.mode) == VFS_TYPE_CHAR) {
+            TtyDevice* dev = (TtyDevice*)device;
             *ret = createTtyDeviceFile(node, dev, path);
             return simpleError(SUCCESS);
         } else {
@@ -310,7 +312,7 @@ static Error vfsOpenNode(Process* process, VfsNode* node, char* path, VfsOpenFla
                 dealloc(path);
             });
         }
-        *ret = vfsCreateFile(node, path, (flags & VFS_OPEN_APPEND) != 0 ? node->size : 0);
+        *ret = vfsCreateFile(node, path, (flags & VFS_OPEN_APPEND) != 0 ? node->stat.size : 0);
         return simpleError(SUCCESS);
     }
 }
@@ -322,7 +324,7 @@ Error vfsOpenAt(VirtualFilesystem* fs, Process* process, VfsFile* file, const ch
     if (err.kind == ENOENT && (flags & VFS_OPEN_CREATE) != 0) {
         // Open can open special files but not create them.
         VfsMode file_mode = (mode & ~VFS_MODE_TYPE) | TYPE_MODE(VFS_TYPE_REG);
-        Error err = vfsCreateNewNode(fs, process, file, path, file_mode, &node, &real_path);
+        Error err = vfsCreateNewNode(fs, process, file, path, file_mode, 0, &node, &real_path);
         if (isError(err)) {
             vfsNodeClose(node);
             dealloc(real_path);
@@ -351,7 +353,7 @@ Error vfsMknodAt(VirtualFilesystem* fs, Process* process, VfsFile* file, const c
         VfsNode* node;
         Error err = vfsLookupNodeAt(fs, process, file, path, VFS_LOOKUP_NORMAL, &node, NULL);
         if (err.kind == ENOENT) {
-            Error err = vfsCreateNewNode(fs, process, file, path, mode, &node, NULL);
+            Error err = vfsCreateNewNode(fs, process, file, path, mode, id, &node, NULL);
             if (isError(err)) {
                 return err;
             } else {
@@ -381,14 +383,14 @@ static Error vfsRemoveDirectoryDotAndDotDot(Process* process, VfsNode* parent, V
     } while (tmp_size != 0);
     dealloc(entry);
     lockTaskLock(&dir->lock);
-    if (dir->nlinks == 2) {
+    if (dir->stat.nlinks == 2) {
         CHECKED(vfsNodeUnlink(dir, process, "."));
-        dir->nlinks -= 1;
+        dir->stat.nlinks -= 1;
         unlockTaskLock(&dir->lock);
         CHECKED(vfsSuperWriteNode(dir));
         CHECKED(vfsNodeUnlink(dir, process, ".."));
         lockTaskLock(&parent->lock);
-        parent->nlinks -= 1;
+        parent->stat.nlinks -= 1;
         unlockTaskLock(&parent->lock);
         CHECKED(vfsSuperWriteNode(parent));
         return simpleError(SUCCESS);
@@ -401,14 +403,14 @@ static Error vfsRemoveDirectoryDotAndDotDot(Process* process, VfsNode* parent, V
 }
 
 Error vfsUnlinkFrom(Process* process, VfsNode* parent, const char* filename, VfsNode* node) {
-    if (MODE_TYPE(node->mode) == VFS_TYPE_DIR) {
+    if (MODE_TYPE(node->stat.mode) == VFS_TYPE_DIR) {
         CHECKED(vfsNodeUnlink(parent, process, filename));
         CHECKED(vfsRemoveDirectoryDotAndDotDot(process, parent, node));
     } else {
         CHECKED(vfsNodeUnlink(parent, process, filename));
     }
     lockTaskLock(&node->lock);
-    node->nlinks--;
+    node->stat.nlinks--;
     unlockTaskLock(&node->lock);
     return vfsSuperWriteNode(node);
 }
@@ -459,7 +461,7 @@ Error vfsMount(VirtualFilesystem* fs, Process* process, const char* path, VfsSup
         unlockTaskLock(&node->lock);
         vfsNodeClose(node);
         return simpleError(EINVAL);
-    } else if (MODE_TYPE(node->mode) != VFS_TYPE_DIR) {
+    } else if (MODE_TYPE(node->stat.mode) != VFS_TYPE_DIR) {
         unlockTaskLock(&node->lock);
         vfsNodeClose(node);
         return simpleError(ENOTDIR);
@@ -504,34 +506,39 @@ Error vfsCreateSuperblock(
     }
 }
 
-bool canAccess(VfsMode mode, Uid file_uid, Gid file_gid, struct Process_s* process, VfsAccessFlags flags) {
+Error canAccess(VfsStat* stat, struct Process_s* process, VfsAccessFlags flags) {
     if (process == NULL || process->resources.uid == 0) {
         // Kernel or uid 0 are allowed to do everything
-        return true;
+        return simpleError(SUCCESS);
     } else if (
-        (flags & VFS_ACCESS_R) != 0 && (mode & VFS_MODE_A_R) == 0
-        && ((mode & VFS_MODE_G_R) == 0 || file_gid != process->resources.gid)
-        && ((mode & VFS_MODE_O_R) == 0 || file_uid != process->resources.uid)
+        ((flags & VFS_ACCESS_CHMOD) != 0 || (flags & VFS_ACCESS_CHOWN))
+        && stat->uid != process->resources.uid
     ) {
-        return false;
+        return simpleError(EPERM);
     } else if (
-        (flags & VFS_ACCESS_W) != 0 && (mode & VFS_MODE_A_W) == 0
-        && ((mode & VFS_MODE_G_W) == 0 || file_gid != process->resources.gid)
-        && ((mode & VFS_MODE_O_W) == 0 || file_uid != process->resources.uid)
+        (flags & VFS_ACCESS_R) != 0 && (stat->mode & VFS_MODE_A_R) == 0
+        && ((stat->mode & VFS_MODE_G_R) == 0 || stat->gid != process->resources.gid)
+        && ((stat->mode & VFS_MODE_O_R) == 0 || stat->uid != process->resources.uid)
     ) {
-        return false;
+        return simpleError(EACCES);
     } else if (
-        (flags & VFS_ACCESS_X) != 0 && (mode & VFS_MODE_A_X) == 0
-        && ((mode & VFS_MODE_G_X) == 0 || file_gid != process->resources.gid)
-        && ((mode & VFS_MODE_O_X) == 0 || file_uid != process->resources.uid)
+        (flags & VFS_ACCESS_W) != 0 && (stat->mode & VFS_MODE_A_W) == 0
+        && ((stat->mode & VFS_MODE_G_W) == 0 || stat->gid != process->resources.gid)
+        && ((stat->mode & VFS_MODE_O_W) == 0 || stat->uid != process->resources.uid)
     ) {
-        return false;
-    } else if ((flags & VFS_ACCESS_REG) != 0 && MODE_TYPE(mode) != VFS_TYPE_REG) {
-        return false;
-    } else if ((flags & VFS_ACCESS_DIR) != 0 && MODE_TYPE(mode) != VFS_TYPE_DIR) {
-        return false;
+        return simpleError(EACCES);
+    } else if (
+        (flags & VFS_ACCESS_X) != 0 && (stat->mode & VFS_MODE_A_X) == 0
+        && ((stat->mode & VFS_MODE_G_X) == 0 || stat->gid != process->resources.gid)
+        && ((stat->mode & VFS_MODE_O_X) == 0 || stat->uid != process->resources.uid)
+    ) {
+        return simpleError(EACCES);
+    } else if ((flags & VFS_ACCESS_REG) != 0 && MODE_TYPE(stat->mode) != VFS_TYPE_REG) {
+        return simpleError(MODE_TYPE(stat->mode) == VFS_TYPE_DIR ? EISDIR : EINVAL);
+    } else if ((flags & VFS_ACCESS_DIR) != 0 && MODE_TYPE(stat->mode) != VFS_TYPE_DIR) {
+        return simpleError(ENOTDIR);
     } else {
-        return true;
+        return simpleError(SUCCESS);
     }
 }
 

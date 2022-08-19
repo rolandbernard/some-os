@@ -4,17 +4,16 @@
 #include "files/vfs/fs.h"
 #include "files/vfs/super.h"
 
-#define DELEGATE_NODE_FUNCTION(NAME, PARAMS, ACCESS)                            \
-    if (node->functions->NAME == NULL) {                                        \
-        return simpleError(EINVAL);                                             \
-    } else {                                                                    \
-        lockTaskLock(&node->lock);                                              \
-        if (!canAccess(node->mode, node->uid, node->gid, process, ACCESS)) {    \
-            unlockTaskLock(&node->lock);                                        \
-            return simpleError(EACCES);                                         \
-        }                                                                       \
-        unlockTaskLock(&node->lock);                                            \
-        return node->functions->NAME PARAMS;                                    \
+#define DELEGATE_NODE_FUNCTION(NAME, PARAMS, ACCESS)        \
+    if (node->functions->NAME == NULL) {                    \
+        return simpleError(EINVAL);                         \
+    } else {                                                \
+        lockTaskLock(&node->lock);                          \
+        CHECKED(canAccess(&node->stat, process, ACCESS), {  \
+            unlockTaskLock(&node->lock);                    \
+        });                                                 \
+        unlockTaskLock(&node->lock);                        \
+        return node->functions->NAME PARAMS;                \
     }
 
 Error vfsNodeReadAt(VfsNode* node, Process* process, VirtPtr buff, size_t offset, size_t length, size_t* read) {
@@ -26,7 +25,7 @@ Error vfsNodeWriteAt(VfsNode* node, Process* process, VirtPtr buff, size_t offse
 }
 
 Error vfsNodeReaddirAt(VfsNode* node, Process* process, VirtPtr buff, size_t offset, size_t length, size_t* read) {
-    DELEGATE_NODE_FUNCTION(readdir_at, (node, buff, offset, length, read), VFS_ACCESS_R);
+    DELEGATE_NODE_FUNCTION(readdir_at, (node, buff, offset, length, read), VFS_ACCESS_R | VFS_ACCESS_DIR);
 }
 
 Error vfsNodeTrunc(VfsNode* node, Process* process, size_t length) {
@@ -34,7 +33,7 @@ Error vfsNodeTrunc(VfsNode* node, Process* process, size_t length) {
 }
 
 static Error vfsNodeBasicLookup(VfsNode* node, Process* process, const char* name, size_t* ret) {
-    DELEGATE_NODE_FUNCTION(lookup, (node, name, ret), VFS_ACCESS_R);
+    DELEGATE_NODE_FUNCTION(lookup, (node, name, ret), VFS_ACCESS_X | VFS_ACCESS_DIR);
 }
 
 Error vfsNodeLookup(VfsNode* node, Process* process, const char* name, VfsNode** ret) {
@@ -44,19 +43,22 @@ Error vfsNodeLookup(VfsNode* node, Process* process, const char* name, VfsNode**
 }
 
 Error vfsNodeUnlink(VfsNode* node, Process* process, const char* name) {
-    DELEGATE_NODE_FUNCTION(unlink, (node, name), VFS_ACCESS_W);
-}
-
-static Error vfsNodeBasicLink(VfsNode* node, Process* process, const char* name, VfsNode* entry) {
-    DELEGATE_NODE_FUNCTION(link, (node, name, entry), VFS_ACCESS_W);
+    DELEGATE_NODE_FUNCTION(unlink, (node, name), VFS_ACCESS_W | VFS_ACCESS_DIR);
 }
 
 Error vfsNodeLink(VfsNode* node, Process* process, const char* name, VfsNode* entry) {
-    lockTaskLock(&node->lock);
-    node->nlinks++;
-    unlockTaskLock(&node->lock);
-    CHECKED(vfsSuperWriteNode(node));
-    return vfsNodeBasicLink(node, process, name, entry);
+    if (node->functions->link == NULL) {
+        return simpleError(EINVAL);
+    } else {
+        lockTaskLock(&node->lock);
+        CHECKED(canAccess(&node->stat, process, VFS_ACCESS_W | VFS_ACCESS_DIR), {
+            unlockTaskLock(&node->lock);
+        });
+        node->stat.nlinks++;
+        unlockTaskLock(&node->lock);
+        CHECKED(vfsSuperWriteNode(node));
+        return node->functions->link(node, name, entry);
+    }
 }
 
 void vfsNodeCopy(VfsNode* node) {
