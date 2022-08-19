@@ -17,7 +17,7 @@ typedef enum {
     VFS_TYPE_DIR = 4,
     VFS_TYPE_BLOCK = 6,
     VFS_TYPE_REG = 8,
-    VFS_TYPE_LNK = 10,
+    VFS_TYPE_LNK = 10, // TODO: implement symbolic links
     VFS_TYPE_SOCK = 12,
     VFS_TYPE_MT = 15,
 } VfsFileType;
@@ -41,7 +41,6 @@ typedef enum {
     VFS_OPEN_EXCL = (1 << 9),
     VFS_OPEN_RDONLY = (1 << 10),
     VFS_OPEN_WRONLY = (1 << 11),
-    VFS_OPEN_NOFOLLOW = (1 << 12), // TODO: implement symbolic links
 } VfsOpenFlags;
 
 typedef enum {
@@ -139,6 +138,13 @@ typedef struct {
     VfsSuperblockFreeNodeFunction free_node;    // Remove the node from the filesystem.
 } VfsSuperblockFunctions;
 
+typedef struct {
+    struct VfsNode_s** nodes;
+    size_t count;
+    size_t capacity;
+    TaskLock lock;
+} VfsNodeCache;
+
 typedef struct VfsSuperblock_s {
     VfsSuperblockFunctions* functions;
     struct VfsNode_s* mount_point;
@@ -146,7 +152,7 @@ typedef struct VfsSuperblock_s {
     size_t id;
     size_t ref_count;
     TaskLock lock;
-    // TODO: Add node cache!
+    VfsNodeCache nodes;
 } VfsSuperblock;
 
 typedef void (*VfsNodeFreeFunction)(struct VfsNode_s* node);

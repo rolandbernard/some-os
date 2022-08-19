@@ -22,4 +22,6 @@ uint32_t hashInt32(uint32_t x);
 
 uint64_t hashString(const char* s);
 
+uint64_t hashCombine(uint64_t first, uint64_t second);
+
 #endif

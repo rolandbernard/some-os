@@ -45,3 +45,7 @@ uint64_t hashString(const char* s) {
     return hashInt64(hash);
 }
 
+uint64_t hashCombine(uint64_t first, uint64_t second) {
+    return first ^ (second + 0x9e3779b9 + (first << 6) + (first >> 2));
+}
+

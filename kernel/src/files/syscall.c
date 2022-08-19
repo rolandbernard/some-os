@@ -111,12 +111,12 @@ SyscallReturn renameSyscall(TrapFrame* frame) {
     assert(frame->hart != NULL);                                    \
     Task* task = (Task*)frame;                                      \
     size_t fd = SYSCALL_ARG(0);                                     \
-    FileDescriptor* desc = getFileDescriptor(task->process, fd);    \
+    VfsFileDescriptor* desc = getFileDescriptor(task->process, fd); \
     if (desc != NULL) {                                             \
         if ((desc->flags & VFS_FILE_RDONLY) != 0 && WRITE) {        \
-            SYSCALL_RETURN(-EPERM);                                 \
+            SYSCALL_RETURN(-EBADF);                                 \
         } else if ((desc->flags & VFS_FILE_WRONLY) != 0 && READ) {  \
-            SYSCALL_RETURN(-EPERM);                                 \
+            SYSCALL_RETURN(-EBADF);                                 \
         } else {                                                    \
             DO;                                                     \
         }                                                           \
@@ -234,7 +234,7 @@ SyscallReturn mountSyscall(TrapFrame* frame) {
         task->process != NULL && task->process->resources.uid != 0
         && task->process->resources.gid != 0
     ) { // Only root can mount
-        SYSCALL_RETURN(-EACCES);
+        SYSCALL_RETURN(-EPERM);
     } else {
         char* source = copyPathFromSyscallArgs(task, SYSCALL_ARG(0));
         if (source != NULL) {
@@ -275,7 +275,7 @@ SyscallReturn umountSyscall(TrapFrame* frame) {
     Task* task = (Task*)frame;
     if (task->process->resources.uid != 0 && task->process->resources.gid != 0) {
         // Only root can mount
-        SYSCALL_RETURN(-EACCES);
+        SYSCALL_RETURN(-EPERM);
     } else {
         char* path = copyPathFromSyscallArgs(task, SYSCALL_ARG(0));
         if (path != NULL) {

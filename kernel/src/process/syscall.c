@@ -241,7 +241,7 @@ int killSyscallCallback(Process* process, void* udata) {
         addSignalToProcess(process, task->frame.regs[REG_ARGUMENT_2]);
         return -SUCCESS;
     } else {
-        return -EACCES;
+        return -EPERM;
     }
 }
 
@@ -260,7 +260,7 @@ SyscallReturn setUidSyscall(TrapFrame* frame) {
         task->process->resources.uid = SYSCALL_ARG(0);
         SYSCALL_RETURN(-SUCCESS);
     } else {
-        SYSCALL_RETURN(-EACCES);
+        SYSCALL_RETURN(-EPERM);
     }
 }
 
@@ -272,7 +272,7 @@ SyscallReturn setGidSyscall(TrapFrame* frame) {
         task->process->resources.gid = SYSCALL_ARG(0);
         SYSCALL_RETURN(-SUCCESS);
     } else {
-        SYSCALL_RETURN(-EACCES);
+        SYSCALL_RETURN(-EPERM);
     }
 }
 
