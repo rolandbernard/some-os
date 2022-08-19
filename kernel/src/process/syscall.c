@@ -4,7 +4,6 @@
 #include <stdbool.h>
 #include <string.h>
 
-#include "files/vfs.h"
 #include "interrupt/syscall.h"
 #include "interrupt/timer.h"
 #include "memory/kalloc.h"

@@ -1,4 +1,92 @@
 
 #include "files/vfs/file.h"
 
+#include "files/special/blkfile.h"
+#include "files/special/pipe.h"
+#include "files/special/ttyfile.h"
+#include "files/vfs/fs.h"
+#include "files/vfs/node.h"
+#include "memory/kalloc.h"
+
+Error vfsFileSeek(VfsFile* file, Process* process, size_t offset, VfsSeekWhence whence, size_t* new_pos) {
+    lockTaskLock(&file->lock);
+    if (whence == VFS_SEEK_CUR) {
+        file->offset = file->offset + offset;
+        *new_pos = file->offset;
+    } else if (whence == VFS_SEEK_SET) {
+        file->offset = offset;
+        *new_pos = file->offset;
+    } else if (whence == VFS_SEEK_END) {
+        lockTaskLock(&file->node->lock);
+        file->offset = file->node->size + offset;
+        *new_pos = file->offset;
+        unlockTaskLock(&file->node->lock);
+    } else {
+        unlockTaskLock(&file->lock);
+        return simpleError(EINVAL);
+    }
+    unlockTaskLock(&file->lock);
+    return simpleError(SUCCESS);
+}
+
+Error vfsFileRead(VfsFile* file, Process* process, VirtPtr buffer, size_t length, size_t* read) {
+    lockTaskLock(&file->lock);
+    Error err = vfsFileReadAt(file, process, buffer, length, file->offset, read);
+    if (!isError(err)) {
+        file->offset += *read;
+    }
+    unlockTaskLock(&file->lock);
+    return err;
+}
+
+Error vfsFileWrite(VfsFile* file, Process* process, VirtPtr buffer, size_t length, size_t* written) {
+    lockTaskLock(&file->lock);
+    Error err = vfsFileWriteAt(file, process, buffer, length, file->offset, written);
+    if (!isError(err)) {
+        file->offset += *written;
+    }
+    unlockTaskLock(&file->lock);
+    return err;
+}
+
+Error vfsFileReadAt(VfsFile* file, Process* process, VirtPtr buffer, size_t offset, size_t length, size_t* read) {
+    return vfsNodeReadAt(file->node, process, buffer, offset, length, read);
+}
+
+Error vfsFileWriteAt(VfsFile* file, Process* process, VirtPtr buffer, size_t offset, size_t length, size_t* written) {
+    return vfsNodeWriteAt(file->node, process, buffer, offset, length, written);
+}
+
+Error vfsFileStat(VfsFile* file, Process* process, VirtPtr ret) {
+}
+
+Error vfsFileTrunc(VfsFile* file, Process* process, size_t size) {
+}
+
+Error vfsFileChmod(VfsFile* file, Process* process, VfsMode mode) {
+}
+
+Error vfsFileChown(VfsFile* file, Process* process, Uid uid, Gid gid) {
+}
+
+Error vfsFileReaddir(VfsFile* file, Process* process, VirtPtr buffer, size_t length, size_t* read) {
+}
+
+void vfsFileCopy(VfsFile* file) {
+    lockTaskLock(&file->lock);
+    file->ref_count++;
+    unlockTaskLock(&file->lock);
+}
+
+void vfsFileClose(VfsFile* file) {
+    lockTaskLock(&file->lock);
+    file->ref_count--;
+    if (file->ref_count == 0) {
+        unlockTaskLock(&file->lock);
+        vfsNodeClose(file->node);
+        dealloc(file);
+    } else {
+        unlockTaskLock(&file->lock);
+    }
+}
 

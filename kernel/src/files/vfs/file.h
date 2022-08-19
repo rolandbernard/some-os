@@ -10,9 +10,9 @@ Error vfsFileRead(VfsFile* file, Process* process, VirtPtr buffer, size_t length
 
 Error vfsFileWrite(VfsFile* file, Process* process, VirtPtr buffer, size_t length, size_t* written);
 
-Error vfsFileReadAt(VfsFile* file, Process* process, VirtPtr buffer, size_t length, size_t offset, size_t* read);
+Error vfsFileReadAt(VfsFile* file, Process* process, VirtPtr buffer, size_t offset, size_t length, size_t* read);
 
-Error vfsFileWriteAt(VfsFile* file, Process* process, VirtPtr buffer, size_t length, size_t offset, size_t* read);
+Error vfsFileWriteAt(VfsFile* file, Process* process, VirtPtr buffer, size_t offset, size_t length, size_t* written);
 
 Error vfsFileStat(VfsFile* file, Process* process, VirtPtr ret);
 

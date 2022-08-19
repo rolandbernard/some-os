@@ -26,7 +26,7 @@ typedef struct {
     int next_fd;
     VfsFileDescriptor* files;
     char* cwd;
-    SpinLock lock;
+    TaskLock lock;
 } ProcessResources;
 
 typedef struct ProcessWaitResult_s {

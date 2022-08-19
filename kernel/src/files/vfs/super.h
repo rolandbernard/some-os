@@ -11,6 +11,10 @@ Error vfsSuperNewNode(VfsSuperblock* sb, VfsNode** ret);
 
 Error vfsSuperFreeNode(VfsNode* node);
 
+Error vfsSuperCopyNode(VfsNode* node);
+
+Error vfsSuperCloseNode(VfsNode* node);
+
 void vfsSuperCopy(VfsSuperblock* sb);
 
 void vfsSuperClose(VfsSuperblock* sb);

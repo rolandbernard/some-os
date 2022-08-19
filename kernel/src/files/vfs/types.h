@@ -8,7 +8,7 @@
 #include "error/error.h"
 #include "interrupt/timer.h"
 #include "memory/virtptr.h"
-#include "task/spinlock.h"
+#include "task/tasklock.h"
 
 typedef enum {
     VFS_TYPE_UNKNOWN = 0,
@@ -141,8 +141,8 @@ typedef struct VfsSuperblock_s {
     struct VfsNode_s* root_node;
     size_t id;
     size_t ref_count;
-    SpinLock lock;
-    // TODO: Node cache
+    TaskLock lock;
+    // TODO: Add node cache!
 } VfsSuperblock;
 
 typedef void (*VfsNodeFreeFunction)(struct VfsNode_s* node);
@@ -178,32 +178,19 @@ typedef struct VfsNode_s {
     Time st_mtime;
     Time st_ctime;
     size_t ref_count;
-    SpinLock lock;
+    TaskLock lock;
     Device* device;         // If this node represents a device, this is not NULL. (Also, functions should be changed.)
     VfsSuperblock* mounted; // If a filesystem is mounted at this node, this is not NULL.
 } VfsNode;
 
-typedef enum {
-    VFS_FILE_NORMAL,
-    VFS_FILE_PIPE,
-    VFS_FILE_DEV_CHARD,
-    VFS_FILE_DEV_BLOCK,
-} VfsFileKind;
-
 struct PipeSharedData_s;
 
 typedef struct VfsFile_s {
-    VfsFileKind kind;
     VfsNode* node;
-    union {
-        BlockDevice* block_dev;
-        TtyDevice* tty_dev;
-        struct PipeSharedData_s* pipe_data;
-    } special;
     char* path;
-    size_t offset;
     size_t ref_count;
-    SpinLock lock;
+    size_t offset;
+    TaskLock lock;
 } VfsFile;
 
 typedef struct VfsFileDescriptor_s {
@@ -215,7 +202,7 @@ typedef struct VfsFileDescriptor_s {
 
 typedef struct {
     VfsSuperblock* root_mounted;
-    SpinLock lock;
+    TaskLock lock;
 } VirtualFilesystem;
 
 #endif

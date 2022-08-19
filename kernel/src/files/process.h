@@ -1,12 +1,12 @@
 #ifndef _FILE_PROCESS_H_
 #define _FILE_PROCESS_H_
 
-#include "files/vfs.h"
+#include "files/vfs/types.h"
 #include "process/types.h"
 
 int allocateNewFileDescriptorId(Process* process);
 
-FileDescriptor* getFileDescriptor(Process* process, int fd);
+VfsFileDescriptor* getFileDescriptor(Process* process, int fd);
 
 void putNewFileDescriptor(Process* process, int fd, int flags, VfsFile* file);
 

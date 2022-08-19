@@ -24,21 +24,21 @@ typedef enum {
 } VfsLookupFlags;
 
 static VfsNode* vfsFollowMounts(VfsNode* curr, bool last_mountpoint) {
-    lockSpinLock(&curr->lock);
+    lockTaskLock(&curr->lock);
     if (curr->mounted != NULL) {
-        lockSpinLock(&curr->mounted->lock);
+        lockTaskLock(&curr->mounted->lock);
         VfsNode* mounted_root = curr->mounted->root_node;
         vfsNodeCopy(mounted_root);
-        unlockSpinLock(&curr->mounted->lock);
-        unlockSpinLock(&curr->lock);
+        unlockTaskLock(&curr->mounted->lock);
+        unlockTaskLock(&curr->lock);
         if (last_mountpoint) {
-            lockSpinLock(&mounted_root->lock);
+            lockTaskLock(&mounted_root->lock);
             if (mounted_root->mounted != NULL) {
-                unlockSpinLock(&mounted_root->lock);
+                unlockTaskLock(&mounted_root->lock);
                 vfsNodeClose(curr);
                 return vfsFollowMounts(mounted_root, last_mountpoint);
             } else {
-                unlockSpinLock(&mounted_root->lock);
+                unlockTaskLock(&mounted_root->lock);
                 vfsNodeClose(mounted_root);
                 return curr;
             }
@@ -46,7 +46,7 @@ static VfsNode* vfsFollowMounts(VfsNode* curr, bool last_mountpoint) {
             return vfsFollowMounts(mounted_root, last_mountpoint);
         }
     } else {
-        unlockSpinLock(&curr->lock);
+        unlockTaskLock(&curr->lock);
         return curr;
     }
 }
@@ -147,11 +147,11 @@ static Error vfsLookupNode(
 static Error vfsLookupNodeAtExactAbs(
     VirtualFilesystem* fs, Process* process, const char* path, VfsLookupFlags flags, VfsNode** ret, char** real_path
 ) {
-    lockSpinLock(&fs->lock);
+    lockTaskLock(&fs->lock);
     VfsSuperblock* root_mount = fs->root_mounted;
     if (root_mount != NULL) {
         vfsSuperCopy(root_mount);
-        unlockSpinLock(&fs->lock);
+        unlockTaskLock(&fs->lock);
         VfsNode* root = root_mount->root_node;
         vfsNodeCopy(root);
         vfsSuperClose(root_mount);
@@ -159,7 +159,7 @@ static Error vfsLookupNodeAtExactAbs(
         vfsNodeClose(root);
         return err;
     } else {
-        unlockSpinLock(&fs->lock);
+        unlockTaskLock(&fs->lock);
         return simpleError(ENOENT);
     }
 }
@@ -188,11 +188,11 @@ static Error vfsLookupNodeAt(
         size_t path_length = strlen(path);
         if (file == NULL) {
             assert(process != NULL);
-            lockSpinLock(&process->resources.lock);
+            lockTaskLock(&process->resources.lock);
             cwd_length = strlen(process->resources.cwd);
             absolute_path = kalloc(cwd_length + path_length + 2);
             memcpy(absolute_path, process->resources.cwd, cwd_length);
-            unlockSpinLock(&process->resources.lock);
+            unlockTaskLock(&process->resources.lock);
         } else {
             cwd_length = strlen(file->path);
             absolute_path = kalloc(cwd_length + path_length + 2);
@@ -265,12 +265,11 @@ static Error vfsCreateNewNode(VirtualFilesystem* fs, Process* process, VfsFile* 
 
 static VfsFile* vfsCreateFile(VfsNode* node, char* path, size_t offset) {
     VfsFile* file = kalloc(sizeof(VfsFile));
-    file->kind = VFS_FILE_NORMAL;
     file->node = node;
     file->path = path;
-    file->offset = offset;
-    initSpinLock(&file->lock);
     file->ref_count = 1;
+    file->offset = offset;
+    initTaskLock(&file->lock);
     return file;
 }
 
@@ -381,20 +380,20 @@ static Error vfsRemoveDirectoryDotAndDotDot(Process* process, VfsNode* parent, V
         }
     } while (tmp_size != 0);
     dealloc(entry);
-    lockSpinLock(&dir->lock);
+    lockTaskLock(&dir->lock);
     if (dir->nlinks == 2) {
-        dir->nlinks -= 1;
-        unlockSpinLock(&dir->lock);
         CHECKED(vfsNodeUnlink(dir, process, "."));
+        dir->nlinks -= 1;
+        unlockTaskLock(&dir->lock);
         CHECKED(vfsSuperWriteNode(dir));
-        lockSpinLock(&parent->lock);
-        parent->nlinks -= 1;
-        unlockSpinLock(&parent->lock);
         CHECKED(vfsNodeUnlink(dir, process, ".."));
+        lockTaskLock(&parent->lock);
+        parent->nlinks -= 1;
+        unlockTaskLock(&parent->lock);
         CHECKED(vfsSuperWriteNode(parent));
         return simpleError(SUCCESS);
     } else {
-        unlockSpinLock(&dir->lock);
+        unlockTaskLock(&dir->lock);
         // If we are here, there must be more than one link to this directory.
         // This is not well support right now. (".." entry might be wrong now.)
         return simpleError(SUCCESS);
@@ -408,9 +407,9 @@ Error vfsUnlinkFrom(Process* process, VfsNode* parent, const char* filename, Vfs
     } else {
         CHECKED(vfsNodeUnlink(parent, process, filename));
     }
-    lockSpinLock(&node->lock);
+    lockTaskLock(&node->lock);
     node->nlinks--;
-    unlockSpinLock(&node->lock);
+    unlockTaskLock(&node->lock);
     return vfsSuperWriteNode(node);
 }
 
@@ -455,18 +454,18 @@ Error vfsLinkAt(VirtualFilesystem* fs, Process* process, VfsFile* old_file, cons
 Error vfsMount(VirtualFilesystem* fs, Process* process, const char* path, VfsSuperblock* sb) {
     VfsNode* node;
     CHECKED(vfsLookupNodeAt(fs, process, NULL, path, VFS_LOOKUP_NORMAL, &node, NULL));
-    lockSpinLock(&node->lock);
+    lockTaskLock(&node->lock);
     if (node->mounted != NULL) {
-        unlockSpinLock(&node->lock);
+        unlockTaskLock(&node->lock);
         vfsNodeClose(node);
         return simpleError(EINVAL);
     } else if (MODE_TYPE(node->mode) != VFS_TYPE_DIR) {
-        unlockSpinLock(&node->lock);
+        unlockTaskLock(&node->lock);
         vfsNodeClose(node);
         return simpleError(ENOTDIR);
     } else {
         node->mounted = sb;
-        unlockSpinLock(&node->lock);
+        unlockTaskLock(&node->lock);
         // We keep sb and node referenced until we unmount.
         return simpleError(SUCCESS);
     }
@@ -475,15 +474,15 @@ Error vfsMount(VirtualFilesystem* fs, Process* process, const char* path, VfsSup
 Error vfsUmount(VirtualFilesystem* fs, Process* process, const char* path) {
     VfsNode* node;
     CHECKED(vfsLookupNodeAt(fs, process, NULL, path, VFS_LOOKUP_SKIPLASTMOUNT, &node, NULL));
-    lockSpinLock(&node->lock);
+    lockTaskLock(&node->lock);
     if (node->mounted == NULL) {
-        unlockSpinLock(&node->lock);
+        unlockTaskLock(&node->lock);
         vfsNodeClose(node);
         return simpleError(EINVAL);
     } else {
         vfsSuperClose(node->mounted);
         node->mounted = NULL;
-        unlockSpinLock(&node->lock);
+        unlockTaskLock(&node->lock);
         vfsNodeClose(node);
         vfsNodeClose(node); // Close this two times, ones for this lookup and ones for the mount.
         return simpleError(SUCCESS);
