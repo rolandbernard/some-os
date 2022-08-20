@@ -8,7 +8,7 @@ Error vfsNodeReadAt(VfsNode* node, Process* process, VirtPtr buff, size_t offset
 
 Error vfsNodeWriteAt(VfsNode* node, Process* process, VirtPtr buff, size_t offset, size_t length, size_t* written);
 
-Error vfsNodeReaddirAt(VfsNode* node, Process* process, VirtPtr buff, size_t offset, size_t length, size_t* read);
+Error vfsNodeReaddirAt(VfsNode* node, Process* process, VirtPtr buff, size_t offset, size_t length, size_t* read_file, size_t* written_buff);
 
 Error vfsNodeTrunc(VfsNode* node, Process* process, size_t length);
 

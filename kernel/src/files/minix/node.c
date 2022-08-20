@@ -1,5 +1,6 @@
 
 #include <assert.h>
+#include <string.h>
 
 #include "files/minix/node.h"
 
@@ -11,6 +12,8 @@
 #include "util/util.h"
 
 #define SUPER(NODE) ((MinixVfsSuperblock*)NODE->base.superblock)
+
+#define MAX_LOOKUP_READ_SIZE (1 << 16)
 
 static void minixFree(MinixVfsNode* node) {
     dealloc(node);
@@ -193,7 +196,32 @@ static Error minixWriteAt(MinixVfsNode* node, VirtPtr buff, size_t offset, size_
     return minixReadWrite(node, buff, offset, length, true, written);
 }
 
-static Error minixReaddirAt(MinixVfsNode* node, VirtPtr buff, size_t offset, size_t length, size_t* read) {
+static Error minixReaddirAt(MinixVfsNode* node, VirtPtr buff, size_t offset, size_t length, size_t* read_file, size_t* written_buff) {
+    size_t tmp_size;
+    MinixDirEntry entry;
+    CHECKED(minixReadAt(node, virtPtrForKernel(&entry), offset, sizeof(MinixDirEntry), &tmp_size));
+    if (tmp_size != 0 && tmp_size != sizeof(MinixDirEntry)) {
+        return simpleError(EIO);
+    } else {
+        *read_file = tmp_size;
+        if (tmp_size == 0) {
+            *written_buff = 0;
+            return simpleError(SUCCESS);
+        } else {
+            size_t name_len = strlen((char*)entry.name);
+            size_t vfs_entry_size = sizeof(VfsDirectoryEntry) + name_len + 1;
+            VfsDirectoryEntry* vfs_entry = kalloc(vfs_entry_size);
+            vfs_entry->id = entry.inode;
+            vfs_entry->off = offset;
+            vfs_entry->len = vfs_entry_size;
+            vfs_entry->type = VFS_TYPE_UNKNOWN;
+            memcpy(vfs_entry->name, entry.name, name_len + 1);
+            memcpyBetweenVirtPtr(buff, virtPtrForKernel(vfs_entry), umin(length, vfs_entry_size));
+            *written_buff = umin(vfs_entry_size, length);
+            dealloc(vfs_entry);
+            return simpleError(SUCCESS);
+        }
+    }
 }
 
 typedef struct {
@@ -245,13 +273,81 @@ static Error minixTrunc(MinixVfsNode* node, size_t length) {
     }
 }
 
+static Error minixInternalLookup(MinixVfsNode* node, const char* name, uint32_t* inodenum, size_t* off) {
+    size_t offset = 0;
+    size_t left = node->base.stat.size;
+    MinixDirEntry* tmp_buffer = kalloc(umin(MAX_LOOKUP_READ_SIZE, left));
+    while (left > 0) {
+        size_t tmp_size = umin(MAX_LOOKUP_READ_SIZE, left);
+        CHECKED(minixReadAt(node, virtPtrForKernel(tmp_buffer), tmp_size, offset, &tmp_size), {
+            dealloc(tmp_buffer);
+        });
+        if (tmp_size == 0) {
+            dealloc(tmp_buffer);
+            return simpleError(EIO);
+        }
+        for (size_t i = 0; i < (tmp_size / sizeof(MinixDirEntry)); i++) {
+            if (tmp_buffer[i].inode != 0 && strcmp((char*)tmp_buffer[i].name, name) == 0) {
+                *inodenum = tmp_buffer[i].inode;
+                *off = offset;
+                dealloc(tmp_buffer);
+                return simpleError(SUCCESS);
+            }
+            offset += sizeof(MinixDirEntry);
+        }
+        left -= tmp_size;
+    }
+    dealloc(tmp_buffer);
+    return simpleError(ENOENT);
+}
+
 static Error minixLookup(MinixVfsNode* node, const char* name, size_t* node_id) {
+    uint32_t inodenum;
+    size_t offset;
+    lockTaskLock(&node->lock);
+    Error err = minixInternalLookup(node, name, &inodenum, &offset);
+    unlockTaskLock(&node->lock);
+    *node_id = inodenum;
+    return err;
 }
 
 static Error minixUnlink(MinixVfsNode* node, const char* name) {
+    uint32_t inodenum;
+    size_t offset;
+    lockTaskLock(&node->lock);
+    CHECKED(minixInternalLookup(node, name, &inodenum, &offset), unlockTaskLock(&node->lock));
+    MinixDirEntry entry;
+    size_t tmp_size;
+    CHECKED(
+        minixReadAt(node, virtPtrForKernel(&entry), node->base.stat.size - sizeof(MinixDirEntry), sizeof(MinixDirEntry), &tmp_size),
+        unlockTaskLock(&node->lock)
+    );
+    if (tmp_size != sizeof(MinixDirEntry)) {
+        unlockTaskLock(&node->lock);
+        return simpleError(EIO);
+    }
+    CHECKED(minixWriteAt(node, virtPtrForKernel(&entry), offset, sizeof(MinixDirEntry), &tmp_size), unlockTaskLock(&node->lock));
+    Error err = minixTrunc(node, node->base.stat.size - sizeof(MinixDirEntry));
+    unlockTaskLock(&node->lock);
+    return err;
 }
 
-static Error minixLink(MinixVfsNode* node, const char* name, MinixVfsNode* entry) {
+static Error minixLink(MinixVfsNode* node, const char* name, MinixVfsNode* entry_node) {
+    MinixDirEntry entry = { .inode = entry_node->base.stat.id };
+    size_t name_len = strlen(name);
+    if (name_len >= sizeof(entry.name)) {
+        name_len = sizeof(entry.name) - 1;
+    }
+    memcpy(entry.name, name, name_len);
+    entry.name[name_len] = 0;
+    size_t tmp_size;
+    lockTaskLock(&node->lock);
+    CHECKED(
+        minixWriteAt(node, virtPtrForKernel(&entry), node->base.stat.size, sizeof(MinixDirEntry), &tmp_size),
+        unlockTaskLock(&node->lock)
+    );
+    unlockTaskLock(&node->lock);
+    return simpleError(tmp_size != sizeof(MinixDirEntry) ? EIO : SUCCESS);
 }
 
 VfsNodeFunctions funcs = {

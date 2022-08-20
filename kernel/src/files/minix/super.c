@@ -19,8 +19,6 @@ size_t offsetForZone(size_t zone) {
     return zone * MINIX_BLOCK_SIZE;
 }
 
-#define MAX_SINGLE_READ_SIZE (1 << 16)
-
 static void minixFreeSuperblock(MinixVfsSuperblock* sb) {
     vfsFileClose(sb->block_device);
     dealloc(sb);

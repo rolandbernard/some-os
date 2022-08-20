@@ -157,7 +157,7 @@ typedef struct VfsSuperblock_s {
 typedef void (*VfsNodeFreeFunction)(struct VfsNode_s* node);
 typedef Error (*VfsNodeReadAtFunction)(struct VfsNode_s* node, VirtPtr buff, size_t offset, size_t length, size_t* read);
 typedef Error (*VfsNodeWriteAtFunction)(struct VfsNode_s* node, VirtPtr buff, size_t offset, size_t length, size_t* written);
-typedef Error (*VfsNodeReaddirAtFunction)(struct VfsNode_s* node, VirtPtr buff, size_t offset, size_t length, size_t* read);
+typedef Error (*VfsNodeReaddirAtFunction)(struct VfsNode_s* node, VirtPtr buff, size_t offset, size_t length, size_t* read_file, size_t* written_buff);
 typedef Error (*VfsNodeTruncFunction)(struct VfsNode_s* node, size_t length);
 typedef Error (*VfsNodeLookupFunction)(struct VfsNode_s* node, const char* name, size_t* node_id);
 typedef Error (*VfsNodeUnlinkFunction)(struct VfsNode_s* node, const char* name);

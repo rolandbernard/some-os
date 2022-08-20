@@ -8,6 +8,7 @@
 #include "files/vfs/node.h"
 #include "files/vfs/super.h"
 #include "memory/kalloc.h"
+#include "util/util.h"
 
 Error vfsFileSeek(VfsFile* file, Process* process, size_t offset, VfsSeekWhence whence, size_t* new_pos) {
     lockTaskLock(&file->lock);
@@ -92,9 +93,10 @@ Error vfsFileChown(VfsFile* file, Process* process, Uid uid, Gid gid) {
 
 Error vfsFileReaddir(VfsFile* file, Process* process, VirtPtr buffer, size_t length, size_t* read) {
     lockTaskLock(&file->lock);
-    Error err = vfsNodeReaddirAt(file->node, process, buffer, length, file->offset, read);
+    size_t tmp_size;
+    Error err = vfsNodeReaddirAt(file->node, process, buffer, length, file->offset, &tmp_size, read);
     if (!isError(err)) {
-        file->offset += *read;
+        file->offset += tmp_size;
     }
     unlockTaskLock(&file->lock);
     return err;

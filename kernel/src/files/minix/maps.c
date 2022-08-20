@@ -5,15 +5,15 @@
 #include "memory/kalloc.h"
 #include "util/util.h"
 
-#define MAX_SINGLE_READ_SIZE (1 << 16)
+#define MAX_MAPS_READ_SIZE (1 << 16)
 
 static Error genericMinixGetBitMap(MinixVfsSuperblock* fs, size_t offset, size_t size, bool inode, size_t* pos) {
     lockTaskLock(&fs->maps_lock);
     size_t position = 0;
     size_t bytes = (size + 7) / 8;
-    uint8_t* tmp_buffer = kalloc(umin(MAX_SINGLE_READ_SIZE, bytes));
+    uint8_t* tmp_buffer = kalloc(umin(MAX_MAPS_READ_SIZE, bytes));
     while (bytes > 0) {
-        size_t tmp_size = umin(MAX_SINGLE_READ_SIZE, bytes);
+        size_t tmp_size = umin(MAX_MAPS_READ_SIZE, bytes);
         CHECKED(vfsFileReadAt(fs->block_device, NULL, virtPtrForKernel(tmp_buffer), tmp_size, offset, &tmp_size), {
             unlockTaskLock(&fs->maps_lock);
             dealloc(tmp_buffer);

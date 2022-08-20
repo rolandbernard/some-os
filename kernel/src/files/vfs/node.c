@@ -30,8 +30,8 @@ Error vfsNodeWriteAt(VfsNode* node, Process* process, VirtPtr buff, size_t offse
     DELEGATE_NODE_FUNCTION(write_at, (node, buff, offset, length, written), VFS_ACCESS_W);
 }
 
-Error vfsNodeReaddirAt(VfsNode* node, Process* process, VirtPtr buff, size_t offset, size_t length, size_t* read) {
-    DELEGATE_NODE_FUNCTION(readdir_at, (node, buff, offset, length, read), VFS_ACCESS_R | VFS_ACCESS_DIR);
+Error vfsNodeReaddirAt(VfsNode* node, Process* process, VirtPtr buff, size_t offset, size_t length, size_t* read_file, size_t* written_buff) {
+    DELEGATE_NODE_FUNCTION(readdir_at, (node, buff, offset, length, read_file, written_buff), VFS_ACCESS_R | VFS_ACCESS_DIR);
 }
 
 Error vfsNodeTrunc(VfsNode* node, Process* process, size_t length) {
