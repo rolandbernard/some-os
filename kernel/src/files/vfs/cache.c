@@ -3,6 +3,7 @@
 
 #include "files/vfs/cache.h"
 
+#include "files/vfs/node.h"
 #include "memory/kalloc.h"
 #include "util/util.h"
 
@@ -79,6 +80,7 @@ VfsNode* vfsCacheGetNodeOrLock(VfsNodeCache* cache, size_t sb_id, size_t node_id
     size_t idx = findIndexHashTable(cache, sb_id, node_id);
     VfsNode* found = cache->nodes[idx];
     if (found != DELETED && found != EMPTY) {
+        vfsNodeCopy(found);
         unlockTaskLock(&cache->lock);
         return found;
     } else {
@@ -86,22 +88,30 @@ VfsNode* vfsCacheGetNodeOrLock(VfsNodeCache* cache, size_t sb_id, size_t node_id
     }
 }
 
-void vfsCacheRegisterNodeAndUnlock(VfsNodeCache* cache, VfsNode* node) {
+static void vfsCacheInsertNewNode(VfsNodeCache* cache, VfsNode* node) {
     testForResize(cache);
     size_t idx = insertIndexHashTable(cache, node);
     assert(cache->nodes[idx] == EMPTY || cache->nodes[idx] == DELETED);
     cache->nodes[idx] = node;
+}
+
+void vfsCacheUnlock(VfsNodeCache* cache) {
     unlockTaskLock(&cache->lock);
 }
 
 void vfsCacheCopyNode(VfsNodeCache* cache, VfsNode* node) {
     lockTaskLock(&cache->lock);
+    if (node->ref_count == 0) {
+        // This is a new node, add it to the cache.
+        vfsCacheInsertNewNode(cache, node);
+    }
     node->ref_count++;
     unlockTaskLock(&cache->lock);
 }
 
 void vfsCacheCloseNode(VfsNodeCache* cache, VfsNode* node) {
     lockTaskLock(&cache->lock);
+    assert(node->ref_count > 0);
     node->ref_count--;
     if (node->ref_count == 0) {
         size_t idx = findIndexHashTable(cache, node->superblock->id, node->stat.id);
@@ -109,5 +119,16 @@ void vfsCacheCloseNode(VfsNodeCache* cache, VfsNode* node) {
         cache->nodes[idx] = DELETED;
     }
     unlockTaskLock(&cache->lock);
+}
+
+void vfsCacheInit(VfsNodeCache* cache) {
+    cache->count = 0;
+    cache->capacity = 0;
+    cache->nodes = NULL;
+    initTaskLock(&cache->lock);
+}
+
+void vfsCacheDeinit(VfsNodeCache* cache) {
+    dealloc(cache->nodes);
 }
 

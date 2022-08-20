@@ -127,7 +127,7 @@ struct VfsFile_s;
 typedef void (*VfsSuperblockFreeFunction)(struct VfsSuperblock_s* sb);
 typedef Error (*VfsSuperblockReadNodeFunction)(struct VfsSuperblock_s* sb, size_t id, struct VfsNode_s** out);
 typedef Error (*VfsSuperblockWriteNodeFunction)(struct VfsSuperblock_s* sb, struct VfsNode_s* write);
-typedef Error (*VfsSuperblockNewNodeFunction)(struct VfsSuperblock_s* sb, struct VfsNode_s** out);
+typedef Error (*VfsSuperblockNewNodeFunction)(struct VfsSuperblock_s* sb, size_t* id);
 typedef Error (*VfsSuperblockFreeNodeFunction)(struct VfsSuperblock_s* sb, struct VfsNode_s* free);
 
 typedef struct {
@@ -147,7 +147,6 @@ typedef struct {
 
 typedef struct VfsSuperblock_s {
     VfsSuperblockFunctions* functions;
-    struct VfsNode_s* mount_point;
     struct VfsNode_s* root_node;
     size_t id;
     size_t ref_count;

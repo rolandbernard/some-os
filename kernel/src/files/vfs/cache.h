@@ -8,10 +8,16 @@
 
 VfsNode* vfsCacheGetNodeOrLock(VfsNodeCache* cache, size_t sb_id, size_t node_id);
 
-void vfsCacheRegisterNodeAndUnlock(VfsNodeCache* cache, VfsNode* node);
+void vfsCacheUnlock(VfsNodeCache* cache);
+
+void vfsCacheRegister(VfsNodeCache* cache, VfsNode* node);
 
 void vfsCacheCopyNode(VfsNodeCache* cache, VfsNode* node);
 
 void vfsCacheCloseNode(VfsNodeCache* cache, VfsNode* node);
+
+void vfsCacheInit(VfsNodeCache* cache);
+
+void vfsCacheDeinit(VfsNodeCache* cache);
 
 #endif
