@@ -14,7 +14,7 @@ Error vfsNodeTrunc(VfsNode* node, Process* process, size_t length);
 
 Error vfsNodeLookup(VfsNode* node, Process* process, const char* name, VfsNode** ret);
 
-Error vfsNodeUnlink(VfsNode* node, Process* process, const char* name);
+Error vfsNodeUnlink(VfsNode* node, Process* process, const char* name, VfsNode* entry);
 
 Error vfsNodeLink(VfsNode* node, Process* process, const char* name, VfsNode* entry);
 

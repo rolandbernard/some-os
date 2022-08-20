@@ -383,16 +383,10 @@ static Error vfsRemoveDirectoryDotAndDotDot(Process* process, VfsNode* parent, V
     } while (tmp_size != 0);
     dealloc(entry);
     lockTaskLock(&dir->lock);
-    if (dir->stat.nlinks == 2) {
-        CHECKED(vfsNodeUnlink(dir, process, "."));
-        dir->stat.nlinks -= 1;
+    if (dir->stat.nlinks == 1) {
         unlockTaskLock(&dir->lock);
-        CHECKED(vfsSuperWriteNode(dir));
-        CHECKED(vfsNodeUnlink(dir, process, ".."));
-        lockTaskLock(&parent->lock);
-        parent->stat.nlinks -= 1;
-        unlockTaskLock(&parent->lock);
-        CHECKED(vfsSuperWriteNode(parent));
+        CHECKED(vfsNodeUnlink(dir, process, ".", dir));
+        CHECKED(vfsNodeUnlink(dir, process, "..", parent));
         return simpleError(SUCCESS);
     } else {
         unlockTaskLock(&dir->lock);
@@ -404,15 +398,11 @@ static Error vfsRemoveDirectoryDotAndDotDot(Process* process, VfsNode* parent, V
 
 Error vfsUnlinkFrom(Process* process, VfsNode* parent, const char* filename, VfsNode* node) {
     if (MODE_TYPE(node->stat.mode) == VFS_TYPE_DIR) {
-        CHECKED(vfsNodeUnlink(parent, process, filename));
-        CHECKED(vfsRemoveDirectoryDotAndDotDot(process, parent, node));
+        CHECKED(vfsNodeUnlink(parent, process, filename, node));
+        return vfsRemoveDirectoryDotAndDotDot(process, parent, node);
     } else {
-        CHECKED(vfsNodeUnlink(parent, process, filename));
+        return vfsNodeUnlink(parent, process, filename, node);
     }
-    lockTaskLock(&node->lock);
-    node->stat.nlinks--;
-    unlockTaskLock(&node->lock);
-    return vfsSuperWriteNode(node);
 }
 
 Error vfsUnlinkAt(VirtualFilesystem* fs, Process* process, VfsFile* file, const char* path, VfsUnlinkFlags flags) {

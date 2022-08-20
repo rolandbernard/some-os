@@ -3,6 +3,7 @@
 
 #include "files/vfs/fs.h"
 #include "files/vfs/super.h"
+#include "kernel/time.h"
 
 #define DELEGATE_NODE_FUNCTION(NAME, PARAMS, ACCESS)        \
     if (node->functions->NAME == NULL) {                    \
@@ -12,6 +13,11 @@
         CHECKED(canAccess(&node->stat, process, ACCESS), {  \
             unlockTaskLock(&node->lock);                    \
         });                                                 \
+        if ((ACCESS & VFS_ACCESS_W) != 0) {                 \
+            node->stat.mtime = getNanoseconds();            \
+        }                                                   \
+        node->stat.atime = getNanoseconds();                \
+        vfsSuperWriteNode(node);                            \
         unlockTaskLock(&node->lock);                        \
         return node->functions->NAME PARAMS;                \
     }
@@ -42,8 +48,17 @@ Error vfsNodeLookup(VfsNode* node, Process* process, const char* name, VfsNode**
     return vfsSuperReadNode(node->superblock, node_id, ret);
 }
 
-Error vfsNodeUnlink(VfsNode* node, Process* process, const char* name) {
+static Error vfsNodeBasicUnlink(VfsNode* node, Process* process, const char* name) {
     DELEGATE_NODE_FUNCTION(unlink, (node, name), VFS_ACCESS_W | VFS_ACCESS_DIR);
+}
+
+Error vfsNodeUnlink(VfsNode* node, Process* process, const char* name, VfsNode* entry) {
+    CHECKED(vfsNodeBasicUnlink(node, process, name));
+    lockTaskLock(&entry->lock);
+    entry->stat.nlinks -= 1;
+    Error err = vfsSuperWriteNode(entry);
+    unlockTaskLock(&node->lock);
+    return err;
 }
 
 Error vfsNodeLink(VfsNode* node, Process* process, const char* name, VfsNode* entry) {
@@ -54,9 +69,11 @@ Error vfsNodeLink(VfsNode* node, Process* process, const char* name, VfsNode* en
         CHECKED(canAccess(&node->stat, process, VFS_ACCESS_W | VFS_ACCESS_DIR), {
             unlockTaskLock(&node->lock);
         });
-        node->stat.nlinks++;
         unlockTaskLock(&node->lock);
-        CHECKED(vfsSuperWriteNode(node));
+        lockTaskLock(&entry->lock);
+        entry->stat.nlinks++;
+        CHECKED(vfsSuperWriteNode(node), unlockTaskLock(&entry->lock));
+        unlockTaskLock(&entry->lock);
         return node->functions->link(node, name, entry);
     }
 }

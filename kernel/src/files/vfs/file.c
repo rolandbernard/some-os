@@ -76,16 +76,18 @@ Error vfsFileChmod(VfsFile* file, Process* process, VfsMode mode) {
     });
     file->node->stat.mode &= VFS_MODE_TYPE;
     file->node->stat.mode |= mode & ~VFS_MODE_TYPE; // We don't allow changing the type
+    Error err = vfsSuperWriteNode(file->node);
     unlockTaskLock(&file->node->lock);
-    return vfsSuperWriteNode(file->node);
+    return err;
 }
 
 Error vfsFileChown(VfsFile* file, Process* process, Uid uid, Gid gid) {
     lockTaskLock(&file->node->lock);
     file->node->stat.uid = uid;
     file->node->stat.gid = gid;
+    Error err = vfsSuperWriteNode(file->node);
     unlockTaskLock(&file->node->lock);
-    return vfsSuperWriteNode(file->node);
+    return err;
 }
 
 Error vfsFileReaddir(VfsFile* file, Process* process, VirtPtr buffer, size_t length, size_t* read) {

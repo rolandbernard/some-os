@@ -5,6 +5,7 @@
 
 #include "files/vfs/cache.h"
 #include "files/vfs/node.h"
+#include "kernel/time.h"
 
 Error vfsSuperReadNode(VfsSuperblock* sb, size_t id, VfsNode** ret) {
     if (id == sb->root_node->stat.id) {
@@ -31,7 +32,12 @@ Error vfsSuperReadNode(VfsSuperblock* sb, size_t id, VfsNode** ret) {
 }
 
 Error vfsSuperWriteNode(VfsNode* write) {
-    return write->superblock->functions->write_node(write->superblock, write);
+    lockTaskLock(&write->lock);
+    write->stat.ctime = getNanoseconds();
+    // This could also just be marked dirty and written only when closing the node.
+    Error err = write->superblock->functions->write_node(write->superblock, write);
+    unlockTaskLock(&write->lock);
+    return err;
 }
 
 Error vfsSuperNewNode(VfsSuperblock* sb, VfsNode** ret) {
