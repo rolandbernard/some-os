@@ -8,6 +8,8 @@ size_t offsetForINode(const MinixVfsSuperblock* sb, uint32_t inode);
 
 size_t offsetForZone(size_t zone);
 
+Error minixWriteNode(MinixVfsSuperblock* sb, MinixVfsNode* write);
+
 Error createMinixVfsSuperblock(VfsFile* block_device, VirtPtr data, MinixVfsSuperblock** ret);
 
 #endif

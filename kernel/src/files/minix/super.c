@@ -52,7 +52,7 @@ static Error minixReadNode(MinixVfsSuperblock* sb, size_t id, MinixVfsNode** out
     return simpleError(SUCCESS);
 }
 
-static Error minixWriteNode(MinixVfsSuperblock* sb, MinixVfsNode* write) {
+Error minixWriteNode(MinixVfsSuperblock* sb, MinixVfsNode* write) {
     lockTaskLock(&write->base.lock);
     MinixInode inode = {
         .mode = write->base.stat.mode,

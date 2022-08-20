@@ -1,21 +1,248 @@
 
+#include <assert.h>
+
 #include "files/minix/node.h"
 
+#include "files/minix/maps.h"
+#include "files/minix/super.h"
+#include "files/vfs/file.h"
 #include "memory/kalloc.h"
+#include "memory/pagealloc.h"
+#include "util/util.h"
+
+#define SUPER(NODE) ((MinixVfsSuperblock*)NODE->base.superblock)
 
 static void minixFree(MinixVfsNode* node) {
+    dealloc(node);
+}
+
+typedef Error (*MinixZoneWalkFunction)(uint32_t* zone, bool* changed, size_t position, size_t size, bool pre, bool post, void* udata);
+
+static Error minixZoneWalkRec(
+    MinixVfsNode* node, size_t* position, size_t offset, size_t depth, uint32_t indirect_table, MinixZoneWalkFunction callback, void* udata
+);
+
+static Error minixZoneWalkRecScan(
+    MinixVfsNode* node, size_t* position, size_t offset, size_t depth, uint32_t* table, size_t len,
+    bool* changed, MinixZoneWalkFunction callback, void* udata
+) {
+    for (size_t i = 0; i < len; i++) {
+        size_t size = MINIX_BLOCK_SIZE << (MINIX_NUM_IPTRS_LOG2 * depth);
+        if (offset < *position + size) {
+            CHECKED(callback(table + i, changed, *position, size, true, false, udata));
+            if (depth == 0 || table[i] == 0) {
+                CHECKED(callback(table + i, changed, *position, size, false, false, udata));
+            } else {
+                CHECKED(minixZoneWalkRec(node, position, offset, depth - 1, table[i], callback, udata));
+            }
+            CHECKED(callback(table + i, changed, *position, size, false, true, udata));
+        }
+        *position += size;
+    }
+    return simpleError(SUCCESS);
+}
+
+static Error minixZoneWalkRec(
+    MinixVfsNode* node, size_t* position, size_t offset, size_t depth, uint32_t indirect_table, MinixZoneWalkFunction callback, void* udata
+) {
+    uint32_t* table = kalloc(MINIX_BLOCK_SIZE);
+    size_t tmp_size;
+    CHECKED(vfsFileReadAt(
+        SUPER(node)->block_device, NULL, virtPtrForKernel(table), MINIX_BLOCK_SIZE, offsetForZone(indirect_table), &tmp_size
+    ), dealloc(table));
+    if (tmp_size != MINIX_BLOCK_SIZE) {
+        dealloc(table);
+        return simpleError(EIO);
+    }
+    bool changed = false;
+    Error err = minixZoneWalkRecScan(node, position, offset, depth, table, MINIX_NUM_IPTRS, &changed, callback, udata);
+    if (changed) {
+        Error e = vfsFileWriteAt(
+            SUPER(node)->block_device, NULL, virtPtrForKernel(table), MINIX_BLOCK_SIZE, offsetForZone(indirect_table), &tmp_size
+        );
+        if (!isError(err)) {
+            err = e;
+        }
+    }
+    dealloc(table);
+    return err;
+}
+
+static Error minixZoneWalk(
+    MinixVfsNode* node, size_t offset, MinixZoneWalkFunction callback, void* udata
+) {
+    bool changed = false;
+    size_t position = 0;
+    Error err = minixZoneWalkRecScan(node, &position, offset, 0, node->zones, 7, &changed, callback, udata);
+    if (!isError(err)) {
+        err = minixZoneWalkRecScan(node, &position, offset, 1, node->zones + 7, 1, &changed, callback, udata);
+    }
+    if (!isError(err)) {
+        err = minixZoneWalkRecScan(node, &position, offset, 2, node->zones + 8, 1, &changed, callback, udata);
+    }
+    if (!isError(err)) {
+        err = minixZoneWalkRecScan(node, &position, offset, 3, node->zones + 9, 1, &changed, callback, udata);
+    }
+    if (changed) {
+        Error e = minixWriteNode(SUPER(node), node);
+        if (!isError(err)) {
+            err = e;
+        }
+    }
+    return err;
+}
+
+typedef struct {
+    MinixVfsNode* node;
+    VirtPtr buffer;
+    size_t offset;
+    size_t length;
+    size_t left;
+    bool write;
+} MinixReadWriteRequest;
+
+static Error minixRWZoneWalkCallback(uint32_t* zone, bool* changed, size_t position, size_t size, bool pre, bool post, void* udata) {
+    MinixReadWriteRequest* request = (MinixReadWriteRequest*)udata;
+    if (request->write && pre) {
+        if (*zone == 0 && request->left > 0) {
+            size_t new_zone;
+            CHECKED(getFreeMinixZone(SUPER(request->node), &new_zone));
+            assert(MINIX_BLOCK_SIZE < PAGE_SIZE);
+            size_t tmp_size;
+            CHECKED(vfsFileWriteAt(
+                SUPER(request->node)->block_device, NULL, virtPtrForKernel(zero_page), MINIX_BLOCK_SIZE, offsetForZone(new_zone), &tmp_size
+            ));
+            if (tmp_size != MINIX_BLOCK_SIZE) {
+                return simpleError(EIO);
+            }
+            *zone = new_zone;
+            *changed = true;
+        }
+    }
+    if (!pre && !post && request->left > 0) {
+        size_t file_offset = request->offset > position ? request->offset : position;
+        size_t block_offset = file_offset % MINIX_BLOCK_SIZE;
+        size_t tmp_size = umin(request->left, position + size - file_offset);
+        if (request->write) {
+            CHECKED(vfsFileWriteAt(
+                SUPER(request->node)->block_device, NULL, request->buffer, tmp_size, offsetForZone(*zone) + block_offset, &tmp_size
+            ));
+        } else if (*zone == 0) {
+            memsetVirtPtr(request->buffer, 0, tmp_size);
+        } else {
+            CHECKED(vfsFileReadAt(
+                SUPER(request->node)->block_device, NULL, request->buffer, tmp_size, offsetForZone(*zone) + block_offset, &tmp_size
+            ));
+        }
+        if (tmp_size == 0) {
+            return simpleError(EIO);
+        }
+        request->buffer.address += tmp_size;
+        request->left -= tmp_size;
+    }
+    if (request->left == 0) {
+        return simpleError(SUCCESS_EXIT);
+    } else {
+        return simpleError(SUCCESS);
+    }
+}
+
+static Error minixReadWrite(MinixVfsNode* node, VirtPtr buffer, size_t offset, size_t length, bool write, size_t* ret) {
+    lockTaskLock(&node->lock);
+    if (!write) {
+        if (node->base.stat.size < offset) {
+            length = 0;
+        } else {
+            length = umin(length, node->base.stat.size - offset);
+        }
+    }
+    if (length == 0) {
+        unlockTaskLock(&node->lock);
+        *ret = 0;
+        return simpleError(SUCCESS);
+    }
+    MinixReadWriteRequest request = {
+        .node = node,
+        .buffer = buffer,
+        .length = length,
+        .left = length,
+        .write = write,
+    };
+    Error err = minixZoneWalk(node, offset, minixRWZoneWalkCallback, &request);
+    if (err.kind != SUCCESS_EXIT && isError(err)) {
+        unlockTaskLock(&node->lock);
+        return err;
+    } else {
+        if (write && offset + length > node->base.stat.size) {
+            lockTaskLock(&node->base.lock);
+            node->base.stat.size = offset + length;
+            minixWriteNode(SUPER(node), node);
+            unlockTaskLock(&node->base.lock);
+        }
+        unlockTaskLock(&node->lock);
+        *ret = length;
+        return simpleError(SUCCESS);
+    }
 }
 
 static Error minixReadAt(MinixVfsNode* node, VirtPtr buff, size_t offset, size_t length, size_t* read) {
+    return minixReadWrite(node, buff, offset, length, false, read);
 }
 
 static Error minixWriteAt(MinixVfsNode* node, VirtPtr buff, size_t offset, size_t length, size_t* written) {
+    return minixReadWrite(node, buff, offset, length, true, written);
 }
 
 static Error minixReaddirAt(MinixVfsNode* node, VirtPtr buff, size_t offset, size_t length, size_t* read) {
 }
 
+typedef struct {
+    MinixVfsNode* file;
+    size_t length;
+} MinixTruncRequest;
+
+static Error minixTruncZoneWalkCallback(uint32_t* zone, bool* changed, size_t position, size_t size, bool pre, bool post, void* udata) {
+    MinixTruncRequest* request = (MinixTruncRequest*)udata;
+    if (*zone != 0) {
+        if (request->length < position + size) {
+            if (!pre && !post) { // Zero the rest of the zone
+                size_t block_offset = request->length % position;
+                size_t tmp_size = MINIX_BLOCK_SIZE - block_offset;
+                assert(MINIX_BLOCK_SIZE < PAGE_SIZE);
+                CHECKED(vfsFileWriteAt(
+                    SUPER(request->file)->block_device, NULL, virtPtrForKernel(zero_page), tmp_size,
+                    offsetForZone(*zone) + block_offset, &tmp_size
+                ));
+            }
+        } else {
+            if (post) { // Free the zone in the filesystem zone map
+                CHECKED(freeMinixZone(SUPER(request->file), *zone));
+                *zone = 0;
+                *changed = true;
+            }
+        }
+    }
+    return simpleError(SUCCESS);
+}
+
 static Error minixTrunc(MinixVfsNode* node, size_t length) {
+    lockTaskLock(&node->lock);
+    MinixTruncRequest request = {
+        .file = node,
+        .length = umin(length, node->base.stat.size),
+    };
+    Error err = minixZoneWalk(node, 0, minixTruncZoneWalkCallback, &request);
+    if (err.kind != SUCCESS_EXIT && isError(err)) {
+        unlockTaskLock(&node->lock);
+        return err;
+    } else {
+        lockTaskLock(&node->base.lock);
+        node->base.stat.size = 0;
+        minixWriteNode(SUPER(node), node);
+        unlockTaskLock(&node->base.lock);
+        unlockTaskLock(&node->lock);
+        return simpleError(SUCCESS);
+    }
 }
 
 static Error minixLookup(MinixVfsNode* node, const char* name, size_t* node_id) {
