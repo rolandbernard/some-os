@@ -5,21 +5,21 @@
 #include "files/vfs/super.h"
 #include "kernel/time.h"
 
-#define DELEGATE_NODE_FUNCTION(NAME, PARAMS, ACCESS)        \
-    if (node->functions->NAME == NULL) {                    \
-        return simpleError(EINVAL);                         \
-    } else {                                                \
-        lockTaskLock(&node->lock);                          \
-        CHECKED(canAccess(&node->stat, process, ACCESS), {  \
-            unlockTaskLock(&node->lock);                    \
-        });                                                 \
-        if ((ACCESS & VFS_ACCESS_W) != 0) {                 \
-            node->stat.mtime = getNanoseconds();            \
-        }                                                   \
-        node->stat.atime = getNanoseconds();                \
-        vfsSuperWriteNode(node);                            \
-        unlockTaskLock(&node->lock);                        \
-        return node->functions->NAME PARAMS;                \
+#define DELEGATE_NODE_FUNCTION(NAME, PARAMS, ACCESS)                    \
+    if (node->functions->NAME == NULL) {                                \
+        return simpleError(EINVAL);                                     \
+    } else {                                                            \
+        lockTaskLock(&node->lock);                                      \
+        CHECKED(canAccess(&node->stat, process, ACCESS), {              \
+            unlockTaskLock(&node->lock);                                \
+        });                                                             \
+        if ((ACCESS & VFS_ACCESS_W) != 0) {                             \
+            node->stat.mtime = getNanoseconds();                        \
+        }                                                               \
+        node->stat.atime = getNanoseconds();                            \
+        CHECKED(vfsSuperWriteNode(node), unlockTaskLock(&node->lock));  \
+        unlockTaskLock(&node->lock);                                    \
+        return node->functions->NAME PARAMS;                            \
     }
 
 Error vfsNodeReadAt(VfsNode* node, Process* process, VirtPtr buff, size_t offset, size_t length, size_t* read) {
@@ -69,10 +69,13 @@ Error vfsNodeLink(VfsNode* node, Process* process, const char* name, VfsNode* en
         CHECKED(canAccess(&node->stat, process, VFS_ACCESS_W | VFS_ACCESS_DIR), {
             unlockTaskLock(&node->lock);
         });
+        node->stat.mtime = getNanoseconds();
+        node->stat.atime = getNanoseconds();
+        CHECKED(vfsSuperWriteNode(node), unlockTaskLock(&node->lock));
         unlockTaskLock(&node->lock);
         lockTaskLock(&entry->lock);
         entry->stat.nlinks++;
-        CHECKED(vfsSuperWriteNode(node), unlockTaskLock(&entry->lock));
+        CHECKED(vfsSuperWriteNode(entry), unlockTaskLock(&entry->lock));
         unlockTaskLock(&entry->lock);
         return node->functions->link(node, name, entry);
     }

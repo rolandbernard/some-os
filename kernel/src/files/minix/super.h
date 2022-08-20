@@ -4,7 +4,7 @@
 #include "files/minix/types.h"
 #include "memory/virtptr.h"
 
-size_t offsetForINode(const Minix3Superblock* fs, uint32_t inode);
+size_t offsetForINode(const MinixVfsSuperblock* sb, uint32_t inode);
 
 size_t offsetForZone(size_t zone);
 

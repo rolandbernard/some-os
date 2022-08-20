@@ -3,6 +3,6 @@
 
 #include "files/minix/types.h"
 
-Error createMinixVfsNode(MinixVfsSuperblock* fs, uint32_t inode, MinixVfsNode** ret);
+MinixVfsNode* createMinixVfsNode(MinixVfsSuperblock* fs, uint32_t inode);
 
 #endif

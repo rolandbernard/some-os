@@ -49,14 +49,13 @@ typedef struct {
     VfsSuperblock base;
     Minix3Superblock superblock;
     VfsFile* block_device;
-    TaskLock lock;
     TaskLock maps_lock;
 } MinixVfsSuperblock;
 
 typedef struct {
     VfsNode base;
     TaskLock lock;
-    uint32_t inodenum;
+    uint32_t zones[10];
 } MinixVfsNode;
 
 #endif
