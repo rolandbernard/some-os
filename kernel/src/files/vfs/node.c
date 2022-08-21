@@ -9,12 +9,8 @@
     if (node->functions->NAME == NULL) {                                \
         return simpleError(EINVAL);                                     \
     } else {                                                            \
-        lockTaskLock(&node->real_node->lock);                           \
-        CHECKED(canAccess(&node->real_node->stat, process, ACCESS), {   \
-            unlockTaskLock(&node->real_node->lock);                     \
-        });                                                             \
         lockTaskLock(&node->lock);                                      \
-        unlockTaskLock(&node->real_node->lock);                         \
+        CHECKED(canAccess(node, process, ACCESS));                      \
         if ((ACCESS & VFS_ACCESS_W) != 0) {                             \
             node->stat.mtime = getNanoseconds();                        \
         }                                                               \
@@ -78,9 +74,7 @@ Error vfsNodeLink(VfsNode* node, Process* process, const char* name, VfsNode* en
         return simpleError(EINVAL);
     } else {
         lockTaskLock(&node->lock);
-        CHECKED(canAccess(&node->stat, process, VFS_ACCESS_W | VFS_ACCESS_DIR), {
-            unlockTaskLock(&node->lock);
-        });
+        CHECKED(canAccess(node, process, VFS_ACCESS_W | VFS_ACCESS_DIR));
         node->stat.mtime = getNanoseconds();
         node->stat.atime = getNanoseconds();
         CHECKED(vfsSuperWriteNode(node), unlockTaskLock(&node->lock));

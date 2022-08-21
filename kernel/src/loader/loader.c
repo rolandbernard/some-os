@@ -6,7 +6,8 @@
 
 #include "files/process.h"
 #include "files/syscall.h"
-#include "files/vfs.h"
+#include "files/vfs/fs.h"
+#include "files/vfs/file.h"
 #include "loader/elf.h"
 #include "memory/kalloc.h"
 #include "memory/pagetable.h"
@@ -73,16 +74,16 @@ static uintptr_t findStartBrk(MemorySpace* memspc) {
 
 Error loadProgramInto(Task* task, const char* path, VirtPtr args, VirtPtr envs) {
     VfsFile* file;
-    CHECKED(vfsOpen(&global_file_system, task->process, path, VFS_OPEN_EXECUTE, 0, &file));
+    CHECKED(vfsOpenAt(&global_file_system, task->process, NULL, path, VFS_OPEN_EXECUTE, 0, &file));
     VfsStat stat;
-    CHECKED(file->functions->stat(file, task->process, virtPtrForKernel(&stat)), file->functions->free(file));
+    CHECKED(vfsFileStat(file, task->process, virtPtrForKernel(&stat)), vfsFileClose(file));
     MemorySpace* memory = createMemorySpace();
     uintptr_t entry;
     CHECKED(loadProgramFromElfFile(memory, file, &entry), {
         deallocMemorySpace(memory);
-        file->functions->free(file);
+        vfsFileClose(file);
     });
-    file->functions->free(file);
+    vfsFileClose(file);
     // Find the start_brk in the memory
     uintptr_t start_brk = findStartBrk(memory);
     // Allocate stack
@@ -123,7 +124,7 @@ Error loadProgramInto(Task* task, const char* path, VirtPtr args, VirtPtr envs) 
 SyscallReturn execveSyscall(TrapFrame* frame) {
     assert(frame->hart != NULL);
     Task* task = (Task*)frame;
-    char* string = copyPathFromSyscallArgs(task, SYSCALL_ARG(0));
+    char* string = copyStringFromSyscallArgs(task, SYSCALL_ARG(0));
     if (string != NULL) {
         moveTaskToState(task, WAITING);
         Error e = loadProgramInto(task, string, virtPtrForTask(SYSCALL_ARG(1), task), virtPtrForTask(SYSCALL_ARG(2), task));

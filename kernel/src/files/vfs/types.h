@@ -43,10 +43,6 @@ typedef enum {
     VFS_OPEN_WRONLY = (1 << 11),
 } VfsOpenFlags;
 
-typedef enum {
-    VFS_UNLINK_REMOVEDIR = (1 << 0),
-} VfsUnlinkFlags;
-
 #define OPEN_ACCESS(open_flags) ((open_flags >> 3) & 0b11111)
 
 typedef enum {

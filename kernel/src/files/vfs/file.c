@@ -74,7 +74,7 @@ Error vfsFileChmod(VfsFile* file, Process* process, VfsMode mode) {
     // chmod and chown should use the real node.
     VfsNode* node = file->node->real_node;
     lockTaskLock(&node->lock);
-    CHECKED(canAccess(&node->stat, process, VFS_ACCESS_CHMOD), {
+    CHECKED(canAccess(node, process, VFS_ACCESS_CHMOD), {
         unlockTaskLock(&node->lock);
     });
     node->stat.mode &= VFS_MODE_TYPE;
@@ -87,6 +87,9 @@ Error vfsFileChmod(VfsFile* file, Process* process, VfsMode mode) {
 Error vfsFileChown(VfsFile* file, Process* process, Uid uid, Gid gid) {
     VfsNode* node = file->node->real_node;
     lockTaskLock(&node->lock);
+    CHECKED(canAccess(node, process, VFS_ACCESS_CHOWN), {
+        unlockTaskLock(&node->lock);
+    });
     node->stat.uid = uid;
     node->stat.gid = gid;
     Error err = vfsSuperWriteNode(node);

@@ -4,7 +4,7 @@
 #include "process/types.h"
 #include "interrupt/syscall.h"
 #include "memory/virtptr.h"
-#include "files/vfs.h"
+#include "files/vfs/types.h"
 
 #define USER_STACK_TOP (1UL << 38)
 #define USER_STACK_SIZE (1UL << 19)

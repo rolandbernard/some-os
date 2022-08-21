@@ -6,7 +6,7 @@
 #include "memory/kalloc.h"
 #include "memory/pagealloc.h"
 #include "memory/pagetable.h"
-#include "files/vfs.h"
+#include "files/vfs/file.h"
 #include "util/util.h"
 #include "error/log.h"
 
@@ -74,7 +74,7 @@ static Error loadProgramSegment(PageTable* table, VfsFile* file, ElfProgramHeade
             size_t size = umin(header->memsz, header->filesz);
             size_t read;
             // Using an unsafeVirtPtr here because we might not have write permissions
-            CHECKED(vfsReadAt(file, NULL, unsafeVirtPtrFor(header->vaddr, table), size, header->off, &read));
+            CHECKED(vfsFileReadAt(file, NULL, unsafeVirtPtrFor(header->vaddr, table), size, header->off, &read));
             if (read != size) {
                 return simpleError(EIO);
             } else {
@@ -91,7 +91,7 @@ static Error loadProgramSegment(PageTable* table, VfsFile* file, ElfProgramHeade
 Error loadProgramFromElfFile(PageTable* table, VfsFile* file, uintptr_t* entry) {
     ElfHeader header;
     size_t read;
-    CHECKED(vfsReadAt(file, NULL, virtPtrForKernel(&header), sizeof(ElfHeader), 0, &read));
+    CHECKED(vfsFileReadAt(file, NULL, virtPtrForKernel(&header), sizeof(ElfHeader), 0, &read));
     if (read != sizeof(ElfHeader)) {
         return simpleError(EIO);
     } else if (
@@ -104,7 +104,7 @@ Error loadProgramFromElfFile(PageTable* table, VfsFile* file, uintptr_t* entry) 
         return simpleError(ENOEXEC);
     } else {
         ElfProgramHeader* prog_headers = kalloc(header.phnum * sizeof(ElfProgramHeader));
-        CHECKED(vfsReadAt(
+        CHECKED(vfsFileReadAt(
             file, NULL, virtPtrForKernel(prog_headers), header.phnum * sizeof(ElfProgramHeader), header.phoff, &read
         ), dealloc(prog_headers));
         if (read != sizeof(ElfProgramHeader) * header.phnum) {

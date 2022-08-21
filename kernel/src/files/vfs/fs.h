@@ -10,7 +10,7 @@ Error vfsOpenAt(VirtualFilesystem* fs, Process* process, VfsFile* file, const ch
 
 Error vfsMknodAt(VirtualFilesystem* fs, Process* process, VfsFile* file, const char* path, VfsMode mode, DeviceId id);
 
-Error vfsUnlinkAt(VirtualFilesystem* fs, Process* process, VfsFile* file, const char* path, VfsUnlinkFlags flags);
+Error vfsUnlinkAt(VirtualFilesystem* fs, Process* process, VfsFile* file, const char* path);
 
 Error vfsLinkAt(VirtualFilesystem* fs, Process* process, VfsFile* old_file, const char* old, VfsFile* new_file, const char* new);
 
@@ -20,6 +20,6 @@ Error vfsUmount(VirtualFilesystem* fs, Process* process, const char* path);
 
 Error vfsCreateSuperblock(VirtualFilesystem* fs, Process* process, const char* path, const char* type, VirtPtr data, VfsSuperblock** ret);
 
-Error canAccess(VfsStat* stat, struct Process_s* process, VfsAccessFlags flags);
+Error canAccess(VfsNode* node, struct Process_s* process, VfsAccessFlags flags);
 
 #endif

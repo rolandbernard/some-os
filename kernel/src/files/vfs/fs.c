@@ -188,11 +188,11 @@ static Error vfsLookupNodeAt(
         size_t path_length = strlen(path);
         if (file == NULL) {
             assert(process != NULL);
-            lockTaskLock(&process->resources.lock);
+            lockSpinLock(&process->resources.lock);
             cwd_length = strlen(process->resources.cwd);
             absolute_path = kalloc(cwd_length + path_length + 2);
             memcpy(absolute_path, process->resources.cwd, cwd_length);
-            unlockTaskLock(&process->resources.lock);
+            unlockSpinLock(&process->resources.lock);
         } else if (file->path != NULL) {
             cwd_length = strlen(file->path);
             absolute_path = kalloc(cwd_length + path_length + 2);
@@ -287,7 +287,7 @@ static VfsFile* vfsCreateFile(VfsNode* node, char* path, size_t offset) {
 }
 
 static Error vfsOpenNode(Process* process, VfsNode* node, char* path, VfsOpenFlags flags, VfsFile** ret) {
-    CHECKED(canAccess(&node->stat, process, OPEN_ACCESS(flags)), {
+    CHECKED(canAccess(node, process, OPEN_ACCESS(flags)), {
         vfsNodeClose(node);
         dealloc(path);
     });
@@ -410,7 +410,7 @@ Error vfsUnlinkFrom(Process* process, VfsNode* parent, const char* filename, Vfs
     }
 }
 
-Error vfsUnlinkAt(VirtualFilesystem* fs, Process* process, VfsFile* file, const char* path, VfsUnlinkFlags flags) {
+Error vfsUnlinkAt(VirtualFilesystem* fs, Process* process, VfsFile* file, const char* path) {
     VfsNode* parent;
     CHECKED(vfsLookupNodeAt(fs, process, file, path, VFS_LOOKUP_PARENT, &parent, NULL));
     const char* filename = getBaseFilename(path);
@@ -501,7 +501,7 @@ Error vfsCreateSuperblock(
     }
 }
 
-Error canAccess(VfsStat* stat, struct Process_s* process, VfsAccessFlags flags) {
+static Error basicCanAccess(VfsStat* stat, struct Process_s* process, VfsAccessFlags flags) {
     if (process == NULL || process->resources.uid == 0) {
         // Kernel or uid 0 are allowed to do everything
         return simpleError(SUCCESS);
@@ -534,6 +534,19 @@ Error canAccess(VfsStat* stat, struct Process_s* process, VfsAccessFlags flags) 
         return simpleError(ENOTDIR);
     } else {
         return simpleError(SUCCESS);
+    }
+}
+
+Error canAccess(VfsNode* node, struct Process_s* process, VfsAccessFlags flags) {
+    if (process == NULL) {
+        return simpleError(SUCCESS);
+    } else {
+        lockTaskLock(&node->lock);
+        lockSpinLock(&process->resources.lock);
+        Error err = basicCanAccess(&node->stat, process, flags);
+        unlockSpinLock(&process->resources.lock);
+        unlockTaskLock(&node->lock);
+        return err;
     }
 }
 

@@ -45,10 +45,10 @@ Error initVirtIOBlockDevice(int id, volatile VirtIODeviceLayout* base, VirtIODev
 }
 
 Error virtIOBlockDeviceOperation(VirtIOBlockDevice* device, VirtPtr buffer, size_t offset, size_t size, bool write) {
-    assert(size % BLOCK_SECTOR_SIZE == 0);
-    assert(offset % BLOCK_SECTOR_SIZE == 0);
     if (write && device->read_only) {
         return someError(EINVAL, "Read-only device write attempt");
+    } else if (size % BLOCK_SECTOR_SIZE != 0 || offset % BLOCK_SECTOR_SIZE != 0) {
+        return someError(EINVAL, "Misaligned block device io attempt");
     }
     VirtIOBlockRequest request;
     request.wakeup = getCurrentTask();
