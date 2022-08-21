@@ -32,12 +32,17 @@ Error vfsSuperReadNode(VfsSuperblock* sb, size_t id, VfsNode** ret) {
 }
 
 Error vfsSuperWriteNode(VfsNode* write) {
-    lockTaskLock(&write->lock);
-    write->stat.ctime = getNanoseconds();
-    // This could also just be marked dirty and written only when closing the node.
-    Error err = write->superblock->functions->write_node(write->superblock, write);
-    unlockTaskLock(&write->lock);
-    return err;
+    if (write->superblock == NULL) {
+        // This is not a real node.
+        return simpleError(SUCCESS);
+    } else {
+        lockTaskLock(&write->lock);
+        write->stat.ctime = getNanoseconds();
+        // This could also just be marked dirty and written only when closing the node.
+        Error err = write->superblock->functions->write_node(write->superblock, write);
+        unlockTaskLock(&write->lock);
+        return err;
+    }
 }
 
 Error vfsSuperNewNode(VfsSuperblock* sb, VfsNode** ret) {
@@ -47,34 +52,54 @@ Error vfsSuperNewNode(VfsSuperblock* sb, VfsNode** ret) {
 }
 
 Error vfsSuperFreeNode(VfsNode* node) {
+    assert(node->superblock != NULL);
     CHECKED(vfsNodeTrunc(node, NULL, 0));
     return node->superblock->functions->free_node(node->superblock, node);
 }
 
 Error vfsSuperCopyNode(VfsNode* node) {
-    vfsCacheCopyNode(&node->superblock->nodes, node);
-    return simpleError(SUCCESS);
+    if (node->superblock == NULL) {
+        lockTaskLock(&node->lock);
+        node->ref_count++;
+        unlockTaskLock(&node->lock);
+        return simpleError(SUCCESS);
+    } else {
+        vfsCacheCopyNode(&node->superblock->nodes, node);
+        return simpleError(SUCCESS);
+    }
 }
 
 Error vfsSuperCloseNode(VfsNode* node) {
-    vfsCacheCloseNode(&node->superblock->nodes, node);
-    VfsSuperblock* sb = node->superblock;
-    if (node->ref_count == 0) {
-        if (sb->root_node == node) {
-            // The root node is special. We never totally remove it until we close the superblock.
-            // Still dereference the superblock, this might trigger freeing everything.
-            vfsSuperClose(sb);
-        } else {
-            // If ref_count is 0 it was removed from the cache. We can free it.
-            if (node->stat.nlinks == 0) {
-                // There are no other links to this node, we should free the data.
-                CHECKED(vfsSuperFreeNode(node));
-            }
+    if (node->superblock == NULL) {
+        lockTaskLock(&node->lock);
+        node->ref_count--;
+        if (node->ref_count == 0) {
+            unlockTaskLock(&node->lock);
             node->functions->free(node);
-            vfsSuperClose(sb);
+        } else {
+            unlockTaskLock(&node->lock);
         }
+        return simpleError(SUCCESS);
+    } else {
+        vfsCacheCloseNode(&node->superblock->nodes, node);
+        VfsSuperblock* sb = node->superblock;
+        if (node->ref_count == 0) {
+            if (sb->root_node == node) {
+                // The root node is special. We never totally remove it until we close the superblock.
+                // Still dereference the superblock, this might trigger freeing everything.
+                vfsSuperClose(sb);
+            } else {
+                // If ref_count is 0 it was removed from the cache. We can free it.
+                if (node->stat.nlinks == 0) {
+                    // There are no other links to this node, we should free the data.
+                    CHECKED(vfsSuperFreeNode(node));
+                }
+                node->functions->free(node);
+                vfsSuperClose(sb);
+            }
+        }
+        return simpleError(SUCCESS);
     }
-    return simpleError(SUCCESS);
 }
 
 void vfsSuperCopy(VfsSuperblock* sb) {

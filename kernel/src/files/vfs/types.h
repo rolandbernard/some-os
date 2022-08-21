@@ -181,6 +181,7 @@ typedef struct VfsNode_s {
     size_t ref_count;
     TaskLock lock;
     VfsSuperblock* mounted; // If a filesystem is mounted at this node, this is not NULL.
+    struct VfsNode_s* real_node; // node->real_node != node if node is a special file node (pipe/fifo/block/tty).
 } VfsNode;
 
 struct PipeSharedData_s;
@@ -190,6 +191,7 @@ typedef struct VfsFile_s {
     char* path;
     size_t ref_count;
     size_t offset;
+    VfsFileDescFlags flags;
     TaskLock lock;
 } VfsFile;
 

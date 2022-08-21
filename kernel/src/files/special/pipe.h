@@ -30,6 +30,8 @@ typedef struct PipeSharedData_s {
 
 PipeSharedData* createPipeSharedData();
 
+void freePipeSharedData(PipeSharedData* data);
+
 Error executePipeOperation(PipeSharedData* data, Process* process, VirtPtr buffer, size_t size, bool write, size_t* ret);
 
 VfsFile* createPipeFile();

@@ -13,6 +13,8 @@ static void handleInterrupt(ExternalInterrupt id, void* udata) {
 }
 
 Error initVirtIOBlockDevice(int id, volatile VirtIODeviceLayout* base, VirtIODevice** output) {
+    VirtIOBlockDeviceLayout* mmio = (VirtIOBlockDeviceLayout*)base;
+    assert(mmio->config.blk_size == BLOCK_SECTOR_SIZE); // TODO: actually use the data in mmio->config?
     VirtIOBlockDevice* device = zalloc(sizeof(VirtIOBlockDevice));
     assert(device != NULL);
     device->virtio.type = base->device_id;
@@ -134,7 +136,9 @@ static BlockDeviceFunctions funcs = {
 
 Error registerVirtIOBlockDevice(VirtIOBlockDevice* dev) {
     VirtIORegisteredBlockDevice* reg = kalloc(sizeof(VirtIORegisteredBlockDevice));
+    VirtIOBlockDeviceLayout* mmio = (VirtIOBlockDeviceLayout*)dev->virtio.mmio;
     reg->base.block_size = BLOCK_SECTOR_SIZE;
+    reg->base.size = mmio->config.capacity * BLOCK_SECTOR_SIZE;
     reg->base.base.type = DEVICE_BLOCK;
     reg->base.functions = &funcs;
     reg->virtio_device = dev;

@@ -61,7 +61,7 @@ Error vfsFileWriteAt(VfsFile* file, Process* process, VirtPtr buffer, size_t off
 
 Error vfsFileStat(VfsFile* file, Process* process, VirtPtr ret) {
     lockTaskLock(&file->node->lock);
-    memcpyBetweenVirtPtr(ret, virtPtrForKernel(&file->node->stat), sizeof(VfsStat));
+    memcpyBetweenVirtPtr(ret, virtPtrForKernel(&file->node->real_node->stat), sizeof(VfsStat));
     unlockTaskLock(&file->node->lock);
     return simpleError(SUCCESS);
 }
@@ -71,23 +71,26 @@ Error vfsFileTrunc(VfsFile* file, Process* process, size_t size) {
 }
 
 Error vfsFileChmod(VfsFile* file, Process* process, VfsMode mode) {
-    lockTaskLock(&file->node->lock);
-    CHECKED(canAccess(&file->node->stat, process, VFS_ACCESS_CHMOD), {
-        unlockTaskLock(&file->node->lock);
+    // chmod and chown should use the real node.
+    VfsNode* node = file->node->real_node;
+    lockTaskLock(&node->lock);
+    CHECKED(canAccess(&node->stat, process, VFS_ACCESS_CHMOD), {
+        unlockTaskLock(&node->lock);
     });
-    file->node->stat.mode &= VFS_MODE_TYPE;
-    file->node->stat.mode |= mode & ~VFS_MODE_TYPE; // We don't allow changing the type
-    Error err = vfsSuperWriteNode(file->node);
-    unlockTaskLock(&file->node->lock);
+    node->stat.mode &= VFS_MODE_TYPE;
+    node->stat.mode |= mode & ~VFS_MODE_TYPE; // We don't allow changing the type
+    Error err = vfsSuperWriteNode(node);
+    unlockTaskLock(&node->lock);
     return err;
 }
 
 Error vfsFileChown(VfsFile* file, Process* process, Uid uid, Gid gid) {
-    lockTaskLock(&file->node->lock);
-    file->node->stat.uid = uid;
-    file->node->stat.gid = gid;
-    Error err = vfsSuperWriteNode(file->node);
-    unlockTaskLock(&file->node->lock);
+    VfsNode* node = file->node->real_node;
+    lockTaskLock(&node->lock);
+    node->stat.uid = uid;
+    node->stat.gid = gid;
+    Error err = vfsSuperWriteNode(node);
+    unlockTaskLock(&node->lock);
     return err;
 }
 

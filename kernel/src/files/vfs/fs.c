@@ -193,10 +193,12 @@ static Error vfsLookupNodeAt(
             absolute_path = kalloc(cwd_length + path_length + 2);
             memcpy(absolute_path, process->resources.cwd, cwd_length);
             unlockTaskLock(&process->resources.lock);
-        } else {
+        } else if (file->path != NULL) {
             cwd_length = strlen(file->path);
             absolute_path = kalloc(cwd_length + path_length + 2);
             memcpy(absolute_path, file->path, cwd_length);
+        } else {
+            return simpleError(EINVAL);
         }
         absolute_path[cwd_length] = '/';
         memcpy(absolute_path + cwd_length + 1, path, path_length);
@@ -275,9 +277,11 @@ static Error vfsCreateNewNode(
 static VfsFile* vfsCreateFile(VfsNode* node, char* path, size_t offset) {
     VfsFile* file = kalloc(sizeof(VfsFile));
     file->node = node;
+    file->node->real_node = node;
     file->path = path;
     file->ref_count = 1;
     file->offset = offset;
+    file->flags = 0;
     initTaskLock(&file->lock);
     return file;
 }
@@ -294,7 +298,7 @@ static Error vfsOpenNode(Process* process, VfsNode* node, char* path, VfsOpenFla
         Device* device = getDeviceWithId(node->stat.rdev);
         if (device != NULL && device->type == DEVICE_BLOCK && MODE_TYPE(node->stat.mode) == VFS_TYPE_BLOCK) {
             BlockDevice* dev = (BlockDevice*)device;
-            *ret = createBlockDeviceFile(node, dev, path, (flags & VFS_OPEN_APPEND) != 0 ? node->stat.size : 0);
+            *ret = createBlockDeviceFile(node, dev, path, (flags & VFS_OPEN_APPEND) != 0 ? dev->size : 0);
             return simpleError(SUCCESS);
         } else if (device != NULL && device->type == DEVICE_BLOCK && MODE_TYPE(node->stat.mode) == VFS_TYPE_CHAR) {
             TtyDevice* dev = (TtyDevice*)device;
@@ -375,7 +379,8 @@ static Error vfsRemoveDirectoryDotAndDotDot(Process* process, VfsNode* parent, V
     size_t tmp_size = 0;
     VfsDirectoryEntry* entry = kalloc(max_size + 3);
     do {
-        CHECKED(vfsNodeReaddirAt(dir, process, virtPtrForKernel(entry), offset, max_size, &tmp_size), dealloc(entry));
+        size_t vfs_size = 0;
+        CHECKED(vfsNodeReaddirAt(dir, process, virtPtrForKernel(entry), offset, max_size, &tmp_size, &vfs_size), dealloc(entry));
         if (entry->len > max_size || (strcmp(entry->name, ".") != 0 && strcmp(entry->name, "..") != 0)) {
             dealloc(entry);
             return simpleError(EEXIST);

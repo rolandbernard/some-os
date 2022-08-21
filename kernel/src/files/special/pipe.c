@@ -109,73 +109,6 @@ Error executePipeOperation(PipeSharedData* data, Process* process, VirtPtr buffe
     return simpleError(SUCCESS);
 }
 
-static Error pipeReadFunction(PipeFile* file, Process* process, VirtPtr buffer, size_t size, size_t* ret) {
-    return executePipeOperation(file->data, process, buffer, size, false, ret);
-}
-
-static Error pipeWriteFunction(PipeFile* file, Process* process, VirtPtr buffer, size_t size, size_t* ret) {
-    return executePipeOperation(file->data, process, buffer, size, true, ret);
-}
-
-static Error pipeStatFunction(PipeFile* file, Process* process, VirtPtr stat) {
-    VfsStat ret = {
-        .id = file->base.ino,
-        .mode = TYPE_MODE(VFS_TYPE_CHAR) | VFS_MODE_OGA_RW,
-        .nlinks = file->data->ref_count,
-        .uid = file->base.uid,
-        .gid = file->base.gid,
-        .size = file->data->count,
-        .block_size = 0,
-        .st_atime = getNanoseconds(),
-        .st_mtime = getNanoseconds(),
-        .st_ctime = getNanoseconds(),
-        .dev = 0,
-    };
-    memcpyBetweenVirtPtr(stat, virtPtrForKernel(&ret), sizeof(VfsStat));
-    return simpleError(SUCCESS);
-}
-
-static void pipeFreeFunction(PipeFile* file) {
-    TrapFrame* lock = criticalEnter();
-    lockSpinLock(&file->data->lock);
-    file->data->ref_count--;
-    if (file->data->ref_count == 0) {
-        unlockSpinLock(&file->data->lock);
-        dealloc(file->data->buffer);
-        dealloc(file->data);
-    } else {
-        unlockSpinLock(&file->data->lock);
-    }
-    dealloc(file);
-    criticalReturn(lock);
-}
-
-PipeFile* duplicatePipeFile(PipeFile* file) {
-    if (file != NULL) {
-        lockSpinLock(&file->data->lock);
-        file->data->ref_count++;
-        unlockSpinLock(&file->data->lock);
-        PipeFile* copy = kalloc(sizeof(PipeFile));
-        memcpy(copy, file, sizeof(PipeFile));
-        return copy;
-    } else {
-        return NULL;
-    }
-}
-
-static Error pipeCopyFunction(PipeFile* file, Process* process, VfsFile** ret) {
-    *ret = (VfsFile*)duplicatePipeFile(file);
-    return simpleError(SUCCESS);
-}
-
-static const VfsFileVtable functions = {
-    .read = (ReadFunction)pipeReadFunction,
-    .write = (WriteFunction)pipeWriteFunction,
-    .stat = (StatFunction)pipeStatFunction,
-    .free = (FileFreeFunction)pipeFreeFunction,
-    .copy = (CopyFunction)pipeCopyFunction,
-};
-
 PipeSharedData* createPipeSharedData() {
     PipeSharedData* data = zalloc(sizeof(PipeSharedData));
     data->ref_count = 1;
@@ -183,17 +116,36 @@ PipeSharedData* createPipeSharedData() {
     return data;
 }
 
-PipeFile* createPipeFile() {
-    PipeFile* file = zalloc(sizeof(PipeFile));
-    if (file != NULL) {
-        file->base.functions = &functions;
-        file->base.ino = 0;
-        file->data = createPipeSharedData();
-        if (file->data == NULL) {
-            dealloc(file);
-            file = NULL;
-        }
+void freePipeSharedData(PipeSharedData* data) {
+    lockSpinLock(&data->lock);
+    data->ref_count--;
+    if (data->ref_count == 0) {
+        unlockSpinLock(&data->lock);
+        dealloc(data->buffer);
+        dealloc(data);
+    } else {
+        unlockSpinLock(&data->lock);
     }
+}
+
+typedef struct {
+    VfsNode base;
+    PipeSharedData* data;
+} VfsPipeNode;
+
+VfsPipeNode* createPipeNode() {
+    // TODO
+    return NULL;
+}
+
+VfsFile* createPipeFile() {
+    VfsFile* file = kalloc(sizeof(VfsFile));
+    file->node = (VfsNode*)createPipeNode();
+    file->path = NULL;
+    file->ref_count = 1;
+    file->offset = 0;
+    file->flags = 0;
+    initTaskLock(&file->lock);
     return file;
 }
 

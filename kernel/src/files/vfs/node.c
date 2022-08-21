@@ -9,10 +9,12 @@
     if (node->functions->NAME == NULL) {                                \
         return simpleError(EINVAL);                                     \
     } else {                                                            \
-        lockTaskLock(&node->lock);                                      \
-        CHECKED(canAccess(&node->stat, process, ACCESS), {              \
-            unlockTaskLock(&node->lock);                                \
+        lockTaskLock(&node->real_node->lock);                           \
+        CHECKED(canAccess(&node->real_node->stat, process, ACCESS), {   \
+            unlockTaskLock(&node->real_node->lock);                     \
         });                                                             \
+        lockTaskLock(&node->lock);                                      \
+        unlockTaskLock(&node->real_node->lock);                         \
         if ((ACCESS & VFS_ACCESS_W) != 0) {                             \
             node->stat.mtime = getNanoseconds();                        \
         }                                                               \
@@ -53,16 +55,26 @@ static Error vfsNodeBasicUnlink(VfsNode* node, Process* process, const char* nam
 }
 
 Error vfsNodeUnlink(VfsNode* node, Process* process, const char* name, VfsNode* entry) {
-    CHECKED(vfsNodeBasicUnlink(node, process, name));
-    lockTaskLock(&entry->lock);
-    entry->stat.nlinks -= 1;
-    Error err = vfsSuperWriteNode(entry);
-    unlockTaskLock(&node->lock);
-    return err;
+    // For link and unlink, we should consider the real node for special files.
+    // node can't be a special file (as that will give an EXDEV error).
+    entry = entry->real_node;
+    if (node->superblock != entry->superblock) {
+        return simpleError(EXDEV);
+    } else {
+        CHECKED(vfsNodeBasicUnlink(node, process, name));
+        lockTaskLock(&entry->lock);
+        entry->stat.nlinks -= 1;
+        Error err = vfsSuperWriteNode(entry);
+        unlockTaskLock(&node->lock);
+        return err;
+    }
 }
 
 Error vfsNodeLink(VfsNode* node, Process* process, const char* name, VfsNode* entry) {
-    if (node->functions->link == NULL) {
+    entry = entry->real_node;
+    if (node->superblock != entry->superblock) {
+        return simpleError(EXDEV);
+    } else if (node->functions->link == NULL) {
         return simpleError(EINVAL);
     } else {
         lockTaskLock(&node->lock);

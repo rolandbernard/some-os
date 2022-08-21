@@ -30,6 +30,7 @@ typedef struct BlockDevice_s {
     Device base;
     BlockDeviceFunctions* functions;
     size_t block_size;
+    size_t size;
 } BlockDevice;
 
 struct TtyDevice_s;
