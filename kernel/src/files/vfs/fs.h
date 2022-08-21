@@ -6,6 +6,8 @@
 
 extern VirtualFilesystem global_file_system;
 
+Error vfsInit(VirtualFilesystem* fs);
+
 Error vfsOpenAt(VirtualFilesystem* fs, Process* process, VfsFile* file, const char* path, VfsOpenFlags flags, VfsMode mode, VfsFile** ret);
 
 Error vfsMknodAt(VirtualFilesystem* fs, Process* process, VfsFile* file, const char* path, VfsMode mode, DeviceId id);

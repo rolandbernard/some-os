@@ -1,7 +1,6 @@
 
 #include "devices/devices.h"
 
-#include "devices/devfs.h"
 #include "devices/serial/uart16550.h"
 #include "devices/virtio/block.h"
 #include "devices/virtio/virtio.h"
@@ -63,11 +62,5 @@ Device* getDeviceOfType(DeviceType type, DeviceId id) {
 
 TtyDevice* getDefaultTtyDevice() {
     return (TtyDevice*)getDeviceOfType(DEVICE_TTY, 0);
-}
-
-Error mountDeviceFiles() {
-    CHECKED(mountFilesystem(&global_file_system, (VfsFilesystem*)createDeviceFilesystem(), "/dev"))
-    KERNEL_SUBSUCCESS("Mounted device filesystem at /dev");
-    return simpleError(SUCCESS);
 }
 

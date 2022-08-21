@@ -6,6 +6,7 @@
 
 #include "devices/devices.h"
 #include "error/log.h"
+#include "files/vfs/fs.h"
 #include "interrupt/com.h"
 #include "interrupt/syscall.h"
 #include "interrupt/trap.h"
@@ -19,9 +20,8 @@ void kernelMain();
 void testingCode();
 
 void kernelInit() {
-    Error status;
     // Initialize baseline devices
-    status = initBaselineDevices();
+    Error status = initBaselineDevices();
     if (isError(status)) {
         KERNEL_ERROR("Failed to initialize baseline devices: %s", getErrorMessage(status));
         panic();
@@ -47,9 +47,8 @@ void kernelInit() {
 }
 
 void kernelMain() {
-    Error status;
     // Initialize devices
-    status = initDevices();
+    Error status = initDevices();
     if (isError(status)) {
         KERNEL_ERROR("Failed to initialize devices: %s", getErrorMessage(status));
         panic();
@@ -57,16 +56,23 @@ void kernelMain() {
         KERNEL_SUCCESS("Devices initialized");
     }
     // Initialize virtual filesystem
-    status = initVirtualFileSystem();
+    status = vfsInit(&global_file_system);
     if (isError(status)) {
         KERNEL_ERROR("Failed to initialize filesystem: %s", getErrorMessage(status));
         panic();
     } else {
         KERNEL_SUCCESS("Filesystem initialized");
     }
-    int res;
-    // Mount filesystem
-    res = syscall(SYSCALL_MOUNT, "/dev/blk0", "/", "minix", NULL); // Mount root filesystem
+    // Mount device filesystem
+    int res = syscall(SYSCALL_MOUNT, NULL, "/dev", "dev", NULL);
+    if (isError(status)) {
+        KERNEL_ERROR("Failed to mount device filesystem: %s", getErrorKindMessage(-res));
+        panic();
+    } else {
+        KERNEL_SUCCESS("Mounted device filesystem at /dev");
+    }
+    // Mount root filesystem
+    res = syscall(SYSCALL_MOUNT, "/dev/blk0", "/", "minix", NULL);
     if (res < 0) {
         KERNEL_ERROR("Failed to mount root filesystem: %s", getErrorKindMessage(-res));
         panic();

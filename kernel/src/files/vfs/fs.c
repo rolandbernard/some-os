@@ -4,6 +4,8 @@
 
 #include "files/vfs/fs.h"
 
+#include "devices/devfs.h"
+#include "files/minix/super.h"
 #include "files/path.h"
 #include "files/special/blkfile.h"
 #include "files/special/fifo.h"
@@ -12,7 +14,6 @@
 #include "files/vfs/file.h"
 #include "files/vfs/node.h"
 #include "files/vfs/super.h"
-#include "files/minix/super.h"
 #include "kernel/time.h"
 #include "memory/kalloc.h"
 #include "util/util.h"
@@ -147,6 +148,7 @@ static Error vfsLookupNode(
 static Error vfsLookupNodeAtExactAbs(
     VirtualFilesystem* fs, Process* process, const char* path, VfsLookupFlags flags, VfsNode** ret, char** real_path
 ) {
+    // TODO: tmp mounts
     lockTaskLock(&fs->lock);
     VfsSuperblock* root_mount = fs->root_mounted;
     if (root_mount != NULL) {
@@ -449,54 +451,84 @@ Error vfsLinkAt(VirtualFilesystem* fs, Process* process, VfsFile* old_file, cons
 }
 
 Error vfsMount(VirtualFilesystem* fs, Process* process, const char* path, VfsSuperblock* sb) {
-    VfsNode* node;
-    CHECKED(vfsLookupNodeAt(fs, process, NULL, path, VFS_LOOKUP_NORMAL, &node, NULL));
-    lockTaskLock(&node->lock);
-    if (node->mounted != NULL) {
-        unlockTaskLock(&node->lock);
-        vfsNodeClose(node);
-        return simpleError(EINVAL);
-    } else if (MODE_TYPE(node->stat.mode) != VFS_TYPE_DIR) {
-        unlockTaskLock(&node->lock);
-        vfsNodeClose(node);
-        return simpleError(ENOTDIR);
+    lockTaskLock(&fs->lock);
+    if (fs->root_mounted == NULL) {
+        char* path_copy = stringClone(path);
+        inlineReducePath(path_copy);
+        if (strcmp(path_copy, "/") == 0) {
+            fs->root_mounted = sb;
+            while (fs->tmp_mounted != NULL) {
+                // TODO: tmp mounts
+            }
+            unlockTaskLock(&fs->lock);
+            return simpleError(SUCCESS);
+        } else {
+            // TODO: tmp mounts
+        }
     } else {
-        node->mounted = sb;
-        unlockTaskLock(&node->lock);
-        // We keep sb and node referenced until we unmount.
-        return simpleError(SUCCESS);
+        unlockTaskLock(&fs->lock);
+        VfsNode* node;
+        CHECKED(vfsLookupNodeAt(fs, process, NULL, path, VFS_LOOKUP_NORMAL, &node, NULL));
+        lockTaskLock(&node->lock);
+        if (node->mounted != NULL) {
+            unlockTaskLock(&node->lock);
+            vfsNodeClose(node);
+            return simpleError(EINVAL);
+        } else if (MODE_TYPE(node->stat.mode) != VFS_TYPE_DIR) {
+            unlockTaskLock(&node->lock);
+            vfsNodeClose(node);
+            return simpleError(ENOTDIR);
+        } else {
+            node->mounted = sb;
+            unlockTaskLock(&node->lock);
+            // We keep sb and node referenced until we unmount.
+            return simpleError(SUCCESS);
+        }
     }
 }
 
 Error vfsUmount(VirtualFilesystem* fs, Process* process, const char* path) {
-    VfsNode* node;
-    CHECKED(vfsLookupNodeAt(fs, process, NULL, path, VFS_LOOKUP_SKIPLASTMOUNT, &node, NULL));
-    lockTaskLock(&node->lock);
-    if (node->mounted == NULL) {
-        unlockTaskLock(&node->lock);
-        vfsNodeClose(node);
-        return simpleError(EINVAL);
-    } else {
-        vfsSuperClose(node->mounted);
-        node->mounted = NULL;
-        unlockTaskLock(&node->lock);
-        vfsNodeClose(node);
-        vfsNodeClose(node); // Close this two times, ones for this lookup and ones for the mount.
+    lockTaskLock(&fs->lock);
+    // TODO: tmp mounts
+    if (strcmp(path, "/") == 0 && fs->root_mounted != NULL && fs->root_mounted->root_node->mounted == NULL) {
+        VfsSuperblock* sb = fs->root_mounted;
+        fs->root_mounted = NULL;
+        unlockTaskLock(&fs->lock);
+        vfsSuperClose(sb);
         return simpleError(SUCCESS);
+    } else {
+        unlockTaskLock(&fs->lock);
+        VfsNode* node;
+        CHECKED(vfsLookupNodeAt(fs, process, NULL, path, VFS_LOOKUP_SKIPLASTMOUNT, &node, NULL));
+        lockTaskLock(&node->lock);
+        if (node->mounted == NULL) {
+            unlockTaskLock(&node->lock);
+            vfsNodeClose(node);
+            return simpleError(EINVAL);
+        } else {
+            vfsSuperClose(node->mounted);
+            node->mounted = NULL;
+            unlockTaskLock(&node->lock);
+            vfsNodeClose(node);
+            vfsNodeClose(node); // Close this two times, ones for this lookup and ones for the mount.
+            return simpleError(SUCCESS);
+        }
     }
 }
 
 Error vfsCreateSuperblock(
     VirtualFilesystem* fs, Process* process, const char* path, const char* type, VirtPtr data, VfsSuperblock** ret
 ) {
-    VfsFile* file;
-    CHECKED(vfsOpenAt(fs, process, NULL, path, VFS_OPEN_READ, 0, &file));
     if (strcmp(type, "minix") == 0) {
+        VfsFile* file;
+        CHECKED(vfsOpenAt(fs, process, NULL, path, VFS_OPEN_READ, 0, &file));
         Error err = createMinixVfsSuperblock(file, data, (MinixVfsSuperblock**)&ret);
         vfsFileClose(file);
         return err;
+    } else if (strcmp(type, "dev") == 0) {
+        *ret = (VfsSuperblock*)createDeviceFilesystem();
+        return simpleError(SUCCESS);
     } else {
-        vfsFileClose(file);
         return simpleError(EINVAL);
     }
 }
@@ -548,5 +580,13 @@ Error canAccess(VfsNode* node, struct Process_s* process, VfsAccessFlags flags) 
         unlockTaskLock(&node->lock);
         return err;
     }
+}
+
+VirtualFilesystem global_file_system;
+
+Error vfsInit(VirtualFilesystem* fs) {
+    initTaskLock(&fs->lock);
+    fs->root_mounted = NULL;
+    return simpleError(SUCCESS);
 }
 

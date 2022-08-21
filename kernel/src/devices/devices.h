@@ -65,6 +65,4 @@ Device* getDeviceOfType(DeviceType type, DeviceId id);
 // Get the device to be used for kernel input/output
 TtyDevice* getDefaultTtyDevice();
 
-Error mountDeviceFiles();
-
 #endif

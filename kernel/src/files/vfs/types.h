@@ -198,8 +198,15 @@ typedef struct VfsFileDescriptor_s {
     VfsFileDescFlags flags;
 } VfsFileDescriptor;
 
+typedef struct VfsTmpMounts_s {
+    struct VfsTmpMounts_s* next;
+    const char* prefix;
+    VfsSuperblock* mounted;
+} VfsTmpMounts;
+
 typedef struct {
     VfsSuperblock* root_mounted;
+    VfsTmpMounts* tmp_mounted;
     TaskLock lock;
 } VirtualFilesystem;
 
