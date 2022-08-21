@@ -3,6 +3,7 @@
 
 #include "files/special/fifo.h"
 
+#include "files/vfs/node.h"
 #include "memory/kalloc.h"
 #include "util/stringmap.h"
 
@@ -52,6 +53,7 @@ typedef struct {
 
 static void fifoNodeFree(VfsFifoNode* node) {
     decreaseReferenceFor(node->name);
+    vfsNodeClose(node->base.real_node);
     dealloc(node);
 }
 
