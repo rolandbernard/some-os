@@ -53,14 +53,15 @@ static VfsNode* vfsFollowMounts(VfsNode* curr, bool last_mountpoint) {
 }
 
 static Error vfsLookupNode(
-    Process* process, VfsNode* curr, const char* path, VfsLookupFlags flags, VfsNode** ret, char** real_path
+    Process* process, VfsNode* curr, const char* path, VfsLookupFlags flags, VfsNode** ret, const char* prefix, char** real_path
 ) {
     Error err = simpleError(SUCCESS);
     vfsNodeCopy(curr);
     size_t dirs_capacity = 64;
     size_t dirs_count = 1;
     VfsNode** dirs = kalloc(dirs_capacity * sizeof(VfsNode*));
-    const char** segs = real_path != NULL ? kalloc(dirs_capacity * sizeof(const char*)) : NULL;
+    const char** segs = real_path != NULL && prefix != NULL
+        ? kalloc(dirs_capacity * sizeof(const char*)) : NULL;
     dirs[0] = curr;
     vfsNodeCopy(curr);
     char* path_clone = stringClone(path);
@@ -81,6 +82,13 @@ static Error vfsLookupNode(
         while (segments[0] == '/') {
             segments++;
         }
+        lockTaskLock(&curr->lock);
+        if (MODE_TYPE(curr->stat.mode) != VFS_TYPE_DIR) {
+            unlockTaskLock(&curr->lock);
+            err = simpleError(ENOTDIR);
+            break;
+        }
+        unlockTaskLock(&curr->lock);
         if (strcmp(segment, ".") == 0) {
             // Noop?
         } else if (strcmp(segment, "..") == 0) {
@@ -94,11 +102,12 @@ static Error vfsLookupNode(
             if (dirs_count == dirs_capacity) {
                 dirs_capacity = dirs_capacity * 3 / 2;
                 dirs = krealloc(dirs, dirs_capacity * sizeof(VfsNode*));
-                segs = real_path != NULL ? krealloc(segs, dirs_capacity * sizeof(const char*)) : NULL;
+                segs = real_path != NULL && prefix != NULL
+                    ? krealloc(segs, dirs_capacity * sizeof(const char*)) : NULL;
             }
             vfsNodeCopy(curr);
             dirs[dirs_count] = curr;
-            if (real_path != NULL) {
+            if (real_path != NULL && prefix != NULL) {
                 segs[dirs_count - 1] = segment;
             }
             dirs_count++;
@@ -123,22 +132,27 @@ static Error vfsLookupNode(
     } else {
         curr = vfsFollowMounts(curr, (flags & VFS_LOOKUP_SKIPLASTMOUNT) != 0);
         if (real_path != NULL) {
-            size_t path_length = 0;
-            for (size_t i = 0; i < dirs_count - 1; i++) {
-                path_length += 1 + strlen(segs[i]);
-            }
-            char* path = kalloc(umax(1, path_length) + 1);
-            path[0] = '/';
-            path[umax(1, path_length)] = 0;
-            path_length = 0;
-            for (size_t i = 0; i < dirs_count - 1; i++) {
+            if (prefix == NULL) {
+                *real_path = NULL;
+            } else {
+                size_t path_length = strlen(prefix);
+                for (size_t i = 0; i < dirs_count - 1; i++) {
+                    path_length += 1 + strlen(segs[i]);
+                }
+                char* path = kalloc(umax(1, path_length) + 1);
+                path_length = strlen(prefix);
+                memcpy(path, prefix, path_length);
                 path[path_length] = '/';
-                memcpy(path + 1 + path_length, segs, strlen(segs[i]));
-                path_length += 1 + strlen(segs[i]);
+                for (size_t i = 0; i < dirs_count - 1; i++) {
+                    path[path_length] = '/';
+                    memcpy(path + 1 + path_length, segs[i], strlen(segs[i]));
+                    path_length += 1 + strlen(segs[i]);
+                }
+                path[umax(1, path_length)] = 0;
+                *real_path = path;
+                dealloc(segs);
             }
-            *real_path = path;
         }
-        dealloc(segs);
         dealloc(path_clone);
         *ret = curr;
     }
@@ -154,7 +168,7 @@ static Error vfsLookupNodeAtExactAbs(
         VfsNode* root = root_mount->root_node;
         vfsNodeCopy(root);
         unlockTaskLock(&fs->lock);
-        Error err = vfsLookupNode(process, root, path, flags, ret, real_path);
+        Error err = vfsLookupNode(process, root, path, flags, ret, "", real_path);
         vfsNodeClose(root);
         return err;
     } else {
@@ -166,7 +180,7 @@ static Error vfsLookupNodeAtExactAbs(
                 VfsNode* root = mount->mounted->root_node;
                 vfsNodeCopy(root);
                 unlockTaskLock(&fs->lock);
-                Error err = vfsLookupNode(process, root, path, flags, ret, real_path);
+                Error err = vfsLookupNode(process, root, path + prefix_len, flags, ret, mount->prefix, real_path);
                 vfsNodeClose(root);
                 return err;
             }
@@ -349,7 +363,6 @@ Error vfsOpenAt(VirtualFilesystem* fs, Process* process, VfsFile* file, const ch
             return vfsOpenNode(process, node, real_path, flags, ret);
         }
     } else if (isError(err)) {
-        vfsNodeClose(node);
         dealloc(real_path);
         return err;
     } else if ((flags & VFS_OPEN_EXCL) != 0) {
@@ -461,6 +474,7 @@ Error vfsLinkAt(VirtualFilesystem* fs, Process* process, VfsFile* old_file, cons
 }
 
 Error vfsMount(VirtualFilesystem* fs, Process* process, const char* path, VfsSuperblock* sb) {
+    assert(sb != NULL);
     lockTaskLock(&fs->lock);
     if (fs->root_mounted == NULL) {
         char* path_copy = stringClone(path);
@@ -565,7 +579,7 @@ Error vfsCreateSuperblock(
     if (strcmp(type, "minix") == 0) {
         VfsFile* file;
         CHECKED(vfsOpenAt(fs, process, NULL, path, VFS_OPEN_READ, 0, &file));
-        Error err = createMinixVfsSuperblock(file, data, (MinixVfsSuperblock**)&ret);
+        Error err = createMinixVfsSuperblock(file, data, (MinixVfsSuperblock**)ret);
         vfsFileClose(file);
         return err;
     } else if (strcmp(type, "dev") == 0) {
@@ -630,6 +644,7 @@ VirtualFilesystem global_file_system;
 Error vfsInit(VirtualFilesystem* fs) {
     initTaskLock(&fs->lock);
     fs->root_mounted = NULL;
+    fs->tmp_mounted = NULL;
     return simpleError(SUCCESS);
 }
 

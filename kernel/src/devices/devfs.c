@@ -41,7 +41,7 @@ static VfsNode* createDeviceFsDevNode(DeviceFilesystem* sb, Device* device) {
     node->superblock = (VfsSuperblock*)sb;
     node->stat.dev = sb->base.id;
     node->stat.id = device->id + 1;
-    node->stat.mode = vfsTypeForDevice(device) | VFS_MODE_OG_RW;
+    node->stat.mode = TYPE_MODE(vfsTypeForDevice(device)) | VFS_MODE_OG_RW;
     node->stat.nlinks = device->name_id == 0 ? 2 : 1;
     node->stat.uid = 0;
     node->stat.gid = 0;

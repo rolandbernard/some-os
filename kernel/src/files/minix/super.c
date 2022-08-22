@@ -119,6 +119,7 @@ Error createMinixVfsSuperblock(VfsFile* block_device, VirtPtr data, MinixVfsSupe
         CHECKED(minixReadNode(sb, 1, (MinixVfsNode**)&sb->base.root_node), dealloc(sb));
         vfsCacheInit(&sb->base.nodes);
         vfsFileCopy(block_device);
+        *ret = sb;
         return simpleError(SUCCESS);
     }
 }
