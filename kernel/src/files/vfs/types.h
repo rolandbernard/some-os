@@ -200,13 +200,13 @@ typedef struct VfsFileDescriptor_s {
 
 typedef struct VfsTmpMounts_s {
     struct VfsTmpMounts_s* next;
-    const char* prefix;
+    char* prefix;
     VfsSuperblock* mounted;
-} VfsTmpMounts;
+} VfsTmpMount;
 
 typedef struct {
     VfsSuperblock* root_mounted;
-    VfsTmpMounts* tmp_mounted;
+    VfsTmpMount* tmp_mounted;
     TaskLock lock;
 } VirtualFilesystem;
 

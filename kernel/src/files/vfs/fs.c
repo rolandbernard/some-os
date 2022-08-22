@@ -148,19 +148,30 @@ static Error vfsLookupNode(
 static Error vfsLookupNodeAtExactAbs(
     VirtualFilesystem* fs, Process* process, const char* path, VfsLookupFlags flags, VfsNode** ret, char** real_path
 ) {
-    // TODO: tmp mounts
     lockTaskLock(&fs->lock);
     VfsSuperblock* root_mount = fs->root_mounted;
     if (root_mount != NULL) {
-        vfsSuperCopy(root_mount);
-        unlockTaskLock(&fs->lock);
         VfsNode* root = root_mount->root_node;
         vfsNodeCopy(root);
-        vfsSuperClose(root_mount);
+        unlockTaskLock(&fs->lock);
         Error err = vfsLookupNode(process, root, path, flags, ret, real_path);
         vfsNodeClose(root);
         return err;
     } else {
+        // Temporary mounts are only for use until the root filesystem is mounted.
+        VfsTmpMount* mount = fs->tmp_mounted;
+        while (mount != NULL) {
+            size_t prefix_len = strlen(mount->prefix);
+            if (strncmp(path, mount->prefix, prefix_len) == 0 && (mount->prefix[prefix_len] == '/' || mount->prefix[prefix_len] == 0)) {
+                VfsNode* root = mount->mounted->root_node;
+                vfsNodeCopy(root);
+                unlockTaskLock(&fs->lock);
+                Error err = vfsLookupNode(process, root, path, flags, ret, real_path);
+                vfsNodeClose(root);
+                return err;
+            }
+            mount = mount->next;
+        }
         unlockTaskLock(&fs->lock);
         return simpleError(ENOENT);
     }
@@ -456,14 +467,28 @@ Error vfsMount(VirtualFilesystem* fs, Process* process, const char* path, VfsSup
         char* path_copy = stringClone(path);
         inlineReducePath(path_copy);
         if (strcmp(path_copy, "/") == 0) {
+            dealloc(path_copy);
             fs->root_mounted = sb;
             while (fs->tmp_mounted != NULL) {
-                // TODO: tmp mounts
+                VfsTmpMount* mount = fs->tmp_mounted;
+                fs->tmp_mounted = mount->next;
+                if (isError(vfsMount(fs, NULL, mount->prefix, mount->mounted))) {
+                    // If there is an error, we throw away the mount.
+                    vfsSuperClose(mount->mounted);
+                }
+                dealloc(mount->prefix);
+                dealloc(mount);
             }
             unlockTaskLock(&fs->lock);
             return simpleError(SUCCESS);
         } else {
-            // TODO: tmp mounts
+            VfsTmpMount* tmp_mount = kalloc(sizeof(VfsTmpMount));
+            tmp_mount->next = fs->tmp_mounted;
+            tmp_mount->prefix = path_copy;
+            tmp_mount->mounted = sb;
+            fs->tmp_mounted = tmp_mount;
+            unlockTaskLock(&fs->lock);
+            return simpleError(SUCCESS);
         }
     } else {
         unlockTaskLock(&fs->lock);
@@ -489,8 +514,27 @@ Error vfsMount(VirtualFilesystem* fs, Process* process, const char* path, VfsSup
 
 Error vfsUmount(VirtualFilesystem* fs, Process* process, const char* path) {
     lockTaskLock(&fs->lock);
-    // TODO: tmp mounts
-    if (strcmp(path, "/") == 0 && fs->root_mounted != NULL && fs->root_mounted->root_node->mounted == NULL) {
+    if (fs->root_mounted == NULL) {
+        char* path_copy = stringClone(path);
+        inlineReducePath(path_copy);
+        VfsTmpMount** mount = &fs->tmp_mounted;
+        while (*mount != NULL) {
+            if (strcmp(path_copy, (*mount)->prefix) == 0) {
+                VfsTmpMount* to_remove = *mount;
+                *mount = (*mount)->next;
+                unlockTaskLock(&fs->lock);
+                vfsSuperClose(to_remove->mounted);
+                dealloc(to_remove->prefix);
+                dealloc(to_remove);
+                dealloc(path_copy);
+                return simpleError(SUCCESS);
+            }
+            mount = &(*mount)->next;
+        }
+        unlockTaskLock(&fs->lock);
+        dealloc(path_copy);
+        return simpleError(ENOENT);
+    } else if (strcmp(path, "/") == 0 && fs->root_mounted->root_node->mounted == NULL) {
         VfsSuperblock* sb = fs->root_mounted;
         fs->root_mounted = NULL;
         unlockTaskLock(&fs->lock);
