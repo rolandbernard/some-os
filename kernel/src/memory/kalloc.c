@@ -25,7 +25,9 @@ typedef struct AllocatedMemory_s {
     uint8_t bytes[];
 } AllocatedMemory;
 
-static FreeMemory* first_free = NULL;
+// This is a small buffer to be used for early allocation.
+static FreeMemory small_buffer[1024] = { { .size = sizeof(small_buffer) } };
+static FreeMemory* first_free = small_buffer;
 static SpinLock kalloc_lock;
 
 static void insertFreeMemory(FreeMemory* memory) {
@@ -131,8 +133,9 @@ static void tryFreeingOldMemory() {
             page_end = (mem_end - KALLOC_MIN_FREE_MEM) & -PAGE_SIZE;
         }
         if (
-            (mem_start == page_start && mem_end == page_end) // If this will not create any additional fragmentation
-            || page_end >= page_start + KALLOC_MIN_PAGES_TO_FREE * PAGE_SIZE // Or free more than a minimum number of pages
+            (mem_end <= (uintptr_t)small_buffer || mem_start >= (uintptr_t)small_buffer + sizeof(small_buffer)) // Do not free the small_buffer memory
+            &&  ((mem_start == page_start && mem_end == page_end) // If this will not create any additional fragmentation
+                || page_end >= page_start + KALLOC_MIN_PAGES_TO_FREE * PAGE_SIZE) // Or free more than a minimum number of pages
         ) {
             PageAllocation alloc = {
                 .ptr = (void*)page_start,

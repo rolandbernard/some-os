@@ -20,7 +20,7 @@ Error logKernelMessage(const char* fmt, ...) {
     CharDevice* tty = getDefaultTtyDevice();
     FORMAT_STRING(string, fmt);
     lockSpinLock(&kernel_log_lock);
-    Error error = writeToTty(tty, "%s", string);
+    Error error = writeStringToTty(tty, string);
     unlockSpinLock(&kernel_log_lock);
     return error;
 }

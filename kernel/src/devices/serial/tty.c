@@ -57,7 +57,7 @@ static Error uartTtyWriteFunction(UartTtyDevice* dev, VirtPtr buffer, size_t siz
     VirtPtrBufferPart parts[part_count];
     getVirtPtrParts(buffer, size, parts, part_count, false);
     for (size_t i = 0; i < part_count; i++) {
-        for (size_t j = 0; j < parts[i].length; i++) {
+        for (size_t j = 0; j < parts[i].length; j++) {
             Error err;
             do {
                 err = dev->write_func(dev->uart_data, ((char*)parts[i].address)[j]);
@@ -75,7 +75,7 @@ static size_t uartTtyAvailFunction(UartTtyDevice* dev) {
 }
 
 static void uartTtyResizeBuffer(UartTtyDevice* dev) {
-    size_t capacity = 2 * dev->buffer_capacity;
+    size_t capacity = dev->buffer_capacity * 3 / 2;
     dev->buffer = krealloc(dev->buffer, capacity);
     if (dev->buffer_capacity < dev->buffer_start + dev->buffer_count) {
         size_t to_move = dev->buffer_start - dev->buffer_capacity + dev->buffer_count;
@@ -123,8 +123,8 @@ UartTtyDevice* createUartTtyDevice(void* uart, UartWriteFunction write, UartRead
     dev->read_func = read;
     dev->buffer_start = 0;
     dev->buffer_count = 0;
-    dev->buffer_capacity = INITIAL_TTY_BUFFER_CAPACITY;
-    dev->buffer = kalloc(dev->buffer_capacity);
+    dev->buffer_capacity = 0;
+    dev->buffer = NULL;
     dev->blocked = NULL;
     initSpinLock(&dev->lock);
     return dev;

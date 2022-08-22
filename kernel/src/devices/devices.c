@@ -37,13 +37,11 @@ static Device** devices;
 
 static size_t getDeviceNameId(const char* name) {
     size_t count = 0;
-    lockSpinLock(&device_lock);
     for (size_t i = 0; i < device_count; i++) {
         if (strcmp(name, devices[i]->name) == 0 && devices[i]->name_id >= count) {
             count = devices[i]->name_id + 1;
         }
     }
-    unlockSpinLock(&device_lock);
     return count;
 }
 
