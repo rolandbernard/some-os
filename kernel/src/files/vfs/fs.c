@@ -8,9 +8,9 @@
 #include "files/minix/super.h"
 #include "files/path.h"
 #include "files/special/blkfile.h"
+#include "files/special/chrfile.h"
 #include "files/special/fifo.h"
 #include "files/special/pipe.h"
-#include "files/special/ttyfile.h"
 #include "files/vfs/file.h"
 #include "files/vfs/node.h"
 #include "files/vfs/super.h"
@@ -314,8 +314,8 @@ static Error vfsOpenNode(Process* process, VfsNode* node, char* path, VfsOpenFla
             *ret = createBlockDeviceFile(node, dev, path, (flags & VFS_OPEN_APPEND) != 0 ? dev->size : 0);
             return simpleError(SUCCESS);
         } else if (device != NULL && device->type == DEVICE_BLOCK && MODE_TYPE(node->stat.mode) == VFS_TYPE_CHAR) {
-            TtyDevice* dev = (TtyDevice*)device;
-            *ret = createTtyDeviceFile(node, dev, path);
+            CharDevice* dev = (CharDevice*)device;
+            *ret = createCharDeviceFile(node, dev, path);
             return simpleError(SUCCESS);
         } else {
             vfsNodeClose(node);

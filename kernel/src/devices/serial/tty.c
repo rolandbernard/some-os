@@ -107,15 +107,15 @@ void uartTtyDataReady(UartTtyDevice* dev) {
     unlockSpinLock(&dev->lock);
 }
 
-static TtyDeviceFunctions funcs = {
-    .read = (TtyDeviceReadFunction)uartTtyReadFunction,
-    .write = (TtyDeviceWriteFunction)uartTtyWriteFunction,
-    .avail = (TtyDeviceAvailFunction)uartTtyAvailFunction,
+static CharDeviceFunctions funcs = {
+    .read = (CharDeviceReadFunction)uartTtyReadFunction,
+    .write = (CharDeviceWriteFunction)uartTtyWriteFunction,
+    .avail = (CharDeviceAvailFunction)uartTtyAvailFunction,
 };
 
 UartTtyDevice* createUartTtyDevice(void* uart, UartWriteFunction write, UartReadFunction read) {
     UartTtyDevice* dev = kalloc(sizeof(UartTtyDevice));
-    dev->base.base.type = DEVICE_TTY;
+    dev->base.base.type = DEVICE_CHAR;
     dev->base.functions = &funcs;
     dev->uart_data = uart;
     dev->write_func = write;
@@ -129,15 +129,15 @@ UartTtyDevice* createUartTtyDevice(void* uart, UartWriteFunction write, UartRead
     return dev;
 }
 
-Error writeStringToTty(TtyDevice* dev, const char* str) {
+Error writeStringToTty(CharDevice* dev, const char* str) {
     return writeStringNToTty(dev, str, strlen(str));
 }
 
-Error writeStringNToTty(TtyDevice* dev, const char* str, size_t length) {
+Error writeStringNToTty(CharDevice* dev, const char* str, size_t length) {
     return dev->functions->write(dev, virtPtrForKernel(str), length);
 }
 
-Error writeToSerial(TtyDevice* dev, const char* fmt, ...) {
+Error writeToSerial(CharDevice* dev, const char* fmt, ...) {
     FORMAT_STRING(string, fmt);
     return writeStringToTty(dev, string);
 }

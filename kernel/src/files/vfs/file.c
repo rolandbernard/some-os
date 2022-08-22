@@ -1,9 +1,6 @@
 
 #include "files/vfs/file.h"
 
-#include "files/special/blkfile.h"
-#include "files/special/pipe.h"
-#include "files/special/ttyfile.h"
 #include "files/vfs/fs.h"
 #include "files/vfs/node.h"
 #include "files/vfs/super.h"

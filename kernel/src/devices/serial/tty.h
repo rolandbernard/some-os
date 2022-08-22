@@ -14,7 +14,7 @@ typedef Error (*UartWriteFunction)(void* uart, char value);
 typedef Error (*UartReadFunction)(void* uart, char* value);
 
 typedef struct {
-    TtyDevice base;
+    CharDevice base;
     void* uart_data;
     UartWriteFunction write_func;
     UartReadFunction read_func;
@@ -31,12 +31,12 @@ UartTtyDevice* createUartTtyDevice(void* uart, UartWriteFunction write, UartRead
 void uartTtyDataReady(UartTtyDevice* uart_tty);
 
 // Write null-terminated string to the given serial device
-Error writeStringToTty(TtyDevice* dev, const char* str);
+Error writeStringToTty(CharDevice* dev, const char* str);
 
 // Write string of given length to the given serial device
-Error writeStringNToTty(TtyDevice* dev, const char* str, size_t length);
+Error writeStringNToTty(CharDevice* dev, const char* str, size_t length);
 
 // Write format string to the serial device
-Error writeToTty(TtyDevice* dev, const char* fmt, ...);
+Error writeToTty(CharDevice* dev, const char* fmt, ...);
 
 #endif

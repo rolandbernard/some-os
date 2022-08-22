@@ -6,7 +6,7 @@
 
 typedef enum {
     DEVICE_BLOCK,
-    DEVICE_TTY,
+    DEVICE_CHAR,
 } DeviceType;
 
 typedef int DeviceId;
@@ -33,22 +33,22 @@ typedef struct BlockDevice_s {
     size_t size;
 } BlockDevice;
 
-struct TtyDevice_s;
+struct CharDevice_s;
 
-typedef Error (*TtyDeviceReadFunction)(struct TtyDevice_s* dev, VirtPtr buff, size_t size, bool block);
-typedef Error (*TtyDeviceWriteFunction)(struct TtyDevice_s* dev, VirtPtr buff, size_t size);
-typedef size_t (*TtyDeviceAvailFunction)(struct TtyDevice_s* dev);
+typedef Error (*CharDeviceReadFunction)(struct CharDevice_s* dev, VirtPtr buff, size_t size, bool block);
+typedef Error (*CharDeviceWriteFunction)(struct CharDevice_s* dev, VirtPtr buff, size_t size);
+typedef size_t (*CharDeviceAvailFunction)(struct CharDevice_s* dev);
 
 typedef struct {
-    TtyDeviceReadFunction read;
-    TtyDeviceWriteFunction write;
-    TtyDeviceAvailFunction avail;
-} TtyDeviceFunctions;
+    CharDeviceReadFunction read;
+    CharDeviceWriteFunction write;
+    CharDeviceAvailFunction avail;
+} CharDeviceFunctions;
 
-typedef struct TtyDevice_s {
+typedef struct CharDevice_s {
     Device base;
-    TtyDeviceFunctions* functions;
-} TtyDevice;
+    CharDeviceFunctions* functions;
+} CharDevice;
 
 // Initialize all devices that must be started befor initializing the kernel
 Error initBaselineDevices();
@@ -63,6 +63,6 @@ Device* getDeviceWithId(DeviceId id);
 Device* getDeviceOfType(DeviceType type, DeviceId id);
 
 // Get the device to be used for kernel input/output
-TtyDevice* getDefaultTtyDevice();
+CharDevice* getDefaultTtyDevice();
 
 #endif

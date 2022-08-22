@@ -6,6 +6,6 @@
 
 // File wrapper around a character device
 
-VfsFile* createTtyDeviceFile(VfsNode* node, TtyDevice* device, char* path);
+VfsFile* createCharDeviceFile(VfsNode* node, CharDevice* device, char* path);
 
 #endif

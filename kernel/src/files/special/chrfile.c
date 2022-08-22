@@ -1,14 +1,14 @@
 
 #include <string.h>
 
-#include "files/special/ttyfile.h"
+#include "files/special/chrfile.h"
 
 #include "files/vfs/node.h"
 #include "memory/kalloc.h"
 
 typedef struct {
     VfsNode base;
-    TtyDevice* device;
+    CharDevice* device;
 } VfsTtyNode;
 
 static void ttyNodeFree(VfsTtyNode* node) {
@@ -30,7 +30,7 @@ VfsNodeFunctions funcs = {
     .write_at = (VfsNodeWriteAtFunction)ttyNodeWriteAt,
 };
 
-VfsTtyNode* createTtyNode(TtyDevice* device, VfsNode* real_node) {
+VfsTtyNode* createTtyNode(CharDevice* device, VfsNode* real_node) {
     VfsTtyNode* node = kalloc(sizeof(VfsTtyNode));
     node->base.functions = &funcs;
     node->base.superblock = NULL;
@@ -47,7 +47,7 @@ VfsTtyNode* createTtyNode(TtyDevice* device, VfsNode* real_node) {
     return node;
 }
 
-VfsFile* createTtyDeviceFile(VfsNode* node, TtyDevice* device, char* path) {
+VfsFile* createCharDeviceFile(VfsNode* node, CharDevice* device, char* path) {
     VfsFile* file = kalloc(sizeof(VfsFile));
     file->node = (VfsNode*)createTtyNode(device, node);
     file->path = path;

@@ -60,7 +60,7 @@ Device* getDeviceOfType(DeviceType type, DeviceId id) {
     return NULL;
 }
 
-TtyDevice* getDefaultTtyDevice() {
-    return (TtyDevice*)getDeviceOfType(DEVICE_TTY, 0);
+CharDevice* getDefaultTtyDevice() {
+    return (CharDevice*)getDeviceOfType(DEVICE_CHAR, 0);
 }
 
