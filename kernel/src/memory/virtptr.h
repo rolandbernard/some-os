@@ -20,8 +20,9 @@ typedef struct {
     size_t length;
 } VirtPtrBufferPart;
 
-// This is a const pointer just to avoid warnings and unnecessary casts.
-VirtPtr virtPtrForKernel(const void* addr);
+VirtPtr virtPtrForKernel(void* addr);
+
+VirtPtr virtPtrForKernelConst(const void* addr);
 
 VirtPtr virtPtrFor(uintptr_t addr, MemorySpace* mem);
 

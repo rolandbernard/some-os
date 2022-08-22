@@ -135,10 +135,10 @@ Error writeStringToTty(CharDevice* dev, const char* str) {
 }
 
 Error writeStringNToTty(CharDevice* dev, const char* str, size_t length) {
-    return dev->functions->write(dev, virtPtrForKernel(str), length);
+    return dev->functions->write(dev, virtPtrForKernelConst(str), length);
 }
 
-Error writeToSerial(CharDevice* dev, const char* fmt, ...) {
+Error writeToTty(CharDevice* dev, const char* fmt, ...) {
     FORMAT_STRING(string, fmt);
     return writeStringToTty(dev, string);
 }

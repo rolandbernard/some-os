@@ -11,7 +11,7 @@
     } else {                                                            \
         lockTaskLock(&node->lock);                                      \
         CHECKED(canAccess(node, process, ACCESS));                      \
-        if ((ACCESS & VFS_ACCESS_W) != 0) {                             \
+        if (((ACCESS) & VFS_ACCESS_W) != 0) {                           \
             node->stat.mtime = getNanoseconds();                        \
         }                                                               \
         node->stat.atime = getNanoseconds();                            \

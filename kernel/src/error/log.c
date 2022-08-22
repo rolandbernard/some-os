@@ -17,7 +17,7 @@ static SpinLock kernel_log_lock;
 
 Error logKernelMessage(const char* fmt, ...) {
     // Logging happens to the default serial device
-    TtyDevice* tty = getDefaultTtyDevice();
+    CharDevice* tty = getDefaultTtyDevice();
     FORMAT_STRING(string, fmt);
     lockSpinLock(&kernel_log_lock);
     Error error = writeToTty(tty, "%s", string);
@@ -26,7 +26,7 @@ Error logKernelMessage(const char* fmt, ...) {
 }
 
 static void* writeVirtPtrString(VirtPtrBufferPart part, void* udata) {
-    TtyDevice* tty = getDefaultTtyDevice();
+    CharDevice* tty = getDefaultTtyDevice();
     writeStringNToTty(tty, part.address, part.length);
     return udata;
 }
