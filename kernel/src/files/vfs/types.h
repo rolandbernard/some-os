@@ -142,7 +142,7 @@ typedef struct {
 } VfsNodeCache;
 
 typedef struct VfsSuperblock_s {
-    VfsSuperblockFunctions* functions;
+    const VfsSuperblockFunctions* functions;
     struct VfsNode_s* root_node;
     size_t id;
     size_t ref_count;
@@ -171,7 +171,7 @@ typedef struct {
 } VfsNodeFunctions;
 
 typedef struct VfsNode_s {
-    VfsNodeFunctions* functions;
+    const VfsNodeFunctions* functions;
     VfsSuperblock* superblock;
     VfsStat stat;
     size_t ref_count;

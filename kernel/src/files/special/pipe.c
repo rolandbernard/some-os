@@ -156,7 +156,7 @@ static Error pipeNodeWriteAt(VfsPipeNode* node, VirtPtr buff, size_t offset, siz
     return executePipeOperation(node->data, buff, length, true, written);
 }
 
-VfsNodeFunctions funcs = {
+static const VfsNodeFunctions funcs = {
     .free = (VfsNodeFreeFunction)pipeNodeFree,
     .read_at = (VfsNodeReadAtFunction)pipeNodeReadAt,
     .write_at = (VfsNodeWriteAtFunction)pipeNodeWriteAt,

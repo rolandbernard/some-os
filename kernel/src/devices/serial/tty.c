@@ -107,7 +107,7 @@ void uartTtyDataReady(UartTtyDevice* dev) {
     unlockSpinLock(&dev->lock);
 }
 
-static CharDeviceFunctions funcs = {
+static const CharDeviceFunctions funcs = {
     .read = (CharDeviceReadFunction)uartTtyReadFunction,
     .write = (CharDeviceWriteFunction)uartTtyWriteFunction,
     .avail = (CharDeviceAvailFunction)uartTtyAvailFunction,
@@ -116,6 +116,7 @@ static CharDeviceFunctions funcs = {
 UartTtyDevice* createUartTtyDevice(void* uart, UartWriteFunction write, UartReadFunction read) {
     UartTtyDevice* dev = kalloc(sizeof(UartTtyDevice));
     dev->base.base.type = DEVICE_CHAR;
+    dev->base.base.name = "tty";
     dev->base.functions = &funcs;
     dev->uart_data = uart;
     dev->write_func = write;

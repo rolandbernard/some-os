@@ -24,7 +24,7 @@ static Error ttyNodeWriteAt(VfsTtyNode* node, VirtPtr buff, size_t offset, size_
     return node->device->functions->write(node->device, buff, length);
 }
 
-VfsNodeFunctions funcs = {
+static const VfsNodeFunctions funcs = {
     .free = (VfsNodeFreeFunction)ttyNodeFree,
     .read_at = (VfsNodeReadAtFunction)ttyNodeReadAt,
     .write_at = (VfsNodeWriteAtFunction)ttyNodeWriteAt,

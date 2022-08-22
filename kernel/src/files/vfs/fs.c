@@ -290,7 +290,6 @@ static Error vfsCreateNewNode(
 static VfsFile* vfsCreateFile(VfsNode* node, char* path, size_t offset) {
     VfsFile* file = kalloc(sizeof(VfsFile));
     file->node = node;
-    file->node->real_node = node;
     file->path = path;
     file->ref_count = 1;
     file->offset = offset;
@@ -305,17 +304,17 @@ static Error vfsOpenNode(Process* process, VfsNode* node, char* path, VfsOpenFla
         dealloc(path);
     });
     if (MODE_TYPE(node->stat.mode) == VFS_TYPE_FIFO) {
-        *ret = createFifoFile(node, path);
+        *ret = createFifoFile(node->real_node, path);
         return simpleError(SUCCESS);
     } else if (MODE_TYPE(node->stat.mode) == VFS_TYPE_CHAR || MODE_TYPE(node->stat.mode) == VFS_TYPE_BLOCK) {
         Device* device = getDeviceWithId(node->stat.rdev);
         if (device != NULL && device->type == DEVICE_BLOCK && MODE_TYPE(node->stat.mode) == VFS_TYPE_BLOCK) {
             BlockDevice* dev = (BlockDevice*)device;
-            *ret = createBlockDeviceFile(node, dev, path, (flags & VFS_OPEN_APPEND) != 0 ? dev->size : 0);
+            *ret = createBlockDeviceFile(node->real_node, dev, path, (flags & VFS_OPEN_APPEND) != 0 ? dev->size : 0);
             return simpleError(SUCCESS);
         } else if (device != NULL && device->type == DEVICE_BLOCK && MODE_TYPE(node->stat.mode) == VFS_TYPE_CHAR) {
             CharDevice* dev = (CharDevice*)device;
-            *ret = createCharDeviceFile(node, dev, path);
+            *ret = createCharDeviceFile(node->real_node, dev, path);
             return simpleError(SUCCESS);
         } else {
             vfsNodeClose(node);

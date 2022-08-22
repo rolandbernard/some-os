@@ -62,7 +62,7 @@ static Error blkNodeWriteAt(VfsBlockNode* node, VirtPtr buff, size_t offset, siz
     return genericBlockFileFunction(node, true, buff, offset, length, written);
 }
 
-VfsNodeFunctions funcs = {
+static const VfsNodeFunctions funcs = {
     .free = (VfsNodeFreeFunction)blkNodeFree,
     .read_at = (VfsNodeReadAtFunction)blkNodeReadAt,
     .write_at = (VfsNodeWriteAtFunction)blkNodeWriteAt,

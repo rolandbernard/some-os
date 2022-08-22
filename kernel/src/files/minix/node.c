@@ -350,7 +350,7 @@ static Error minixLink(MinixVfsNode* node, const char* name, MinixVfsNode* entry
     return simpleError(tmp_size != sizeof(MinixDirEntry) ? EIO : SUCCESS);
 }
 
-VfsNodeFunctions funcs = {
+static const VfsNodeFunctions funcs = {
     .free = (VfsNodeFreeFunction)minixFree,
     .read_at = (VfsNodeReadAtFunction)minixReadAt,
     .write_at = (VfsNodeWriteAtFunction)minixWriteAt,
@@ -367,6 +367,7 @@ MinixVfsNode* createMinixVfsNode(MinixVfsSuperblock* fs, uint32_t inode) {
     node->base.functions = &funcs;
     node->base.mounted = NULL;
     node->base.ref_count = 0;
+    node->base.real_node = (VfsNode*)node;
     node->base.stat.dev = fs->base.id;
     node->base.stat.id = inode;
     node->base.stat.rdev = 0;

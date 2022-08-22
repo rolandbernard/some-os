@@ -65,7 +65,7 @@ static Error fifoNodeWriteAt(VfsFifoNode* node, VirtPtr buff, size_t offset, siz
     return executePipeOperation(node->data, buff, length, true, written);
 }
 
-VfsNodeFunctions funcs = {
+static const VfsNodeFunctions funcs = {
     .free = (VfsNodeFreeFunction)fifoNodeFree,
     .read_at = (VfsNodeReadAtFunction)fifoNodeReadAt,
     .write_at = (VfsNodeWriteAtFunction)fifoNodeWriteAt,

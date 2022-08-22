@@ -88,7 +88,7 @@ static Error minixFreeNode(MinixVfsSuperblock* sb, MinixVfsNode* free) {
     return freeMinixInode(sb, free->base.stat.id);
 }
 
-VfsSuperblockFunctions funcs = {
+static const VfsSuperblockFunctions funcs = {
     .free = (VfsSuperblockFreeFunction)minixFreeSuperblock,
     .read_node = (VfsSuperblockReadNodeFunction)minixReadNode,
     .write_node = (VfsSuperblockWriteNodeFunction)minixWriteNode,

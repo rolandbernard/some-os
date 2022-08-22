@@ -14,6 +14,8 @@ typedef int DeviceId;
 typedef struct {
     DeviceType type;
     DeviceId id;
+    const char* name;
+    size_t name_id;
 } Device;
 
 struct BlockDevice_s;
@@ -28,7 +30,7 @@ typedef struct {
 
 typedef struct BlockDevice_s {
     Device base;
-    BlockDeviceFunctions* functions;
+    const BlockDeviceFunctions* functions;
     size_t block_size;
     size_t size;
 } BlockDevice;
@@ -47,7 +49,7 @@ typedef struct {
 
 typedef struct CharDevice_s {
     Device base;
-    CharDeviceFunctions* functions;
+    const CharDeviceFunctions* functions;
 } CharDevice;
 
 // Initialize all devices that must be started befor initializing the kernel
@@ -60,7 +62,10 @@ void registerDevice(Device* device);
 
 Device* getDeviceWithId(DeviceId id);
 
-Device* getDeviceOfType(DeviceType type, DeviceId id);
+Device* getDeviceNamed(const char* name, size_t name_id);
+
+// This is only for use with the devfs implementation
+Device* getNthDevice(size_t nth, bool* fst);
 
 // Get the device to be used for kernel input/output
 CharDevice* getDefaultTtyDevice();

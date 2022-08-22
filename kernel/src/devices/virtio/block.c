@@ -129,7 +129,7 @@ static Error writeFunction(VirtIORegisteredBlockDevice* dev, VirtPtr buff, size_
     return virtIOBlockDeviceOperation(dev->virtio_device, buff, offset, size, true);
 }
 
-static BlockDeviceFunctions funcs = {
+static const BlockDeviceFunctions funcs = {
     .read = (BlockDeviceReadFunction)readFunction,
     .write = (BlockDeviceWriteFunction)writeFunction,
 };
@@ -140,6 +140,7 @@ Error registerVirtIOBlockDevice(VirtIOBlockDevice* dev) {
     reg->base.block_size = BLOCK_SECTOR_SIZE;
     reg->base.size = mmio->config.capacity * BLOCK_SECTOR_SIZE;
     reg->base.base.type = DEVICE_BLOCK;
+    reg->base.base.name = "blk";
     reg->base.functions = &funcs;
     reg->virtio_device = dev;
     registerDevice((Device*)reg);
