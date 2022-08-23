@@ -242,7 +242,7 @@ void terminateAllProcessTasks(Process* process) {
     terminateAllProcessTasksBut(process, NULL);
 }
 
-static void processFinalizeTaskEntry(Process* process) {
+static void processFinalizeTask(Process* process) {
     // This must be a task becuase it might include blocking operations.
     assert(getCurrentTask() != NULL);
     unregisterProcess(process);
@@ -251,15 +251,16 @@ static void processFinalizeTaskEntry(Process* process) {
         deallocMemorySpace(process->memory.mem);
     }
     dealloc(process);
+    leave();
 }
 
 void deallocProcess(Process* process) {
     if (getCurrentTask() == NULL) {
-        Task* syscall_task = createKernelTask(processFinalizeTaskEntry, HART_STACK_SIZE, DEFAULT_PRIORITY);
+        Task* syscall_task = createKernelTask(processFinalizeTask, HART_STACK_SIZE, DEFAULT_PRIORITY - 10);
         syscall_task->frame.regs[REG_ARGUMENT_0] = (uintptr_t)process;
         enqueueTask(syscall_task);
     } else {
-        processFinalizeTaskEntry(process);
+        processFinalizeTask(process);
     }
 }
 
