@@ -17,11 +17,11 @@ static void ttyNodeFree(VfsTtyNode* node) {
 }
 
 static Error ttyNodeReadAt(VfsTtyNode* node, VirtPtr buff, size_t offset, size_t length, size_t* read) {
-    return node->device->functions->read(node->device, buff, length, true);
+    return node->device->functions->read(node->device, buff, length, read, true);
 }
 
 static Error ttyNodeWriteAt(VfsTtyNode* node, VirtPtr buff, size_t offset, size_t length, size_t* written) {
-    return node->device->functions->write(node->device, buff, length);
+    return node->device->functions->write(node->device, buff, length, written);
 }
 
 static const VfsNodeFunctions funcs = {

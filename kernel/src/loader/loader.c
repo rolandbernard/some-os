@@ -97,7 +97,7 @@ Error loadProgramInto(Task* task, const char* path, VirtPtr args, VirtPtr envs) 
     uintptr_t args_addr = pushStringArray(virtPtrFor(envs_addr, memory), args, &argc);
     // If everything went well, replace the original process
     if (task->process == NULL) {
-        task->process = createUserProcess(NULL);
+        addTaskToProcess(createUserProcess(NULL), task);
     } else {
         terminateAllProcessTasksBut(task->process, task);
     }

@@ -37,8 +37,8 @@ typedef struct BlockDevice_s {
 
 struct CharDevice_s;
 
-typedef Error (*CharDeviceReadFunction)(struct CharDevice_s* dev, VirtPtr buff, size_t size, bool block);
-typedef Error (*CharDeviceWriteFunction)(struct CharDevice_s* dev, VirtPtr buff, size_t size);
+typedef Error (*CharDeviceReadFunction)(struct CharDevice_s* dev, VirtPtr buff, size_t size, size_t* read, bool block);
+typedef Error (*CharDeviceWriteFunction)(struct CharDevice_s* dev, VirtPtr buff, size_t size, size_t* written);
 typedef size_t (*CharDeviceAvailFunction)(struct CharDevice_s* dev);
 
 typedef struct {

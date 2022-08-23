@@ -242,13 +242,25 @@ void terminateAllProcessTasks(Process* process) {
     terminateAllProcessTasksBut(process, NULL);
 }
 
-void deallocProcess(Process* process) {
+static void processFinalizeTaskEntry(Process* process) {
+    // This must be a task becuase it might include blocking operations.
+    assert(getCurrentTask() != NULL);
     unregisterProcess(process);
     closeAllProcessFiles(process);
     if (process->pid != 0) {
         deallocMemorySpace(process->memory.mem);
     }
     dealloc(process);
+}
+
+void deallocProcess(Process* process) {
+    if (getCurrentTask() == NULL) {
+        Task* syscall_task = createKernelTask(processFinalizeTaskEntry, HART_STACK_SIZE, DEFAULT_PRIORITY);
+        syscall_task->frame.regs[REG_ARGUMENT_0] = (uintptr_t)process;
+        enqueueTask(syscall_task);
+    } else {
+        processFinalizeTaskEntry(process);
+    }
 }
 
 void exitProcess(Process* process, Signal signal, int exit) {
