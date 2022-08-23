@@ -51,7 +51,7 @@ static Error minixZoneWalkRec(
     uint32_t* table = kalloc(MINIX_BLOCK_SIZE);
     size_t tmp_size;
     CHECKED(vfsFileReadAt(
-        SUPER(node)->block_device, NULL, virtPtrForKernel(table), MINIX_BLOCK_SIZE, offsetForZone(indirect_table), &tmp_size
+        SUPER(node)->block_device, NULL, virtPtrForKernel(table), offsetForZone(indirect_table), MINIX_BLOCK_SIZE, &tmp_size
     ), dealloc(table));
     if (tmp_size != MINIX_BLOCK_SIZE) {
         dealloc(table);
@@ -61,7 +61,7 @@ static Error minixZoneWalkRec(
     Error err = minixZoneWalkRecScan(node, position, offset, depth, table, MINIX_NUM_IPTRS, &changed, callback, udata);
     if (changed) {
         Error e = vfsFileWriteAt(
-            SUPER(node)->block_device, NULL, virtPtrForKernel(table), MINIX_BLOCK_SIZE, offsetForZone(indirect_table), &tmp_size
+            SUPER(node)->block_device, NULL, virtPtrForKernel(table), offsetForZone(indirect_table), MINIX_BLOCK_SIZE, &tmp_size
         );
         if (!isError(err)) {
             err = e;
@@ -99,7 +99,6 @@ typedef struct {
     MinixVfsNode* node;
     VirtPtr buffer;
     size_t offset;
-    size_t length;
     size_t left;
     bool write;
 } MinixReadWriteRequest;
@@ -113,7 +112,7 @@ static Error minixRWZoneWalkCallback(uint32_t* zone, bool* changed, size_t posit
             assert(MINIX_BLOCK_SIZE < PAGE_SIZE);
             size_t tmp_size;
             CHECKED(vfsFileWriteAt(
-                SUPER(request->node)->block_device, NULL, virtPtrForKernel(zero_page), MINIX_BLOCK_SIZE, offsetForZone(new_zone), &tmp_size
+                SUPER(request->node)->block_device, NULL, virtPtrForKernel(zero_page), offsetForZone(new_zone), MINIX_BLOCK_SIZE, &tmp_size
             ));
             if (tmp_size != MINIX_BLOCK_SIZE) {
                 return simpleError(EIO);
@@ -128,13 +127,13 @@ static Error minixRWZoneWalkCallback(uint32_t* zone, bool* changed, size_t posit
         size_t tmp_size = umin(request->left, position + size - file_offset);
         if (request->write) {
             CHECKED(vfsFileWriteAt(
-                SUPER(request->node)->block_device, NULL, request->buffer, tmp_size, offsetForZone(*zone) + block_offset, &tmp_size
+                SUPER(request->node)->block_device, NULL, request->buffer, offsetForZone(*zone) + block_offset, tmp_size, &tmp_size
             ));
         } else if (*zone == 0) {
             memsetVirtPtr(request->buffer, 0, tmp_size);
         } else {
             CHECKED(vfsFileReadAt(
-                SUPER(request->node)->block_device, NULL, request->buffer, tmp_size, offsetForZone(*zone) + block_offset, &tmp_size
+                SUPER(request->node)->block_device, NULL, request->buffer, offsetForZone(*zone) + block_offset, tmp_size, &tmp_size
             ));
         }
         if (tmp_size == 0) {
@@ -167,7 +166,7 @@ static Error minixReadWrite(MinixVfsNode* node, VirtPtr buffer, size_t offset, s
     MinixReadWriteRequest request = {
         .node = node,
         .buffer = buffer,
-        .length = length,
+        .offset = offset,
         .left = length,
         .write = write,
     };
@@ -176,6 +175,7 @@ static Error minixReadWrite(MinixVfsNode* node, VirtPtr buffer, size_t offset, s
         unlockTaskLock(&node->lock);
         return err;
     } else {
+        length -= request.left;
         if (write && offset + length > node->base.stat.size) {
             lockTaskLock(&node->base.lock);
             node->base.stat.size = offset + length;
@@ -238,8 +238,8 @@ static Error minixTruncZoneWalkCallback(uint32_t* zone, bool* changed, size_t po
                 size_t tmp_size = MINIX_BLOCK_SIZE - block_offset;
                 assert(MINIX_BLOCK_SIZE < PAGE_SIZE);
                 CHECKED(vfsFileWriteAt(
-                    SUPER(request->file)->block_device, NULL, virtPtrForKernel(zero_page), tmp_size,
-                    offsetForZone(*zone) + block_offset, &tmp_size
+                    SUPER(request->file)->block_device, NULL, virtPtrForKernel(zero_page),
+                    offsetForZone(*zone) + block_offset, tmp_size, &tmp_size
                 ));
             }
         } else {
@@ -279,7 +279,7 @@ static Error minixInternalLookup(MinixVfsNode* node, const char* name, uint32_t*
     MinixDirEntry* tmp_buffer = kalloc(umin(MAX_LOOKUP_READ_SIZE, left));
     while (left > 0) {
         size_t tmp_size = umin(MAX_LOOKUP_READ_SIZE, left);
-        CHECKED(minixReadAt(node, virtPtrForKernel(tmp_buffer), tmp_size, offset, &tmp_size), {
+        CHECKED(minixReadAt(node, virtPtrForKernel(tmp_buffer), offset, tmp_size, &tmp_size), {
             dealloc(tmp_buffer);
         });
         if (tmp_size == 0) {

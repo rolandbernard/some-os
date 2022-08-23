@@ -30,7 +30,7 @@ Error vfsFileSeek(VfsFile* file, Process* process, size_t offset, VfsSeekWhence 
 
 Error vfsFileRead(VfsFile* file, Process* process, VirtPtr buffer, size_t length, size_t* read) {
     lockTaskLock(&file->lock);
-    Error err = vfsFileReadAt(file, process, buffer, length, file->offset, read);
+    Error err = vfsFileReadAt(file, process, buffer, file->offset, length, read);
     if (!isError(err)) {
         file->offset += *read;
     }
@@ -40,7 +40,7 @@ Error vfsFileRead(VfsFile* file, Process* process, VirtPtr buffer, size_t length
 
 Error vfsFileWrite(VfsFile* file, Process* process, VirtPtr buffer, size_t length, size_t* written) {
     lockTaskLock(&file->lock);
-    Error err = vfsFileWriteAt(file, process, buffer, length, file->offset, written);
+    Error err = vfsFileWriteAt(file, process, buffer, file->offset, length, written);
     if (!isError(err)) {
         file->offset += *written;
     }

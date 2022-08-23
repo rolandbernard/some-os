@@ -326,7 +326,7 @@ static Error vfsOpenNode(Process* process, VfsNode* node, char* path, VfsOpenFla
             BlockDevice* dev = (BlockDevice*)device;
             *ret = createBlockDeviceFile(node->real_node, dev, path, (flags & VFS_OPEN_APPEND) != 0 ? dev->size : 0);
             return simpleError(SUCCESS);
-        } else if (device != NULL && device->type == DEVICE_BLOCK && MODE_TYPE(node->stat.mode) == VFS_TYPE_CHAR) {
+        } else if (device != NULL && device->type == DEVICE_CHAR && MODE_TYPE(node->stat.mode) == VFS_TYPE_CHAR) {
             CharDevice* dev = (CharDevice*)device;
             *ret = createCharDeviceFile(node->real_node, dev, path);
             return simpleError(SUCCESS);

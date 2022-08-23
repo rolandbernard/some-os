@@ -14,7 +14,7 @@ static Error genericMinixGetBitMap(MinixVfsSuperblock* fs, size_t offset, size_t
     uint8_t* tmp_buffer = kalloc(umin(MAX_MAPS_READ_SIZE, bytes));
     while (bytes > 0) {
         size_t tmp_size = umin(MAX_MAPS_READ_SIZE, bytes);
-        CHECKED(vfsFileReadAt(fs->block_device, NULL, virtPtrForKernel(tmp_buffer), tmp_size, offset, &tmp_size), {
+        CHECKED(vfsFileReadAt(fs->block_device, NULL, virtPtrForKernel(tmp_buffer), offset, tmp_size, &tmp_size), {
             unlockTaskLock(&fs->maps_lock);
             dealloc(tmp_buffer);
         });
@@ -29,7 +29,7 @@ static Error genericMinixGetBitMap(MinixVfsSuperblock* fs, size_t offset, size_t
                 if (((byte >> j) & 1) == 0) {
                     // This bit is free
                     tmp_buffer[i] |= (1 << j);
-                    CHECKED(vfsFileWriteAt(fs->block_device, NULL, virtPtrForKernel(&tmp_buffer[i]), 1, offset + i, &tmp_size), {
+                    CHECKED(vfsFileWriteAt(fs->block_device, NULL, virtPtrForKernel(&tmp_buffer[i]), offset + i, 1, &tmp_size), {
                         unlockTaskLock(&fs->maps_lock);
                         dealloc(tmp_buffer);
                     });
@@ -71,7 +71,7 @@ static Error genericMinixClearBitMap(MinixVfsSuperblock* fs, size_t offset, size
     char tmp_buffer[1];
     size_t size;
     CHECKED(
-        vfsFileReadAt(fs->block_device, NULL, virtPtrForKernel(tmp_buffer), 1, offset + position / 8, &size),
+        vfsFileReadAt(fs->block_device, NULL, virtPtrForKernel(tmp_buffer), offset + position / 8, 1, &size),
         unlockTaskLock(&fs->maps_lock)
     );
     if (size == 0) {
@@ -80,7 +80,7 @@ static Error genericMinixClearBitMap(MinixVfsSuperblock* fs, size_t offset, size
     } else {
         tmp_buffer[0] &= ~(1 << (position % 8));
         CHECKED(
-            vfsFileWriteAt(fs->block_device, NULL, virtPtrForKernel(tmp_buffer), 1, offset + position / 8, &size),
+            vfsFileWriteAt(fs->block_device, NULL, virtPtrForKernel(tmp_buffer), offset + position / 8, 1, &size),
             unlockTaskLock(&fs->maps_lock)
         );
         unlockTaskLock(&fs->maps_lock);
