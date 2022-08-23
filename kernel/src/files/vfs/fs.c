@@ -215,11 +215,11 @@ static Error vfsLookupNodeAt(
         size_t path_length = strlen(path);
         if (file == NULL) {
             assert(process != NULL);
-            lockSpinLock(&process->resources.lock);
+            lockTaskLock(&process->resources.lock);
             cwd_length = strlen(process->resources.cwd);
             absolute_path = kalloc(cwd_length + path_length + 2);
             memcpy(absolute_path, process->resources.cwd, cwd_length);
-            unlockSpinLock(&process->resources.lock);
+            unlockTaskLock(&process->resources.lock);
         } else if (file->path != NULL) {
             cwd_length = strlen(file->path);
             absolute_path = kalloc(cwd_length + path_length + 2);
@@ -631,9 +631,9 @@ Error canAccess(VfsNode* node, struct Process_s* process, VfsAccessFlags flags) 
         return simpleError(SUCCESS);
     } else {
         lockTaskLock(&node->lock);
-        lockSpinLock(&process->resources.lock);
+        lockTaskLock(&process->resources.lock);
         Error err = basicCanAccess(&node->stat, process, flags);
-        unlockSpinLock(&process->resources.lock);
+        unlockTaskLock(&process->resources.lock);
         unlockTaskLock(&node->lock);
         return err;
     }
