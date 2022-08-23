@@ -12,9 +12,9 @@ void vfsCacheUnlock(VfsNodeCache* cache);
 
 void vfsCacheRegister(VfsNodeCache* cache, VfsNode* node);
 
-void vfsCacheCopyNode(VfsNodeCache* cache, VfsNode* node);
+size_t vfsCacheCopyNode(VfsNodeCache* cache, VfsNode* node);
 
-void vfsCacheCloseNode(VfsNodeCache* cache, VfsNode* node);
+size_t vfsCacheCloseNode(VfsNodeCache* cache, VfsNode* node);
 
 void vfsCacheInit(VfsNodeCache* cache);
 

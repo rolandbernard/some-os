@@ -99,17 +99,19 @@ void vfsCacheUnlock(VfsNodeCache* cache) {
     unlockTaskLock(&cache->lock);
 }
 
-void vfsCacheCopyNode(VfsNodeCache* cache, VfsNode* node) {
+size_t vfsCacheCopyNode(VfsNodeCache* cache, VfsNode* node) {
     lockTaskLock(&cache->lock);
     if (node->ref_count == 0) {
         // This is a new node, add it to the cache.
         vfsCacheInsertNewNode(cache, node);
     }
     node->ref_count++;
+    size_t refs = node->ref_count;
     unlockTaskLock(&cache->lock);
+    return refs;
 }
 
-void vfsCacheCloseNode(VfsNodeCache* cache, VfsNode* node) {
+size_t vfsCacheCloseNode(VfsNodeCache* cache, VfsNode* node) {
     lockTaskLock(&cache->lock);
     assert(node->ref_count > 0);
     node->ref_count--;
@@ -118,7 +120,9 @@ void vfsCacheCloseNode(VfsNodeCache* cache, VfsNode* node) {
         assert(cache->nodes[idx] == node);
         cache->nodes[idx] = DELETED;
     }
+    size_t refs = node->ref_count;
     unlockTaskLock(&cache->lock);
+    return refs;
 }
 
 void vfsCacheInit(VfsNodeCache* cache) {

@@ -22,7 +22,6 @@ Error vfsSuperReadNode(VfsSuperblock* sb, size_t id, VfsNode** ret) {
             if (!isError(err)) {
                 assert(node->ref_count == 0);
                 vfsNodeCopy(node);
-                vfsSuperCopy(sb);
                 *ret = node;
             }
             vfsCacheUnlock(&sb->nodes);
@@ -64,7 +63,10 @@ Error vfsSuperCopyNode(VfsNode* node) {
         unlockTaskLock(&node->lock);
         return simpleError(SUCCESS);
     } else {
-        vfsCacheCopyNode(&node->superblock->nodes, node);
+        size_t refs = vfsCacheCopyNode(&node->superblock->nodes, node);
+        if (refs == 1) {
+            vfsSuperCopy(node->superblock);
+        }
         return simpleError(SUCCESS);
     }
 }
@@ -81,9 +83,9 @@ Error vfsSuperCloseNode(VfsNode* node) {
         }
         return simpleError(SUCCESS);
     } else {
-        vfsCacheCloseNode(&node->superblock->nodes, node);
-        VfsSuperblock* sb = node->superblock;
-        if (node->ref_count == 0) {
+        size_t refs = vfsCacheCloseNode(&node->superblock->nodes, node);
+        if (refs == 0) {
+            VfsSuperblock* sb = node->superblock;
             if (sb->root_node == node) {
                 // The root node is special. We never totally remove it until we close the superblock.
                 // Still dereference the superblock, this might trigger freeing everything.
