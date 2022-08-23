@@ -183,10 +183,12 @@ Process* createUserProcess(Process* parent) {
                 sizeof(parent->signals.handlers)
             );
             // Copy resource information
+            lockTaskLock(&parent->resources.lock);
             process->resources.uid = parent->resources.uid;
             process->resources.gid = parent->resources.gid;
             process->resources.next_fd = parent->resources.next_fd;
             process->resources.cwd = stringClone(parent->resources.cwd);
+            unlockTaskLock(&parent->resources.lock);
             process->memory.start_brk = parent->memory.start_brk;
             process->memory.brk = parent->memory.brk;
             process->memory.mem = cloneMemorySpace(parent->memory.mem);

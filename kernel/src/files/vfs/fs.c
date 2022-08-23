@@ -260,8 +260,15 @@ static Error vfsCreateNewNode(
     });
     new->stat.mode = mode;
     new->stat.nlinks = 0;
-    new->stat.uid = process != NULL ? process->resources.uid : 0;
-    new->stat.gid = process != NULL ? process->resources.gid : 0;
+    if (process != NULL) {
+        lockTaskLock(&process->resources.lock);
+        new->stat.uid = process->resources.uid;
+        new->stat.gid = process->resources.gid;
+        unlockTaskLock(&process->resources.lock);
+    } else {
+        new->stat.uid = 0;
+        new->stat.gid = 0;
+    }
     new->stat.rdev = device;
     new->stat.size = 0;
     Time time = getNanoseconds();

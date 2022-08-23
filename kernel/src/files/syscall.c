@@ -225,74 +225,83 @@ SyscallReturn readdirSyscall(TrapFrame* frame) {
 SyscallReturn mountSyscall(TrapFrame* frame) {
     assert(frame->hart != NULL);
     Task* task = (Task*)frame;
-    if (
-        task->process != NULL && task->process->resources.uid != 0
-        && task->process->resources.gid != 0
-    ) { // Only root can mount
-        SYSCALL_RETURN(-EPERM);
-    } else {
-        char* source = copyStringFromSyscallArgs(task, SYSCALL_ARG(0));
-        if (source != NULL) {
-            char* type = copyStringFromSyscallArgs(task, SYSCALL_ARG(2));
-            if (type != NULL) {
-                VfsSuperblock* sb;
-                Error err = vfsCreateSuperblock(
-                    &global_file_system, task->process, source, type,
-                    virtPtrForTask(SYSCALL_ARG(3), task), &sb
-                );
-                dealloc(type);
-                dealloc(source);
-                if (isError(err)) {
+    if (task->process != NULL) {
+        lockTaskLock(&task->process->resources.lock);
+        if (task->process->resources.uid != 0 && task->process->resources.gid != 0) {
+            unlockTaskLock(&task->process->resources.lock);
+            // Only root can mount
+            SYSCALL_RETURN(-EPERM);
+        }
+        unlockTaskLock(&task->process->resources.lock);
+    }
+    char* source = copyStringFromSyscallArgs(task, SYSCALL_ARG(0));
+    if (source != NULL) {
+        char* type = copyStringFromSyscallArgs(task, SYSCALL_ARG(2));
+        if (type != NULL) {
+            VfsSuperblock* sb;
+            Error err = vfsCreateSuperblock(
+                &global_file_system, task->process, source, type,
+                virtPtrForTask(SYSCALL_ARG(3), task), &sb
+            );
+            dealloc(type);
+            dealloc(source);
+            if (isError(err)) {
+                SYSCALL_RETURN(-err.kind);
+            } else {
+                char* target = copyStringFromSyscallArgs(task, SYSCALL_ARG(1));
+                if (target != NULL) {
+                    err = vfsMount(&global_file_system, task->process, target, sb);
+                    dealloc(target);
+                    if (isError(err)) {
+                        vfsSuperClose(sb);
+                    }
                     SYSCALL_RETURN(-err.kind);
                 } else {
-                    char* target = copyStringFromSyscallArgs(task, SYSCALL_ARG(1));
-                    if (target != NULL) {
-                        err = vfsMount(&global_file_system, task->process, target, sb);
-                        dealloc(target);
-                        if (isError(err)) {
-                            vfsSuperClose(sb);
-                        }
-                        SYSCALL_RETURN(-err.kind);
-                    } else {
-                        vfsSuperClose(sb);
-                        SYSCALL_RETURN(-EINVAL);
-                    }
+                    vfsSuperClose(sb);
+                    SYSCALL_RETURN(-EINVAL);
                 }
-            } else {
-                dealloc(source);
-                SYSCALL_RETURN(-EINVAL);
             }
         } else {
+            dealloc(source);
             SYSCALL_RETURN(-EINVAL);
         }
+    } else {
+        SYSCALL_RETURN(-EINVAL);
     }
 }
 
 SyscallReturn umountSyscall(TrapFrame* frame) {
     assert(frame->hart != NULL);
     Task* task = (Task*)frame;
-    if (task->process->resources.uid != 0 && task->process->resources.gid != 0) {
-        // Only root can mount
-        SYSCALL_RETURN(-EPERM);
-    } else {
-        char* path = copyStringFromSyscallArgs(task, SYSCALL_ARG(0));
-        if (path != NULL) {
-            Error err = vfsUmount(&global_file_system, task->process, path);
-            dealloc(path);
-            SYSCALL_RETURN(-err.kind);
-        } else {
-            SYSCALL_RETURN(-EINVAL);
+    if (task->process != NULL) {
+        lockTaskLock(&task->process->resources.lock);
+        if (task->process->resources.uid != 0 && task->process->resources.gid != 0) {
+            unlockTaskLock(&task->process->resources.lock);
+            // Only root can unmount
+            SYSCALL_RETURN(-EPERM);
         }
+        unlockTaskLock(&task->process->resources.lock);
+    }
+    char* path = copyStringFromSyscallArgs(task, SYSCALL_ARG(0));
+    if (path != NULL) {
+        Error err = vfsUmount(&global_file_system, task->process, path);
+        dealloc(path);
+        SYSCALL_RETURN(-err.kind);
+    } else {
+        SYSCALL_RETURN(-EINVAL);
     }
 }
 
 SyscallReturn chdirSyscall(TrapFrame* frame) {
     assert(frame->hart != NULL);
     Task* task = (Task*)frame;
+    assert(task->process != NULL);
     char* path = copyStringFromSyscallArgs(task, SYSCALL_ARG(0));
     if (path != NULL) {
+        lockTaskLock(&task->process->resources.lock);
         dealloc(task->process->resources.cwd);
         task->process->resources.cwd = path;
+        unlockTaskLock(&task->process->resources.lock);
         SYSCALL_RETURN(-SUCCESS);
     } else {
         SYSCALL_RETURN(-EINVAL);
@@ -302,12 +311,15 @@ SyscallReturn chdirSyscall(TrapFrame* frame) {
 SyscallReturn getcwdSyscall(TrapFrame* frame) {
     assert(frame->hart != NULL);
     Task* task = (Task*)frame;
+    assert(task->process != NULL);
     VirtPtr buff = virtPtrForTask(SYSCALL_ARG(0), task);
     size_t length = SYSCALL_ARG(1);
+    lockTaskLock(&task->process->resources.lock);
     size_t cwd_length = strlen(task->process->resources.cwd);
     memcpyBetweenVirtPtr(
         buff, virtPtrForKernel(task->process->resources.cwd), umin(length, cwd_length + 1)
     );
+    unlockTaskLock(&task->process->resources.lock);
     SYSCALL_RETURN(-SUCCESS);
 }
 

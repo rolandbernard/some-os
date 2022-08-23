@@ -121,7 +121,6 @@ typedef struct Task_s {
     uintptr_t stack_top;
     TaskSched sched;
     TaskTimes times;
-    struct Task_s* syscall_task;
     struct Process_s* process;
     struct Task_s* proc_next;
 } Task;

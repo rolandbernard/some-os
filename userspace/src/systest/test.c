@@ -207,7 +207,7 @@ static bool testGetSetUid() {
         ASSERT_CHILD(getuid() == 0);
         ASSERT_CHILD(setuid(1000) == 0);
         ASSERT_CHILD(getuid() == 1000);
-        ASSERT_CHILD(setgid(1000) == 0);
+        ASSERT_CHILD(setgid(1000) == -1);
         ASSERT_CHILD(setuid(1100) == -1);
         exit(0);
     } else {
@@ -225,7 +225,7 @@ static bool testGetSetGid() {
         ASSERT_CHILD(getgid() == 0);
         ASSERT_CHILD(setgid(1000) == 0);
         ASSERT_CHILD(getgid() == 1000);
-        ASSERT_CHILD(setuid(1000) == 0);
+        ASSERT_CHILD(setuid(1000) == -0);
         ASSERT_CHILD(setgid(1100) == -1);
         exit(0);
     } else {
