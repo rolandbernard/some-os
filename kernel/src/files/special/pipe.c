@@ -4,10 +4,11 @@
 #include "files/special/pipe.h"
 
 #include "error/error.h"
+#include "files/vfs/node.h"
 #include "kernel/time.h"
 #include "memory/kalloc.h"
-#include "task/syscall.h"
 #include "task/schedule.h"
+#include "task/syscall.h"
 #include "util/util.h"
 
 // Shared data should be locked before calling this
@@ -173,21 +174,30 @@ VfsPipeNode* createPipeNode() {
     node->base.stat.mtime = getNanoseconds();
     node->base.stat.ctime = getNanoseconds();
     node->base.real_node = (VfsNode*)node;
-    node->base.ref_count = 1;
+    node->base.ref_count = 0;
     initTaskLock(&node->base.lock);
     node->base.mounted = NULL;
     node->data = createPipeSharedData();
     return node;
 }
 
-VfsFile* createPipeFile() {
+static VfsFile* createPipeFileWithNode(VfsNode* node) {
+    vfsNodeCopy(node);
     VfsFile* file = kalloc(sizeof(VfsFile));
-    file->node = (VfsNode*)createPipeNode();
+    file->node = node;
     file->path = NULL;
     file->ref_count = 1;
     file->offset = 0;
     file->flags = 0;
     initTaskLock(&file->lock);
     return file;
+}
+
+VfsFile* createPipeFile() {
+    return createPipeFileWithNode((VfsNode*)createPipeNode());
+}
+
+VfsFile* createPipeFileClone(VfsFile* file) {
+    return createPipeFileWithNode(file->node);
 }
 

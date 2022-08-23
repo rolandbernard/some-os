@@ -326,20 +326,16 @@ SyscallReturn getcwdSyscall(TrapFrame* frame) {
 SyscallReturn pipeSyscall(TrapFrame* frame) {
     assert(frame->hart != NULL);
     Task* task = (Task*)frame;
-    VfsFile* file = createPipeFile();
-    if (file != NULL) {
-        vfsFileCopy(file);
-        int pipe_read = allocateNewFileDescriptorId(task->process);
-        int pipe_write = allocateNewFileDescriptorId(task->process);
-        putNewFileDescriptor(task->process, pipe_read, VFS_FILE_RDONLY, (VfsFile*)file);
-        putNewFileDescriptor(task->process, pipe_write, VFS_FILE_WRONLY, (VfsFile*)file);
-        VirtPtr arr = virtPtrForTask(SYSCALL_ARG(0), task);
-        writeIntAt(arr, sizeof(int) * 8, 0, pipe_read);
-        writeIntAt(arr, sizeof(int) * 8, 1, pipe_write);
-        SYSCALL_RETURN(-SUCCESS);
-    } else {
-        SYSCALL_RETURN(-ENOMEM);
-    }
+    VfsFile* file_read = createPipeFile();
+    VfsFile* file_write = createPipeFileClone(file_read);
+    int pipe_read = allocateNewFileDescriptorId(task->process);
+    int pipe_write = allocateNewFileDescriptorId(task->process);
+    putNewFileDescriptor(task->process, pipe_read, VFS_FILE_RDONLY, (VfsFile*)file_read);
+    putNewFileDescriptor(task->process, pipe_write, VFS_FILE_WRONLY, (VfsFile*)file_write);
+    VirtPtr arr = virtPtrForTask(SYSCALL_ARG(0), task);
+    writeIntAt(arr, sizeof(int) * 8, 0, pipe_read);
+    writeIntAt(arr, sizeof(int) * 8, 1, pipe_write);
+    SYSCALL_RETURN(-SUCCESS);
 }
 
 SyscallReturn mknodSyscall(TrapFrame* frame) {

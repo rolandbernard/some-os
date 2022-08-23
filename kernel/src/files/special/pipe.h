@@ -38,4 +38,6 @@ Error executePipeOperation(PipeSharedData* data, VirtPtr buffer, size_t size, bo
 
 VfsFile* createPipeFile();
 
+VfsFile* createPipeFileClone(VfsFile* file);
+
 #endif
