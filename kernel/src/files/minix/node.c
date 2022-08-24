@@ -257,15 +257,15 @@ static Error minixTrunc(MinixVfsNode* node, size_t length) {
     lockTaskLock(&node->lock);
     MinixTruncRequest request = {
         .file = node,
-        .length = umin(length, node->base.stat.size),
+        .length = length,
     };
-    Error err = minixZoneWalk(node, 0, minixTruncZoneWalkCallback, &request);
+    Error err = minixZoneWalk(node, length, minixTruncZoneWalkCallback, &request);
     if (err.kind != SUCCESS_EXIT && isError(err)) {
         unlockTaskLock(&node->lock);
         return err;
     } else {
         lockTaskLock(&node->base.lock);
-        node->base.stat.size = 0;
+        node->base.stat.size = length;
         minixWriteNode(SUPER(node), node);
         unlockTaskLock(&node->base.lock);
         unlockTaskLock(&node->lock);
