@@ -196,7 +196,7 @@ static Error vfsLookupNodeAtAbs(
 ) {
     if ((flags & VFS_LOOKUP_PARENT) != 0) {
         char* parent_path = getParentPath(path);
-        Error err = vfsLookupNodeAtExactAbs(fs, process, path, flags, ret, real_path);
+        Error err = vfsLookupNodeAtExactAbs(fs, process, parent_path, flags, ret, real_path);
         dealloc(parent_path);
         return err;
     } else {
@@ -363,14 +363,11 @@ Error vfsOpenAt(VirtualFilesystem* fs, Process* process, VfsFile* file, const ch
         VfsMode file_mode = (mode & ~VFS_MODE_TYPE) | TYPE_MODE(VFS_TYPE_REG);
         Error err = vfsCreateNewNode(fs, process, file, path, file_mode, 0, &node, &real_path);
         if (isError(err)) {
-            vfsNodeClose(node);
-            dealloc(real_path);
             return err;
         } else {
             return vfsOpenNode(process, node, real_path, flags, ret);
         }
     } else if (isError(err)) {
-        dealloc(real_path);
         return err;
     } else if ((flags & VFS_OPEN_EXCL) != 0) {
         vfsNodeClose(node);

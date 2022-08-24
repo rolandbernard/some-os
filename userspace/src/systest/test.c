@@ -392,7 +392,9 @@ static bool testOpenReadClose() {
 }
 
 static bool testOpenExcl() {
-    ASSERT(open("/tmp/test.txt", O_CREAT | O_EXCL) == -1);
+    ASSERT(open("/tmp/test_new.txt", O_CREAT | O_EXCL) != -1);
+    ASSERT(open("/tmp/test_new.txt", O_CREAT | O_EXCL) == -1);
+    ASSERT(remove("/tmp/test_new.txt") == 0)
     return true;
 }
 
