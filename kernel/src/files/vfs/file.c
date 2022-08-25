@@ -97,7 +97,7 @@ Error vfsFileChown(VfsFile* file, Process* process, Uid uid, Gid gid) {
 Error vfsFileReaddir(VfsFile* file, Process* process, VirtPtr buffer, size_t length, size_t* read) {
     lockTaskLock(&file->lock);
     size_t tmp_size;
-    Error err = vfsNodeReaddirAt(file->node, process, buffer, length, file->offset, &tmp_size, read);
+    Error err = vfsNodeReaddirAt(file->node, process, buffer, file->offset, length, &tmp_size, read);
     if (!isError(err)) {
         file->offset += tmp_size;
     }

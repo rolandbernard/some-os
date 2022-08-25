@@ -402,7 +402,7 @@ Error vfsMknodAt(VirtualFilesystem* fs, Process* process, VfsFile* file, const c
     }
 }
 
-static Error vfsRemoveDirectoryDotAndDotDot(Process* process, VfsNode* parent, VfsNode* dir) {
+static Error vfsCheckDirectoryIsEmpty(Process* process, VfsNode* dir) {
     size_t max_size = sizeof(VfsDirectoryEntry) + 3;
     size_t offset = 0;
     size_t tmp_size = 0;
@@ -414,8 +414,13 @@ static Error vfsRemoveDirectoryDotAndDotDot(Process* process, VfsNode* parent, V
             dealloc(entry);
             return simpleError(EEXIST);
         }
+        offset += tmp_size;
     } while (tmp_size != 0);
     dealloc(entry);
+    return simpleError(SUCCESS);
+}
+
+static Error vfsRemoveDirectoryDotAndDotDot(Process* process, VfsNode* parent, VfsNode* dir) {
     lockTaskLock(&dir->lock);
     if (dir->stat.nlinks == 1) {
         unlockTaskLock(&dir->lock);
@@ -432,6 +437,7 @@ static Error vfsRemoveDirectoryDotAndDotDot(Process* process, VfsNode* parent, V
 
 Error vfsUnlinkFrom(Process* process, VfsNode* parent, const char* filename, VfsNode* node) {
     if (MODE_TYPE(node->stat.mode) == VFS_TYPE_DIR) {
+        CHECKED(vfsCheckDirectoryIsEmpty(process, node));
         CHECKED(vfsNodeUnlink(parent, process, filename, node));
         return vfsRemoveDirectoryDotAndDotDot(process, parent, node);
     } else {
