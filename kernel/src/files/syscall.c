@@ -298,10 +298,17 @@ SyscallReturn chdirSyscall(TrapFrame* frame) {
     assert(task->process != NULL);
     char* path = copyStringFromSyscallArgs(task, SYSCALL_ARG(0));
     if (path != NULL) {
+        VfsFile* file;
+        Error err = vfsOpenAt(&global_file_system, task->process, NULL, path, VFS_OPEN_DIRECTORY, 0, &file);
+        dealloc(path);
+        if (isError(err)) {
+            SYSCALL_RETURN(-err.kind);
+        }
         lockTaskLock(&task->process->resources.lock);
         dealloc(task->process->resources.cwd);
-        task->process->resources.cwd = path;
+        task->process->resources.cwd = stringClone(file->path);
         unlockTaskLock(&task->process->resources.lock);
+        vfsFileClose(file);
         SYSCALL_RETURN(-SUCCESS);
     } else {
         SYSCALL_RETURN(-EINVAL);
