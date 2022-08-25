@@ -1,4 +1,5 @@
 
+#include <assert.h>
 #include <stdint.h>
 #include <string.h>
 
@@ -22,6 +23,9 @@ typedef struct FreeMemory_s {
 
 typedef struct AllocatedMemory_s {
     size_t size; // Number of bytes allocated
+#ifdef DEBUG
+    struct AllocatedMemory_s* next;
+#endif
     uint8_t bytes[];
 } AllocatedMemory;
 
@@ -29,6 +33,9 @@ typedef struct AllocatedMemory_s {
 static FreeMemory small_buffer[1024] = { { .size = sizeof(small_buffer) } };
 static FreeMemory* first_free = small_buffer;
 static SpinLock kalloc_lock;
+#ifdef DEBUG
+static AllocatedMemory* allocated = NULL;
+#endif
 
 static void insertFreeMemory(FreeMemory* memory) {
     FreeMemory** current = &first_free;
@@ -101,6 +108,10 @@ void* kalloc(size_t size) {
                 mem->size = alloc_size;
             }
             ret = mem->bytes;
+#ifdef DEBUG
+            mem->next = allocated;
+            allocated = mem;
+#endif
         }
         unlockSpinLock(&kalloc_lock);
         return ret;
@@ -164,10 +175,30 @@ static void tryFreeingOldMemory() {
     }
 }
 
+static AllocatedMemory* findAllocatedMemoryFor(void* ptr, bool remove) {
+#ifdef DEBUG
+    AllocatedMemory** curr = &allocated;
+    while (*curr != NULL) {
+        if ((*curr)->bytes == ptr) {
+            AllocatedMemory* found = *curr;
+            if (remove) {
+                *curr = (*curr)->next;
+            }
+            return found;
+        } else {
+            curr = &(*curr)->next;
+        }
+    }
+    panic();
+#else
+    return (AllocatedMemory*)(ptr - sizeof(AllocatedMemory));
+#endif
+}
+
 void dealloc(void* ptr) {
     if (ptr != NULL) {
         lockSpinLock(&kalloc_lock);
-        FreeMemory* mem = (FreeMemory*)(ptr - sizeof(AllocatedMemory));
+        FreeMemory* mem = (FreeMemory*)findAllocatedMemoryFor(ptr, true);
         insertFreeMemory(mem);
         tryFreeingOldMemory();
         unlockSpinLock(&kalloc_lock);
@@ -211,7 +242,7 @@ void* krealloc(void* ptr, size_t size) {
     } else {
         size_t alloc_size = kallocActualSizeFor(size);
         lockSpinLock(&kalloc_lock);
-        AllocatedMemory* mem = (AllocatedMemory*)(ptr - sizeof(AllocatedMemory));
+        AllocatedMemory* mem = findAllocatedMemoryFor(ptr, false);
         FreeMemory** before = findFreeMemoryBefore(mem);
         FreeMemory** after = findFreeMemoryAfter(mem);
         size_t old_size = mem->size;
@@ -222,7 +253,7 @@ void* krealloc(void* ptr, size_t size) {
             old_size += (*after)->size;
         }
         if (old_size >= alloc_size) {
-            AllocatedMemory* start = mem;
+            AllocatedMemory* start = findAllocatedMemoryFor(ptr, true);
             if (before != NULL) {
                 start = (AllocatedMemory*)*before;
             }
@@ -249,6 +280,10 @@ void* krealloc(void* ptr, size_t size) {
                 start->size = alloc_size;
             }
             tryFreeingOldMemory();
+#ifdef DEBUG
+            mem->next = allocated;
+            allocated = mem;
+#endif
             unlockSpinLock(&kalloc_lock);
             return start->bytes;
         } else {
@@ -267,7 +302,13 @@ size_t kallocSize(void* ptr) {
     if (ptr == NULL) {
         return 0;
     } else {
-        FreeMemory* mem = (FreeMemory*)(ptr - sizeof(AllocatedMemory));
+        lockSpinLock(&kalloc_lock);
+        AllocatedMemory* mem = findAllocatedMemoryFor(ptr, false);
+#ifdef DEBUG
+        mem->next = allocated;
+        allocated = mem;
+#endif
+        unlockSpinLock(&kalloc_lock);
         return mem->size;
     }
 }
