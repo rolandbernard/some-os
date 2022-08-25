@@ -415,6 +415,12 @@ static bool testReadDir() {
     ASSERT(dir != NULL);
     struct dirent* entr = readdir(dir);
     ASSERT(entr != NULL);
+    ASSERT(strcmp(entr->d_name, ".") == 0);
+    entr = readdir(dir);
+    ASSERT(entr != NULL);
+    ASSERT(strcmp(entr->d_name, "..") == 0);
+    entr = readdir(dir);
+    ASSERT(entr != NULL);
     ASSERT(strcmp(entr->d_name, "test.txt") == 0);
     entr = readdir(dir);
     ASSERT(entr != NULL);
@@ -441,6 +447,12 @@ static bool testReadDir2() {
     DIR* dir = opendir("tmp");
     ASSERT(dir != NULL);
     struct dirent* entr = readdir(dir);
+    ASSERT(entr != NULL);
+    ASSERT(strcmp(entr->d_name, ".") == 0);
+    entr = readdir(dir);
+    ASSERT(entr != NULL);
+    ASSERT(strcmp(entr->d_name, "..") == 0);
+    entr = readdir(dir);
     ASSERT(entr != NULL);
     ASSERT(strcmp(entr->d_name, "test3.txt") == 0);
     entr = readdir(dir);
