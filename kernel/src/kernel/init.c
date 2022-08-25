@@ -3,7 +3,6 @@
 
 #include "error/backtrace.h"
 #include "error/log.h"
-#include "files/vfs.h"
 #include "interrupt/plic.h"
 #include "interrupt/trap.h"
 #include "memory/pagealloc.h"

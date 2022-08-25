@@ -5,12 +5,6 @@
 
 #include "files/special/pipe.h"
 
-typedef struct {
-    VfsFile base;
-    const char* name;
-    PipeSharedData* data;
-} FifoFile;
-
-FifoFile* createFifoFile(const char* path, VfsMode mode, Uid uid, Gid gid);
+VfsFile* createFifoFile(VfsNode* node, char* path);
 
 #endif

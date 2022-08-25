@@ -22,6 +22,8 @@ typedef struct {
 
 VirtPtr virtPtrForKernel(void* addr);
 
+VirtPtr virtPtrForKernelConst(const void* addr);
+
 VirtPtr virtPtrFor(uintptr_t addr, MemorySpace* mem);
 
 VirtPtr unsafeVirtPtrFor(uintptr_t addr, MemorySpace* mem);

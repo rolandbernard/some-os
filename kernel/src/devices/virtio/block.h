@@ -87,15 +87,13 @@ typedef struct {
     VirtIOBlockConfig config;
 } VirtIOBlockDeviceLayout;
 
-typedef void (*VirtIOBlockCallback)(Error status, void* udata);
-
 typedef struct VirtIOBlockRequest_s {
     VirtIOBlockRequestHeader header;
     VirtIOBlockRequestData data;
     VirtIOBlockRequestStatus status;
     uint16_t head;
-    VirtIOBlockCallback callback;
-    void* udata;
+    Error result;
+    Task* wakeup;
     struct VirtIOBlockRequest_s* next;
 } VirtIOBlockRequest;
 
@@ -108,10 +106,9 @@ typedef struct {
 
 Error initVirtIOBlockDevice(int id, volatile VirtIODeviceLayout* base, VirtIODevice** output);
 
-void virtIOBlockDeviceOperation(
-    VirtIOBlockDevice* device, VirtPtr buffer, size_t offset, size_t size, bool write,
-    VirtIOBlockCallback callback, void* udata
-);
+Error registerVirtIOBlockDevice(VirtIOBlockDevice* dev);
+
+Error virtIOBlockDeviceOperation(VirtIOBlockDevice* device, VirtPtr buffer, size_t offset, size_t size, bool write);
 
 void virtIOBlockFreePendingRequests(VirtIOBlockDevice* device);
 

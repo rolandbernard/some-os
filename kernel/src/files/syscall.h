@@ -43,6 +43,4 @@ SyscallReturn pipeSyscall(TrapFrame* frame);
 
 SyscallReturn mknodSyscall(TrapFrame* frame);
 
-char* copyPathFromSyscallArgs(Task* task, uintptr_t ptr);
-
 #endif

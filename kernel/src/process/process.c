@@ -183,10 +183,12 @@ Process* createUserProcess(Process* parent) {
                 sizeof(parent->signals.handlers)
             );
             // Copy resource information
+            lockTaskLock(&parent->resources.lock);
             process->resources.uid = parent->resources.uid;
             process->resources.gid = parent->resources.gid;
             process->resources.next_fd = parent->resources.next_fd;
             process->resources.cwd = stringClone(parent->resources.cwd);
+            unlockTaskLock(&parent->resources.lock);
             process->memory.start_brk = parent->memory.start_brk;
             process->memory.brk = parent->memory.brk;
             process->memory.mem = cloneMemorySpace(parent->memory.mem);
@@ -242,13 +244,26 @@ void terminateAllProcessTasks(Process* process) {
     terminateAllProcessTasksBut(process, NULL);
 }
 
-void deallocProcess(Process* process) {
+static void processFinalizeTask(Process* process) {
+    // This must be a task becuase it might include blocking operations.
+    assert(getCurrentTask() != NULL);
     unregisterProcess(process);
     closeAllProcessFiles(process);
     if (process->pid != 0) {
         deallocMemorySpace(process->memory.mem);
     }
     dealloc(process);
+    leave();
+}
+
+void deallocProcess(Process* process) {
+    if (getCurrentTask() == NULL) {
+        Task* syscall_task = createKernelTask(processFinalizeTask, HART_STACK_SIZE, DEFAULT_PRIORITY - 10);
+        syscall_task->frame.regs[REG_ARGUMENT_0] = (uintptr_t)process;
+        enqueueTask(syscall_task);
+    } else {
+        processFinalizeTask(process);
+    }
 }
 
 void exitProcess(Process* process, Signal signal, int exit) {

@@ -1,6 +1,7 @@
 
 #include "devices/serial/uart16550.h"
 
+#include "devices/serial/tty.h"
 #include "error/log.h"
 #include "task/spinlock.h"
 
@@ -26,6 +27,7 @@ Error initUart16550(Uart16550* uart) {
         uart->initialized = true;
 
         unlockSpinLock(&uart->lock);
+        registerUart16550(uart);
         KERNEL_SUBSUCCESS("Initialized UART device");
     } else {
         unlockSpinLock(&uart->lock);
@@ -36,13 +38,16 @@ Error initUart16550(Uart16550* uart) {
 Error writeUart16550(Uart16550* uart, char value) {
     lockSpinLock(&uart->lock);
     if (uart->initialized) {
-        while (((uart->base_address[5] >> 5) & 0x1) == 0) {
-            /* Wait for THR to be empty */
+        if (((uart->base_address[5] >> 5) & 0x1) == 0) {
+            /* THR is not empty */
+            unlockSpinLock(&uart->lock);
+            return simpleError(EBUSY);
+        } else {
+            // Write directly to MMIO
+            uart->base_address[0] = value;
+            unlockSpinLock(&uart->lock);
+            return simpleError(SUCCESS);
         }
-        // Write directly to MMIO
-        uart->base_address[0] = value;
-        unlockSpinLock(&uart->lock);
-        return simpleError(SUCCESS);
     } else {
         unlockSpinLock(&uart->lock);
         return someError(EIO, "Uart16550 is not initialized");
@@ -68,12 +73,11 @@ Error readUart16550(Uart16550* uart, char* value) {
     }
 }
 
-Serial serialUart16550(Uart16550* uart) {
-    Serial ret = {
-        .data = uart,
-        .write = (SerialWriteFunction)writeUart16550,
-        .read = (SerialReadFunction)readUart16550,
-    };
-    return ret;
+Error registerUart16550(Uart16550* uart) {
+    UartTtyDevice* dev = createUartTtyDevice(
+        uart, (UartWriteFunction)writeUart16550, (UartReadFunction)readUart16550
+    );
+    registerDevice((Device*)dev);
+    return simpleError(SUCCESS);
 }
 

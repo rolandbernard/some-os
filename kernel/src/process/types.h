@@ -9,7 +9,7 @@
 #include "memory/pagetable.h"
 #include "memory/memspace.h"
 #include "task/spinlock.h"
-#include "files/vfs.h"
+#include "files/vfs/types.h"
 #include "task/task.h"
 
 typedef int Pid;
@@ -21,16 +21,12 @@ typedef struct {
 } ProcessMemory;
 
 typedef struct {
-    VfsFile* file;
-} ProcessFileDescEntry;
-
-typedef struct {
     Uid uid;
     Gid gid;
     int next_fd;
-    FileDescriptor* files;
+    VfsFileDescriptor* files;
     char* cwd;
-    SpinLock lock;
+    TaskLock lock;
 } ProcessResources;
 
 typedef struct ProcessWaitResult_s {

@@ -23,7 +23,7 @@ BINARY_DIR := $(BUILD_DIR)/$(BUILD)/bin
 # == Common Flags
 WARNINGS := -Wall -Wextra -Wno-unused-parameter
 
-CCFLAGS.debug   += -O0 -g -DDEBUG
+CCFLAGS.debug   += -O0 -g -DDEBUG -Werror
 LDFLAGS.debug   += -O0 -g
 CCFLAGS.release += -O3
 LDFLAGS.release += -O3

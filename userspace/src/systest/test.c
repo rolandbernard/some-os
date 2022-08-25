@@ -207,7 +207,7 @@ static bool testGetSetUid() {
         ASSERT_CHILD(getuid() == 0);
         ASSERT_CHILD(setuid(1000) == 0);
         ASSERT_CHILD(getuid() == 1000);
-        ASSERT_CHILD(setgid(1000) == 0);
+        ASSERT_CHILD(setgid(1000) == -1);
         ASSERT_CHILD(setuid(1100) == -1);
         exit(0);
     } else {
@@ -225,7 +225,7 @@ static bool testGetSetGid() {
         ASSERT_CHILD(getgid() == 0);
         ASSERT_CHILD(setgid(1000) == 0);
         ASSERT_CHILD(getgid() == 1000);
-        ASSERT_CHILD(setuid(1000) == 0);
+        ASSERT_CHILD(setuid(1000) == -0);
         ASSERT_CHILD(setgid(1100) == -1);
         exit(0);
     } else {
@@ -392,7 +392,9 @@ static bool testOpenReadClose() {
 }
 
 static bool testOpenExcl() {
-    ASSERT(open("/tmp/test.txt", O_CREAT | O_EXCL) == -1);
+    ASSERT(open("/tmp/test_new.txt", O_CREAT | O_EXCL) != -1);
+    ASSERT(open("/tmp/test_new.txt", O_CREAT | O_EXCL) == -1);
+    ASSERT(remove("/tmp/test_new.txt") == 0)
     return true;
 }
 
@@ -412,6 +414,12 @@ static bool testReadDir() {
     DIR* dir = opendir("tmp");
     ASSERT(dir != NULL);
     struct dirent* entr = readdir(dir);
+    ASSERT(entr != NULL);
+    ASSERT(strcmp(entr->d_name, ".") == 0);
+    entr = readdir(dir);
+    ASSERT(entr != NULL);
+    ASSERT(strcmp(entr->d_name, "..") == 0);
+    entr = readdir(dir);
     ASSERT(entr != NULL);
     ASSERT(strcmp(entr->d_name, "test.txt") == 0);
     entr = readdir(dir);
@@ -439,6 +447,12 @@ static bool testReadDir2() {
     DIR* dir = opendir("tmp");
     ASSERT(dir != NULL);
     struct dirent* entr = readdir(dir);
+    ASSERT(entr != NULL);
+    ASSERT(strcmp(entr->d_name, ".") == 0);
+    entr = readdir(dir);
+    ASSERT(entr != NULL);
+    ASSERT(strcmp(entr->d_name, "..") == 0);
+    entr = readdir(dir);
     ASSERT(entr != NULL);
     ASSERT(strcmp(entr->d_name, "test3.txt") == 0);
     entr = readdir(dir);
