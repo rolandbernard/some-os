@@ -66,13 +66,13 @@ static void deviceDirFreeFunction(DeviceDirectoryFile* file) {
 }
 
 static Error deviceDirCopyFunction(DeviceDirectoryFile* file, Process* process, VfsFile** ret) {
-    TrapFrame* lock = criticalEnter();
+    Task* task = criticalEnter();
     lockSpinLock(&file->lock);
     DeviceDirectoryFile* copy = kalloc(sizeof(DeviceDirectoryFile));
     memcpy(copy, file, sizeof(DeviceDirectoryFile));
     unlockSpinLock(&file->lock);
     unlockSpinLock(&copy->lock); // Also unlock the new file
-    criticalReturn(lock);
+    criticalReturn(task);
     *ret = (VfsFile*)copy;
     return simpleError(SUCCESS);
 }

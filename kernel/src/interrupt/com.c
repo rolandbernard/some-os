@@ -27,7 +27,7 @@ void clearMachineSoftwareInterrupt(int hart) {
 }
 
 void sendMessageTo(int hartid, MessageType type, void* data) {
-    TrapFrame* lock = criticalEnter();
+    Task* task = criticalEnter();
     lockUnsafeLock(&message_write_lock);
     message_type = type;
     message_data = data;
@@ -38,7 +38,7 @@ void sendMessageTo(int hartid, MessageType type, void* data) {
     unlockUnsafeLock(&message_read_lock);
     // Only after the message has been handled can we write another one
     unlockUnsafeLock(&message_write_lock);
-    criticalReturn(lock);
+    criticalReturn(task);
 }
 
 void sendMessageToAll(MessageType type, void* data) {

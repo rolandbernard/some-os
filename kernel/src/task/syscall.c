@@ -32,6 +32,10 @@ SyscallReturn sleepSyscall(TrapFrame* frame) {
 }
 
 SyscallReturn criticalSyscall(TrapFrame* frame) {
+#ifdef CRITICAL_FAST_PATH
+    // This is handled by a special fast path in the trap handler
+    panic();
+#else
     if (frame->hart != NULL) {
         frame->regs[REG_ARGUMENT_0] = (uintptr_t)frame;
         swapTrapFrame(frame, getCurrentTrapFrame());
@@ -39,19 +43,27 @@ SyscallReturn criticalSyscall(TrapFrame* frame) {
         frame->regs[REG_ARGUMENT_0] = 0;
     }
     return CONTINUE;
+#endif
 }
 
-TrapFrame* criticalEnter() {
+Task* criticalEnter() {
     if (getCurrentTask() != NULL) {
-        return (TrapFrame*)syscall(SYSCALL_CRITICAL);
+        return (Task*)syscall(SYSCALL_CRITICAL);
     } else {
         return NULL;
     }
 }
 
-void criticalReturn(TrapFrame* to) {
-    if (to != NULL && getCurrentTask() == NULL) {
-        swapTrapFrame(getCurrentTrapFrame(), to);
+extern void criticalReturnFastPath(Task* to);
+
+void criticalReturn(Task* to) {
+    assert(getCurrentTask() == NULL);
+    if (to != NULL) {
+#ifdef CRITICAL_FAST_PATH
+        criticalReturnFastPath(to);
+#else
+        swapTrapFrame(getCurrentTrapFrame(), &to->frame);
+#endif
     }
 }
 

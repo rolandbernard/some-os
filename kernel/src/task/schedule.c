@@ -35,7 +35,7 @@ void enqueueTask(Task* task) {
     ScheduleQueue* queue = &hart->queue;
     if (hart->idle_task != task) { // Ignore the idle process
         lockSpinLock(&task->sched.lock);
-        switch (task->sched._state) {
+        switch (task->sched.state) {
             case SLEEPING:
             case PAUSED:
             case WAIT_CHLD:
@@ -72,7 +72,7 @@ void enqueueTask(Task* task) {
 
 static void awakenTask(Task* task) {
     lockSpinLock(&task->sched.lock);
-    if (task->sched._state == SLEEPING) {
+    if (task->sched.state == SLEEPING) {
         Time time = getTime();
         if (time >= task->sched.sleeping_until) {
             task->frame.regs[REG_ARGUMENT_0] = 0;
@@ -98,9 +98,9 @@ static void awakenTasks() {
         Task* task = *current;
         lockSpinLock(&task->sched.lock);
         if (
-            (task->sched._state == SLEEPING && task->sched.sleeping_until <= time)
+            (task->sched.state == SLEEPING && task->sched.sleeping_until <= time)
             || (task->process != NULL && shouldTaskWakeup(task))
-            || task->sched._state == TERMINATED
+            || task->sched.state == TERMINATED
         ) {
             unlockSpinLock(&task->sched.lock);
             *current = task->sched.sched_next;
@@ -132,7 +132,7 @@ noreturn void runNextTaskFrom(HartFrame* hart) {
         while (next == NULL) {
             next = pullTaskForHart(hart);
             lockSpinLock(&next->sched.lock);
-            if (next->sched._state == TERMINATED) {
+            if (next->sched.state == TERMINATED) {
                 unlockSpinLock(&next->sched.lock);
                 deallocTask(next);
                 next = NULL;
@@ -222,8 +222,8 @@ Task* removeTaskFromQueue(ScheduleQueue* queue, Task* task) {
 
 void moveTaskToState(Task* task, TaskState state) {
     lockSpinLock(&task->sched.lock);
-    if (task->sched._state != TERMINATED) {
-        task->sched._state = state;
+    if (task->sched.state != TERMINATED) {
+        task->sched.state = state;
     }
     unlockSpinLock(&task->sched.lock);
 }

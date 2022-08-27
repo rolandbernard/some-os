@@ -10,7 +10,7 @@ typedef struct {
     UnsafeLock unsafelock;
     struct HartFrame_s* locked_by;
     size_t num_locks;
-    struct TrapFrame_s* crit_ret_frame;
+    struct Task_s* crit_ret_frame;
 } SpinLock;
 
 void initSpinLock(SpinLock* lock);

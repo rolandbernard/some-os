@@ -109,9 +109,8 @@ static void syscallTaskEntry(SyscallFunction func, TrapFrame* frame) {
     assert(frame->hart != NULL);
     Task* task = (Task*)frame;
     SyscallReturn ret = func(frame);
-    Task* self = getCurrentTask();
+    Task* self = criticalEnter();
     assert(self != NULL); // Make sure we did not miss to call criticalReturn somewhere
-    TrapFrame* lock = criticalEnter();
     task->times.system_time += self->times.user_time + self->times.system_time;
     task->times.system_time += self->times.user_child_time + self->times.system_child_time;
     if (ret == CONTINUE) {
@@ -119,7 +118,8 @@ static void syscallTaskEntry(SyscallFunction func, TrapFrame* frame) {
         enqueueTask(task);
     }
     moveTaskToState(self, TERMINATED);
-    criticalReturn(lock);
+    enqueueTask(self);
+    runNextTask();
     panic();
 }
 

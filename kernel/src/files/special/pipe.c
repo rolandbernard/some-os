@@ -1,4 +1,5 @@
 
+#include <assert.h>
 #include <string.h>
 
 #include "files/special/pipe.h"
@@ -77,14 +78,14 @@ static void doOperationOnPipe(PipeSharedData* pipe) {
 }
 
 Error executePipeOperation(PipeSharedData* data, Process* process, VirtPtr buffer, size_t size, bool write, size_t* ret) {
-    Task* self = getCurrentTask();
     WaitingPipeOperation op;
     op.buffer = buffer;
     op.size = size;
     op.written = 0;
-    op.wakeup = self;
     op.next = NULL;
-    TrapFrame* lock = criticalEnter();
+    Task* self = criticalEnter();
+    assert(self != NULL);
+    op.wakeup = self;
     moveTaskToState(self, WAITING);
     lockSpinLock(&data->lock);
     if (write) {
@@ -104,7 +105,7 @@ Error executePipeOperation(PipeSharedData* data, Process* process, VirtPtr buffe
     }
     doOperationOnPipe(data);
     unlockSpinLock(&data->lock);
-    criticalReturn(lock);
+    criticalReturn(self);
     *ret = op.written;
     return simpleError(SUCCESS);
 }
@@ -136,7 +137,7 @@ static Error pipeStatFunction(PipeFile* file, Process* process, VirtPtr stat) {
 }
 
 static void pipeFreeFunction(PipeFile* file) {
-    TrapFrame* lock = criticalEnter();
+    Task* task = criticalEnter();
     lockSpinLock(&file->data->lock);
     file->data->ref_count--;
     if (file->data->ref_count == 0) {
@@ -147,7 +148,7 @@ static void pipeFreeFunction(PipeFile* file) {
         unlockSpinLock(&file->data->lock);
     }
     dealloc(file);
-    criticalReturn(lock);
+    criticalReturn(task);
 }
 
 PipeFile* duplicatePipeFile(PipeFile* file) {

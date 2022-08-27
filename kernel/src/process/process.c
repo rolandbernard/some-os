@@ -296,7 +296,7 @@ int doForProcessWithPid(int pid, ProcessFindCallback callback, void* udata) {
 }
 
 void handleProcessTaskWakeup(Task* task) {
-    if (task->sched._state == WAIT_CHLD) {
+    if (task->sched.state == WAIT_CHLD) {
         basicProcessWait(task);
     }
 }

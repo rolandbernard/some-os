@@ -16,7 +16,7 @@ void initTaskLock(TaskLock* lock) {
 
 static bool lockOrWaitTaskLock(TaskLock* lock, Task* self) {
     bool result;
-    TrapFrame* lock_frame = criticalEnter();
+    Task* task = criticalEnter();
     lockUnsafeLock(&lock->unsafelock);
     if (lock->locked_by == NULL) {
         result = true;
@@ -27,7 +27,7 @@ static bool lockOrWaitTaskLock(TaskLock* lock, Task* self) {
         lock->wait_queue = self;
     }
     unlockUnsafeLock(&lock->unsafelock);
-    criticalReturn(lock_frame);
+    criticalReturn(task);
     return result;
 }
 
@@ -53,7 +53,7 @@ bool tryLockingTaskLock(TaskLock* lock) {
         return true;
     } else {
         bool result;
-        TrapFrame* lock_frame = criticalEnter();
+        self = criticalEnter();
         lockUnsafeLock(&lock->unsafelock);
         if (lock->locked_by == NULL) {
             lock->num_locks++;
@@ -63,7 +63,7 @@ bool tryLockingTaskLock(TaskLock* lock) {
             result = false;
         }
         unlockUnsafeLock(&lock->unsafelock);
-        criticalReturn(lock_frame);
+        criticalReturn(self);
         return result;
     }
 }
@@ -72,7 +72,7 @@ void unlockTaskLock(TaskLock* lock) {
     assert(getCurrentTask() != NULL);
     lock->num_locks--;
     if (lock->num_locks == 0) {
-        TrapFrame* lock_frame = criticalEnter();
+        Task* task = criticalEnter();
         lockUnsafeLock(&lock->unsafelock);
         lock->locked_by = NULL;
         while (lock->wait_queue != NULL) {
@@ -82,7 +82,7 @@ void unlockTaskLock(TaskLock* lock) {
             enqueueTask(wakeup);
         }
         unlockUnsafeLock(&lock->unsafelock);
-        criticalReturn(lock_frame);
+        criticalReturn(task);
     }
 }
 

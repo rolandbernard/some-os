@@ -22,6 +22,7 @@ initTraps:
     # NOTE: Delegation disabled for now.
     # (How to handle M-mode interrupt while handling S-mode interrupt?)
     # (SpinLocks are a problem.)
+    # (criticalEnter will break.)
     # csrw medeleg, t0
     # csrw mideleg, t0
     csrw mie, t0
@@ -106,10 +107,44 @@ kernelTrapReturn:
     sret
 .cfi_endproc
 
+.global criticalEnterFastPath
+criticalEnterFastPath:
+.cfi_startproc
+    csrr a0, sscratch
+    ld t0, 0(a0)
+    csrw sscratch, t0
+    csrr t0, mepc
+    addi t0, t0, 4
+    jr t0
+.cfi_endproc
+
+.global criticalReturnFastPath
+criticalReturnFastPath:
+.cfi_startproc
+    li t0, 1 << 8
+    csrrs zero, sstatus, t0
+    csrw sepc, ra
+    csrw sscratch, a0
+    sret
+.cfi_endproc
+
 .align 4
 indirectKernelTrapVector:
 .cfi_startproc
     csrw mscratch, t0
+#ifdef CRITICAL_FAST_PATH
+    csrr t0, mcause
+    addi t0, t0, -9
+    beqz t0, 1f  # cause 9: Environment call from S-mode
+    addi t0, t0, -2
+    beqz t0, 1f  # cause 11: Environment call from M-mode
+    j 2f
+1:
+    mv t0, a0
+    addi t0, t0, -1024
+    beqz t0, criticalEnterFastPath
+2:
+#endif
     csrr t0, mcause
     csrw scause, t0
     csrr t0, mepc
