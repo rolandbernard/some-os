@@ -14,7 +14,7 @@ void initTaskLock(TaskLock* lock) {
     lock->wait_queue = NULL;
 }
 
-static void addTaskToWaitQueue(void* _, Task* task, TaskLock* lock) {
+static void waitForTaskLock(void* _, Task* task, TaskLock* lock) {
     moveTaskToState(task, WAITING);
     enqueueTask(task);
     task->sched.sched_next = lock->wait_queue;
@@ -35,7 +35,7 @@ static bool lockOrWaitTaskLock(TaskLock* lock) {
     } else {
         result = false;
         if (saveToFrame(&task->frame)) {
-            callInHart((void*)addTaskToWaitQueue, task, lock);
+            callInHart((void*)waitForTaskLock, task, lock);
         }
     }
     return result;

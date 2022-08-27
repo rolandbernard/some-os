@@ -15,7 +15,7 @@ CC := $(ARCH)-someos-gcc
 # == Flags
 CCFLAGS += -nostdlib -ffreestanding -mcmodel=medany
 CCFLAGS += -I$(SOURCE_DIR)/libc/include
-#CCFLAGS += -DCRITICAL_FAST_PATH
+CCFLAGS += -DCRITICAL_FAST_PATH
 
 LDFLAGS += -L$(TOOLS_DIR)/lib/gcc/riscv64-someos/12.0.0/
 LDLIBS  += -lgcc

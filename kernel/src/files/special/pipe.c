@@ -77,16 +77,23 @@ static void doOperationOnPipe(PipeSharedData* pipe) {
     }
 }
 
+static void waitForPipeOperation(void* _, Task* task, PipeSharedData* data) {
+    moveTaskToState(task, WAITING);
+    enqueueTask(task);
+    doOperationOnPipe(data);
+    unlockSpinLock(&data->lock);
+    runNextTask();
+}
+
 Error executePipeOperation(PipeSharedData* data, Process* process, VirtPtr buffer, size_t size, bool write, size_t* ret) {
     WaitingPipeOperation op;
     op.buffer = buffer;
     op.size = size;
     op.written = 0;
     op.next = NULL;
-    Task* self = criticalEnter();
-    assert(self != NULL);
-    op.wakeup = self;
-    moveTaskToState(self, WAITING);
+    Task* task = criticalEnter();
+    assert(task != NULL);
+    op.wakeup = task;
     lockSpinLock(&data->lock);
     if (write) {
         if (data->waiting_writes == NULL) {
@@ -103,9 +110,9 @@ Error executePipeOperation(PipeSharedData* data, Process* process, VirtPtr buffe
             data->waiting_reads_tail->next = &op;
         }
     }
-    doOperationOnPipe(data);
-    unlockSpinLock(&data->lock);
-    criticalReturn(self);
+    if (saveToFrame(&task->frame)) {
+        callInHart((void*)waitForPipeOperation, task, data);
+    }
     *ret = op.written;
     return simpleError(SUCCESS);
 }

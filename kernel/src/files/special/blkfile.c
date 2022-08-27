@@ -45,7 +45,7 @@ static void blockOperatonCallback(Error status, BlockFileOperation* wakeup) {
     enqueueTask(wakeup->wakeup);
 }
 
-static void syncBlockOperationHart(
+static void waitForBlockOperation(
     void* _, BlockFileOperation* op, BlockOperationFunction func, void* dev, VirtPtr buf, size_t off, size_t size, bool write
 ) {
     moveTaskToState(op->wakeup, WAITING);
@@ -59,7 +59,7 @@ static Error syncBlockOperation(BlockOperationFunction func, void* dev, VirtPtr 
     BlockFileOperation wakeup;
     wakeup.wakeup = task;
     if (saveToFrame(&task->frame)) {
-        callInHart((void*)syncBlockOperationHart, &wakeup, func, dev, buf, off, size, write);
+        callInHart((void*)waitForBlockOperation, &wakeup, func, dev, buf, off, size, write);
     }
     return wakeup.result;
 }
