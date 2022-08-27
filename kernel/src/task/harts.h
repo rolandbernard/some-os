@@ -33,4 +33,8 @@ void* getKernelGlobalPointer();
 // Save the current state to one TrapFrame and load from the other.
 void swapTrapFrame(TrapFrame* load_from, TrapFrame* save_to);
 
+// Save the current state to frame.
+// Returns true immediately, but false when loading the frame.
+bool saveStateToFrame(TrapFrame* frame);
+
 #endif

@@ -54,6 +54,7 @@ void unlockSpinLock(SpinLock* lock) {
     if (hart != NULL) {
         hart->spinlocks_locked--;
     }
+    assert(hart == lock->locked_by);
 #endif
     lock->num_locks--;
     if (lock->num_locks == 0) {

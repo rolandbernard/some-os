@@ -104,7 +104,7 @@ static bool isSyncSyscall(Syscalls id) {
     return id == SYSCALL_CRITICAL;
 }
 
-static void syscallTaskEntry(SyscallFunction func, TrapFrame* frame) {
+static void syscallTask(SyscallFunction func, TrapFrame* frame) {
     assert(getCurrentTask() != NULL);
     assert(frame->hart != NULL);
     Task* task = (Task*)frame;
@@ -150,7 +150,7 @@ void runSyscall(TrapFrame* frame, bool is_kernel) {
             assert(frame->hart != NULL); // Only tasks can wait for async syscalls
             Task* task = (Task*)frame;
             moveTaskToState(task, WAITING);
-            Task* syscall_task = createKernelTask(syscallTaskEntry, SYSCALL_STACK_SIZE, task->sched.priority);
+            Task* syscall_task = createKernelTask(syscallTask, SYSCALL_STACK_SIZE, task->sched.priority);
             syscall_task->frame.regs[REG_ARGUMENT_0] = (uintptr_t)func;
             syscall_task->frame.regs[REG_ARGUMENT_1] = (uintptr_t)frame;
             enqueueTask(syscall_task);

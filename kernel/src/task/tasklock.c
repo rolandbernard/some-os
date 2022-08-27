@@ -73,6 +73,7 @@ void unlockTaskLock(TaskLock* lock) {
     lock->num_locks--;
     if (lock->num_locks == 0) {
         Task* task = criticalEnter();
+        assert(task == lock->locked_by);
         lockUnsafeLock(&lock->unsafelock);
         lock->locked_by = NULL;
         while (lock->wait_queue != NULL) {

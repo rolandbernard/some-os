@@ -47,14 +47,10 @@ static void blockOperatonCallback(Error status, BlockFileWakeup* wakeup) {
 
 static Error syncBlockOperation(BlockOperationFunction func, void* dev, VirtPtr buf, size_t off, size_t size, bool write) {
     BlockFileWakeup wakeup;
-    Task* self = criticalEnter();
-    assert(self != NULL);
-    wakeup.wakeup = self;
-    moveTaskToState(self, WAITING);
-    enqueueTask(self);
-    func(dev, buf, off, size, write, (BlockOperatonCallback)blockOperatonCallback, &wakeup);
-    runNextTask();
-    panic();
+    if (taskWaitFor(&wakeup.wakeup)) {
+        func(dev, buf, off, size, write, (BlockOperatonCallback)blockOperatonCallback, &wakeup);
+        runNextTask();
+    }
     return wakeup.result;
 }
 
