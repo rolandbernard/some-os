@@ -305,8 +305,3 @@ SyscallReturn getGidSyscall(TrapFrame* frame) {
     SYSCALL_RETURN(gid);
 }
 
-noreturn void leave() {
-    syscall(SYSCALL_EXIT);
-    panic(); // This will never return
-}
-

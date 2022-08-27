@@ -6,11 +6,15 @@
 #include "task/types.h"
 #include "util/unsafelock.h"
 
-typedef struct {
+typedef struct TaskLock_s {
     UnsafeLock unsafelock;
     Task* locked_by;
     size_t num_locks;
     Task* wait_queue;
+#ifdef DEBUG
+    struct TaskLock_s* next_locked;
+    struct TaskLock_s* prev_locked;
+#endif
 } TaskLock;
 
 void initTaskLock(TaskLock* lock);

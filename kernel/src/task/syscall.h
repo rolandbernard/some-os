@@ -13,4 +13,6 @@ Task* criticalEnter();
 
 void criticalReturn(Task* to);
 
+noreturn void leave();
+
 #endif

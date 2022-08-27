@@ -7,6 +7,11 @@
 #include "task/syscall.h"
 #include "task/task.h"
 
+#ifdef DEBUG
+static SpinLock locked_lock;
+static TaskLock* locked_locks;
+#endif
+
 void initTaskLock(TaskLock* lock) {
     lock->unsafelock.lock = 0;
     lock->locked_by = NULL;
@@ -23,20 +28,51 @@ static void waitForTaskLock(void* _, Task* task, TaskLock* lock) {
     runNextTask();
 }
 
+static void basicLockByTask(TaskLock* lock, Task* task) {
+    lock->locked_by = task;
+#ifdef DEBUG
+    lockSpinLock(&locked_lock);
+    lock->prev_locked = NULL;
+    lock->next_locked = locked_locks;
+    if (locked_locks != NULL) {
+        locked_locks->prev_locked = lock;
+    }
+    locked_locks = lock;
+    unlockSpinLock(&locked_lock);
+#endif
+}
+
+static void basicUnlockByTask(TaskLock* lock, Task* task) {
+    lock->locked_by = NULL;
+#ifdef DEBUG
+    lockSpinLock(&locked_lock);
+    if (lock->prev_locked != NULL) {
+        lock->prev_locked->next_locked = lock->next_locked;
+    } else {
+        locked_locks = lock->next_locked;
+    }
+    if (lock->next_locked != NULL) {
+        lock->next_locked->prev_locked = lock->prev_locked;
+    }
+    unlockSpinLock(&locked_lock);
+#endif
+}
+
 static bool lockOrWaitTaskLock(TaskLock* lock) {
     bool result;
     Task* task = criticalEnter();
     assert(task != NULL);
     lockUnsafeLock(&lock->unsafelock);
     if (lock->locked_by == NULL) {
-        result = true;
+        basicLockByTask(lock, task);
         unlockUnsafeLock(&lock->unsafelock);
         criticalReturn(task);
+        result = true;
     } else {
-        result = false;
         if (saveToFrame(&task->frame)) {
             callInHart((void*)waitForTaskLock, task, lock);
         }
+        result = false;
     }
     return result;
 }
@@ -44,48 +80,43 @@ static bool lockOrWaitTaskLock(TaskLock* lock) {
 void lockTaskLock(TaskLock* lock) {
     Task* task = getCurrentTask();
     assert(task != NULL);
-    if (lock->locked_by == task) {
-        lock->num_locks++;
-    } else {
-        while (!lockOrWaitTaskLock(lock)) {
-            // Wait until we are able to lock.
-        }
-        lock->num_locks++;
-        lock->locked_by = task;
+    if (lock->locked_by != task) {
+        // Wait until we are able to lock.
+        while (!lockOrWaitTaskLock(lock));
     }
+    lock->num_locks++;
 }
 
 bool tryLockingTaskLock(TaskLock* lock) {
     Task* task = getCurrentTask();
     assert(task != NULL);
-    if (lock->locked_by == task) {
-        lock->num_locks++;
-        return true;
-    } else {
-        bool result;
+    bool result = true;
+    if (lock->locked_by != task) {
         task = criticalEnter();
         lockUnsafeLock(&lock->unsafelock);
         if (lock->locked_by == NULL) {
-            lock->num_locks++;
-            lock->locked_by = task;
+            basicLockByTask(lock, task);
             result = true;
         } else {
             result = false;
         }
         unlockUnsafeLock(&lock->unsafelock);
         criticalReturn(task);
-        return result;
     }
+    if (result) {
+        lock->num_locks++;
+    }
+    return result;
 }
 
 void unlockTaskLock(TaskLock* lock) {
     assert(getCurrentTask() != NULL);
+    assert(getCurrentTask() == lock->locked_by);
     lock->num_locks--;
     if (lock->num_locks == 0) {
         Task* task = criticalEnter();
-        assert(task == lock->locked_by);
         lockUnsafeLock(&lock->unsafelock);
-        lock->locked_by = NULL;
+        basicUnlockByTask(lock, task);
         while (lock->wait_queue != NULL) {
             Task* wakeup = lock->wait_queue;
             lock->wait_queue = wakeup->sched.sched_next;

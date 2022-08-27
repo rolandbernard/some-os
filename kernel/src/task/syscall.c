@@ -67,3 +67,15 @@ void criticalReturn(Task* to) {
     }
 }
 
+static void taskLeave(void* _, Task* task) {
+    moveTaskToState(task, TERMINATED);
+    enqueueTask(task);
+    runNextTask();
+}
+
+noreturn void leave() {
+    Task* task = criticalEnter();
+    assert(task != NULL);
+    callInHart((void*)taskLeave, task);
+}
+
