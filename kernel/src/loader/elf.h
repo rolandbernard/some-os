@@ -4,7 +4,7 @@
 #include <stdint.h>
 
 #include "error/error.h"
-#include "files/vfs.h"
+#include "files/vfs/types.h"
 #include "process/types.h"
 #include "memory/virtptr.h"
 

@@ -6,7 +6,7 @@
 #include "error/log.h"
 
 #include "devices/devices.h"
-#include "devices/serial/serial.h"
+#include "devices/serial/tty.h"
 #include "error/debuginfo.h"
 #include "interrupt/syscall.h"
 #include "memory/virtptr.h"
@@ -19,9 +19,9 @@ static SpinLock kernel_log_lock;
 
 static Error logKernelMessageV(const char* fmt, va_list args) {
     // Logging happens to the default serial device
-    Serial serial = getDefaultSerialDevice();
+    CharDevice* tty = getDefaultTtyDevice();
     FORMAT_STRINGV(string, fmt, args);
-    Error error = writeToSerial(serial, "%s", string);
+    Error error = writeStringToTty(tty, string);
     return error;
 }
 

@@ -3,8 +3,7 @@
 
 #include "files/special/fifo.h"
 
-#include "files/vfs.h"
-#include "kernel/time.h"
+#include "files/vfs/node.h"
 #include "memory/kalloc.h"
 #include "util/stringmap.h"
 
@@ -29,17 +28,6 @@ static PipeSharedData* getDataForName(const char* name, const char** unique_name
     return ret;
 }
 
-static void increaseReferenceFor(const char* name) {
-    lockSpinLock(&fifo_name_lock);
-    PipeSharedData* data = getFromStringMap(&named_data, name);
-    if (data != NULL) {
-        lockSpinLock(&data->lock);
-        data->ref_count++;
-        unlockSpinLock(&data->lock);
-    }
-    unlockSpinLock(&fifo_name_lock);
-}
-
 static void decreaseReferenceFor(const char* name) {
     lockSpinLock(&fifo_name_lock);
     PipeSharedData* data = getFromStringMap(&named_data, name);
@@ -57,79 +45,56 @@ static void decreaseReferenceFor(const char* name) {
     unlockSpinLock(&fifo_name_lock);
 }
 
-static Error fifoReadFunction(FifoFile* file, Process* process, VirtPtr buffer, size_t size, size_t* ret) {
-    if (canAccess(file->base.mode, file->base.uid, file->base.gid, process, VFS_ACCESS_R)) {
-        return executePipeOperation(file->data, process, buffer, size, false, ret);
-    } else {
-        return simpleError(EACCES);
-    }
+typedef struct {
+    VfsNode base;
+    PipeSharedData* data;
+    const char* name;
+} VfsFifoNode;
+
+static void fifoNodeFree(VfsFifoNode* node) {
+    decreaseReferenceFor(node->name);
+    vfsNodeClose(node->base.real_node);
+    dealloc(node);
 }
 
-static Error fifoWriteFunction(FifoFile* file, Process* process, VirtPtr buffer, size_t size, size_t* ret) {
-    if (canAccess(file->base.mode, file->base.uid, file->base.gid, process, VFS_ACCESS_W)) {
-        return executePipeOperation(file->data, process, buffer, size, true, ret);
-    } else {
-        return simpleError(EACCES);
-    }
+static Error fifoNodeReadAt(VfsFifoNode* node, VirtPtr buff, size_t offset, size_t length, size_t* read) {
+    return executePipeOperation(node->data, buff, length, false, read);
 }
 
-static Error fifoStatFunction(FifoFile* file, Process* process, VirtPtr stat) {
-    VfsStat ret = {
-        .id = file->base.ino,
-        .mode = file->base.mode,
-        .nlinks = file->data->ref_count,
-        .uid = file->base.uid,
-        .gid = file->base.gid,
-        .size = file->data->count,
-        .block_size = 0,
-        .st_atime = getNanoseconds(),
-        .st_mtime = getNanoseconds(),
-        .st_ctime = getNanoseconds(),
-        .dev = 0,
-    };
-    memcpyBetweenVirtPtr(stat, virtPtrForKernel(&ret), sizeof(VfsStat));
-    return simpleError(SUCCESS);
+static Error fifoNodeWriteAt(VfsFifoNode* node, VirtPtr buff, size_t offset, size_t length, size_t* written) {
+    return executePipeOperation(node->data, buff, length, true, written);
 }
 
-static void fifoFreeFunction(FifoFile* file) {
-    decreaseReferenceFor(file->name);
-    dealloc(file);
-}
-
-static Error fifoCopyFunction(FifoFile* file, Process* process, VfsFile** ret) {
-    increaseReferenceFor(file->name);
-    FifoFile* copy = kalloc(sizeof(FifoFile));
-    memcpy(copy, file, sizeof(FifoFile));
-    *ret = (VfsFile*)copy;
-    return simpleError(SUCCESS);
-}
-
-static const VfsFileVtable functions = {
-    .read = (ReadFunction)fifoReadFunction,
-    .write = (WriteFunction)fifoWriteFunction,
-    .stat = (StatFunction)fifoStatFunction,
-    .free = (FileFreeFunction)fifoFreeFunction,
-    .copy = (CopyFunction)fifoCopyFunction,
+static const VfsNodeFunctions funcs = {
+    .free = (VfsNodeFreeFunction)fifoNodeFree,
+    .read_at = (VfsNodeReadAtFunction)fifoNodeReadAt,
+    .write_at = (VfsNodeWriteAtFunction)fifoNodeWriteAt,
 };
 
-FifoFile* createFifoFile(const char* path, VfsMode mode, Uid uid, Gid gid) {
-    const char* name;
-    PipeSharedData* data = getDataForName(path, &name);
-    if (data == NULL || name == NULL) {
-        return NULL;
-    }
-    FifoFile* file = zalloc(sizeof(FifoFile));
-    if (file == NULL) {
-        decreaseReferenceFor(name);
-        return NULL;
-    }
-    file->base.functions = &functions;
-    file->base.mode = mode;
-    file->base.ino = 0;
-    file->base.gid = gid;
-    file->base.uid = uid;
-    file->name = name;
-    file->data = data;
+VfsFifoNode* createFifoNode(char* path, VfsNode* real_node) {
+    VfsFifoNode* node = kalloc(sizeof(VfsFifoNode));
+    node->base.functions = &funcs;
+    node->base.superblock = NULL;
+    memcpy(&node->base.stat, &real_node->stat, sizeof(VfsStat));
+    node->base.stat.size = 0;
+    node->base.stat.block_size = 0;
+    node->base.stat.blocks = 0;
+    node->base.real_node = real_node;
+    node->base.ref_count = 1;
+    initTaskLock(&node->base.lock);
+    node->base.mounted = NULL;
+    node->data = getDataForName(path, &node->name);
+    return node;
+}
+
+VfsFile* createFifoFile(VfsNode* node, char* path) {
+    VfsFile* file = kalloc(sizeof(VfsFile));
+    file->node = (VfsNode*)createFifoNode(path, node);
+    file->path = path;
+    file->ref_count = 1;
+    file->offset = 0;
+    file->flags = 0;
+    initTaskLock(&file->lock);
     return file;
 }
 

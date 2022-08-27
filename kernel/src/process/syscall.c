@@ -4,7 +4,6 @@
 #include <stdbool.h>
 #include <string.h>
 
-#include "files/vfs.h"
 #include "interrupt/syscall.h"
 #include "interrupt/timer.h"
 #include "memory/kalloc.h"
@@ -238,11 +237,14 @@ SyscallReturn sigprocmaskSyscall(TrapFrame* frame) {
 
 int killSyscallCallback(Process* process, void* udata) {
     Task* task = (Task*)udata;
+    lockTaskLock(&task->process->resources.lock);
     if (task->process->resources.uid == 0 || process->resources.uid == task->process->resources.uid) {
+        unlockTaskLock(&task->process->resources.lock);
         addSignalToProcess(process, task->frame.regs[REG_ARGUMENT_2]);
         return -SUCCESS;
     } else {
-        return -EACCES;
+        unlockTaskLock(&task->process->resources.lock);
+        return -EPERM;
     }
 }
 
@@ -257,11 +259,14 @@ SyscallReturn setUidSyscall(TrapFrame* frame) {
     assert(frame->hart != NULL);
     Task* task = (Task*)frame;
     assert(task->process != NULL);
-    if (task->process->resources.uid == 0 || task->process->resources.gid == 0) {
+    lockTaskLock(&task->process->resources.lock);
+    if (task->process->resources.uid == 0) {
         task->process->resources.uid = SYSCALL_ARG(0);
+        unlockTaskLock(&task->process->resources.lock);
         SYSCALL_RETURN(-SUCCESS);
     } else {
-        SYSCALL_RETURN(-EACCES);
+        unlockTaskLock(&task->process->resources.lock);
+        SYSCALL_RETURN(-EPERM);
     }
 }
 
@@ -269,11 +274,14 @@ SyscallReturn setGidSyscall(TrapFrame* frame) {
     assert(frame->hart != NULL);
     Task* task = (Task*)frame;
     assert(task->process != NULL);
-    if (task->process->resources.uid == 0 || task->process->resources.gid == 0) {
+    lockTaskLock(&task->process->resources.lock);
+    if (task->process->resources.uid == 0) {
         task->process->resources.gid = SYSCALL_ARG(0);
+        unlockTaskLock(&task->process->resources.lock);
         SYSCALL_RETURN(-SUCCESS);
     } else {
-        SYSCALL_RETURN(-EACCES);
+        unlockTaskLock(&task->process->resources.lock);
+        SYSCALL_RETURN(-EPERM);
     }
 }
 
@@ -281,14 +289,20 @@ SyscallReturn getUidSyscall(TrapFrame* frame) {
     assert(frame->hart != NULL);
     Task* task = (Task*)frame;
     assert(task->process != NULL);
-    SYSCALL_RETURN(task->process->resources.uid);
+    lockTaskLock(&task->process->resources.lock);
+    Uid uid = task->process->resources.uid;
+    unlockTaskLock(&task->process->resources.lock);
+    SYSCALL_RETURN(uid);
 }
 
 SyscallReturn getGidSyscall(TrapFrame* frame) {
     assert(frame->hart != NULL);
     Task* task = (Task*)frame;
     assert(task->process != NULL);
-    SYSCALL_RETURN(task->process->resources.gid);
+    lockTaskLock(&task->process->resources.lock);
+    Gid gid = task->process->resources.gid;
+    unlockTaskLock(&task->process->resources.lock);
+    SYSCALL_RETURN(gid);
 }
 
 noreturn void leave() {

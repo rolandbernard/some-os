@@ -1,20 +1,12 @@
 #ifndef _DEVFS_H_
 #define _DEVFS_H_
 
-#include "files/vfs.h"
-
-#define DEV_INO (size_t)(-1)
+#include "files/vfs/types.h"
 
 // Filesystem mounted as /dev
 
 typedef struct {
-    VfsFile base;
-    size_t entry;
-    SpinLock lock;
-} DeviceDirectoryFile;
-
-typedef struct {
-    VfsFilesystem base;
+    VfsSuperblock base;
 } DeviceFilesystem;
 
 DeviceFilesystem* createDeviceFilesystem();

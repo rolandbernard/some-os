@@ -3,7 +3,6 @@
 
 #include <stddef.h>
 
-#include "files/vfs.h"
 #include "task/spinlock.h"
 #include "process/types.h"
 
@@ -17,7 +16,7 @@ typedef struct WaitingPipeOperation_s {
     struct WaitingPipeOperation_s* next;
 } WaitingPipeOperation;
 
-typedef struct {
+typedef struct PipeSharedData_s {
     size_t ref_count;
     SpinLock lock;
     char* buffer;
@@ -29,17 +28,16 @@ typedef struct {
     WaitingPipeOperation* waiting_writes_tail;
 } PipeSharedData;
 
-typedef struct {
-    VfsFile base;
-    PipeSharedData* data;
-} PipeFile;
-
-PipeFile* createPipeFile();
-
-PipeFile* duplicatePipeFile(PipeFile* file);
-
-Error executePipeOperation(PipeSharedData* data, Process* process, VirtPtr buffer, size_t size, bool write, size_t* ret);
-
 PipeSharedData* createPipeSharedData();
+
+void copyPipeSharedData(PipeSharedData* data);
+
+void freePipeSharedData(PipeSharedData* data);
+
+Error executePipeOperation(PipeSharedData* data, VirtPtr buffer, size_t size, bool write, size_t* ret);
+
+VfsFile* createPipeFile();
+
+VfsFile* createPipeFileClone(VfsFile* file);
 
 #endif

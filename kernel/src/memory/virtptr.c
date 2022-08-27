@@ -11,6 +11,11 @@
 #include "error/log.h"
 
 VirtPtr virtPtrForKernel(void* addr) {
+    // There is currently not actually a difference between mutable and immutable VirtPtr
+    return virtPtrForKernelConst(addr);
+}
+
+VirtPtr virtPtrForKernelConst(const void* addr) {
     return virtPtrFor((uintptr_t)addr, kernel_page_table);
 }
 

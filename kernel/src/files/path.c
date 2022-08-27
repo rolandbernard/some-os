@@ -95,7 +95,10 @@ char* getParentPath(const char* path) {
     while (len > 0 && path_copy[len] != '/') {
         len--;
     }
-    if (len == 0) {
+    while (len > 0 && path_copy[len - 1] == '/') {
+        len--;
+    }
+    if (len == 0 && path_copy[0] == '/') {
         len++;
     }
     path_copy[len] = 0;
@@ -107,6 +110,10 @@ const char* getBaseFilename(const char* path) {
     while (len > 0 && path[len] != '/') {
         len--;
     }
-    return path + len + 1;
+    if (path[len] == '/') {
+        return path + len + 1;
+    } else {
+        return path + len;
+    }
 }
 

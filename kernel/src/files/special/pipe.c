@@ -5,10 +5,11 @@
 #include "files/special/pipe.h"
 
 #include "error/error.h"
+#include "files/vfs/node.h"
 #include "kernel/time.h"
 #include "memory/kalloc.h"
-#include "task/syscall.h"
 #include "task/schedule.h"
+#include "task/syscall.h"
 #include "util/util.h"
 
 // Shared data should be locked before calling this
@@ -39,8 +40,10 @@ static void doOperationOnPipe(PipeSharedData* pipe) {
                 if (pipe->waiting_reads == NULL) {
                     pipe->waiting_reads_tail = NULL;
                 }
-                moveTaskToState(op->wakeup, ENQUABLE);
-                enqueueTask(op->wakeup);
+                if (op->wakeup != NULL) {
+                    moveTaskToState(op->wakeup, ENQUABLE);
+                    enqueueTask(op->wakeup);
+                }
             }
         } else if (pipe->waiting_writes != NULL && pipe->count < PIPE_BUFFER_CAPACITY) {
             // We can do some writing
@@ -67,8 +70,10 @@ static void doOperationOnPipe(PipeSharedData* pipe) {
                 if (pipe->waiting_writes == NULL) {
                     pipe->waiting_writes_tail = NULL;
                 }
-                moveTaskToState(op->wakeup, ENQUABLE);
-                enqueueTask(op->wakeup);
+                if (op->wakeup != NULL) {
+                    moveTaskToState(op->wakeup, ENQUABLE);
+                    enqueueTask(op->wakeup);
+                }
             }
         } else {
             // We can't do anything right now.
@@ -85,7 +90,7 @@ static void waitForPipeOperation(void* _, Task* task, PipeSharedData* data) {
     runNextTask();
 }
 
-Error executePipeOperation(PipeSharedData* data, Process* process, VirtPtr buffer, size_t size, bool write, size_t* ret) {
+Error executePipeOperation(PipeSharedData* data, VirtPtr buffer, size_t size, bool write, size_t* ret) {
     WaitingPipeOperation op;
     op.buffer = buffer;
     op.size = size;
@@ -117,73 +122,6 @@ Error executePipeOperation(PipeSharedData* data, Process* process, VirtPtr buffe
     return simpleError(SUCCESS);
 }
 
-static Error pipeReadFunction(PipeFile* file, Process* process, VirtPtr buffer, size_t size, size_t* ret) {
-    return executePipeOperation(file->data, process, buffer, size, false, ret);
-}
-
-static Error pipeWriteFunction(PipeFile* file, Process* process, VirtPtr buffer, size_t size, size_t* ret) {
-    return executePipeOperation(file->data, process, buffer, size, true, ret);
-}
-
-static Error pipeStatFunction(PipeFile* file, Process* process, VirtPtr stat) {
-    VfsStat ret = {
-        .id = file->base.ino,
-        .mode = TYPE_MODE(VFS_TYPE_CHAR) | VFS_MODE_OGA_RW,
-        .nlinks = file->data->ref_count,
-        .uid = file->base.uid,
-        .gid = file->base.gid,
-        .size = file->data->count,
-        .block_size = 0,
-        .st_atime = getNanoseconds(),
-        .st_mtime = getNanoseconds(),
-        .st_ctime = getNanoseconds(),
-        .dev = 0,
-    };
-    memcpyBetweenVirtPtr(stat, virtPtrForKernel(&ret), sizeof(VfsStat));
-    return simpleError(SUCCESS);
-}
-
-static void pipeFreeFunction(PipeFile* file) {
-    Task* task = criticalEnter();
-    lockSpinLock(&file->data->lock);
-    file->data->ref_count--;
-    if (file->data->ref_count == 0) {
-        unlockSpinLock(&file->data->lock);
-        dealloc(file->data->buffer);
-        dealloc(file->data);
-    } else {
-        unlockSpinLock(&file->data->lock);
-    }
-    dealloc(file);
-    criticalReturn(task);
-}
-
-PipeFile* duplicatePipeFile(PipeFile* file) {
-    if (file != NULL) {
-        lockSpinLock(&file->data->lock);
-        file->data->ref_count++;
-        unlockSpinLock(&file->data->lock);
-        PipeFile* copy = kalloc(sizeof(PipeFile));
-        memcpy(copy, file, sizeof(PipeFile));
-        return copy;
-    } else {
-        return NULL;
-    }
-}
-
-static Error pipeCopyFunction(PipeFile* file, Process* process, VfsFile** ret) {
-    *ret = (VfsFile*)duplicatePipeFile(file);
-    return simpleError(SUCCESS);
-}
-
-static const VfsFileVtable functions = {
-    .read = (ReadFunction)pipeReadFunction,
-    .write = (WriteFunction)pipeWriteFunction,
-    .stat = (StatFunction)pipeStatFunction,
-    .free = (FileFreeFunction)pipeFreeFunction,
-    .copy = (CopyFunction)pipeCopyFunction,
-};
-
 PipeSharedData* createPipeSharedData() {
     PipeSharedData* data = zalloc(sizeof(PipeSharedData));
     data->ref_count = 1;
@@ -191,17 +129,83 @@ PipeSharedData* createPipeSharedData() {
     return data;
 }
 
-PipeFile* createPipeFile() {
-    PipeFile* file = zalloc(sizeof(PipeFile));
-    if (file != NULL) {
-        file->base.functions = &functions;
-        file->base.ino = 0;
-        file->data = createPipeSharedData();
-        if (file->data == NULL) {
-            dealloc(file);
-            file = NULL;
-        }
+void copyPipeSharedData(PipeSharedData* data) {
+    lockSpinLock(&data->lock);
+    data->ref_count++;
+    unlockSpinLock(&data->lock);
+}
+
+void freePipeSharedData(PipeSharedData* data) {
+    lockSpinLock(&data->lock);
+    data->ref_count--;
+    if (data->ref_count == 0) {
+        unlockSpinLock(&data->lock);
+        dealloc(data->buffer);
+        dealloc(data);
+    } else {
+        unlockSpinLock(&data->lock);
     }
+}
+
+typedef struct {
+    VfsNode base;
+    PipeSharedData* data;
+} VfsPipeNode;
+
+static void pipeNodeFree(VfsPipeNode* node) {
+    freePipeSharedData(node->data);
+    dealloc(node);
+}
+
+static Error pipeNodeReadAt(VfsPipeNode* node, VirtPtr buff, size_t offset, size_t length, size_t* read) {
+    return executePipeOperation(node->data, buff, length, false, read);
+}
+
+static Error pipeNodeWriteAt(VfsPipeNode* node, VirtPtr buff, size_t offset, size_t length, size_t* written) {
+    return executePipeOperation(node->data, buff, length, true, written);
+}
+
+static const VfsNodeFunctions funcs = {
+    .free = (VfsNodeFreeFunction)pipeNodeFree,
+    .read_at = (VfsNodeReadAtFunction)pipeNodeReadAt,
+    .write_at = (VfsNodeWriteAtFunction)pipeNodeWriteAt,
+};
+
+VfsPipeNode* createPipeNode() {
+    VfsPipeNode* node = kalloc(sizeof(VfsPipeNode));
+    node->base.functions = &funcs;
+    node->base.superblock = NULL;
+    memset(&node->base.stat, 0, sizeof(VfsStat));
+    // Everything is allowed.
+    node->base.stat.mode = TYPE_MODE(VFS_TYPE_UNKNOWN) | 0777;
+    node->base.stat.atime = getNanoseconds();
+    node->base.stat.mtime = getNanoseconds();
+    node->base.stat.ctime = getNanoseconds();
+    node->base.real_node = (VfsNode*)node;
+    node->base.ref_count = 0;
+    initTaskLock(&node->base.lock);
+    node->base.mounted = NULL;
+    node->data = createPipeSharedData();
+    return node;
+}
+
+static VfsFile* createPipeFileWithNode(VfsNode* node) {
+    vfsNodeCopy(node);
+    VfsFile* file = kalloc(sizeof(VfsFile));
+    file->node = node;
+    file->path = NULL;
+    file->ref_count = 1;
+    file->offset = 0;
+    file->flags = 0;
+    initTaskLock(&file->lock);
     return file;
+}
+
+VfsFile* createPipeFile() {
+    return createPipeFileWithNode((VfsNode*)createPipeNode());
+}
+
+VfsFile* createPipeFileClone(VfsFile* file) {
+    return createPipeFileWithNode(file->node);
 }
 
