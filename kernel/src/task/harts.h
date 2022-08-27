@@ -1,6 +1,8 @@
 #ifndef _HARTS_H_
 #define _HARTS_H_
 
+#include <stdnoreturn.h>
+
 #include "task/types.h"
 
 #define HART_STACK_SIZE (1 << 16)
@@ -30,11 +32,18 @@ int getCurrentHartId();
 
 void* getKernelGlobalPointer();
 
+// Save the current state to frame.
+// Returns true immediately, but false when loading the frame.
+bool saveToFrame(TrapFrame* frame);
+
+// Load state from frame.
+noreturn void loadFromFrame(TrapFrame* frame);
+
 // Save the current state to one TrapFrame and load from the other.
 void swapTrapFrame(TrapFrame* load_from, TrapFrame* save_to);
 
-// Save the current state to frame.
-// Returns true immediately, but false when loading the frame.
-bool saveStateToFrame(TrapFrame* frame);
+typedef void (*CallInFunction)(TrapFrame* self, ...);
+
+noreturn void callInHart(CallInFunction func, ...);
 
 #endif

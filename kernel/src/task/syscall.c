@@ -67,16 +67,3 @@ void criticalReturn(Task* to) {
     }
 }
 
-bool taskWaitFor(Task** ret) {
-    Task* task = criticalEnter();
-    assert(task != NULL);
-    if (saveStateToFrame(&task->frame)) {
-        *ret = task;
-        moveTaskToState(task, WAITING);
-        enqueueTask(task);
-        return true;
-    } else {
-        return false;
-    }
-}
-

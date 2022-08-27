@@ -22,6 +22,11 @@ void initTrapFrame(TrapFrame* frame, uintptr_t sp, uintptr_t gp, uintptr_t pc, u
     frame->satp = satpForMemory(asid, table);
 }
 
+void initKernelTrapFrame(TrapFrame* frame, uintptr_t sp, uintptr_t pc) {
+    initTrapFrame(frame, sp, (uintptr_t)getKernelGlobalPointer(), pc, 0, kernel_page_table);
+    frame->regs[REG_RETURN_ADDRESS] = (uintptr_t)__builtin_return_address(0);
+}
+
 Task* createTask() {
     return zalloc(sizeof(Task));
 }
@@ -33,10 +38,7 @@ Task* createKernelTask(void* enter, size_t stack_size, Priority priority) {
     }
     task->stack = kalloc(stack_size);
     task->stack_top = (uintptr_t)task->stack + stack_size;
-    initTrapFrame(
-        &task->frame, task->stack_top, (uintptr_t)getKernelGlobalPointer(),
-        (uintptr_t)enter, 0, kernel_page_table
-    );
+    initKernelTrapFrame(&task->frame, task->stack_top, (uintptr_t)enter);
     task->sched.priority = priority;
     moveTaskToState(task, ENQUABLE);
     return task;

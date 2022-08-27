@@ -14,20 +14,30 @@ void initTaskLock(TaskLock* lock) {
     lock->wait_queue = NULL;
 }
 
-static bool lockOrWaitTaskLock(TaskLock* lock, Task* self) {
+static void addTaskToWaitQueue(void* _, Task* task, TaskLock* lock) {
+    moveTaskToState(task, WAITING);
+    enqueueTask(task);
+    task->sched.sched_next = lock->wait_queue;
+    lock->wait_queue = task;
+    unlockUnsafeLock(&lock->unsafelock);
+    runNextTask();
+}
+
+static bool lockOrWaitTaskLock(TaskLock* lock) {
     bool result;
     Task* task = criticalEnter();
+    assert(task != NULL);
     lockUnsafeLock(&lock->unsafelock);
     if (lock->locked_by == NULL) {
         result = true;
+        unlockUnsafeLock(&lock->unsafelock);
+        criticalReturn(task);
     } else {
         result = false;
-        moveTaskToState(self, WAITING);
-        self->sched.sched_next = lock->wait_queue;
-        lock->wait_queue = self;
+        if (saveToFrame(&task->frame)) {
+            callInHart((void*)addTaskToWaitQueue, task, lock);
+        }
     }
-    unlockUnsafeLock(&lock->unsafelock);
-    criticalReturn(task);
     return result;
 }
 
@@ -37,7 +47,7 @@ void lockTaskLock(TaskLock* lock) {
     if (lock->locked_by == self) {
         lock->num_locks++;
     } else {
-        while (!lockOrWaitTaskLock(lock, self)) {
+        while (!lockOrWaitTaskLock(lock)) {
             // Wait until we are able to lock.
         }
         lock->num_locks++;

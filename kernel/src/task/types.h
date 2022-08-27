@@ -68,7 +68,7 @@ typedef struct {
 
 typedef struct HartFrame_s {
     TrapFrame frame;
-    void* stack_top;
+    uintptr_t stack_top;
     int hartid;
     ScheduleQueue queue;
     struct Task_s* idle_task;

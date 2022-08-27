@@ -104,6 +104,12 @@ static bool isSyncSyscall(Syscalls id) {
     return id == SYSCALL_CRITICAL;
 }
 
+static void syscallTaskEnd(void* _, Task* task) {
+    moveTaskToState(task, TERMINATED);
+    enqueueTask(task);
+    runNextTask();
+}
+
 static void syscallTask(SyscallFunction func, TrapFrame* frame) {
     assert(getCurrentTask() != NULL);
     assert(frame->hart != NULL);
@@ -117,10 +123,7 @@ static void syscallTask(SyscallFunction func, TrapFrame* frame) {
         moveTaskToState(task, ENQUABLE);
         enqueueTask(task);
     }
-    moveTaskToState(self, TERMINATED);
-    enqueueTask(self);
-    runNextTask();
-    panic();
+    callInHart((void*)syscallTaskEnd, self);
 }
 
 void runSyscall(TrapFrame* frame, bool is_kernel) {

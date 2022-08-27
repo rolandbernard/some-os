@@ -12,6 +12,8 @@
 
 void initTrapFrame(TrapFrame* frame, uintptr_t sp, uintptr_t gp, uintptr_t pc, uintptr_t asid, PageTable* table);
 
+void initKernelTrapFrame(TrapFrame* frame, uintptr_t sp, uintptr_t pc);
+
 Task* createTask();
 
 Task* createKernelTask(void* enter, size_t stack_size, Priority priority);

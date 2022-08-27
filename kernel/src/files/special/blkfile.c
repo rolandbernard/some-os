@@ -35,21 +35,31 @@ static Error blockSeekFunction(BlockDeviceFile* file, Process* process, size_t o
 }
 
 typedef struct {
-    Error result;
     Task* wakeup;
-} BlockFileWakeup;
+    Error result;
+} BlockFileOperation;
 
-static void blockOperatonCallback(Error status, BlockFileWakeup* wakeup) {
+static void blockOperatonCallback(Error status, BlockFileOperation* wakeup) {
     wakeup->result = status;
     moveTaskToState(wakeup->wakeup, ENQUABLE);
     enqueueTask(wakeup->wakeup);
 }
 
+static void syncBlockOperationHart(
+    void* _, BlockFileOperation* op, BlockOperationFunction func, void* dev, VirtPtr buf, size_t off, size_t size, bool write
+) {
+    moveTaskToState(op->wakeup, WAITING);
+    enqueueTask(op->wakeup);
+    func(dev, buf, off, size, write, (BlockOperatonCallback)blockOperatonCallback, op);
+    runNextTask();
+}
+
 static Error syncBlockOperation(BlockOperationFunction func, void* dev, VirtPtr buf, size_t off, size_t size, bool write) {
-    BlockFileWakeup wakeup;
-    if (taskWaitFor(&wakeup.wakeup)) {
-        func(dev, buf, off, size, write, (BlockOperatonCallback)blockOperatonCallback, &wakeup);
-        runNextTask();
+    Task* task = criticalEnter();
+    BlockFileOperation wakeup;
+    wakeup.wakeup = task;
+    if (saveToFrame(&task->frame)) {
+        callInHart((void*)syncBlockOperationHart, &wakeup, func, dev, buf, off, size, write);
     }
     return wakeup.result;
 }

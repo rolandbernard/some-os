@@ -38,8 +38,8 @@ HartFrame* setupHartFrame(int hartid) {
     HartFrame* existing = getCurrentHartFrame();
     if (existing == NULL) {
         HartFrame* hart = zalloc(sizeof(HartFrame));
-        hart->stack_top = kalloc(HART_STACK_SIZE) + HART_STACK_SIZE;
-        initTrapFrame(&hart->frame, (uintptr_t)hart->stack_top, (uintptr_t)__global_pointer, 0, 0, kernel_page_table);
+        hart->stack_top = (uintptr_t)kalloc(HART_STACK_SIZE) + HART_STACK_SIZE;
+        initKernelTrapFrame(&hart->frame, hart->stack_top, 0);
         hart->idle_task = createKernelTask(idle, IDLE_STACK_SIZE, LOWEST_PRIORITY); // Every hart needs an idle process
         hart->hartid = hartid;
         writeSscratch(&hart->frame);
@@ -81,6 +81,12 @@ int getCurrentHartId() {
         return frame->hartid;
     } else {
         return readMhartid();
+    }
+}
+
+void swapTrapFrame(TrapFrame* load_from, TrapFrame* save_to) {
+    if (saveToFrame(save_to)) {
+        loadFromFrame(load_from);
     }
 }
 
