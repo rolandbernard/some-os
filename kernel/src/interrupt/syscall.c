@@ -20,7 +20,7 @@
 #define SYSCALL_STACK_SIZE HART_STACK_SIZE
 
 SyscallFunction user_syscalls[] = {
-    [SYSCALL_PRINT] = printSyscall,
+    [SYSCALL_UNKNOWN] = NULL,
     [SYSCALL_EXIT] = exitSyscall,
     [SYSCALL_YIELD] = yieldSyscall,
     [SYSCALL_FORK] = forkSyscall,

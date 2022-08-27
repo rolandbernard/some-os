@@ -11,41 +11,53 @@
 #include "interrupt/syscall.h"
 #include "memory/virtptr.h"
 #include "process/types.h"
+#include "task/harts.h"
 #include "task/syscall.h"
 #include "util/text.h"
 
 static SpinLock kernel_log_lock;
 
+static Error logKernelMessageV(const char* fmt, va_list args) {
+    // Logging happens to the default serial device
+    Serial serial = getDefaultSerialDevice();
+    FORMAT_STRINGV(string, fmt, args);
+    Error error = writeToSerial(serial, "%s", string);
+    return error;
+}
+
+static void unsafeLogKernelMessage(const char* fmt, ...) {
+    va_list args;
+    va_start(args, fmt);
+    logKernelMessageV(fmt, args);
+    va_end(args);
+}
+
 static void logDebugLocation(uintptr_t addr) {
-    logKernelMessage(STYLE_DEBUG " ∟ at \e[m" STYLE_DEBUG_EXT "%p \e[m", addr);
+    HartFrame* hart = getCurrentHartFrame();
+    unsafeLogKernelMessage(
+        STYLE_DEBUG " ∟ hart %i at \e[m" STYLE_DEBUG_EXT "%p\e[m",
+        hart != NULL ? hart->hartid : 0, addr
+    );
     SymbolDebugInfo* symb_info = searchSymbolDebugInfo(addr - 1);
     if (symb_info != NULL) {
-        logKernelMessage(
+        unsafeLogKernelMessage(
             STYLE_DEBUG " (\e[m" STYLE_DEBUG_EXT "%s\e[m" STYLE_DEBUG "+%p)\e[m",
             symb_info->symbol, addr - symb_info->addr
         );
     }
     LineDebugInfo* line_info = searchLineDebugInfo(addr - 1);
     if (line_info != NULL) {
-        logKernelMessage(STYLE_DEBUG_LOC " %s:%d", line_info->file, line_info->line);
+        unsafeLogKernelMessage(STYLE_DEBUG_LOC " %s:%d", line_info->file, line_info->line);
     }
-    logKernelMessage("\e[m\n");
-}
-
-Error logKernelMessageV(const char* fmt, va_list args) {
-    // Logging happens to the default serial device
-    Serial serial = getDefaultSerialDevice();
-    FORMAT_STRINGV(string, fmt, args);
-    lockSpinLock(&kernel_log_lock);
-    Error error = writeToSerial(serial, "%s", string);
-    unlockSpinLock(&kernel_log_lock);
-    return error;
+    unsafeLogKernelMessage("\e[m\n");
 }
 
 Error logKernelMessage(const char* fmt, ...) {
     va_list args;
     va_start(args, fmt);
+    lockSpinLock(&kernel_log_lock);
     Error error = logKernelMessageV(fmt, args);
+    unlockSpinLock(&kernel_log_lock);
     va_end(args);
     return error;
 }
@@ -53,35 +65,20 @@ Error logKernelMessage(const char* fmt, ...) {
 void logKernelMessageWithDebugLocationAt(uintptr_t pc, const char* fmt, ...) {
     va_list args;
     va_start(args, fmt);
+    lockSpinLock(&kernel_log_lock);
     logKernelMessageV(fmt, args);
     va_end(args);
     logDebugLocation(pc);
+    unlockSpinLock(&kernel_log_lock);
 }
 
 void logKernelMessageWithDebugLocation(const char* fmt, ...) {
     va_list args;
     va_start(args, fmt);
+    lockSpinLock(&kernel_log_lock);
     logKernelMessageV(fmt, args);
     va_end(args);
     logDebugLocation((uintptr_t)__builtin_return_address(0) - 4);
-}
-
-static void* writeVirtPtrString(VirtPtrBufferPart part, void* udata) {
-    Serial serial = getDefaultSerialDevice();
-    writeStringNToSerial(serial, part.address, part.length);
-    return udata;
-}
-
-SyscallReturn printSyscall(TrapFrame* frame) {
-    VirtPtr str;
-    if (frame->hart == NULL) {
-        str = virtPtrForKernel((void*)SYSCALL_ARG(0));
-    } else {
-        Task* task = (Task*)frame;
-        str = virtPtrForTask(SYSCALL_ARG(0), task);
-    }
-    size_t length = strlenVirtPtr(str);
-    virtPtrPartsDo(str, length, writeVirtPtrString, NULL, false);
-    return CONTINUE;
+    unlockSpinLock(&kernel_log_lock);
 }
 
