@@ -42,38 +42,38 @@ static bool lockOrWaitTaskLock(TaskLock* lock) {
 }
 
 void lockTaskLock(TaskLock* lock) {
-    Task* self = getCurrentTask();
-    assert(self != NULL);
-    if (lock->locked_by == self) {
+    Task* task = getCurrentTask();
+    assert(task != NULL);
+    if (lock->locked_by == task) {
         lock->num_locks++;
     } else {
         while (!lockOrWaitTaskLock(lock)) {
             // Wait until we are able to lock.
         }
         lock->num_locks++;
-        lock->locked_by = self;
+        lock->locked_by = task;
     }
 }
 
 bool tryLockingTaskLock(TaskLock* lock) {
-    Task* self = getCurrentTask();
-    assert(self != NULL);
-    if (lock->locked_by == self) {
+    Task* task = getCurrentTask();
+    assert(task != NULL);
+    if (lock->locked_by == task) {
         lock->num_locks++;
         return true;
     } else {
         bool result;
-        self = criticalEnter();
+        task = criticalEnter();
         lockUnsafeLock(&lock->unsafelock);
         if (lock->locked_by == NULL) {
             lock->num_locks++;
-            lock->locked_by = self;
+            lock->locked_by = task;
             result = true;
         } else {
             result = false;
         }
         unlockUnsafeLock(&lock->unsafelock);
-        criticalReturn(self);
+        criticalReturn(task);
         return result;
     }
 }

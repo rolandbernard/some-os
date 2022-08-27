@@ -7,6 +7,7 @@
 #include "memory/kalloc.h"
 #include "task/schedule.h"
 #include "task/spinlock.h"
+#include "task/syscall.h"
 
 static void handleInterrupt(ExternalInterrupt id, void* udata) {
     virtIOBlockFreePendingRequests((VirtIOBlockDevice*)udata);
@@ -44,6 +45,14 @@ Error initVirtIOBlockDevice(int id, volatile VirtIODeviceLayout* base, VirtIODev
     return simpleError(SUCCESS);
 }
 
+static void waitForBlockOperation(void* _, VirtIOBlockDevice* device, VirtIOBlockRequest* request) {
+    moveTaskToState(request->wakeup, WAITING);
+    enqueueTask(request->wakeup);
+    sendRequestAt(&device->virtio, request->head);
+    unlockSpinLock(&device->lock);
+    runNextTask();
+}
+
 Error virtIOBlockDeviceOperation(VirtIOBlockDevice* device, VirtPtr buffer, size_t offset, size_t size, bool write) {
     if (write && device->read_only) {
         return someError(EINVAL, "Read-only device write attempt");
@@ -51,7 +60,7 @@ Error virtIOBlockDeviceOperation(VirtIOBlockDevice* device, VirtPtr buffer, size
         return someError(EINVAL, "Misaligned block device io attempt");
     }
     VirtIOBlockRequest request;
-    request.wakeup = getCurrentTask();
+    request.wakeup = criticalEnter();
     assert(request.wakeup != NULL);
     lockSpinLock(&device->lock);
     if (device->virtio.queue->available.index - device->virtio.ack_index >= VIRTIO_RING_SIZE) {
@@ -69,9 +78,9 @@ Error virtIOBlockDeviceOperation(VirtIOBlockDevice* device, VirtPtr buffer, size
     addDescriptorsFor(&device->virtio, virtPtrForKernel(&request.status), sizeof(VirtIOBlockRequestStatus), VIRTIO_DESC_WRITE, true);
     request.next = device->requests;
     device->requests = &request;
-    moveTaskToState(request.wakeup, WAITING);
-    sendRequestAt(&device->virtio, request.head);
-    unlockSpinLock(&device->lock);
+    if (saveToFrame(&request.wakeup->frame)) {
+        callInHart((void*)waitForBlockOperation, device, &request);
+    }
     return request.result;
 }
 
