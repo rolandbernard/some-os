@@ -61,6 +61,7 @@ void unlockSpinLock(SpinLock* lock) {
         lock->locked_by = NULL;
         unlockUnsafeLock(&lock->unsafelock);
         criticalReturn(lock->crit_ret_frame);
+        lock->crit_ret_frame = NULL;
     }
 }
 

@@ -246,7 +246,6 @@ void terminateAllProcessTasks(Process* process) {
 
 static void processFinalizeTask(Process* process) {
     // This must be a task becuase it might include blocking operations.
-    assert(getCurrentTask() != NULL);
     unregisterProcess(process);
     closeAllProcessFiles(process);
     if (process->pid != 0) {

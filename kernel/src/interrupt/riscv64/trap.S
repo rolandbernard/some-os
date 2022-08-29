@@ -17,7 +17,7 @@ initTraps:
 .cfi_startproc
     la t0, kernelTrapVector
     csrw stvec, t0
-    li t0, 0xffff
+    li t0, 0b100010001000
     csrw mie, t0
     # NOTE: Delegation disabled for now.
     # (How to handle M-mode interrupt while handling S-mode interrupt?)
@@ -80,7 +80,7 @@ kernelTrapReturn:
 .cfi_startproc
     li t0, 1 << 3
     csrrc zero, mstatus, t0
-    li t0, 0xffff
+    li t0, 0b100010001000
     csrw mie, t0
     ld t0, 512(a0)
     csrw sepc, t0
@@ -125,7 +125,7 @@ criticalReturnFastPath:
 .cfi_startproc
     li t0, 1 << 3
     csrrc zero, mstatus, t0
-    li t0, 0xffff
+    li t0, 0b100010001000
     csrw mie, t0
     li t0, 1 << 8
     csrrs zero, sstatus, t0
@@ -142,23 +142,21 @@ indirectKernelTrapVector:
     bgez t0, 3f
     sll t0, t0, 1
     addi t0, t0, -6
-    blez t0, 2f
-    li t0, 1 << 3
+    beqz t0, 2f
+    li t0, 0b1000
     csrw mie, t0
     li t0, 1 << 3
     csrrs zero, mstatus, t0
     j 2f
 3:
-    li t0, 1 << 3
+    li t0, 0b1000
     csrw mie, t0
     li t0, 1 << 3
     csrrs zero, mstatus, t0
 #ifdef CRITICAL_FAST_PATH
     csrr t0, mcause
     addi t0, t0, -9
-    beqz t0, 1f  # cause 9: Environment call from S-mode
-    addi t0, t0, -2
-    beqz t0, 1f  # cause 11: Environment call from M-mode
+    beqz t0, 1f 
     j 2f
 1:
     mv t0, a0

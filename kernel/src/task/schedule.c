@@ -222,6 +222,7 @@ Task* removeTaskFromQueue(ScheduleQueue* queue, Task* task) {
 }
 
 void moveTaskToState(Task* task, TaskState state) {
+    assert(task != NULL);
     lockSpinLock(&task->sched.lock);
     if (task->sched.state != TERMINATED) {
         task->sched.state = state;

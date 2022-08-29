@@ -1,7 +1,7 @@
 
+#include <assert.h>
 #include <stddef.h>
 #include <stdio.h>
-#include <assert.h>
 #include <string.h>
 
 #include "devices/devices.h"
@@ -47,6 +47,7 @@ void kernelInit() {
 }
 
 void kernelMain() {
+    assert(getCurrentTask() != NULL);
     // Initialize devices
     Error status = initDevices();
     if (isError(status)) {

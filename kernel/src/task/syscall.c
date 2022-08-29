@@ -60,6 +60,7 @@ void criticalReturn(Task* to) {
     assert(getCurrentTask() == NULL);
     if (to != NULL) {
 #ifdef CRITICAL_FAST_PATH
+        assert(getCurrentHartFrame()->spinlocks_locked == 0);
         criticalReturnFastPath(to);
 #else
         swapTrapFrame(getCurrentTrapFrame(), &to->frame);

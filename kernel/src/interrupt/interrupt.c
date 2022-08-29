@@ -1,6 +1,7 @@
 
-#include <stdint.h>
+#include <assert.h>
 #include <stdbool.h>
+#include <stdint.h>
 #include <stdnoreturn.h>
 
 #include "error/log.h"
@@ -59,6 +60,7 @@ void machineTrap(uintptr_t cause, uintptr_t pc, uintptr_t val, uintptr_t scratch
 }
 
 void kernelTrap(uintptr_t cause, uintptr_t pc, uintptr_t val, TrapFrame* frame) {
+    assert(getCurrentHartId() == readMhartid());
     bool interrupt = cause >> (sizeof(uintptr_t) * 8 - 1);
     int code = cause & 0xff;
     if (frame == NULL) {

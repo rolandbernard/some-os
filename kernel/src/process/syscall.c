@@ -43,9 +43,6 @@ SyscallReturn forkSyscall(TrapFrame* frame) {
         memcpy(new_stack_pointer, (void*)old_stack_pointer, used_size);
         // Update stack pointer and hart value
         new_task->frame.regs[REG_STACK_POINTER] = (uintptr_t)new_stack_pointer;
-        if (frame->hart == NULL && new_task->frame.hart == NULL) {
-            new_task->frame.hart = (HartFrame*)frame;
-        }
         // Set the return value of the syscall to 1 for the new process
         new_task->frame.regs[REG_ARGUMENT_0] = 1;
         enqueueTask(new_task);
