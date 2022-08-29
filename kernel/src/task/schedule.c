@@ -20,6 +20,7 @@ Task* sleeping = NULL;
 
 static void addSleepingTask(Task* task) {
     lockSpinLock(&sleeping_lock);
+    assert(task != sleeping);
     task->sched.sched_next = sleeping;
     sleeping = task;
     unlockSpinLock(&sleeping_lock);

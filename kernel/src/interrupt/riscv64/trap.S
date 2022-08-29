@@ -17,16 +17,14 @@ initTraps:
 .cfi_startproc
     la t0, kernelTrapVector
     csrw stvec, t0
-    # Delagate all exceptions and interrupts
     li t0, 0xffff
+    csrw mie, t0
     # NOTE: Delegation disabled for now.
     # (How to handle M-mode interrupt while handling S-mode interrupt?)
     # (SpinLocks are a problem.)
     # (criticalEnter will break.)
     # csrw medeleg, t0
     # csrw mideleg, t0
-    csrw mie, t0
-    csrw sie, t0
     # Some things can not be delegated
     la t0, indirectKernelTrapVector
     csrw mtvec, t0
@@ -80,6 +78,10 @@ enterKernelMode:
 # Return from trap using trap frame in a0
 kernelTrapReturn:
 .cfi_startproc
+    li t0, 1 << 3
+    csrrc zero, mstatus, t0
+    li t0, 0xffff
+    csrw mie, t0
     ld t0, 512(a0)
     csrw sepc, t0
     ld t0, 520(a0)
@@ -121,6 +123,10 @@ criticalEnterFastPath:
 .global criticalReturnFastPath
 criticalReturnFastPath:
 .cfi_startproc
+    li t0, 1 << 3
+    csrrc zero, mstatus, t0
+    li t0, 0xffff
+    csrw mie, t0
     li t0, 1 << 8
     csrrs zero, sstatus, t0
     csrw sepc, ra
@@ -132,6 +138,21 @@ criticalReturnFastPath:
 indirectKernelTrapVector:
 .cfi_startproc
     csrw mscratch, t0
+    csrr t0, mcause
+    bgez t0, 3f
+    sll t0, t0, 1
+    addi t0, t0, -6
+    blez t0, 2f
+    li t0, 1 << 3
+    csrw mie, t0
+    li t0, 1 << 3
+    csrrs zero, mstatus, t0
+    j 2f
+3:
+    li t0, 1 << 3
+    csrw mie, t0
+    li t0, 1 << 3
+    csrrs zero, mstatus, t0
 #ifdef CRITICAL_FAST_PATH
     csrr t0, mcause
     addi t0, t0, -9
@@ -143,8 +164,8 @@ indirectKernelTrapVector:
     mv t0, a0
     addi t0, t0, -1024
     beqz t0, criticalEnterFastPath
-2:
 #endif
+2:
     csrr t0, mcause
     csrw scause, t0
     csrr t0, mepc

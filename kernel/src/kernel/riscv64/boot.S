@@ -30,10 +30,10 @@ _start:
     # Init traps for the first hart
     jal initTraps
 
-    # Enter the kernel in S mode and enable FPU
+    # Enter the kernel in M mode and enable FPU
     li t0, 0b11 << 11 | 0b11 << 13
     csrrc zero, mstatus, t0
-    li t0, 0b01 << 11 | 0b01 << 13
+    li t0, 0b11 << 11 | 0b01 << 13
     csrrs zero, mstatus, t0
     la t0, runtimeInit
     csrw mepc, t0

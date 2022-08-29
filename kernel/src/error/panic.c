@@ -6,9 +6,8 @@
 
 UnsafeLock global_panic_lock;
 
-noreturn void notifyPanic() {
+void notifyPanic() {
     sendMessageToAll(KERNEL_PANIC, NULL);
-    silentPanic();
 }
 
 noreturn void silentPanic() {

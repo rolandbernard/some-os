@@ -1,4 +1,5 @@
 
+#include <assert.h>
 #include <stddef.h>
 
 #include "interrupt/trap.h"
@@ -36,26 +37,22 @@ int hartIdToIndex(int hartid) {
 
 HartFrame* setupHartFrame(int hartid) {
     HartFrame* existing = getCurrentHartFrame();
-    if (existing == NULL) {
-        HartFrame* hart = zalloc(sizeof(HartFrame));
-        hart->stack_top = (uintptr_t)kalloc(HART_STACK_SIZE) + HART_STACK_SIZE;
-        initKernelTrapFrame(&hart->frame, hart->stack_top, 0);
-        hart->idle_task = createKernelTask(idle, IDLE_STACK_SIZE, LOWEST_PRIORITY); // Every hart needs an idle process
-        hart->hartid = hartid;
-        writeSscratch(&hart->frame);
-        lockUnsafeLock(&hart_lock); 
-        hart->next = harts_head;
-        harts_head = hart;
-        if (harts_tail == NULL) {
-            harts_tail = hart;
-        }
-        harts_tail->next = hart;
-        unlockUnsafeLock(&hart_lock); 
-        return hart;
-    } else {
-        existing->hartid = hartid;
-        return existing;
+    assert(existing == NULL);
+    HartFrame* hart = zalloc(sizeof(HartFrame));
+    hart->stack_top = (uintptr_t)kalloc(HART_STACK_SIZE) + HART_STACK_SIZE;
+    initKernelTrapFrame(&hart->frame, hart->stack_top, 0);
+    hart->idle_task = createKernelTask(idle, IDLE_STACK_SIZE, LOWEST_PRIORITY); // Every hart needs an idle process
+    hart->hartid = hartid;
+    writeSscratch(&hart->frame);
+    lockUnsafeLock(&hart_lock); 
+    hart->next = harts_head;
+    harts_head = hart;
+    if (harts_tail == NULL) {
+        harts_tail = hart;
     }
+    harts_tail->next = hart;
+    unlockUnsafeLock(&hart_lock); 
+    return hart;
 }
 
 HartFrame* getCurrentHartFrame() {
