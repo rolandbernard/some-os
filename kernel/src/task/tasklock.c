@@ -83,6 +83,9 @@ void lockTaskLock(TaskLock* lock) {
     if (lock->locked_by != task) {
         // Wait until we are able to lock.
         while (!lockOrWaitTaskLock(lock));
+#ifdef DEBUG
+        lock->locked_at = (uintptr_t)__builtin_return_address(0);
+#endif
     }
     lock->num_locks++;
 }
@@ -97,6 +100,9 @@ bool tryLockingTaskLock(TaskLock* lock) {
         if (lock->locked_by == NULL) {
             basicLockByTask(lock, task);
             result = true;
+#ifdef DEBUG
+            lock->locked_at = (uintptr_t)__builtin_return_address(0);
+#endif
         } else {
             result = false;
         }
@@ -114,6 +120,9 @@ void unlockTaskLock(TaskLock* lock) {
     assert(getCurrentTask() == lock->locked_by);
     lock->num_locks--;
     if (lock->num_locks == 0) {
+#ifdef DEBUG
+        lock->locked_at = 0;
+#endif
         Task* task = criticalEnter();
         lockUnsafeLock(&lock->unsafelock);
         basicUnlockByTask(lock, task);

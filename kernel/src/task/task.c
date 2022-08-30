@@ -15,7 +15,7 @@
 
 void initTrapFrame(TrapFrame* frame, uintptr_t sp, uintptr_t gp, uintptr_t pc, uintptr_t asid, PageTable* table) {
     frame->hart = NULL; // Set to NULL for now. Will be set when enqueuing
-    frame->regs[REG_RETURN_ADDRESS] = 0;
+    // frame->regs[REG_RETURN_ADDRESS] = 0;
     frame->regs[REG_STACK_POINTER] = sp;
     frame->regs[REG_GLOBAL_POINTER] = gp;
     frame->pc = pc;
@@ -53,6 +53,7 @@ void deallocTask(Task* task) {
 }
 
 noreturn void enterTask(Task* task) {
+    assert(getCurrentTask() == NULL);
     moveTaskToState(task, RUNNING);
     HartFrame* hart = getCurrentHartFrame();
     assert(hart != NULL);

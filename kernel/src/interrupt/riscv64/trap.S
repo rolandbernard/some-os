@@ -17,7 +17,7 @@ initTraps:
 .cfi_startproc
     la t0, kernelTrapVector
     csrw stvec, t0
-    li t0, 0b100010001000
+    li t0, 0xffff
     csrw mie, t0
     # NOTE: Delegation disabled for now.
     # (How to handle M-mode interrupt while handling S-mode interrupt?)
@@ -43,9 +43,9 @@ enableInterrupts:
 .global enterUserMode
 enterUserMode:
 .cfi_startproc
-    # 0b0 << 8 SPP (Previous Protection Mode) is 0 (U mode)
-    li t0, 1 << 8
-    csrrc zero, sstatus, t0
+    # MPP (Previous Protection Mode) is 00 (U mode)
+    li t0, 0b11 << 11
+    csrrc zero, mstatus, t0
     j kernelTrapReturn
 .cfi_endproc
 
@@ -53,9 +53,21 @@ enterUserMode:
 .global enterKernelMode
 enterKernelMode:
 .cfi_startproc
-    # 0b1 << 8 SPP (Previous Protection Mode) is 1 (S mode)
-    li t0, 1 << 8
-    csrrs zero, sstatus, t0
+    # MPP (Previous Protection Mode) is 01 (S mode)
+    li t0, 0b11 << 11
+    csrrc zero, mstatus, t0
+    li t0, 0b01 << 11
+    csrrs zero, mstatus, t0
+    j kernelTrapReturn
+.cfi_endproc
+
+# Enter as machine using trap frame in a0. This is for nested traps.
+.global enterKernelModeTrap
+enterKernelModeTrap:
+.cfi_startproc
+    # MPP (Previous Protection Mode) is 11 (M mode)
+    li t0, 0b11 << 11
+    csrrs zero, mstatus, t0
     j kernelTrapReturn
 .cfi_endproc
 
@@ -80,17 +92,17 @@ kernelTrapReturn:
 .cfi_startproc
     li t0, 1 << 3
     csrrc zero, mstatus, t0
-    li t0, 0b100010001000
+    li t0, 0xffff
     csrw mie, t0
     ld t0, 512(a0)
-    csrw sepc, t0
+    csrw mepc, t0
     ld t0, 520(a0)
     csrw satp, t0
     csrw sscratch, a0
     li t0, 0b11 << 13
-    csrrc zero, sstatus, t0
+    csrrc zero, mstatus, t0
     li t0, 0b01 << 13 | 1 << 5 # Enable FPU and SPIE
-    csrrs zero, sstatus, t0
+    csrrs zero, mstatus, t0
     mv x31, a0 # Load into x31 because it is loaded last
     # Restore floating point registers
 .set i, 0
@@ -106,7 +118,7 @@ kernelTrapReturn:
 .endr
     # There is currently no good ASID support
     sfence.vma zero, zero
-    sret
+    mret
 .cfi_endproc
 
 .global criticalEnterFastPath
@@ -125,13 +137,16 @@ criticalReturnFastPath:
 .cfi_startproc
     li t0, 1 << 3
     csrrc zero, mstatus, t0
-    li t0, 0b100010001000
+    li t0, 0xffff
     csrw mie, t0
-    li t0, 1 << 8
-    csrrs zero, sstatus, t0
-    csrw sepc, ra
+    # MPP (Previous Protection Mode) is 01 (S mode)
+    li t0, 0b11 << 11
+    csrrc zero, mstatus, t0
+    li t0, 0b01 << 11
+    csrrs zero, mstatus, t0
+    csrw mepc, ra
     csrw sscratch, a0
-    sret
+    mret
 .cfi_endproc
 
 .align 4
@@ -139,10 +154,11 @@ indirectKernelTrapVector:
 .cfi_startproc
     csrw mscratch, t0
     csrr t0, mcause
+# Reenable software interrupts unless the trap cause is a software interrupt
     bgez t0, 3f
     sll t0, t0, 1
     addi t0, t0, -6
-    beqz t0, 2f
+    blez t0, 2f
     li t0, 0b1000
     csrw mie, t0
     li t0, 1 << 3

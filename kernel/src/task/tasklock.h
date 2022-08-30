@@ -12,6 +12,7 @@ typedef struct TaskLock_s {
     size_t num_locks;
     Task* wait_queue;
 #ifdef DEBUG
+    uintptr_t locked_at;
     struct TaskLock_s* next_locked;
     struct TaskLock_s* prev_locked;
 #endif

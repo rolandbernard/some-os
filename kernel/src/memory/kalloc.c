@@ -313,7 +313,3 @@ size_t kallocSize(void* ptr) {
     }
 }
 
-void panicUnlockKalloc() {
-    initSpinLock(&kalloc_lock);
-}
-

@@ -153,8 +153,8 @@ void kernelTrap(uintptr_t cause, uintptr_t pc, uintptr_t val, TrapFrame* frame) 
             enqueueTask(task);
             runNextTask();
         } else {
-            // This is not called from a process, but from kernel init or interrupt handler
-            enterKernelMode(frame);
+            // This is not called from a task, but from kernel init or interrupt handler
+            enterKernelModeTrap(frame);
         }
     }
 }
