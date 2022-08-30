@@ -18,10 +18,22 @@ _start:
 
     # Disable address translation
     csrw satp, zero
-    # Give S and U mode access to memory
-    csrw pmpcfg0, 0xF
-    li t0, -1
+    # Setup PMP (Physical Memory Protection)
+    # Allow all for everything before __text_start
+    la t0, __text_start
+    srli t0, t0, 2
     csrw pmpaddr0, t0
+    # Allow execution(+read) between __text_start and __text_end
+    la t0, __text_end
+    srli t0, t0, 2
+    csrw pmpaddr1, t0
+    # Allow all for the rest of the memory
+    li t0, -1
+    csrw pmpaddr2, t0
+    # Lower 8bits are for pmpaddr0, middle 8bits for pmpaddr1, upper 8bits for pmpaddr2
+    # Set the lock bits. We also want PMP to apply in M mode.
+    li t0, 0x8f8d8f
+    csrw pmpcfg0, t0
 
     # Go into infinite loop with all but one hart
     csrr t0, mhartid

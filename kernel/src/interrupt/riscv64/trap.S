@@ -17,7 +17,7 @@ initTraps:
 .cfi_startproc
     la t0, kernelTrapVector
     csrw stvec, t0
-    li t0, 0xffff
+    li t0, 0b100010001000
     csrw mie, t0
     # NOTE: Delegation disabled for now.
     # (How to handle M-mode interrupt while handling S-mode interrupt?)
@@ -25,6 +25,8 @@ initTraps:
     # (criticalEnter will break.)
     # csrw medeleg, t0
     # csrw mideleg, t0
+    csrw medeleg, zero
+    csrw mideleg, zero
     # Some things can not be delegated
     la t0, indirectKernelTrapVector
     csrw mtvec, t0
@@ -92,7 +94,7 @@ kernelTrapReturn:
 .cfi_startproc
     li t0, 1 << 3
     csrrc zero, mstatus, t0
-    li t0, 0xffff
+    li t0, 0b100010001000
     csrw mie, t0
     ld t0, 512(a0)
     csrw mepc, t0
@@ -101,7 +103,7 @@ kernelTrapReturn:
     csrw sscratch, a0
     li t0, 0b11 << 13
     csrrc zero, mstatus, t0
-    li t0, 0b01 << 13 | 1 << 5 # Enable FPU and SPIE
+    li t0, 0b01 << 13 # Enable FPU
     csrrs zero, mstatus, t0
     mv x31, a0 # Load into x31 because it is loaded last
     # Restore floating point registers
@@ -137,7 +139,7 @@ criticalReturnFastPath:
 .cfi_startproc
     li t0, 1 << 3
     csrrc zero, mstatus, t0
-    li t0, 0xffff
+    li t0, 0b100010001000
     csrw mie, t0
     # MPP (Previous Protection Mode) is 01 (S mode)
     li t0, 0b11 << 11
