@@ -20,11 +20,11 @@ SECTIONS {
         PROVIDE(__text_start = .);
         *(.text.boot)
         *(.text .text*)
+        . = ALIGN(4096);
         PROVIDE(__text_end = .);
     } >ram AT>ram :text
 
     .eh_frame : {
-        . = ALIGN(4096);
         PROVIDE(__eh_frame_start = .);
         *(.eh_frame .eh_frame*)
         . += 8;
@@ -36,11 +36,11 @@ SECTIONS {
         *(.got .got*)
         *(.rodata .rodata*)
         *(.srodata .srodata*)
+        . = ALIGN(4096);
         PROVIDE(__rodata_end = .);
     } >ram AT>ram :rodata
 
     .data : {
-        . = ALIGN(4096);
         PROVIDE(__data_start = .);
         *(.sdata .sdata*)
         *(.data .data*)
