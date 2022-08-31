@@ -213,7 +213,9 @@ static bool testGetSetUid() {
     } else {
         int status;
         int wait_pid = wait(&status);
-        return wait_pid == pid && WIFEXITED(status) && WEXITSTATUS(status) == 0;
+        ASSERT(wait_pid == pid);
+        ASSERT(WIFEXITED(status));
+        ASSERT(WEXITSTATUS(status) == 0);
     }
     return true;
 }
@@ -231,7 +233,9 @@ static bool testGetSetGid() {
     } else {
         int status;
         int wait_pid = wait(&status);
-        return wait_pid == pid && WIFEXITED(status) && WEXITSTATUS(status) == 0;
+        ASSERT(wait_pid == pid);
+        ASSERT(WIFEXITED(status));
+        ASSERT(WEXITSTATUS(status) == 0);
     }
     return true;
 }
@@ -256,7 +260,9 @@ static bool testPipe() {
         ASSERT(write(fds[1][1], buffer, 10) == 10);
         int status;
         int wait_pid = wait(&status);
-        return wait_pid == pid && WIFEXITED(status) && WEXITSTATUS(status) == 0;
+        ASSERT(wait_pid == pid);
+        ASSERT(WIFEXITED(status));
+        ASSERT(WEXITSTATUS(status) == 0);
     }
     close(fds[0][0]);
     close(fds[0][1]);
@@ -308,7 +314,9 @@ static bool testPipeDup() {
         ASSERT(strcmp(buffer, "Hello world!") == 0);
         int status;
         int wait_pid = wait(&status);
-        return wait_pid == pid && WIFEXITED(status) && WEXITSTATUS(status) == 0;
+        ASSERT(wait_pid == pid);
+        ASSERT(WIFEXITED(status));
+        ASSERT(WEXITSTATUS(status) == 0);
     }
     close(fds[0]);
     close(fds[1]);
@@ -701,6 +709,55 @@ static bool testUnlinkDir() {
     return true;
 }
 
+static bool testUmask() {
+    umask(0);
+    ASSERT(umask(0002) == 0000);
+    ASSERT(umask(0222) == 0002);
+    ASSERT(umask(0022) == 0222);
+    return true;
+}
+
+static bool testUmaskOpen() {
+    umask(0022);
+    int fd = open("test_file.txt", O_CREAT, 0777);
+    ASSERT(fd != -1);
+    struct stat stat_buf;
+    ASSERT(fstat(fd, &stat_buf) == 0);
+    ASSERT(stat_buf.st_mode == (S_IFREG | 0755));
+    ASSERT(close(fd) == 0);
+    ASSERT(remove("test_file.txt") == 0);
+    return true;
+}
+
+static bool testUmaskMkdir() {
+    umask(0023);
+    mkdir("test_dir", 0777);
+    struct stat stat_buf;
+    ASSERT(stat("test_dir", &stat_buf) == 0);
+    ASSERT(stat_buf.st_mode == (S_IFDIR | 0754));
+    ASSERT(remove("test_dir") == 0);
+    return true;
+}
+
+static bool testUmaskFork() {
+    umask(0123);
+    ASSERT(umask(0123) == 0123);
+    int pid = fork();
+    ASSERT(pid != -1);
+    if (pid == 0) {
+        ASSERT_CHILD(umask(0321) == 0123);
+        exit(0);
+    } else {
+        int status;
+        int wait_pid = wait(&status);
+        ASSERT(wait_pid == pid);
+        ASSERT(WIFEXITED(status));
+        ASSERT(WEXITSTATUS(status) == 0);
+        ASSERT(umask(0231) == 0123);
+    }
+    return true;
+}
+
 typedef bool (*TestFunction)();
 
 typedef struct {
@@ -762,6 +819,10 @@ static bool runBasicSyscallTests() {
         TEST(testMount),
         TEST(testUmount),
         TEST(testUnlinkDir),
+        TEST(testUmask),
+        TEST(testUmaskOpen),
+        TEST(testUmaskMkdir),
+        TEST(testUmaskFork),
     };
     bool result = true;
     for (size_t i = 0; i < sizeof(tests) / sizeof(tests[0]); i++) {

@@ -50,6 +50,7 @@ typedef enum {
     SYSCALL_SIGPENDING = 40,
     SYSCALL_SIGPROCMASK = 41,
     SYSCALL_MKNOD = 42,
+    SYSCALL_UMASK = 43,
 // Kernel only syscalls:
     SYSCALL_CRITICAL = 0 + KERNEL_ONLY_SYSCALL_OFFSET,
 } Syscalls;

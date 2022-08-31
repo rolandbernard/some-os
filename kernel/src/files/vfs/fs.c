@@ -264,6 +264,7 @@ static Error vfsCreateNewNode(
         lockTaskLock(&process->resources.lock);
         new->stat.uid = process->resources.uid;
         new->stat.gid = process->resources.gid;
+        new->stat.mode &= ~process->resources.umask;
         unlockTaskLock(&process->resources.lock);
     } else {
         new->stat.uid = 0;

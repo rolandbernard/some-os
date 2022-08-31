@@ -43,4 +43,6 @@ SyscallReturn pipeSyscall(TrapFrame* frame);
 
 SyscallReturn mknodSyscall(TrapFrame* frame);
 
+SyscallReturn umaskSyscall(TrapFrame* frame);
+
 #endif

@@ -188,6 +188,7 @@ Process* createUserProcess(Process* parent) {
             process->resources.gid = parent->resources.gid;
             process->resources.next_fd = parent->resources.next_fd;
             process->resources.cwd = stringClone(parent->resources.cwd);
+            process->resources.umask = parent->resources.umask;
             unlockTaskLock(&parent->resources.lock);
             process->memory.start_brk = parent->memory.start_brk;
             process->memory.brk = parent->memory.brk;
@@ -245,7 +246,7 @@ void terminateAllProcessTasks(Process* process) {
 }
 
 static void processFinalizeTask(Process* process) {
-    // This must be a task becuase it might include blocking operations.
+    // This must be a task because it might include blocking operations.
     unregisterProcess(process);
     closeAllProcessFiles(process);
     if (process->pid != 0) {

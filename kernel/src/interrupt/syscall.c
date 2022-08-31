@@ -63,6 +63,7 @@ SyscallFunction user_syscalls[] = {
     [SYSCALL_SIGPENDING] = sigpendingSyscall,
     [SYSCALL_SIGPROCMASK] = sigprocmaskSyscall,
     [SYSCALL_MKNOD] = mknodSyscall,
+    [SYSCALL_UMASK] = umaskSyscall,
 };
 
 SyscallFunction kernel_syscalls[] = {

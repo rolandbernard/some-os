@@ -358,3 +358,15 @@ SyscallReturn mknodSyscall(TrapFrame* frame) {
     }
 }
 
+SyscallReturn umaskSyscall(TrapFrame* frame) {
+    assert(frame->hart != NULL);
+    Task* task = (Task*)frame;
+    assert(task->process != NULL);
+    VfsMode old_mask;
+    lockTaskLock(&task->process->resources.lock);
+    old_mask = task->process->resources.umask;
+    task->process->resources.umask = SYSCALL_ARG(0) & 0777;
+    unlockTaskLock(&task->process->resources.lock);
+    SYSCALL_RETURN(old_mask);
+}
+

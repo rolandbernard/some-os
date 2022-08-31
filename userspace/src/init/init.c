@@ -43,6 +43,7 @@ void setupTty() {
 }
 
 void setupSystem() {
+    umask(S_IWGRP | S_IWOTH);
     signal(SIGCHLD, signalHandler);
     startProgram("/bin/bash");
 }

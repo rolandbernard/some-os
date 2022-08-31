@@ -23,6 +23,7 @@ typedef struct {
 typedef struct {
     Uid uid;
     Gid gid;
+    VfsMode umask;
     int next_fd;
     VfsFileDescriptor* files;
     char* cwd;
