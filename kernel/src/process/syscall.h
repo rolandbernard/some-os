@@ -35,4 +35,16 @@ SyscallReturn getUidSyscall(TrapFrame* frame);
 
 SyscallReturn getGidSyscall(TrapFrame* frame);
 
+SyscallReturn getEUidSyscall(TrapFrame* frame);
+
+SyscallReturn getEGidSyscall(TrapFrame* frame);
+
+SyscallReturn setEUidSyscall(TrapFrame* frame);
+
+SyscallReturn setEGidSyscall(TrapFrame* frame);
+
+SyscallReturn setREUidSyscall(TrapFrame* frame);
+
+SyscallReturn setREGidSyscall(TrapFrame* frame);
+
 #endif

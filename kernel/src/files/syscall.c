@@ -226,13 +226,13 @@ SyscallReturn mountSyscall(TrapFrame* frame) {
     assert(frame->hart != NULL);
     Task* task = (Task*)frame;
     if (task->process != NULL) {
-        lockTaskLock(&task->process->resources.lock);
-        if (task->process->resources.uid != 0 && task->process->resources.gid != 0) {
-            unlockTaskLock(&task->process->resources.lock);
+        lockSpinLock(&task->process->user.lock);
+        if (task->process->user.euid != 0) {
+            unlockSpinLock(&task->process->user.lock);
             // Only root can mount
             SYSCALL_RETURN(-EPERM);
         }
-        unlockTaskLock(&task->process->resources.lock);
+        unlockSpinLock(&task->process->user.lock);
     }
     char* source = copyStringFromSyscallArgs(task, SYSCALL_ARG(0));
     if (source != NULL) {
@@ -274,13 +274,13 @@ SyscallReturn umountSyscall(TrapFrame* frame) {
     assert(frame->hart != NULL);
     Task* task = (Task*)frame;
     if (task->process != NULL) {
-        lockTaskLock(&task->process->resources.lock);
-        if (task->process->resources.uid != 0 && task->process->resources.gid != 0) {
-            unlockTaskLock(&task->process->resources.lock);
+        lockSpinLock(&task->process->user.lock);
+        if (task->process->user.euid != 0) {
+            unlockSpinLock(&task->process->user.lock);
             // Only root can unmount
             SYSCALL_RETURN(-EPERM);
         }
-        unlockTaskLock(&task->process->resources.lock);
+        unlockSpinLock(&task->process->user.lock);
     }
     char* path = copyStringFromSyscallArgs(task, SYSCALL_ARG(0));
     if (path != NULL) {

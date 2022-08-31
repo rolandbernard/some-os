@@ -21,14 +21,22 @@ typedef struct {
 } ProcessMemory;
 
 typedef struct {
-    Uid uid;
-    Gid gid;
     VfsMode umask;
     int next_fd;
     VfsFileDescriptor* files;
     char* cwd;
     TaskLock lock;
 } ProcessResources;
+
+typedef struct {
+    Uid ruid;
+    Gid rgid;
+    Uid suid;
+    Gid sgid;
+    Uid euid;
+    Gid egid;
+    SpinLock lock;
+} ProcessUser;
 
 typedef struct ProcessWaitResult_s {
     int pid;
@@ -135,6 +143,7 @@ typedef struct Process_s {
     int status; // This is the status returned from wait
     Task* tasks;
     TaskTimes times;
+    ProcessUser user;
     ProcessTree tree;
     ProcessMemory memory;
     ProcessResources resources;

@@ -64,6 +64,12 @@ SyscallFunction user_syscalls[] = {
     [SYSCALL_SIGPROCMASK] = sigprocmaskSyscall,
     [SYSCALL_MKNOD] = mknodSyscall,
     [SYSCALL_UMASK] = umaskSyscall,
+    [SYSCALL_GETEUID] = getEUidSyscall,
+    [SYSCALL_GETEGID] = getEGidSyscall,
+    [SYSCALL_SETEUID] = setEUidSyscall,
+    [SYSCALL_SETEGID] = setEGidSyscall,
+    [SYSCALL_SETREUID] = setREUidSyscall,
+    [SYSCALL_SETREGID] = setREGidSyscall,
 };
 
 SyscallFunction kernel_syscalls[] = {

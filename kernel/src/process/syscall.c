@@ -234,13 +234,19 @@ SyscallReturn sigprocmaskSyscall(TrapFrame* frame) {
 
 int killSyscallCallback(Process* process, void* udata) {
     Task* task = (Task*)udata;
-    lockTaskLock(&task->process->resources.lock);
-    if (task->process->resources.uid == 0 || process->resources.uid == task->process->resources.uid) {
-        unlockTaskLock(&task->process->resources.lock);
+    lockSpinLock(&task->process->user.lock);
+    if (
+        task->process->user.euid == 0
+        || process->user.euid == task->process->user.suid
+        || process->user.euid == task->process->user.ruid
+        || process->user.ruid == task->process->user.suid
+        || process->user.ruid == task->process->user.ruid
+    ) {
+        unlockSpinLock(&task->process->user.lock);
         addSignalToProcess(process, task->frame.regs[REG_ARGUMENT_2]);
         return -SUCCESS;
     } else {
-        unlockTaskLock(&task->process->resources.lock);
+        unlockSpinLock(&task->process->user.lock);
         return -EPERM;
     }
 }
@@ -256,13 +262,20 @@ SyscallReturn setUidSyscall(TrapFrame* frame) {
     assert(frame->hart != NULL);
     Task* task = (Task*)frame;
     assert(task->process != NULL);
-    lockTaskLock(&task->process->resources.lock);
-    if (task->process->resources.uid == 0) {
-        task->process->resources.uid = SYSCALL_ARG(0);
-        unlockTaskLock(&task->process->resources.lock);
+    lockSpinLock(&task->process->user.lock);
+    Uid new_uid = SYSCALL_ARG(0);
+    if (task->process->user.euid == 0) {
+        task->process->user.ruid = new_uid;
+        task->process->user.suid = new_uid;
+        task->process->user.euid = new_uid;
+        unlockSpinLock(&task->process->user.lock);
+        SYSCALL_RETURN(-SUCCESS);
+    } else if (task->process->user.ruid == new_uid || task->process->user.suid == new_uid) {
+        task->process->user.euid = new_uid;
+        unlockSpinLock(&task->process->user.lock);
         SYSCALL_RETURN(-SUCCESS);
     } else {
-        unlockTaskLock(&task->process->resources.lock);
+        unlockSpinLock(&task->process->user.lock);
         SYSCALL_RETURN(-EPERM);
     }
 }
@@ -271,13 +284,20 @@ SyscallReturn setGidSyscall(TrapFrame* frame) {
     assert(frame->hart != NULL);
     Task* task = (Task*)frame;
     assert(task->process != NULL);
-    lockTaskLock(&task->process->resources.lock);
-    if (task->process->resources.uid == 0) {
-        task->process->resources.gid = SYSCALL_ARG(0);
-        unlockTaskLock(&task->process->resources.lock);
+    lockSpinLock(&task->process->user.lock);
+    Gid new_gid = SYSCALL_ARG(0);
+    if (task->process->user.euid == 0) {
+        task->process->user.rgid = new_gid;
+        task->process->user.sgid = new_gid;
+        task->process->user.egid = new_gid;
+        unlockSpinLock(&task->process->user.lock);
+        SYSCALL_RETURN(-SUCCESS);
+    } else if (task->process->user.rgid == new_gid || task->process->user.sgid == new_gid) {
+        task->process->user.egid = new_gid;
+        unlockSpinLock(&task->process->user.lock);
         SYSCALL_RETURN(-SUCCESS);
     } else {
-        unlockTaskLock(&task->process->resources.lock);
+        unlockSpinLock(&task->process->user.lock);
         SYSCALL_RETURN(-EPERM);
     }
 }
@@ -286,9 +306,9 @@ SyscallReturn getUidSyscall(TrapFrame* frame) {
     assert(frame->hart != NULL);
     Task* task = (Task*)frame;
     assert(task->process != NULL);
-    lockTaskLock(&task->process->resources.lock);
-    Uid uid = task->process->resources.uid;
-    unlockTaskLock(&task->process->resources.lock);
+    lockSpinLock(&task->process->user.lock);
+    Uid uid = task->process->user.ruid;
+    unlockSpinLock(&task->process->user.lock);
     SYSCALL_RETURN(uid);
 }
 
@@ -296,9 +316,125 @@ SyscallReturn getGidSyscall(TrapFrame* frame) {
     assert(frame->hart != NULL);
     Task* task = (Task*)frame;
     assert(task->process != NULL);
-    lockTaskLock(&task->process->resources.lock);
-    Gid gid = task->process->resources.gid;
-    unlockTaskLock(&task->process->resources.lock);
+    lockSpinLock(&task->process->user.lock);
+    Gid gid = task->process->user.rgid;
+    unlockSpinLock(&task->process->user.lock);
     SYSCALL_RETURN(gid);
+}
+
+SyscallReturn getEUidSyscall(TrapFrame* frame) {
+    assert(frame->hart != NULL);
+    Task* task = (Task*)frame;
+    assert(task->process != NULL);
+    lockSpinLock(&task->process->user.lock);
+    Uid uid = task->process->user.euid;
+    unlockSpinLock(&task->process->user.lock);
+    SYSCALL_RETURN(uid);
+}
+
+SyscallReturn getEGidSyscall(TrapFrame* frame) {
+    assert(frame->hart != NULL);
+    Task* task = (Task*)frame;
+    assert(task->process != NULL);
+    lockSpinLock(&task->process->user.lock);
+    Gid gid = task->process->user.egid;
+    unlockSpinLock(&task->process->user.lock);
+    SYSCALL_RETURN(gid);
+}
+
+SyscallReturn setEUidSyscall(TrapFrame* frame) {
+    assert(frame->hart != NULL);
+    Task* task = (Task*)frame;
+    assert(task->process != NULL);
+    lockSpinLock(&task->process->user.lock);
+    Uid new_uid = SYSCALL_ARG(0);
+    if (task->process->user.euid == 0 || task->process->user.ruid == new_uid || task->process->user.suid == new_uid) {
+        task->process->user.euid = new_uid;
+        unlockSpinLock(&task->process->user.lock);
+        SYSCALL_RETURN(-SUCCESS);
+    } else {
+        unlockSpinLock(&task->process->user.lock);
+        SYSCALL_RETURN(-EPERM);
+    }
+}
+
+SyscallReturn setEGidSyscall(TrapFrame* frame) {
+    assert(frame->hart != NULL);
+    Task* task = (Task*)frame;
+    assert(task->process != NULL);
+    lockSpinLock(&task->process->user.lock);
+    Gid new_gid = SYSCALL_ARG(0);
+    if (task->process->user.euid == 0 || task->process->user.rgid == new_gid || task->process->user.sgid == new_gid) {
+        task->process->user.egid = new_gid;
+        unlockSpinLock(&task->process->user.lock);
+        SYSCALL_RETURN(-SUCCESS);
+    } else {
+        unlockSpinLock(&task->process->user.lock);
+        SYSCALL_RETURN(-EPERM);
+    }
+}
+
+SyscallReturn setREUidSyscall(TrapFrame* frame) {
+    assert(frame->hart != NULL);
+    Task* task = (Task*)frame;
+    assert(task->process != NULL);
+    lockSpinLock(&task->process->user.lock);
+    Uid new_ruid = SYSCALL_ARG(0);
+    Uid new_euid = SYSCALL_ARG(1);
+    if (
+        task->process->user.euid == 0
+        || (new_ruid == -1
+            && (new_euid == -1
+                || task->process->user.ruid == new_euid
+                || task->process->user.suid == new_euid
+            ))
+    ) {
+        if (new_euid != -1) {
+            task->process->user.euid = new_euid;
+        }
+        if (new_ruid != -1) {
+            task->process->user.ruid = new_ruid;
+        }
+        if (new_ruid != -1 || (new_euid != -1 && new_euid != task->process->user.ruid)) {
+            task->process->user.suid = task->process->user.euid;
+        }
+        unlockSpinLock(&task->process->user.lock);
+        SYSCALL_RETURN(-SUCCESS);
+    } else {
+        unlockSpinLock(&task->process->user.lock);
+        SYSCALL_RETURN(-EPERM);
+    }
+}
+
+SyscallReturn setREGidSyscall(TrapFrame* frame) {
+    assert(frame->hart != NULL);
+    Task* task = (Task*)frame;
+    assert(task->process != NULL);
+    lockSpinLock(&task->process->user.lock);
+    Gid new_rgid = SYSCALL_ARG(0);
+    Gid new_egid = SYSCALL_ARG(1);
+    if (
+        task->process->user.egid == 0
+        || (new_rgid == -1
+            && (new_egid == -1
+                || task->process->user.rgid == new_egid
+                || task->process->user.sgid == new_egid
+            ))
+    ) {
+        if (new_egid != -1) {
+            task->process->user.egid = new_egid;
+        }
+        if (new_rgid != -1) {
+            task->process->user.rgid = new_rgid;
+        }
+        if (new_rgid != -1 || (new_egid != -1 && new_egid != task->process->user.rgid)) {
+            task->process->user.sgid = task->process->user.egid;
+        }
+        unlockSpinLock(&task->process->user.lock);
+        SYSCALL_RETURN(-SUCCESS);
+    } else {
+        unlockSpinLock(&task->process->user.lock);
+        SYSCALL_RETURN(-EPERM);
+    }
 }
 

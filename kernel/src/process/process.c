@@ -184,12 +184,18 @@ Process* createUserProcess(Process* parent) {
             );
             // Copy resource information
             lockTaskLock(&parent->resources.lock);
-            process->resources.uid = parent->resources.uid;
-            process->resources.gid = parent->resources.gid;
             process->resources.next_fd = parent->resources.next_fd;
             process->resources.cwd = stringClone(parent->resources.cwd);
             process->resources.umask = parent->resources.umask;
             unlockTaskLock(&parent->resources.lock);
+            lockSpinLock(&parent->user.lock);
+            process->user.ruid = parent->user.ruid;
+            process->user.rgid = parent->user.rgid;
+            process->user.suid = parent->user.suid;
+            process->user.sgid = parent->user.sgid;
+            process->user.euid = parent->user.euid;
+            process->user.egid = parent->user.egid;
+            unlockSpinLock(&parent->user.lock);
             process->memory.start_brk = parent->memory.start_brk;
             process->memory.brk = parent->memory.brk;
             process->memory.mem = cloneMemorySpace(parent->memory.mem);

@@ -103,10 +103,12 @@ Error loadProgramInto(Task* task, const char* path, VirtPtr args, VirtPtr envs) 
     }
     deallocMemorySpace(task->process->memory.mem);
     if (stat.mode & VFS_MODE_SETUID) {
-        task->process->resources.uid = stat.uid;
+        task->process->user.euid = stat.uid;
+        task->process->user.suid = stat.uid;
     }
     if (stat.mode & VFS_MODE_SETGID) {
-        task->process->resources.gid = stat.gid;
+        task->process->user.egid = stat.gid;
+        task->process->user.sgid = stat.gid;
     }
     task->process->memory.mem = memory;
     task->process->memory.start_brk = start_brk;

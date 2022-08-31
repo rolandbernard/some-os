@@ -261,9 +261,11 @@ static Error vfsCreateNewNode(
     new->stat.mode = mode;
     new->stat.nlinks = 0;
     if (process != NULL) {
+        lockSpinLock(&process->user.lock);
+        new->stat.uid = process->user.euid;
+        new->stat.gid = process->user.egid;
+        unlockSpinLock(&process->user.lock);
         lockTaskLock(&process->resources.lock);
-        new->stat.uid = process->resources.uid;
-        new->stat.gid = process->resources.gid;
         new->stat.mode &= ~process->resources.umask;
         unlockTaskLock(&process->resources.lock);
     } else {
@@ -602,30 +604,30 @@ Error vfsCreateSuperblock(
 }
 
 static Error basicCanAccess(VfsStat* stat, struct Process_s* process, VfsAccessFlags flags) {
-    if (process == NULL || process->resources.uid == 0) {
+    if (process == NULL || process->user.euid == 0) {
         // Kernel or uid 0 are allowed to do everything
         return simpleError(SUCCESS);
     } else if (
         ((flags & VFS_ACCESS_CHMOD) != 0 || (flags & VFS_ACCESS_CHOWN))
-        && stat->uid != process->resources.uid
+        && stat->uid != process->user.euid
     ) {
         return simpleError(EPERM);
     } else if (
         (flags & VFS_ACCESS_R) != 0 && (stat->mode & VFS_MODE_A_R) == 0
-        && ((stat->mode & VFS_MODE_G_R) == 0 || stat->gid != process->resources.gid)
-        && ((stat->mode & VFS_MODE_O_R) == 0 || stat->uid != process->resources.uid)
+        && ((stat->mode & VFS_MODE_G_R) == 0 || stat->gid != process->user.egid)
+        && ((stat->mode & VFS_MODE_O_R) == 0 || stat->uid != process->user.euid)
     ) {
         return simpleError(EACCES);
     } else if (
         (flags & VFS_ACCESS_W) != 0 && (stat->mode & VFS_MODE_A_W) == 0
-        && ((stat->mode & VFS_MODE_G_W) == 0 || stat->gid != process->resources.gid)
-        && ((stat->mode & VFS_MODE_O_W) == 0 || stat->uid != process->resources.uid)
+        && ((stat->mode & VFS_MODE_G_W) == 0 || stat->gid != process->user.egid)
+        && ((stat->mode & VFS_MODE_O_W) == 0 || stat->uid != process->user.euid)
     ) {
         return simpleError(EACCES);
     } else if (
         (flags & VFS_ACCESS_X) != 0 && (stat->mode & VFS_MODE_A_X) == 0
-        && ((stat->mode & VFS_MODE_G_X) == 0 || stat->gid != process->resources.gid)
-        && ((stat->mode & VFS_MODE_O_X) == 0 || stat->uid != process->resources.uid)
+        && ((stat->mode & VFS_MODE_G_X) == 0 || stat->gid != process->user.egid)
+        && ((stat->mode & VFS_MODE_O_X) == 0 || stat->uid != process->user.euid)
     ) {
         return simpleError(EACCES);
     } else if ((flags & VFS_ACCESS_REG) != 0 && MODE_TYPE(stat->mode) != VFS_TYPE_REG) {
@@ -642,9 +644,9 @@ Error canAccess(VfsNode* node, struct Process_s* process, VfsAccessFlags flags) 
         return simpleError(SUCCESS);
     } else {
         lockTaskLock(&node->lock);
-        lockTaskLock(&process->resources.lock);
+        lockSpinLock(&process->user.lock);
         Error err = basicCanAccess(&node->stat, process, flags);
-        unlockTaskLock(&process->resources.lock);
+        unlockSpinLock(&process->user.lock);
         unlockTaskLock(&node->lock);
         return err;
     }

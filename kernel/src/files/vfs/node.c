@@ -10,7 +10,10 @@
         return simpleError(EINVAL);                                     \
     } else {                                                            \
         lockTaskLock(&node->lock);                                      \
-        CHECKED(canAccess(node, process, ACCESS));                      \
+        CHECKED(                                                        \
+            canAccess(node, process, ACCESS),                           \
+            unlockTaskLock(&node->lock)                                 \
+        );                                                              \
         if (((ACCESS) & VFS_ACCESS_W) != 0) {                           \
             node->stat.mtime = getNanoseconds();                        \
         }                                                               \
@@ -57,7 +60,17 @@ Error vfsNodeUnlink(VfsNode* node, Process* process, const char* name, VfsNode* 
     if (node->superblock != entry->superblock) {
         return simpleError(EXDEV);
     } else {
-        CHECKED(vfsNodeBasicUnlink(node, process, name));
+        lockTaskLock(&node->lock);
+        if ((node->stat.mode & VFS_MODE_STICKY) != 0) {
+            lockTaskLock(&entry->lock);
+            CHECKED(canAccess(entry, process, VFS_ACCESS_W), {
+                unlockTaskLock(&entry->lock);
+                unlockTaskLock(&node->lock);
+            });
+            unlockTaskLock(&entry->lock);
+        }
+        CHECKED(vfsNodeBasicUnlink(node, process, name), unlockTaskLock(&node->lock));
+        unlockTaskLock(&node->lock);
         lockTaskLock(&entry->lock);
         entry->stat.nlinks -= 1;
         Error err = vfsSuperWriteNode(entry);
@@ -74,7 +87,10 @@ Error vfsNodeLink(VfsNode* node, Process* process, const char* name, VfsNode* en
         return simpleError(EINVAL);
     } else {
         lockTaskLock(&node->lock);
-        CHECKED(canAccess(node, process, VFS_ACCESS_W | VFS_ACCESS_DIR));
+        CHECKED(
+            canAccess(node, process, VFS_ACCESS_W | VFS_ACCESS_DIR),
+            unlockTaskLock(&node->lock)
+        );
         node->stat.mtime = getNanoseconds();
         node->stat.atime = getNanoseconds();
         CHECKED(vfsSuperWriteNode(node), unlockTaskLock(&node->lock));
