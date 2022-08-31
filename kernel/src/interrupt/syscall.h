@@ -4,10 +4,10 @@
 #include "task/task.h"
 #include "process/process.h"
 
-#define KERNEL_ONLY_SYSCALL_OFFSET 10000
+#define KERNEL_ONLY_SYSCALL_OFFSET 1024
 
 typedef enum {
-    SYSCALL_PRINT = 0,
+    SYSCALL_UNKNOWN = 0,
     SYSCALL_EXIT = 1,
     SYSCALL_YIELD = 2,
     SYSCALL_FORK = 3,

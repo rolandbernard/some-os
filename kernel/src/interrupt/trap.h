@@ -20,4 +20,7 @@ noreturn void enterUserMode(TrapFrame* process);
 // Enter process at pc into supervisor mode
 noreturn void enterKernelMode(TrapFrame* process);
 
+// Enter frame in machine mode. Used for nested traps.
+noreturn void enterKernelModeTrap(TrapFrame* process);
+
 #endif

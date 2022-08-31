@@ -18,10 +18,33 @@ _start:
 
     # Disable address translation
     csrw satp, zero
-    # Give S and U mode access to memory
-    csrw pmpcfg0, 0xF
+    # Setup PMP (Physical Memory Protection)
+#ifndef DONT_SETUP_PMP
+    # Note: This makes qemu much slower.
+    # Allow execution(+read) between __text_start and __text_end
+    la t0, __text_start
+    srli t0, t0, 2
+    csrw pmpaddr0, t0
+    la t0, __text_end
+    srli t0, t0, 2
+    csrw pmpaddr1, t0
+    # Allow only read after __text_end up to __rodata_end
+    la t0, __rodata_end
+    srli t0, t0, 2
+    csrw pmpaddr2, t0
+    # Allow all for the rest of the memory
+    li t0, -1
+    csrw pmpaddr3, t0
+    # Lower 8bits are for pmpaddr0, middle 8bits for pmpaddr1, upper 8bits for pmpaddr2
+    # Set the lock bits. We also want PMP to apply in M mode.
+    li t0, 0x9f898d87
+    csrw pmpcfg0, t0
+#else 
     li t0, -1
     csrw pmpaddr0, t0
+    li t0, 0x1f
+    csrw pmpcfg0, t0
+#endif
 
     # Go into infinite loop with all but one hart
     csrr t0, mhartid
@@ -30,10 +53,10 @@ _start:
     # Init traps for the first hart
     jal initTraps
 
-    # Enter the kernel in S mode and enable FPU
+    # Enter the kernel in M mode and enable FPU
     li t0, 0b11 << 11 | 0b11 << 13
     csrrc zero, mstatus, t0
-    li t0, 0b01 << 11 | 0b01 << 13
+    li t0, 0b11 << 11 | 0b01 << 13
     csrrs zero, mstatus, t0
     la t0, runtimeInit
     csrw mepc, t0

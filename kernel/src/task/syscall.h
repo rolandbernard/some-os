@@ -9,8 +9,10 @@ SyscallReturn sleepSyscall(TrapFrame* frame);
 
 SyscallReturn criticalSyscall(TrapFrame* frame);
 
-TrapFrame* criticalEnter();
+Task* criticalEnter();
 
-void criticalReturn(TrapFrame* to);
+void criticalReturn(Task* to);
+
+noreturn void leave();
 
 #endif

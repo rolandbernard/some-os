@@ -30,54 +30,54 @@ writeSscratch:
 .macro load_gp i, basereg
     ld x\i, ((\i)*8)(\basereg)
 .endm
-.macro save_fp i, basereg
-    fsd f\i, ((32+(\i))*8)(\basereg)
-.endm
-.macro load_fp i, basereg
-    fld f\i, ((32+(\i))*8)(\basereg)
-.endm
 
-# Save the current state to TrapFrame in a1 and load from a TrapFrame in a0.
-# Because this is only to be used inside the kernel, we can assume that we do not have to
-# preserve caller saved registers.
-.global swapTrapFrame
-swapTrapFrame:
+.global saveToFrame
+saveToFrame:
 .cfi_startproc
-# Saving to a1
-    # Save integer registers
-.set i, 1
-.rept 31
-    save_gp %i, a1
+    mv t0, a0
+    save_gp 2, t0 # sp
+    save_gp 3, t0 # gp
+    save_gp 4, t0 # tp
+    save_gp 8, t0 # s0
+    save_gp 9, t0 # s1
+    li a0, 0
+    save_gp 10, t0 # a0
+.set i, 18
+.rept 10
+    save_gp %i, t0 # s2-11
     .set i, i+1
 .endr
-    # Save floating point registers
-.set i, 0
-.rept 32
-    save_fp %i, a1
-    .set i, i+1
-.endr
-    la t1, 1f # Save address we want to return to
-    sd t1, 512(a1)
-# Loading from a0
-    # Restore floating point registers
-.set i, 0
-.rept 32
-    load_fp %i, a0
-    .set i, i+1
-.endr
-    # Restore integer registers
-.set i, 1
-.rept 9 # Load up to (and not including) a0
-    load_gp %i, a0
-    .set i, i+1
-.endr
-    .set i, i+2
-.rept 20 # Load after (and not including) a1
-    load_gp %i, a0
-    .set i, i+1
-.endr
-    ld a1, 512(a0) # Load return address
-    jr a1
-1:
+    sd ra, 512(t0) # Save address we want to return to
+    li a0, 1
     ret
 .cfi_endproc
+
+.global loadFromFrame
+loadFromFrame:
+.cfi_startproc
+    mv t0, a0
+    load_gp 1, t0
+    load_gp 2, t0
+    load_gp 3, t0
+    load_gp 4, t0
+    load_gp 8, t0
+    load_gp 9, t0
+    load_gp 10, t0
+.set i, 18
+.rept 10
+    load_gp %i, t0
+    .set i, i+1
+.endr
+    ld t0, 512(t0)
+    jr t0
+.cfi_endproc
+
+.global callInHart
+callInHart:
+.cfi_startproc
+    mv t0, a0
+    csrr a0, sscratch
+    load_gp 2, a0
+    jr t0
+.cfi_endproc
+

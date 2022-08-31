@@ -15,11 +15,16 @@
 
 void initTrapFrame(TrapFrame* frame, uintptr_t sp, uintptr_t gp, uintptr_t pc, uintptr_t asid, PageTable* table) {
     frame->hart = NULL; // Set to NULL for now. Will be set when enqueuing
-    frame->regs[REG_RETURN_ADDRESS] = 0;
+    // frame->regs[REG_RETURN_ADDRESS] = 0;
     frame->regs[REG_STACK_POINTER] = sp;
     frame->regs[REG_GLOBAL_POINTER] = gp;
     frame->pc = pc;
     frame->satp = satpForMemory(asid, table);
+}
+
+void initKernelTrapFrame(TrapFrame* frame, uintptr_t sp, uintptr_t pc) {
+    initTrapFrame(frame, sp, (uintptr_t)getKernelGlobalPointer(), pc, 0, kernel_page_table);
+    frame->regs[REG_RETURN_ADDRESS] = (uintptr_t)__builtin_return_address(0);
 }
 
 Task* createTask() {
@@ -33,10 +38,7 @@ Task* createKernelTask(void* enter, size_t stack_size, Priority priority) {
     }
     task->stack = kalloc(stack_size);
     task->stack_top = (uintptr_t)task->stack + stack_size;
-    initTrapFrame(
-        &task->frame, task->stack_top, (uintptr_t)getKernelGlobalPointer(),
-        (uintptr_t)enter, 0, kernel_page_table
-    );
+    initKernelTrapFrame(&task->frame, task->stack_top, (uintptr_t)enter);
     task->sched.priority = priority;
     moveTaskToState(task, ENQUABLE);
     return task;
@@ -51,13 +53,13 @@ void deallocTask(Task* task) {
 }
 
 noreturn void enterTask(Task* task) {
+    assert(getCurrentTask() == NULL);
     moveTaskToState(task, RUNNING);
     HartFrame* hart = getCurrentHartFrame();
+    assert(hart != NULL);
+    hart->frame.regs[REG_STACK_POINTER] = (uintptr_t)hart->stack_top;
+    assert(hart->spinlocks_locked == 0);
     task->frame.hart = hart;
-    if (hart != NULL) {
-        hart->frame.regs[REG_STACK_POINTER] = (uintptr_t)hart->stack_top;
-        assert(hart->spinlocks_locked == 0);
-    }
     task->times.entered = getTime();
     if (task->process == NULL) {
         enterKernelMode(&task->frame);

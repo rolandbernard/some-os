@@ -1,4 +1,5 @@
 
+#include <assert.h>
 #include <string.h>
 
 #include "files/special/pipe.h"
@@ -81,16 +82,23 @@ static void doOperationOnPipe(PipeSharedData* pipe) {
     }
 }
 
+static void waitForPipeOperation(void* _, Task* task, PipeSharedData* data) {
+    moveTaskToState(task, WAITING);
+    enqueueTask(task);
+    doOperationOnPipe(data);
+    unlockSpinLock(&data->lock);
+    runNextTask();
+}
+
 Error executePipeOperation(PipeSharedData* data, VirtPtr buffer, size_t size, bool write, size_t* ret) {
-    Task* self = getCurrentTask();
     WaitingPipeOperation op;
     op.buffer = buffer;
     op.size = size;
     op.written = 0;
-    op.wakeup = self;
     op.next = NULL;
-    TrapFrame* lock = criticalEnter();
-    moveTaskToState(self, WAITING);
+    Task* task = criticalEnter();
+    assert(task != NULL);
+    op.wakeup = task;
     lockSpinLock(&data->lock);
     if (write) {
         if (data->waiting_writes == NULL) {
@@ -107,9 +115,9 @@ Error executePipeOperation(PipeSharedData* data, VirtPtr buffer, size_t size, bo
             data->waiting_reads_tail->next = &op;
         }
     }
-    doOperationOnPipe(data);
-    unlockSpinLock(&data->lock);
-    criticalReturn(lock);
+    if (saveToFrame(&task->frame)) {
+        callInHart((void*)waitForPipeOperation, task, data);
+    }
     *ret = op.written;
     return simpleError(SUCCESS);
 }

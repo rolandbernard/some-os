@@ -1,6 +1,7 @@
 
-#include <stdint.h>
+#include <assert.h>
 #include <stdbool.h>
+#include <stdint.h>
 #include <stdnoreturn.h>
 
 #include "error/log.h"
@@ -54,16 +55,17 @@ void machineTrap(uintptr_t cause, uintptr_t pc, uintptr_t val, uintptr_t scratch
     if (interrupt && (code == 0 || code == 1 || code == 3)) {
         handleMachineSoftwareInterrupt();
     }
-    KERNEL_ERROR("Unhandled machine trap: %p %p %p %s", pc, val, scratch, getCauseString(interrupt, code));
+    KERNEL_REMOTE_ERROR(pc, "Unhandled machine trap: %p %p %p %s", pc, val, scratch, getCauseString(interrupt, code));
     panic();
 }
 
 void kernelTrap(uintptr_t cause, uintptr_t pc, uintptr_t val, TrapFrame* frame) {
+    assert(getCurrentHartId() == readMhartid());
     bool interrupt = cause >> (sizeof(uintptr_t) * 8 - 1);
     int code = cause & 0xff;
     if (frame == NULL) {
         // Can't handle traps before the hart was initialized. (initBasicHart)
-        KERNEL_ERROR("Unhandled trap: %p %p %p %s", pc, val, frame, getCauseString(interrupt, code));
+        KERNEL_REMOTE_ERROR(pc, "Unhandled trap: %p %p %p %s", pc, val, frame, getCauseString(interrupt, code));
         panic();
     } else {
         Task* task = (Task*)frame;
@@ -125,7 +127,7 @@ void kernelTrap(uintptr_t cause, uintptr_t pc, uintptr_t val, TrapFrame* frame) 
                 case 15: // Store/AMO page fault
                     if (frame->hart == NULL || task->process == NULL) {
                         if (!handlePageFault(kernel_page_table, val)) {
-                            KERNEL_ERROR("Unhandled exception: %p %p %p %s", pc, val, frame, getCauseString(interrupt, code));
+                            KERNEL_REMOTE_ERROR(pc, "Unhandled exception: %p %p %p %s", pc, val, frame, getCauseString(interrupt, code));
                             panic();
                         }
                     } else {
@@ -137,7 +139,7 @@ void kernelTrap(uintptr_t cause, uintptr_t pc, uintptr_t val, TrapFrame* frame) 
                     break;
                 default:
                     if (frame->hart == NULL || task->process == NULL) {
-                        KERNEL_ERROR("Unhandled exception: %p %p %p %s", pc, val, frame, getCauseString(interrupt, code));
+                        KERNEL_REMOTE_ERROR(pc, "Unhandled exception: %p %p %p %s", pc, val, frame, getCauseString(interrupt, code));
                         panic();
                     } else {
                         KERNEL_WARNING("Segmentation fault: %i %p %p %p %s", task->process->pid, pc, val, frame, getCauseString(interrupt, code));
@@ -151,8 +153,8 @@ void kernelTrap(uintptr_t cause, uintptr_t pc, uintptr_t val, TrapFrame* frame) 
             enqueueTask(task);
             runNextTask();
         } else {
-            // This is not called from a process, but from kernel init or interrupt handler
-            enterKernelMode(frame);
+            // This is not called from a task, but from kernel init or interrupt handler
+            enterKernelModeTrap(frame);
         }
     }
 }

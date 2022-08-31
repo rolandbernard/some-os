@@ -17,17 +17,22 @@
 
 extern UnsafeLock global_panic_lock;
 
-// Terminate the kernel
-noreturn void notifyPanic();
+// signal panic to all other harts
+void notifyPanic();
 
 noreturn void silentPanic();
 
+// Only here for setting breakpoints on
+void panicBreak();
+
 #define panic() {                                                                   \
+    panicBreak();                                                                   \
     if (tryLockingUnsafeLock(&global_panic_lock)) {                                 \
+        notifyPanic();                                                              \
         KERNEL_ERROR("Kernel panic!" STYLE_DEBUG " on hart %u", getCurrentHartId()) \
         BACKTRACE();                                                                \
     }                                                                               \
-    notifyPanic();                                                                  \
+    silentPanic();                                                                  \
 }
 
 #endif

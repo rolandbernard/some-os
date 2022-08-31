@@ -61,7 +61,7 @@ Error vfsNodeUnlink(VfsNode* node, Process* process, const char* name, VfsNode* 
         lockTaskLock(&entry->lock);
         entry->stat.nlinks -= 1;
         Error err = vfsSuperWriteNode(entry);
-        unlockTaskLock(&node->lock);
+        unlockTaskLock(&entry->lock);
         return err;
     }
 }

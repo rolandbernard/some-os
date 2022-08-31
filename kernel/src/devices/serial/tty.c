@@ -8,22 +8,33 @@
 
 #include "memory/kalloc.h"
 #include "task/schedule.h"
+#include "task/syscall.h"
 #include "util/text.h"
 #include "util/util.h"
 
 #define INITIAL_TTY_BUFFER_CAPACITY 512
 
+static void waitForReadOperation(void* _, Task* task, UartTtyDevice* dev) {
+    moveTaskToState(task, WAITING);
+    enqueueTask(task);
+    task->sched.sched_next = dev->blocked;
+    dev->blocked = task;
+    unlockSpinLock(&dev->lock);
+    runNextTask();
+}
+
 static Error uartTtyReadOrWait(UartTtyDevice* dev, VirtPtr buffer, size_t size, size_t* read, bool block) {
-    Task* self = getCurrentTask();
+    Task* task = criticalEnter();
     lockSpinLock(&dev->lock);
     if (dev->buffer_count == 0) {
         if (block) {
-            assert(self != NULL);
-            moveTaskToState(self, WAITING);
-            self->sched.sched_next = dev->blocked;
-            dev->blocked = self;
+            assert(task != NULL);
+            if (saveToFrame(&task->frame)) {
+                callInHart((void*)waitForReadOperation, task, dev);
+            }
+        } else {
+            unlockSpinLock(&dev->lock);
         }
-        unlockSpinLock(&dev->lock);
         return simpleError(EAGAIN);
     } else {
         size_t length = umin(dev->buffer_count, size);

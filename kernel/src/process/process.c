@@ -246,7 +246,6 @@ void terminateAllProcessTasks(Process* process) {
 
 static void processFinalizeTask(Process* process) {
     // This must be a task becuase it might include blocking operations.
-    assert(getCurrentTask() != NULL);
     unregisterProcess(process);
     closeAllProcessFiles(process);
     if (process->pid != 0) {
@@ -311,7 +310,7 @@ int doForProcessWithPid(int pid, ProcessFindCallback callback, void* udata) {
 }
 
 void handleProcessTaskWakeup(Task* task) {
-    if (task->sched._state == WAIT_CHLD) {
+    if (task->sched.state == WAIT_CHLD) {
         basicProcessWait(task);
     }
 }

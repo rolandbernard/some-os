@@ -68,7 +68,7 @@ typedef struct {
 
 typedef struct HartFrame_s {
     TrapFrame frame;
-    void* stack_top;
+    uintptr_t stack_top;
     int hartid;
     ScheduleQueue queue;
     struct Task_s* idle_task;
@@ -98,7 +98,7 @@ typedef struct {
     Priority priority;
     Priority queue_priority; // Is at maximum priority, but will be decreased over time
     Time run_for;
-    TaskState _state;
+    TaskState state;
     struct Task_s* sched_next; // Used for ready and waiting lists
     Time sleeping_until;
     SpinLock lock;

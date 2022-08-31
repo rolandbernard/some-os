@@ -26,26 +26,23 @@ SyscallReturn forkSyscall(TrapFrame* frame) {
         // Only thing that is created is a new task and stack.
         Priority priority = DEFAULT_PRIORITY;
         size_t stack_size = HART_STACK_SIZE;
-        void* old_stack_top;
+        uintptr_t old_stack_top;
         if (frame->hart == NULL) {
             old_stack_top = ((HartFrame*)frame)->stack_top;
         } else {
             priority = task->sched.priority;
-            old_stack_top = (void*)task->stack_top;
+            old_stack_top = task->stack_top;
         }
         Task* new_task = createKernelTask((void*)frame->pc, stack_size, priority);
         // Copy registers
         memcpy(&new_task->frame, frame, sizeof(TrapFrame));
         // Copy stack
-        void* old_stack_pointer = (void*)frame->regs[REG_STACK_POINTER];
+        uintptr_t old_stack_pointer = frame->regs[REG_STACK_POINTER];
         size_t used_size = old_stack_top - old_stack_pointer;
         void* new_stack_pointer = (void*)new_task->stack_top - used_size;
-        memcpy(new_stack_pointer, old_stack_pointer, used_size);
+        memcpy(new_stack_pointer, (void*)old_stack_pointer, used_size);
         // Update stack pointer and hart value
         new_task->frame.regs[REG_STACK_POINTER] = (uintptr_t)new_stack_pointer;
-        if (frame->hart == NULL && new_task->frame.hart == NULL) {
-            new_task->frame.hart = (HartFrame*)frame;
-        }
         // Set the return value of the syscall to 1 for the new process
         new_task->frame.regs[REG_ARGUMENT_0] = 1;
         enqueueTask(new_task);
@@ -303,10 +300,5 @@ SyscallReturn getGidSyscall(TrapFrame* frame) {
     Gid gid = task->process->resources.gid;
     unlockTaskLock(&task->process->resources.lock);
     SYSCALL_RETURN(gid);
-}
-
-void leave() {
-    syscall(SYSCALL_EXIT);
-    panic(); // This will never return
 }
 

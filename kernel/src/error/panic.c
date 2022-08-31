@@ -1,14 +1,16 @@
 
 #include "error/panic.h"
+
 #include "error/log.h"
 #include "interrupt/com.h"
 #include "interrupt/trap.h"
+#include "util/util.h"
 
 UnsafeLock global_panic_lock;
 
-noreturn void notifyPanic() {
+void notifyPanic() {
     sendMessageToAll(KERNEL_PANIC, NULL);
-    silentPanic();
+    panicUnlock();
 }
 
 noreturn void silentPanic() {
@@ -16,5 +18,9 @@ noreturn void silentPanic() {
         // Infinite loop after panic
         waitForInterrupt();
     }
+}
+
+void panicBreak() {
+    noop();
 }
 

@@ -35,6 +35,4 @@ SyscallReturn getUidSyscall(TrapFrame* frame);
 
 SyscallReturn getGidSyscall(TrapFrame* frame);
 
-void leave();
-
 #endif
