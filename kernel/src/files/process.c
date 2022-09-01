@@ -33,7 +33,7 @@ void putNewFileDescriptor(Process* process, int fd, int flags, VfsFile* file) {
     vfsFileCopy(file);
     VfsFileDescriptor* desc = kalloc(sizeof(VfsFileDescriptor));
     desc->id = fd;
-    desc->flags = flags | file->flags;
+    desc->flags = flags;
     desc->file = file;
     desc->next = process->resources.files;
     process->resources.files = desc;
@@ -79,7 +79,7 @@ void closeExecProcessFiles(Process* process) {
     lockTaskLock(&process->resources.lock);
     VfsFileDescriptor** current = &process->resources.files;
     while (*current != NULL) {
-        if (((*current)->flags & VFS_FILE_CLOEXEC) != 0) {
+        if (((*current)->flags & VFS_DESC_CLOEXEC) != 0) {
             VfsFileDescriptor* to_remove = *current;
             *current = to_remove->next;
             removeFileDescriptor(to_remove);

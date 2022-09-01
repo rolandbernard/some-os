@@ -361,7 +361,7 @@ Error vfsOpenAt(VirtualFilesystem* fs, Process* process, VfsFile* file, const ch
     VfsNode* node;
     char* real_path;
     Error err = vfsLookupNodeAt(fs, process, file, path, VFS_LOOKUP_NORMAL, &node, &real_path);
-    if (err.kind == ENOENT && (flags & VFS_OPEN_CREATE) != 0) {
+    if (err.kind == ENOENT && (flags & VFS_OPEN_CREAT) != 0) {
         // Open can open special files but not create them.
         VfsMode file_mode = (mode & ~VFS_MODE_TYPE) | TYPE_MODE(VFS_TYPE_REG);
         Error err = vfsCreateNewNode(fs, process, file, path, file_mode, 0, &node, &real_path);

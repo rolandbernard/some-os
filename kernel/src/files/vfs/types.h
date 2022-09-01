@@ -23,33 +23,32 @@ typedef enum {
 } VfsFileType;
 
 typedef enum {
-    VFS_SEEK_CUR = 0,
-    VFS_SEEK_SET = 1,
+    VFS_SEEK_SET = 0,
+    VFS_SEEK_CUR = 1,
     VFS_SEEK_END = 2,
 } VfsSeekWhence;
 
 typedef enum {
-    VFS_OPEN_CREATE = (1 << 0),
-    VFS_OPEN_APPEND = (1 << 1),
-    VFS_OPEN_TRUNC = (1 << 2),
-    VFS_OPEN_DIRECTORY = (1 << 3),
-    VFS_OPEN_READ = (1 << 4),
-    VFS_OPEN_WRITE = (1 << 5),
-    VFS_OPEN_EXECUTE = (1 << 6),
-    VFS_OPEN_REGULAR = (1 << 7),
-    VFS_OPEN_CLOEXEC = (1 << 8),
-    VFS_OPEN_EXCL = (1 << 9),
-    VFS_OPEN_RDONLY = (1 << 10),
-    VFS_OPEN_WRONLY = (1 << 11),
+    VFS_OPEN_READ        =   0x0001,
+    VFS_OPEN_WRITE       =   0x0002,
+    VFS_OPEN_ACCESS_MODE =   0x0003,
+    VFS_OPEN_APPEND      =   0x0008,
+    VFS_OPEN_CREAT       =   0x0200,
+    VFS_OPEN_TRUNC       =   0x0400,
+    VFS_OPEN_EXCL        =   0x0800,
+    VFS_OPEN_CLOEXEC     =  0x40000,
+    VFS_OPEN_EXECUTE     = 0x100000,
+    VFS_OPEN_DIRECTORY   = 0x200000,
+    VFS_OPEN_REGULAR     = 0x400000,
 } VfsOpenFlags;
 
-#define OPEN_ACCESS(open_flags) ((open_flags >> 3) & 0b11111)
+#define OPEN_ACCESS(open_flags) ((open_flags & 0b11) | (((open_flags >> 20) & 0b111) << 2))
 
 typedef enum {
-    VFS_ACCESS_DIR = (1 << 0),
-    VFS_ACCESS_R = (1 << 1),
-    VFS_ACCESS_W = (1 << 2),
-    VFS_ACCESS_X = (1 << 3),
+    VFS_ACCESS_R = (1 << 0),
+    VFS_ACCESS_W = (1 << 1),
+    VFS_ACCESS_X = (1 << 2),
+    VFS_ACCESS_DIR = (1 << 3),
     VFS_ACCESS_REG = (1 << 4),
     VFS_ACCESS_CHMOD = (1 << 5),
     VFS_ACCESS_CHOWN = (1 << 6),
@@ -72,10 +71,13 @@ typedef enum {
 } VfsModeFlags;
 
 typedef enum {
-    VFS_FILE_CLOEXEC = (1 << 0),
-    VFS_FILE_RDONLY = (1 << 1),
-    VFS_FILE_WRONLY = (1 << 2),
-} VfsFileDescFlags;
+    VFS_FILE_READ = (1 << 0),
+    VFS_FILE_WRITE = (1 << 1),
+} VfsFileFlags;
+
+typedef enum {
+    VFS_DESC_CLOEXEC = (1 << 0),
+} VfsDescFlags;
 
 typedef int VfsFileDescId;
 
@@ -187,7 +189,7 @@ typedef struct VfsFile_s {
     char* path;
     size_t ref_count;
     size_t offset;
-    VfsFileDescFlags flags;
+    VfsFileFlags flags;
     TaskLock lock;
 } VfsFile;
 
@@ -195,7 +197,7 @@ typedef struct VfsFileDescriptor_s {
     struct VfsFileDescriptor_s* next;
     VfsFile* file;
     VfsFileDescId id;
-    VfsFileDescFlags flags;
+    VfsDescFlags flags;
 } VfsFileDescriptor;
 
 typedef struct VfsTmpMounts_s {
