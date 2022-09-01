@@ -45,4 +45,10 @@ SyscallReturn mknodSyscall(TrapFrame* frame);
 
 SyscallReturn umaskSyscall(TrapFrame* frame);
 
+SyscallReturn fcntlSyscall(TrapFrame* frame);
+
+SyscallReturn ioctlSyscall(TrapFrame* frame);
+
+SyscallReturn isattySyscall(TrapFrame* frame);
+
 #endif

@@ -57,6 +57,9 @@ typedef enum {
     SYSCALL_SETEGID = 47,
     SYSCALL_SETREUID = 48,
     SYSCALL_SETREGID = 49,
+    SYSCALL_FCNTL = 50,
+    SYSCALL_IOCTL = 51,
+    SYSCALL_ISATTY = 52,
 // Kernel only syscalls:
     SYSCALL_CRITICAL = 0 + KERNEL_ONLY_SYSCALL_OFFSET,
 } Syscalls;
@@ -71,7 +74,7 @@ typedef enum {
 
 typedef SyscallReturn (*SyscallFunction)(TrapFrame* frame);
 
-#define SYSCALL_RETURN(VAL) frame->regs[REG_ARGUMENT_0] = (uintptr_t)VAL; return CONTINUE;
+#define SYSCALL_RETURN(VAL) frame->regs[REG_ARGUMENT_0] = (uintptr_t)(VAL); return CONTINUE;
 #define SYSCALL_ARG(NUM) frame->regs[REG_ARGUMENT_1 + NUM]
 
 // Run a syscall for the given process. Return and extract arguments from the process registers.

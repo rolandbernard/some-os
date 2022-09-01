@@ -28,17 +28,19 @@ SyscallReturn openSyscall(TrapFrame* frame) {
             SYSCALL_RETURN(-err.kind);
         } else {
             size_t fd = allocateNewFileDescriptorId(task->process);
-            int flags = 0;
+            VfsFileDescFlags flags_desc = 0;
+            VfsFileDescFlags flags_file = 0;
             if ((SYSCALL_ARG(1) & VFS_OPEN_CLOEXEC) != 0) {
-                flags |= VFS_FILE_CLOEXEC;
+                flags_desc |= VFS_FILE_CLOEXEC;
             }
             if ((SYSCALL_ARG(1) & VFS_OPEN_RDONLY) != 0) {
-                flags |= VFS_FILE_RDONLY;
+                flags_file |= VFS_FILE_RDONLY;
             }
             if ((SYSCALL_ARG(1) & VFS_OPEN_WRONLY) != 0) {
-                flags |= VFS_FILE_WRONLY;
+                flags_file |= VFS_FILE_WRONLY;
             }
-            putNewFileDescriptor(task->process, fd, flags, file);
+            file->flags = flags_file;
+            putNewFileDescriptor(task->process, fd, flags_desc, file);
             SYSCALL_RETURN(fd);
         }
     } else {
@@ -102,21 +104,22 @@ SyscallReturn renameSyscall(TrapFrame* frame) {
     }
 }
 
-#define FILE_SYSCALL_OP(READ, WRITE, DO)                            \
-    assert(frame->hart != NULL);                                    \
-    Task* task = (Task*)frame;                                      \
-    size_t fd = SYSCALL_ARG(0);                                     \
-    VfsFileDescriptor* desc = getFileDescriptor(task->process, fd); \
-    if (desc != NULL) {                                             \
-        if ((desc->flags & VFS_FILE_RDONLY) != 0 && WRITE) {        \
-            SYSCALL_RETURN(-EBADF);                                 \
-        } else if ((desc->flags & VFS_FILE_WRONLY) != 0 && READ) {  \
-            SYSCALL_RETURN(-EBADF);                                 \
-        } else {                                                    \
-            DO;                                                     \
-        }                                                           \
-    } else {                                                        \
-        SYSCALL_RETURN(-EBADF);                                     \
+#define FILE_SYSCALL_OP(READ, WRITE, DO)                                                    \
+    assert(frame->hart != NULL);                                                            \
+    Task* task = (Task*)frame;                                                              \
+    assert(task->process != NULL);                                                          \
+    size_t fd = SYSCALL_ARG(0);                                                             \
+    VfsFileDescriptor* desc = getFileDescriptor(task->process, fd);                         \
+    if (desc != NULL) {                                                                     \
+        if (((desc->flags | desc->file->flags) & VFS_FILE_RDONLY) != 0 && WRITE) {          \
+            SYSCALL_RETURN(-EBADF);                                                         \
+        } else if (((desc->flags | desc->file->flags) & VFS_FILE_WRONLY) != 0 && READ) {    \
+            SYSCALL_RETURN(-EBADF);                                                         \
+        } else {                                                                            \
+            DO;                                                                             \
+        }                                                                                   \
+    } else {                                                                                \
+        SYSCALL_RETURN(-EBADF);                                                             \
     }
 
 SyscallReturn closeSyscall(TrapFrame* frame) {
@@ -335,10 +338,12 @@ SyscallReturn pipeSyscall(TrapFrame* frame) {
     Task* task = (Task*)frame;
     VfsFile* file_read = createPipeFile();
     VfsFile* file_write = createPipeFileClone(file_read);
+    file_read->flags = VFS_FILE_RDONLY;
+    file_write->flags = VFS_FILE_WRONLY;
     int pipe_read = allocateNewFileDescriptorId(task->process);
     int pipe_write = allocateNewFileDescriptorId(task->process);
-    putNewFileDescriptor(task->process, pipe_read, VFS_FILE_RDONLY, (VfsFile*)file_read);
-    putNewFileDescriptor(task->process, pipe_write, VFS_FILE_WRONLY, (VfsFile*)file_write);
+    putNewFileDescriptor(task->process, pipe_read, 0, (VfsFile*)file_read);
+    putNewFileDescriptor(task->process, pipe_write, 0, (VfsFile*)file_write);
     VirtPtr arr = virtPtrForTask(SYSCALL_ARG(0), task);
     writeIntAt(arr, sizeof(int) * 8, 0, pipe_read);
     writeIntAt(arr, sizeof(int) * 8, 1, pipe_write);
@@ -368,5 +373,31 @@ SyscallReturn umaskSyscall(TrapFrame* frame) {
     task->process->resources.umask = SYSCALL_ARG(0) & 0777;
     unlockTaskLock(&task->process->resources.lock);
     SYSCALL_RETURN(old_mask);
+}
+
+SyscallReturn fcntlSyscall(TrapFrame* frame) {
+    SYSCALL_RETURN(-EUNSUP);
+}
+
+SyscallReturn ioctlSyscall(TrapFrame* frame) {
+    SYSCALL_RETURN(-EUNSUP);
+}
+
+SyscallReturn isattySyscall(TrapFrame* frame) {
+    FILE_SYSCALL_OP(false, false, {
+        lockTaskLock(&desc->file->node->lock);
+        if (MODE_TYPE(desc->file->node->stat.mode) == VFS_TYPE_CHAR) {
+            Device* dev = getDeviceWithId(desc->file->node->stat.rdev);
+            unlockTaskLock(&desc->file->node->lock);
+            if (dev != NULL && strcmp(dev->name, "tty") == 0) {
+                SYSCALL_RETURN(-SUCCESS);
+            } else {
+                SYSCALL_RETURN(-ENOTTY);
+            }
+        } else {
+            unlockTaskLock(&desc->file->node->lock);
+            SYSCALL_RETURN(-ENOTTY);
+        }
+    });
 }
 

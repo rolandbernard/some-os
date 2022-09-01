@@ -70,6 +70,9 @@ SyscallFunction user_syscalls[] = {
     [SYSCALL_SETEGID] = setEGidSyscall,
     [SYSCALL_SETREUID] = setREUidSyscall,
     [SYSCALL_SETREGID] = setREGidSyscall,
+    [SYSCALL_FCNTL] = fcntlSyscall,
+    [SYSCALL_IOCTL] = ioctlSyscall,
+    [SYSCALL_ISATTY] = isattySyscall,
 };
 
 SyscallFunction kernel_syscalls[] = {

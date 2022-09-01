@@ -675,6 +675,22 @@ static bool testDup() {
     return true;
 }
 
+static bool testIsatty() {
+    ASSERT(isatty(0) == 1);
+    ASSERT(isatty(1) == 1);
+    ASSERT(isatty(2) == 1);
+    int fd = open("/tmp/test3.txt", O_RDONLY);
+    ASSERT(fd != -1);
+    int res = isatty(fd);
+    ASSERT(errno == ENOTTY);
+    ASSERT(res == 0);
+    close(fd);
+    res = isatty(54321);
+    ASSERT(errno == EBADF);
+    ASSERT(res == 0);
+    return true;
+}
+
 static bool testUnlinkFile() {
     char buffer[512] = "????????????";
     ASSERT(unlink("/tmp/test2.txt") == 0);
@@ -815,6 +831,7 @@ static bool runBasicSyscallTests() {
         TEST(testChmodStat),
         TEST(testChownStat),
         TEST(testDup),
+        TEST(testIsatty),
         TEST(testUnlinkFile),
         TEST(testMount),
         TEST(testUmount),
