@@ -11,6 +11,7 @@
 #include "interrupt/syscall.h"
 #include "interrupt/trap.h"
 #include "kernel/init.h"
+#include "kernel/time.h"
 #include "process/syscall.h"
 #include "task/harts.h"
 #include "task/schedule.h"

@@ -14,10 +14,11 @@
             canAccess(node, process, ACCESS),                           \
             unlockTaskLock(&node->lock)                                 \
         );                                                              \
+        Time time = getNanoseconds();                                   \
         if (((ACCESS) & VFS_ACCESS_W) != 0) {                           \
-            node->stat.mtime = getNanoseconds();                        \
+            node->stat.mtime = time;                                    \
         }                                                               \
-        node->stat.atime = getNanoseconds();                            \
+        node->stat.atime = time;                                        \
         CHECKED(vfsSuperWriteNode(node), unlockTaskLock(&node->lock));  \
         unlockTaskLock(&node->lock);                                    \
         return node->functions->NAME PARAMS;                            \
@@ -91,8 +92,9 @@ Error vfsNodeLink(VfsNode* node, Process* process, const char* name, VfsNode* en
             canAccess(node, process, VFS_ACCESS_W | VFS_ACCESS_DIR),
             unlockTaskLock(&node->lock)
         );
-        node->stat.mtime = getNanoseconds();
-        node->stat.atime = getNanoseconds();
+        Time time = getNanoseconds();
+        node->stat.mtime = time;
+        node->stat.atime = time;
         CHECKED(vfsSuperWriteNode(node), unlockTaskLock(&node->lock));
         unlockTaskLock(&node->lock);
         lockTaskLock(&entry->lock);

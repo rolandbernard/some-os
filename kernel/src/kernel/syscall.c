@@ -19,15 +19,19 @@ typedef struct {
 SyscallReturn timesSyscall(TrapFrame* frame) {
     assert(frame->hart != NULL);
     Task* task = (Task*)frame;
-    TimesStruct times;
-    times.user_time = TIMES_CLOCK_SCALING(task->times.user_time);
-    times.system_time = TIMES_CLOCK_SCALING(task->times.system_time);
-    times.user_child_time = TIMES_CLOCK_SCALING(task->times.user_child_time);
-    times.system_child_time = TIMES_CLOCK_SCALING(task->times.system_child_time);
     if (SYSCALL_ARG(0) != 0) {
+        TimesStruct times;
+        times.user_time = TIMES_CLOCK_SCALING(task->times.user_time);
+        times.system_time = TIMES_CLOCK_SCALING(task->times.system_time);
+        times.user_child_time = TIMES_CLOCK_SCALING(task->times.user_child_time);
+        times.system_child_time = TIMES_CLOCK_SCALING(task->times.system_child_time);
         VirtPtr buf = virtPtrForTask(SYSCALL_ARG(0), task);
         memcpyBetweenVirtPtr(buf, virtPtrForKernel(&times), sizeof(TimesStruct));
     }
     SYSCALL_RETURN(TIMES_CLOCK_SCALING(getTime()));
+}
+
+SyscallReturn nanosecondsSyscall(TrapFrame* frame) {
+    SYSCALL_RETURN(getNanoseconds());
 }
 

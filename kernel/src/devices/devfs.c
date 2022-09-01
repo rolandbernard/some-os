@@ -49,9 +49,10 @@ static VfsNode* createDeviceFsDevNode(DeviceFilesystem* sb, Device* device) {
     node->stat.size = 0;
     node->stat.block_size = 0;
     node->stat.blocks = 0;
-    node->stat.atime = getNanoseconds();
-    node->stat.mtime = getNanoseconds();
-    node->stat.ctime = getNanoseconds();
+    Time time = getNanoseconds();
+    node->stat.atime = time;
+    node->stat.mtime = time;
+    node->stat.ctime = time;
     node->ref_count = 0;
     initTaskLock(&node->lock);
     node->mounted = NULL;
@@ -149,9 +150,10 @@ static VfsNode* createDeviceFsRootDirNode(DeviceFilesystem* sb) {
     node->stat.size = 0;
     node->stat.block_size = 0;
     node->stat.blocks = 0;
-    node->stat.atime = getNanoseconds();
-    node->stat.mtime = getNanoseconds();
-    node->stat.ctime = getNanoseconds();
+    Time time = getNanoseconds();
+    node->stat.atime = time;
+    node->stat.mtime = time;
+    node->stat.ctime = time;
     node->ref_count = 0;
     initTaskLock(&node->lock);
     node->mounted = NULL;

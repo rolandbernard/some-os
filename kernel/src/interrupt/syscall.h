@@ -60,6 +60,7 @@ typedef enum {
     SYSCALL_FCNTL = 50,
     SYSCALL_IOCTL = 51,
     SYSCALL_ISATTY = 52,
+    SYSCALL_NANOSECONDS = 53,
 // Kernel only syscalls:
     SYSCALL_CRITICAL = 0 + KERNEL_ONLY_SYSCALL_OFFSET,
 } Syscalls;

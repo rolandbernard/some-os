@@ -8,6 +8,7 @@
 #include <sys/mman.h>
 #include <sys/mount.h>
 #include <sys/stat.h>
+#include <sys/time.h>
 #include <sys/times.h>
 #include <sys/types.h>
 #include <sys/wait.h>
@@ -774,6 +775,17 @@ static bool testUmaskFork() {
     return true;
 }
 
+static bool testGettimeofday() {
+    struct timeval start;
+    ASSERT(gettimeofday(&start, NULL) == 0);
+    usleep(10000);
+    struct timeval end;
+    ASSERT(gettimeofday(&end, NULL) == 0);
+    ASSERT((start.tv_sec * 1000000 + start.tv_usec) + 5000 < (end.tv_sec * 1000000 + end.tv_usec));
+    ASSERT((start.tv_sec * 1000000 + start.tv_usec) + 20000 > (end.tv_sec * 1000000 + end.tv_usec));
+    return true;
+}
+
 typedef bool (*TestFunction)();
 
 typedef struct {
@@ -840,6 +852,7 @@ static bool runBasicSyscallTests() {
         TEST(testUmaskOpen),
         TEST(testUmaskMkdir),
         TEST(testUmaskFork),
+        TEST(testGettimeofday),
     };
     bool result = true;
     for (size_t i = 0; i < sizeof(tests) / sizeof(tests[0]); i++) {
