@@ -1,63 +1,90 @@
 
+#include <assert.h>
+
 #include "files/process.h"
 
 #include "files/vfs/file.h"
 #include "memory/kalloc.h"
 #include "task/spinlock.h"
 
-int allocateNewFileDescriptorId(Process* process) {
+void vfsFileDescriptorCopy(Process* process, VfsFileDescriptor* desc) {
     lockTaskLock(&process->resources.lock);
-    int fd = process->resources.next_fd;
-    process->resources.next_fd++;
+    desc->ref_count++;
     unlockTaskLock(&process->resources.lock);
-    return fd;
+}
+
+void vfsFileDescriptorClose(Process* process, VfsFileDescriptor* desc) {
+    lockTaskLock(&process->resources.lock);
+    desc->ref_count--;
+    if (desc->ref_count == 0) {
+        unlockTaskLock(&process->resources.lock);
+        VfsFile* file = desc->file;
+        dealloc(desc);
+        vfsFileClose(file);
+    } else {
+        unlockTaskLock(&process->resources.lock);
+    }
 }
 
 VfsFileDescriptor* getFileDescriptor(Process* process, int fd) {
     lockTaskLock(&process->resources.lock);
     VfsFileDescriptor* current = process->resources.files;
-    while (current != NULL) {
-        if (current->id == fd) {
-            unlockTaskLock(&process->resources.lock);
-            return current;
-        } else {
-            current = current->next;
-        }
+    while (current != NULL && current->id < fd) {
+        current = current->next;
     }
-    unlockTaskLock(&process->resources.lock);
-    return NULL;
+    if (current != NULL && current->id == fd) {
+        vfsFileDescriptorCopy(process, current);
+        unlockTaskLock(&process->resources.lock);
+        return current;
+    } else {
+        unlockTaskLock(&process->resources.lock);
+        return NULL;
+    }
 }
 
-void putNewFileDescriptor(Process* process, int fd, int flags, VfsFile* file) {
+int putNewFileDescriptor(Process* process, int fd, int flags, VfsFile* file) {
     lockTaskLock(&process->resources.lock);
     vfsFileCopy(file);
+    VfsFileDescriptor** current = &process->resources.files;
+    if (fd < 0) {
+        fd = 0;
+        while (*current != NULL && (*current)->id == fd) {
+            current = &(*current)->next;
+            fd++;
+        }
+    } else {
+        closeFileDescriptor(process, fd);
+        while (*current != NULL && (*current)->id < fd) {
+            current = &(*current)->next;
+        }
+        if (*current != NULL && (*current)->id == fd) {
+            VfsFileDescriptor* to_remove = *current;
+            *current = to_remove->next;
+            vfsFileDescriptorClose(process, to_remove);
+        }
+    }
+    assert(*current == NULL || (*current)->id > fd);
     VfsFileDescriptor* desc = kalloc(sizeof(VfsFileDescriptor));
     desc->id = fd;
     desc->flags = flags;
     desc->file = file;
-    desc->next = process->resources.files;
-    process->resources.files = desc;
+    desc->next = *current;
+    desc->ref_count = 1;
+    *current = desc;
     unlockTaskLock(&process->resources.lock);
-}
-
-static void removeFileDescriptor(VfsFileDescriptor* desc) {
-    VfsFile* file = desc->file;
-    dealloc(desc);
-    vfsFileClose(file);
+    return fd;
 }
 
 void closeFileDescriptor(Process* process, int fd) {
     lockTaskLock(&process->resources.lock);
     VfsFileDescriptor** current = &process->resources.files;
-    while (*current != NULL) {
-        if ((*current)->id == fd) {
-            VfsFileDescriptor* to_remove = *current;
-            *current = to_remove->next;
-            removeFileDescriptor(to_remove);
-            break;
-        } else {
-            current = &(*current)->next;
-        }
+    while (*current != NULL && (*current)->id < fd) {
+        current = &(*current)->next;
+    }
+    if (*current != NULL && (*current)->id == fd) {
+        VfsFileDescriptor* to_remove = *current;
+        *current = to_remove->next;
+        vfsFileDescriptorClose(process, to_remove);
     }
     unlockTaskLock(&process->resources.lock);
 }
@@ -68,10 +95,9 @@ void closeAllProcessFiles(Process* process) {
     while (current != NULL) {
         VfsFileDescriptor* to_remove = current;
         current = current->next;
-        removeFileDescriptor(to_remove);
+        vfsFileDescriptorClose(process, to_remove);
     }
     process->resources.files = NULL;
-    process->resources.next_fd = 0;
     unlockTaskLock(&process->resources.lock);
 }
 
@@ -82,7 +108,7 @@ void closeExecProcessFiles(Process* process) {
         if (((*current)->flags & VFS_DESC_CLOEXEC) != 0) {
             VfsFileDescriptor* to_remove = *current;
             *current = to_remove->next;
-            removeFileDescriptor(to_remove);
+            vfsFileDescriptorClose(process, to_remove);
         } else {
             current = &(*current)->next;
         }

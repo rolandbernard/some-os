@@ -34,9 +34,8 @@ SyscallReturn openSyscall(TrapFrame* frame) {
         if (isError(err)) {
             SYSCALL_RETURN(-err.kind);
         } else {
-            size_t fd = allocateNewFileDescriptorId(task->process);
             file->flags = flags & VFS_OPEN_ACCESS_MODE;
-            putNewFileDescriptor(task->process, fd, (flags & VFS_OPEN_CLOEXEC) != 0 ? VFS_DESC_CLOEXEC : 0, file);
+            int fd = putNewFileDescriptor(task->process, -1, (flags & VFS_OPEN_CLOEXEC) != 0 ? VFS_DESC_CLOEXEC : 0, file);
             SYSCALL_RETURN(fd);
         }
     } else {
@@ -121,6 +120,7 @@ SyscallReturn renameSyscall(TrapFrame* frame) {
 SyscallReturn closeSyscall(TrapFrame* frame) {
     FILE_SYSCALL_OP(false, false, {
         closeFileDescriptor(task->process, fd);
+        vfsFileDescriptorClose(task->process, desc);
         SYSCALL_RETURN(-SUCCESS);
     });
 }
@@ -129,6 +129,7 @@ SyscallReturn readSyscall(TrapFrame* frame) {
     FILE_SYSCALL_OP(true, false, {
         size_t size;
         Error err = vfsFileRead(desc->file, task->process, virtPtrForTask(SYSCALL_ARG(1), task), SYSCALL_ARG(2), &size);
+        vfsFileDescriptorClose(task->process, desc);
         if (isError(err)) {
             SYSCALL_RETURN(-err.kind);
         } else {
@@ -141,6 +142,7 @@ SyscallReturn writeSyscall(TrapFrame* frame) {
     FILE_SYSCALL_OP(false, true, {
         size_t size;
         Error err = vfsFileWrite(desc->file, task->process, virtPtrForTask(SYSCALL_ARG(1), task), SYSCALL_ARG(2), &size);
+        vfsFileDescriptorClose(task->process, desc);
         if (isError(err)) {
             SYSCALL_RETURN(-err.kind);
         } else {
@@ -153,6 +155,7 @@ SyscallReturn seekSyscall(TrapFrame* frame) {
     FILE_SYSCALL_OP(false, false, {
         size_t size;
         Error err = vfsFileSeek(desc->file, task->process, SYSCALL_ARG(1), SYSCALL_ARG(2), &size);
+        vfsFileDescriptorClose(task->process, desc);
         if (isError(err)) {
             SYSCALL_RETURN(-err.kind);
         } else {
@@ -165,6 +168,7 @@ SyscallReturn statSyscall(TrapFrame* frame) {
     FILE_SYSCALL_OP(false, false, {
         VirtPtr ptr = virtPtrForTask(SYSCALL_ARG(1), task);
         Error err = vfsFileStat(desc->file, task->process, ptr);
+        vfsFileDescriptorClose(task->process, desc);
         SYSCALL_RETURN(-err.kind);
     });
 }
@@ -176,12 +180,8 @@ SyscallReturn dupSyscall(TrapFrame* frame) {
             flags |= VFS_DESC_CLOEXEC;
         }
         int id = SYSCALL_ARG(1);
-        if (id < 0) {
-            id = allocateNewFileDescriptorId(task->process);
-        } else {
-            closeFileDescriptor(task->process, id);
-        }
-        putNewFileDescriptor(task->process, id, flags, desc->file);
+        id = putNewFileDescriptor(task->process, id, flags, desc->file);
+        vfsFileDescriptorClose(task->process, desc);
         SYSCALL_RETURN(id);
     });
 }
@@ -189,6 +189,7 @@ SyscallReturn dupSyscall(TrapFrame* frame) {
 SyscallReturn truncSyscall(TrapFrame* frame) {
     FILE_SYSCALL_OP(false, true, {
         Error err = vfsFileTrunc(desc->file, task->process, SYSCALL_ARG(1));
+        vfsFileDescriptorClose(task->process, desc);
         SYSCALL_RETURN(-err.kind);
     });
 }
@@ -196,6 +197,7 @@ SyscallReturn truncSyscall(TrapFrame* frame) {
 SyscallReturn chmodSyscall(TrapFrame* frame) {
     FILE_SYSCALL_OP(false, true, {
         Error err = vfsFileChmod(desc->file, task->process, SYSCALL_ARG(1));
+        vfsFileDescriptorClose(task->process, desc);
         SYSCALL_RETURN(-err.kind);
     });
 }
@@ -203,6 +205,7 @@ SyscallReturn chmodSyscall(TrapFrame* frame) {
 SyscallReturn chownSyscall(TrapFrame* frame) {
     FILE_SYSCALL_OP(false, true, {
         Error err = vfsFileChown(desc->file, task->process, SYSCALL_ARG(1), SYSCALL_ARG(2));
+        vfsFileDescriptorClose(task->process, desc);
         SYSCALL_RETURN(-err.kind);
     });
 }
@@ -213,6 +216,7 @@ SyscallReturn readdirSyscall(TrapFrame* frame) {
         Error err = vfsFileReaddir(
             desc->file, task->process, virtPtrForTask(SYSCALL_ARG(1), task), SYSCALL_ARG(2), &size
         );
+        vfsFileDescriptorClose(task->process, desc);
         if (isError(err)) {
             SYSCALL_RETURN(-err.kind);
         } else {
@@ -336,10 +340,8 @@ SyscallReturn pipeSyscall(TrapFrame* frame) {
     VfsFile* file_write = createPipeFileClone(file_read);
     file_read->flags = VFS_FILE_READ;
     file_write->flags = VFS_FILE_WRITE;
-    int pipe_read = allocateNewFileDescriptorId(task->process);
-    int pipe_write = allocateNewFileDescriptorId(task->process);
-    putNewFileDescriptor(task->process, pipe_read, 0, (VfsFile*)file_read);
-    putNewFileDescriptor(task->process, pipe_write, 0, (VfsFile*)file_write);
+    int pipe_read = putNewFileDescriptor(task->process, -1, 0, (VfsFile*)file_read);
+    int pipe_write = putNewFileDescriptor(task->process, -1, 0, (VfsFile*)file_write);
     VirtPtr arr = virtPtrForTask(SYSCALL_ARG(0), task);
     writeIntAt(arr, sizeof(int) * 8, 0, pipe_read);
     writeIntAt(arr, sizeof(int) * 8, 1, pipe_write);
@@ -385,6 +387,7 @@ SyscallReturn isattySyscall(TrapFrame* frame) {
         if (MODE_TYPE(desc->file->node->stat.mode) == VFS_TYPE_CHAR) {
             Device* dev = getDeviceWithId(desc->file->node->stat.rdev);
             unlockTaskLock(&desc->file->node->lock);
+            vfsFileDescriptorClose(task->process, desc);
             if (dev != NULL && strcmp(dev->name, "tty") == 0) {
                 SYSCALL_RETURN(-SUCCESS);
             } else {
@@ -392,6 +395,7 @@ SyscallReturn isattySyscall(TrapFrame* frame) {
             }
         } else {
             unlockTaskLock(&desc->file->node->lock);
+            vfsFileDescriptorClose(task->process, desc);
             SYSCALL_RETURN(-ENOTTY);
         }
     });

@@ -184,7 +184,6 @@ Process* createUserProcess(Process* parent) {
             );
             // Copy resource information
             lockTaskLock(&parent->resources.lock);
-            process->resources.next_fd = parent->resources.next_fd;
             process->resources.cwd = stringClone(parent->resources.cwd);
             process->resources.umask = parent->resources.umask;
             unlockTaskLock(&parent->resources.lock);

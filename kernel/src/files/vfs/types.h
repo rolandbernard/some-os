@@ -79,6 +79,14 @@ typedef enum {
     VFS_DESC_CLOEXEC = (1 << 0),
 } VfsDescFlags;
 
+typedef enum {
+    VFS_FCNTL_DUPFD = 0,
+    VFS_FCNTL_GETFD = 1,
+    VFS_FCNTL_SETFD = 2,
+    VFS_FCNTL_GETFL = 3,
+    VFS_FCNTL_SETFL = 4,
+} VfsFcntlRequest;
+
 typedef int VfsFileDescId;
 
 #define VFS_MODE_A_RW (VFS_MODE_A_R | VFS_MODE_A_W)
@@ -198,6 +206,7 @@ typedef struct VfsFileDescriptor_s {
     VfsFile* file;
     VfsFileDescId id;
     VfsDescFlags flags;
+    size_t ref_count;
 } VfsFileDescriptor;
 
 typedef struct VfsTmpMounts_s {

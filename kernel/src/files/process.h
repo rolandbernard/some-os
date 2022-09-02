@@ -4,11 +4,13 @@
 #include "files/vfs/types.h"
 #include "process/types.h"
 
-int allocateNewFileDescriptorId(Process* process);
+void vfsFileDescriptorCopy(Process* process, VfsFileDescriptor* desc);
+
+void vfsFileDescriptorClose(Process* process, VfsFileDescriptor* desc);
 
 VfsFileDescriptor* getFileDescriptor(Process* process, int fd);
 
-void putNewFileDescriptor(Process* process, int fd, int flags, VfsFile* file);
+int putNewFileDescriptor(Process* process, int fd, int flags, VfsFile* file);
 
 void closeFileDescriptor(Process* process, int fd);
 

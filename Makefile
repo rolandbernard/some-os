@@ -16,7 +16,7 @@ QEMU    := qemu-system-$(ARCH)
 GDB     := $(ARCH)-someos-gdb
 
 # Qemu system
-QEMU_SMP  ?= 4
+QEMU_SMP  ?= 1
 QEMU_ARGS := -M virt -m 128M -s $(QEMU_ADD_ARGS)
 QEMU_ARGS += -cpu rv64 -bios none -snapshot
 

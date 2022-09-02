@@ -22,7 +22,6 @@ typedef struct {
 
 typedef struct {
     VfsMode umask;
-    int next_fd;
     VfsFileDescriptor* files;
     char* cwd;
     TaskLock lock;
