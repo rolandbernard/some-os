@@ -10,7 +10,7 @@ void vfsFileDescriptorClose(Process* process, VfsFileDescriptor* desc);
 
 VfsFileDescriptor* getFileDescriptor(Process* process, int fd);
 
-int putNewFileDescriptor(Process* process, int fd, int flags, VfsFile* file);
+int putNewFileDescriptor(Process* process, int fd, int flags, VfsFile* file, bool replace);
 
 void closeFileDescriptor(Process* process, int fd);
 

@@ -676,6 +676,51 @@ static bool testDup() {
     return true;
 }
 
+static bool testFcntlDup() {
+    char buffer[512] = "????????????";
+    int fd = open("/tmp/test3.txt", O_RDONLY);
+    ASSERT(fd != -1);
+    int fd2 = fcntl(fd, F_DUPFD, 5000);
+    ASSERT(fd2 == 5000);
+    ASSERT(read(fd, buffer, 512) == 12);
+    buffer[12] = 0;
+    ASSERT(strcmp(buffer, "Hello world!") == 0)
+    memset(buffer, '?', 12);
+    ASSERT(read(fd2, buffer, 512) == 0);
+    ASSERT(lseek(fd, 0, SEEK_SET) == 0);
+    close(fd);
+    ASSERT(read(fd2, buffer, 512) == 12);
+    buffer[12] = 0;
+    ASSERT(strcmp(buffer, "Hello world!") == 0)
+    close(fd2);
+    return true;
+}
+
+static bool testFcntlGetFlags() {
+    ASSERT((fcntl(0, F_GETFD) & FD_CLOEXEC) == 0);
+    ASSERT((fcntl(0, F_GETFL) & O_ACCMODE) == FREAD);
+    ASSERT((fcntl(1, F_GETFD) & FD_CLOEXEC) == 0);
+    ASSERT((fcntl(1, F_GETFL) & O_ACCMODE) == FWRITE);
+    ASSERT((fcntl(2, F_GETFD) & FD_CLOEXEC) == 0);
+    ASSERT((fcntl(2, F_GETFL) & O_ACCMODE) == FWRITE);
+    int fd = open("/tmp/test3.txt", O_RDONLY);
+    ASSERT(fd != -1);
+    ASSERT((fcntl(fd, F_GETFD) & FD_CLOEXEC) == 0);
+    ASSERT((fcntl(fd, F_GETFL) & O_ACCMODE) == FREAD);
+    close(fd);
+    fd = open("/tmp/test3.txt", O_WRONLY | O_CLOEXEC);
+    ASSERT(fd != -1);
+    ASSERT((fcntl(fd, F_GETFD) & FD_CLOEXEC) != 0);
+    ASSERT((fcntl(fd, F_GETFL) & O_ACCMODE) == FWRITE);
+    close(fd);
+    fd = open("/tmp/test3.txt", O_RDWR);
+    ASSERT(fd != -1);
+    ASSERT((fcntl(fd, F_GETFD) & FD_CLOEXEC) == 0);
+    ASSERT((fcntl(fd, F_GETFL) & O_ACCMODE) == (FREAD | FWRITE));
+    close(fd);
+    return true;
+}
+
 static bool testIsatty() {
     ASSERT(isatty(0) == 1);
     ASSERT(isatty(1) == 1);
@@ -843,6 +888,8 @@ static bool runBasicSyscallTests() {
         TEST(testChmodStat),
         TEST(testChownStat),
         TEST(testDup),
+        TEST(testFcntlDup),
+        TEST(testFcntlGetFlags),
         TEST(testIsatty),
         TEST(testUnlinkFile),
         TEST(testMount),

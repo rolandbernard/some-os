@@ -85,6 +85,7 @@ typedef enum {
     VFS_FCNTL_SETFD = 2,
     VFS_FCNTL_GETFL = 3,
     VFS_FCNTL_SETFL = 4,
+    VFS_FCNTL_DUPFD_CLOEXEC = 14,
 } VfsFcntlRequest;
 
 typedef int VfsFileDescId;

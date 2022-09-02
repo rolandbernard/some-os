@@ -42,7 +42,7 @@ VfsFileDescriptor* getFileDescriptor(Process* process, int fd) {
     }
 }
 
-int putNewFileDescriptor(Process* process, int fd, int flags, VfsFile* file) {
+int putNewFileDescriptor(Process* process, int fd, int flags, VfsFile* file, bool replace) {
     lockTaskLock(&process->resources.lock);
     vfsFileCopy(file);
     VfsFileDescriptor** current = &process->resources.files;
@@ -58,9 +58,16 @@ int putNewFileDescriptor(Process* process, int fd, int flags, VfsFile* file) {
             current = &(*current)->next;
         }
         if (*current != NULL && (*current)->id == fd) {
-            VfsFileDescriptor* to_remove = *current;
-            *current = to_remove->next;
-            vfsFileDescriptorClose(process, to_remove);
+            if (replace) {
+                VfsFileDescriptor* to_remove = *current;
+                *current = to_remove->next;
+                vfsFileDescriptorClose(process, to_remove);
+            } else {
+                while (*current != NULL && (*current)->id == fd) {
+                    current = &(*current)->next;
+                    fd++;
+                }
+            }
         }
     }
     assert(*current == NULL || (*current)->id > fd);
@@ -120,7 +127,7 @@ void forkFileDescriptors(Process* new_process, Process* old_process) {
     lockTaskLock(&old_process->resources.lock);
     VfsFileDescriptor* current = old_process->resources.files;
     while (current != NULL) {
-        putNewFileDescriptor(new_process, current->id, current->flags, current->file);
+        putNewFileDescriptor(new_process, current->id, current->flags, current->file, false);
         current = current->next;
     }
     unlockTaskLock(&old_process->resources.lock);
