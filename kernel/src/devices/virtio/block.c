@@ -33,7 +33,7 @@ Error initVirtIOBlockDevice(int id, volatile VirtIODeviceLayout* base, VirtIODev
     base->status = status;
     if (!(base->status & VIRTIO_FEATURES_OK)) {
         dealloc(device);
-        return someError(EUNSUP, "Device does not support some features");
+        return someError(ENOTSUP, "Device does not support some features");
     }
     CHECKED(setupVirtIOQueue(&device->virtio), dealloc(device));
     status |= VIRTIO_DRIVER_OK;
@@ -114,7 +114,7 @@ void virtIOBlockFreePendingRequests(VirtIOBlockDevice* device) {
                 request->result = simpleError(EIO);
                 break;
             case VIRTIO_BLOCK_S_UNSUPP:
-                request->result = simpleError(EUNSUP);
+                request->result = simpleError(ENOTSUP);
                 break;
             case VIRTIO_BLOCK_S_UNKNOWN:
                 request->result = simpleError(EIO);

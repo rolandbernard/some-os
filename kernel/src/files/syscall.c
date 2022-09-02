@@ -374,11 +374,11 @@ SyscallReturn umaskSyscall(TrapFrame* frame) {
 }
 
 SyscallReturn fcntlSyscall(TrapFrame* frame) {
-    SYSCALL_RETURN(-EUNSUP);
+    SYSCALL_RETURN(-ENOSYS);
 }
 
 SyscallReturn ioctlSyscall(TrapFrame* frame) {
-    SYSCALL_RETURN(-EUNSUP);
+    SYSCALL_RETURN(-ENOSYS);
 }
 
 SyscallReturn isattySyscall(TrapFrame* frame) {
