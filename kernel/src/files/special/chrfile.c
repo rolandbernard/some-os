@@ -3,12 +3,14 @@
 
 #include "files/special/chrfile.h"
 
+#include "devices/serial/ttyctl.h"
 #include "files/vfs/node.h"
 #include "memory/kalloc.h"
 
 typedef struct {
     VfsNode base;
     CharDevice* device;
+    Termios ctrl;
 } VfsTtyNode;
 
 static void ttyNodeFree(VfsTtyNode* node) {
@@ -17,15 +19,57 @@ static void ttyNodeFree(VfsTtyNode* node) {
 }
 
 static Error ttyNodeReadAt(VfsTtyNode* node, VirtPtr buff, size_t offset, size_t length, size_t* read) {
+    // TODO: Implement at least the following flags
+    // * INLCR
+    // * IGNCR
+    // * ICRNL
+    // * ISIG
+    // * ICANON
+    // * ECHO
+    // * ECHOE
+    // * ECHOK
+    // * ECHONL
+    // * VTIME
+    // * VMIN
+    // * VEOF
+    // * VEOL
+    // * VERASE
+    // * VINTR
+    // * VKILL
+    // * VQUIT
     return node->device->functions->read(node->device, buff, length, read, true);
 }
 
 static Error ttyNodeWriteAt(VfsTtyNode* node, VirtPtr buff, size_t offset, size_t length, size_t* written) {
+    // TODO: Implement at least the following flags
+    // * ONLCR
+    // * OCRNL
+    // * ONOCR
+    // * ONLRET
     return node->device->functions->write(node->device, buff, length, written);
 }
 
 static Error ttyNodeIoctl(VfsTtyNode* node, size_t request, VirtPtr argp, int* res) {
-    return simpleError(ENOSYS);
+    switch (request) {
+        case TCGETS:
+            return simpleError(ENOTSUP);
+        case TCSETSF:
+            node->device->functions->flush(node->device);
+        case TCSETS:
+        case TCSETSW:
+            return simpleError(ENOTSUP);
+        case TIOCGPGRP:
+            return simpleError(ENOTSUP);
+        case TIOCSPGRP:
+            return simpleError(ENOTSUP);
+        case TCXONC:
+            return simpleError(ENOTSUP);
+        case TCFLSH:
+            node->device->functions->flush(node->device);
+            return simpleError(SUCCESS);
+        default:
+            return simpleError(ENOTTY);
+    }
 }
 
 static const VfsNodeFunctions funcs = {
@@ -49,6 +93,8 @@ VfsTtyNode* createTtyNode(CharDevice* device, VfsNode* real_node) {
     initTaskLock(&node->base.lock);
     node->base.mounted = NULL;
     node->device = device;
+    // TODO: Init to correct defaults
+    memset(&node->ctrl, 0, sizeof(Termios));
     return node;
 }
 

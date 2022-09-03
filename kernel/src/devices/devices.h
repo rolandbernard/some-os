@@ -40,11 +40,13 @@ struct CharDevice_s;
 typedef Error (*CharDeviceReadFunction)(struct CharDevice_s* dev, VirtPtr buff, size_t size, size_t* read, bool block);
 typedef Error (*CharDeviceWriteFunction)(struct CharDevice_s* dev, VirtPtr buff, size_t size, size_t* written);
 typedef size_t (*CharDeviceAvailFunction)(struct CharDevice_s* dev);
+typedef void (*CharDeviceFlushFunction)(struct CharDevice_s* dev);
 
 typedef struct {
     CharDeviceReadFunction read;
     CharDeviceWriteFunction write;
     CharDeviceAvailFunction avail;
+    CharDeviceFlushFunction flush;
 } CharDeviceFunctions;
 
 typedef struct CharDevice_s {

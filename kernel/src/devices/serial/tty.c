@@ -96,6 +96,12 @@ static size_t uartTtyAvailFunction(UartTtyDevice* dev) {
     return ret;
 }
 
+static void uartTtyFlushFunction(UartTtyDevice* dev) {
+    lockSpinLock(&dev->lock);
+    dev->buffer_count = 0;
+    unlockSpinLock(&dev->lock);
+}
+
 static void uartTtyResizeBuffer(UartTtyDevice* dev) {
     size_t capacity = dev->buffer_capacity * 3 / 2;
     dev->buffer = krealloc(dev->buffer, capacity);
@@ -133,6 +139,7 @@ static const CharDeviceFunctions funcs = {
     .read = (CharDeviceReadFunction)uartTtyReadFunction,
     .write = (CharDeviceWriteFunction)uartTtyWriteFunction,
     .avail = (CharDeviceAvailFunction)uartTtyAvailFunction,
+    .flush = (CharDeviceFlushFunction)uartTtyFlushFunction,
 };
 
 UartTtyDevice* createUartTtyDevice(void* uart, UartWriteFunction write, UartReadFunction read) {
