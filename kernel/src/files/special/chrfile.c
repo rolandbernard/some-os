@@ -24,10 +24,15 @@ static Error ttyNodeWriteAt(VfsTtyNode* node, VirtPtr buff, size_t offset, size_
     return node->device->functions->write(node->device, buff, length, written);
 }
 
+static Error ttyNodeIoctl(VfsTtyNode* node, size_t request, VirtPtr argp, int* res) {
+    return simpleError(ENOSYS);
+}
+
 static const VfsNodeFunctions funcs = {
     .free = (VfsNodeFreeFunction)ttyNodeFree,
     .read_at = (VfsNodeReadAtFunction)ttyNodeReadAt,
     .write_at = (VfsNodeWriteAtFunction)ttyNodeWriteAt,
+    .ioctl = (VfsNodeIoctlFunction)ttyNodeIoctl,
 };
 
 VfsTtyNode* createTtyNode(CharDevice* device, VfsNode* real_node) {

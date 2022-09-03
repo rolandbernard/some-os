@@ -105,6 +105,14 @@ Error vfsNodeLink(VfsNode* node, Process* process, const char* name, VfsNode* en
     }
 }
 
+Error vfsNodeIoctl(VfsNode* node, Process* process, size_t request, VirtPtr argp, int* out) {
+    if (node->functions->ioctl == NULL) {
+        return simpleError(ENOTTY);
+    } else {
+        return node->functions->ioctl(node, request, argp, out);
+    }
+}
+
 void vfsNodeCopy(VfsNode* node) {
     vfsSuperCopyNode(node);
 }

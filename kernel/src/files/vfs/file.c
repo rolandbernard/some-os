@@ -105,6 +105,10 @@ Error vfsFileReaddir(VfsFile* file, Process* process, VirtPtr buffer, size_t len
     return err;
 }
 
+Error vfsFileIoctl(VfsFile* file, Process* process, size_t request, VirtPtr argp, int* out) {
+    return vfsNodeIoctl(file->node, process, request, argp, out);
+}
+
 void vfsFileCopy(VfsFile* file) {
     lockTaskLock(&file->lock);
     file->ref_count++;

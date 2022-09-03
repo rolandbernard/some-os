@@ -401,7 +401,15 @@ SyscallReturn fcntlSyscall(TrapFrame* frame) {
 }
 
 SyscallReturn ioctlSyscall(TrapFrame* frame) {
-    SYSCALL_RETURN(-ENOSYS);
+    FILE_SYSCALL_OP(false, false);
+    int result = 0;
+    Error error = vfsFileIoctl(desc->file, task->process, SYSCALL_ARG(1), virtPtrForTask(SYSCALL_ARG(2), task), &result);
+    vfsFileDescriptorClose(task->process, desc);
+    if (isError(error)) {
+        SYSCALL_RETURN(-error.kind);
+    } else {
+        SYSCALL_RETURN(result);
+    }
 }
 
 SyscallReturn isattySyscall(TrapFrame* frame) {
