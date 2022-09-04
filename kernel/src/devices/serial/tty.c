@@ -75,11 +75,21 @@ static void uartTtyResizeBuffer(UartTtyDevice* dev) {
     dev->buffer_capacity = capacity;
 }
 
+static Error basicTtyWrite(UartTtyDevice* dev, char character) {
+    // TODO: Implement at least the following flags
+    // * ONLCR
+    // * OCRNL
+    // * ONOCR
+    // * ONLRET
+    Error err;
+    do {
+        err = dev->write_func(dev->uart_data, character);
+    } while (err.kind == EBUSY);
+    return err;
+}
+
 static Error basicTtyRead(UartTtyDevice* dev) {
     // TODO: Implement at least the following flags
-    // * INLCR
-    // * IGNCR
-    // * ICRNL
     // * ISIG
     // * ICANON
     // * ECHO
@@ -100,22 +110,23 @@ static Error basicTtyRead(UartTtyDevice* dev) {
     char* new = dev->buffer + (dev->buffer_start + dev->buffer_count) % dev->buffer_capacity;
     Error error = dev->read_func(dev->uart_data, new);
     if (!isError(error)) {
+        if (*new == '\r') {
+            if ((dev->ctrl.iflag & IGNCR) != 0) {
+                return error;
+            } else if ((dev->ctrl.iflag % ICRNL) != 0) {
+                *new = '\n';
+            }
+        } else if (*new == '\n') {
+            if ((dev->ctrl.iflag & INLCR) != 0) {
+                *new = '\r';
+            }
+        }
         dev->buffer_count++;
+        if ((dev->ctrl.lflag & ECHO) != 0) {
+            basicTtyWrite(dev, *new);
+        }
     }
     return error;
-}
-
-static Error basicTtyWrite(UartTtyDevice* dev, char character) {
-    // TODO: Implement at least the following flags
-    // * ONLCR
-    // * OCRNL
-    // * ONOCR
-    // * ONLRET
-    Error err;
-    do {
-        err = dev->write_func(dev->uart_data, character);
-    } while (err.kind == EBUSY);
-    return err;
 }
 
 static Error uartTtyWriteFunction(UartTtyDevice* dev, VirtPtr buffer, size_t size, size_t* written) {
@@ -211,6 +222,8 @@ UartTtyDevice* createUartTtyDevice(void* uart, UartWriteFunction write, UartRead
     initSpinLock(&dev->lock);
     // TODO: Init to correct defaults
     memset(&dev->ctrl, 0, sizeof(Termios));
+    dev->ctrl.iflag = IGNCR;
+    dev->ctrl.lflag = ECHO;
     return dev;
 }
 
