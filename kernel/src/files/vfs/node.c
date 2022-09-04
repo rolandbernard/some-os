@@ -105,7 +105,7 @@ Error vfsNodeLink(VfsNode* node, Process* process, const char* name, VfsNode* en
     }
 }
 
-Error vfsNodeIoctl(VfsNode* node, Process* process, size_t request, VirtPtr argp, int* out) {
+Error vfsNodeIoctl(VfsNode* node, Process* process, size_t request, VirtPtr argp, uintptr_t* out) {
     if (node->functions->ioctl == NULL) {
         return simpleError(ENOTTY);
     } else {

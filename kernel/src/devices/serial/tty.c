@@ -64,44 +64,6 @@ static Error uartTtyReadFunction(UartTtyDevice* dev, VirtPtr buffer, size_t size
     return err;
 }
 
-static Error uartTtyWriteFunction(UartTtyDevice* dev, VirtPtr buffer, size_t size, size_t* written) {
-    size_t count = 0;
-    size_t part_count = getVirtPtrParts(buffer, size, NULL, 0, false);
-    VirtPtrBufferPart parts[part_count];
-    getVirtPtrParts(buffer, size, parts, part_count, false);
-    lockSpinLock(&dev->lock);
-    for (size_t i = 0; i < part_count; i++) {
-        for (size_t j = 0; j < parts[i].length; j++) {
-            Error err;
-            do {
-                err = dev->write_func(dev->uart_data, ((char*)parts[i].address)[j]);
-            } while (err.kind == EBUSY);
-            if (isError(err)) {
-                unlockSpinLock(&dev->lock);
-                *written = count;
-                return err;
-            }
-            count++;
-        }
-    }
-    unlockSpinLock(&dev->lock);
-    *written = count;
-    return simpleError(SUCCESS);
-}
-
-static size_t uartTtyAvailFunction(UartTtyDevice* dev) {
-    lockSpinLock(&dev->lock);
-    size_t ret = dev->buffer_count;
-    unlockSpinLock(&dev->lock);
-    return ret;
-}
-
-static void uartTtyFlushFunction(UartTtyDevice* dev) {
-    lockSpinLock(&dev->lock);
-    dev->buffer_count = 0;
-    unlockSpinLock(&dev->lock);
-}
-
 static void uartTtyResizeBuffer(UartTtyDevice* dev) {
     size_t capacity = dev->buffer_capacity * 3 / 2;
     dev->buffer = krealloc(dev->buffer, capacity);
@@ -113,19 +75,111 @@ static void uartTtyResizeBuffer(UartTtyDevice* dev) {
     dev->buffer_capacity = capacity;
 }
 
-void uartTtyDataReady(UartTtyDevice* dev) {
+static Error basicTtyRead(UartTtyDevice* dev) {
+    // TODO: Implement at least the following flags
+    // * INLCR
+    // * IGNCR
+    // * ICRNL
+    // * ISIG
+    // * ICANON
+    // * ECHO
+    // * ECHOE
+    // * ECHOK
+    // * ECHONL
+    // * VTIME
+    // * VMIN
+    // * VEOF
+    // * VEOL
+    // * VERASE
+    // * VINTR
+    // * VKILL
+    // * VQUIT
+    if (dev->buffer_count == dev->buffer_capacity) {
+        uartTtyResizeBuffer(dev);
+    }
+    char* new = dev->buffer + (dev->buffer_start + dev->buffer_count) % dev->buffer_capacity;
+    Error error = dev->read_func(dev->uart_data, new);
+    if (!isError(error)) {
+        dev->buffer_count++;
+    }
+    return error;
+}
+
+static Error basicTtyWrite(UartTtyDevice* dev, char character) {
+    // TODO: Implement at least the following flags
+    // * ONLCR
+    // * OCRNL
+    // * ONOCR
+    // * ONLRET
     Error err;
+    do {
+        err = dev->write_func(dev->uart_data, character);
+    } while (err.kind == EBUSY);
+    return err;
+}
+
+static Error uartTtyWriteFunction(UartTtyDevice* dev, VirtPtr buffer, size_t size, size_t* written) {
+    size_t count = 0;
+    size_t part_count = getVirtPtrParts(buffer, size, NULL, 0, false);
+    VirtPtrBufferPart parts[part_count];
+    getVirtPtrParts(buffer, size, parts, part_count, false);
+    lockSpinLock(&dev->lock);
+    for (size_t i = 0; i < part_count; i++) {
+        for (size_t j = 0; j < parts[i].length; j++) {
+            Error error = basicTtyWrite(dev, ((char*)parts[i].address)[j]);
+            if (isError(error)) {
+                unlockSpinLock(&dev->lock);
+                *written = count;
+                return error;
+            }
+            count++;
+        }
+    }
+    unlockSpinLock(&dev->lock);
+    *written = count;
+    return simpleError(SUCCESS);
+}
+
+static Error basicUartTtyIoctlFunction(UartTtyDevice* dev, size_t request, VirtPtr argp, uintptr_t* res) {
+    switch (request) {
+        case TCGETS:
+            return simpleError(ENOTSUP);
+        case TCSETSF:
+            dev->buffer_count = 0;
+            // fall through
+        case TCSETS:
+        case TCSETSW:
+            return simpleError(ENOTSUP);
+        case TIOCGPGRP:
+            return simpleError(ENOTSUP);
+        case TIOCSPGRP:
+            return simpleError(ENOTSUP);
+        case TCXONC:
+            return simpleError(ENOTSUP);
+        case TCFLSH:
+            dev->buffer_count = 0;
+            return simpleError(SUCCESS);
+        case FIONREAD:
+            *res = dev->buffer_count;
+            return simpleError(SUCCESS);
+        default:
+            return simpleError(ENOTTY);
+    }
+}
+
+static Error uartTtyIoctlFunction(UartTtyDevice* dev, size_t request, VirtPtr argp, uintptr_t* res) {
+    lockSpinLock(&dev->lock);
+    Error error = basicUartTtyIoctlFunction(dev, request, argp, res);
+    unlockSpinLock(&dev->lock);
+    return error;
+}
+
+void uartTtyDataReady(UartTtyDevice* dev) {
+    Error error;
     lockSpinLock(&dev->lock);
     do {
-        if (dev->buffer_count == dev->buffer_capacity) {
-            uartTtyResizeBuffer(dev);
-        }
-        char* new = dev->buffer + (dev->buffer_start + dev->buffer_count) % dev->buffer_capacity;
-        err = dev->read_func(dev->uart_data, new);
-        if (!isError(err)) {
-            dev->buffer_count++;
-        }
-    } while (!isError(err));
+        error = basicTtyRead(dev);
+    } while (!isError(error));
     while (dev->blocked != NULL) {
         Task* wakeup = dev->blocked;
         dev->blocked = wakeup->sched.sched_next;
@@ -138,8 +192,7 @@ void uartTtyDataReady(UartTtyDevice* dev) {
 static const CharDeviceFunctions funcs = {
     .read = (CharDeviceReadFunction)uartTtyReadFunction,
     .write = (CharDeviceWriteFunction)uartTtyWriteFunction,
-    .avail = (CharDeviceAvailFunction)uartTtyAvailFunction,
-    .flush = (CharDeviceFlushFunction)uartTtyFlushFunction,
+    .ioctl = (CharDeviceIoctlFunction)uartTtyIoctlFunction,
 };
 
 UartTtyDevice* createUartTtyDevice(void* uart, UartWriteFunction write, UartReadFunction read) {
@@ -156,6 +209,8 @@ UartTtyDevice* createUartTtyDevice(void* uart, UartWriteFunction write, UartRead
     dev->buffer = NULL;
     dev->blocked = NULL;
     initSpinLock(&dev->lock);
+    // TODO: Init to correct defaults
+    memset(&dev->ctrl, 0, sizeof(Termios));
     return dev;
 }
 

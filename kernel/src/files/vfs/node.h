@@ -18,7 +18,7 @@ Error vfsNodeUnlink(VfsNode* node, Process* process, const char* name, VfsNode* 
 
 Error vfsNodeLink(VfsNode* node, Process* process, const char* name, VfsNode* entry);
 
-Error vfsNodeIoctl(VfsNode* node, Process* process, size_t request, VirtPtr argp, int* out);
+Error vfsNodeIoctl(VfsNode* node, Process* process, size_t request, VirtPtr argp, uintptr_t* out);
 
 void vfsNodeCopy(VfsNode* node);
 

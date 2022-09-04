@@ -36,6 +36,7 @@ typedef enum {
     VFS_OPEN_CREAT       =   0x0200,
     VFS_OPEN_TRUNC       =   0x0400,
     VFS_OPEN_EXCL        =   0x0800,
+    // TODO: Add VFS_OPEN_NONBLOCK = 0x4000 (for pipe, fifo, chrfile)
     VFS_OPEN_CLOEXEC     =  0x40000,
     VFS_OPEN_EXECUTE     = 0x100000,
     VFS_OPEN_DIRECTORY   = 0x200000,
@@ -169,7 +170,7 @@ typedef Error (*VfsNodeTruncFunction)(struct VfsNode_s* node, size_t length);
 typedef Error (*VfsNodeLookupFunction)(struct VfsNode_s* node, const char* name, size_t* node_id);
 typedef Error (*VfsNodeUnlinkFunction)(struct VfsNode_s* node, const char* name);
 typedef Error (*VfsNodeLinkFunction)(struct VfsNode_s* node, const char* name, struct VfsNode_s* entry);
-typedef Error (*VfsNodeIoctlFunction)(struct VfsNode_s* node, size_t request, VirtPtr argp, int* out);
+typedef Error (*VfsNodeIoctlFunction)(struct VfsNode_s* node, size_t request, VirtPtr argp, uintptr_t* out);
 
 typedef struct {
     VfsNodeFreeFunction free;               // Free all information for the vfs node.

@@ -105,7 +105,7 @@ Error vfsFileReaddir(VfsFile* file, Process* process, VirtPtr buffer, size_t len
     return err;
 }
 
-Error vfsFileIoctl(VfsFile* file, Process* process, size_t request, VirtPtr argp, int* out) {
+Error vfsFileIoctl(VfsFile* file, Process* process, size_t request, VirtPtr argp, uintptr_t* out) {
     return vfsNodeIoctl(file->node, process, request, argp, out);
 }
 

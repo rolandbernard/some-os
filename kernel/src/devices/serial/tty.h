@@ -5,6 +5,7 @@
 #include <stdbool.h>
 
 #include "devices/devices.h"
+#include "devices/serial/ttyctl.h"
 #include "error/error.h"
 #include "interrupt/plic.h"
 #include "task/spinlock.h"
@@ -22,6 +23,7 @@ typedef struct {
     size_t buffer_start;
     size_t buffer_count;
     size_t buffer_capacity;
+    Termios ctrl;
     SpinLock lock;
     Task* blocked;
 } UartTtyDevice;

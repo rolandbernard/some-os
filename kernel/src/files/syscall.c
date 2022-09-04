@@ -402,7 +402,7 @@ SyscallReturn fcntlSyscall(TrapFrame* frame) {
 
 SyscallReturn ioctlSyscall(TrapFrame* frame) {
     FILE_SYSCALL_OP(false, false);
-    int result = 0;
+    uintptr_t result = 0;
     Error error = vfsFileIoctl(desc->file, task->process, SYSCALL_ARG(1), virtPtrForTask(SYSCALL_ARG(2), task), &result);
     vfsFileDescriptorClose(task->process, desc);
     if (isError(error)) {

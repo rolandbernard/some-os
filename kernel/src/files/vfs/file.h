@@ -24,7 +24,7 @@ Error vfsFileChown(VfsFile* file, Process* process, Uid uid, Gid gid);
 
 Error vfsFileReaddir(VfsFile* file, Process* process, VirtPtr buffer, size_t length, size_t* read);
 
-Error vfsFileIoctl(VfsFile* file, Process* process, size_t request, VirtPtr argp, int* out);
+Error vfsFileIoctl(VfsFile* file, Process* process, size_t request, VirtPtr argp, uintptr_t* out);
 
 void vfsFileCopy(VfsFile* file);
 
