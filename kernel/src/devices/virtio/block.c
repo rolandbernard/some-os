@@ -13,7 +13,7 @@ static void handleInterrupt(ExternalInterrupt id, void* udata) {
     virtIOBlockFreePendingRequests((VirtIOBlockDevice*)udata);
 }
 
-Error initVirtIOBlockDevice(int id, volatile VirtIODeviceLayout* base, VirtIODevice** output) {
+Error initVirtIOBlockDevice(int dev_id, volatile VirtIODeviceLayout* base, VirtIODevice** output) {
     VirtIOBlockDeviceLayout* mmio = (VirtIOBlockDeviceLayout*)base;
     assert(mmio->config.blk_size == BLOCK_SECTOR_SIZE); // TODO: actually use the data in mmio->config?
     VirtIOBlockDevice* device = zalloc(sizeof(VirtIOBlockDevice));
@@ -39,8 +39,9 @@ Error initVirtIOBlockDevice(int id, volatile VirtIODeviceLayout* base, VirtIODev
     status |= VIRTIO_DRIVER_OK;
     base->status = status;
     *output = (VirtIODevice*)device;
-    setInterruptFunction(id + 1, handleInterrupt, device);
-    setInterruptPriority(id + 1, 1);
+    ExternalInterrupt itr_id = getVirtIoInterruptId(dev_id);
+    setInterruptFunction(itr_id, handleInterrupt, device);
+    setInterruptPriority(itr_id, 1);
     registerVirtIOBlockDevice(device);
     return simpleError(SUCCESS);
 }

@@ -38,10 +38,10 @@ Error initKernelVirtualMemory() {
         (uintptr_t)__data_start, PAGE_ENTRY_AD_RW
     );
     // Identity map UART
-    identityMapMapedMemory(VIRT_UART0);
-    identityMapMapedMemory(VIRT_CLINT);
-    identityMapMapedMemory(VIRT_PLIC);
-    identityMapMapedMemory(VIRT_VIRTIO);
+    identityMapMapedMemory(MEM_UART0);
+    identityMapMapedMemory(MEM_CLINT);
+    identityMapMapedMemory(MEM_PLIC);
+    identityMapMapedMemory(MEM_VIRTIO);
     setVirtualMemory(0, kernel_page_table);
     unlockSpinLock(&kernel_page_table_lock);
     KERNEL_SUBSUCCESS("Initialized kernel virtual memory");

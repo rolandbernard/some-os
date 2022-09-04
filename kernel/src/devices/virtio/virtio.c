@@ -26,7 +26,7 @@ static const VirtIODeviceInitEntry device_inits[VIRTIO_DEVICE_TYPE_END] = {
 Error initVirtIODevices() {
     for (int i = 0; i < VIRTIO_DEVICE_COUNT; i++) {
         volatile VirtIODeviceLayout* address =
-            (VirtIODeviceLayout*)(memory_map[VIRT_VIRTIO].base + VIRTIO_MEM_STROBE * i);
+            (VirtIODeviceLayout*)(memory_map[MEM_VIRTIO].base + VIRTIO_MEM_STROBE * i);
         VirtIODeviceType type = address->device_id;
         if (address->magic_value == VIRTIO_MAGIC_NUMBER && type != 0) {
             if (type < VIRTIO_DEVICE_TYPE_END && device_inits[type].init != NULL) {

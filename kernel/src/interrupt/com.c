@@ -19,11 +19,11 @@ static MessageType message_type;
 static void* message_data;
 
 void sendMachineSoftwareInterrupt(int hart) {
-    *(volatile uint32_t*)(memory_map[VIRT_CLINT].base + hart * 0x4) = ~0;
+    *(volatile uint32_t*)(memory_map[MEM_CLINT].base + hart * 0x4) = ~0;
 }
 
 void clearMachineSoftwareInterrupt(int hart) {
-    *(volatile uint32_t*)(memory_map[VIRT_CLINT].base + hart * 0x4) = 0;
+    *(volatile uint32_t*)(memory_map[MEM_CLINT].base + hart * 0x4) = 0;
 }
 
 void sendMessageTo(int hartid, MessageType type, void* data) {

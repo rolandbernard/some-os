@@ -58,7 +58,7 @@ void clearTimeout(Timeout timeout) {
 }
 
 void setTimeCmp(Time time) {
-    *(volatile Time*)(memory_map[VIRT_CLINT].base + 0x4000 + 8 * getCurrentHartId()) = time;
+    *(volatile Time*)(memory_map[MEM_CLINT].base + 0x4000 + 8 * getCurrentHartId()) = time;
 }
 
 void initTimerInterrupt() {
@@ -99,6 +99,6 @@ void handleTimerInterrupt() {
 }
 
 Time getTime() {
-    return *(volatile Time*)(memory_map[VIRT_CLINT].base + 0xbff8);
+    return *(volatile Time*)(memory_map[MEM_CLINT].base + 0xbff8);
 }
 

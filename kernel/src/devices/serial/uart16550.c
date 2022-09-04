@@ -12,9 +12,7 @@ Error initUart16550(Uart16550* uart) {
         uart->base_address[3] = (1 << 0) | (1 << 1);
         // Enable FIFO
         uart->base_address[2] = 1 << 0;
-
         uint16_t divisor = 600;
-
         // Enable divisor latch
         uint8_t lcr = uart->base_address[3];
         uart->base_address[3] = lcr | 1 << 7;
@@ -23,9 +21,10 @@ Error initUart16550(Uart16550* uart) {
         uart->base_address[1] = divisor >> 8;
         // Close divisor latch
         uart->base_address[3] = lcr;
-
+        // Enable the data ready interrupt
+        uart->base_address[1] = 1 << 0;
+        uart->base_address[4] = 1 << 3;
         uart->initialized = true;
-
         unlockSpinLock(&uart->lock);
         registerUart16550(uart);
         KERNEL_SUBSUCCESS("Initialized UART device");
@@ -73,10 +72,17 @@ Error readUart16550(Uart16550* uart, char* value) {
     }
 }
 
+static void handleInterrupt(ExternalInterrupt id, void* udata) {
+    uartTtyDataReady((UartTtyDevice*)udata);
+}
+
 Error registerUart16550(Uart16550* uart) {
     UartTtyDevice* dev = createUartTtyDevice(
         uart, (UartWriteFunction)writeUart16550, (UartReadFunction)readUart16550
     );
+    ExternalInterrupt itr_id = getUartInterruptId();
+    setInterruptFunction(itr_id, handleInterrupt, dev);
+    setInterruptPriority(itr_id, 1);
     registerDevice((Device*)dev);
     return simpleError(SUCCESS);
 }

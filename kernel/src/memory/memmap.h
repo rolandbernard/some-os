@@ -4,17 +4,17 @@
 #include <stdint.h>
 
 typedef enum {
-    VIRT_DEBUG,
-    VIRT_MROM,
-    VIRT_TEST,
-    VIRT_CLINT,
-    VIRT_PLIC,
-    VIRT_UART0,
-    VIRT_VIRTIO,
-    VIRT_DRAM,
-    VIRT_PCIE_MMIO,
-    VIRT_PCIE_PIO,
-    VIRT_PCIE_ECAM,
+    MEM_DEBUG,
+    MEM_MROM,
+    MEM_TEST,
+    MEM_CLINT,
+    MEM_PLIC,
+    MEM_UART0,
+    MEM_VIRTIO,
+    MEM_DRAM,
+    MEM_PCIE_MMIO,
+    MEM_PCIE_PIO,
+    MEM_PCIE_ECAM,
 } MemmapType;
 
 typedef struct {

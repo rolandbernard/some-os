@@ -34,6 +34,7 @@ static Error uartTtyReadOrWait(UartTtyDevice* dev, VirtPtr buffer, size_t size, 
             }
         } else {
             unlockSpinLock(&dev->lock);
+            criticalReturn(task);
         }
         return simpleError(EAGAIN);
     } else {
@@ -51,6 +52,7 @@ static Error uartTtyReadOrWait(UartTtyDevice* dev, VirtPtr buffer, size_t size, 
         dev->buffer_start = (dev->buffer_start + length) % dev->buffer_capacity;
         dev->buffer_count -= length;
         unlockSpinLock(&dev->lock);
+        criticalReturn(task);
         *read = length;
         return simpleError(SUCCESS);
     }
@@ -65,7 +67,8 @@ static Error uartTtyReadFunction(UartTtyDevice* dev, VirtPtr buffer, size_t size
 }
 
 static void uartTtyResizeBuffer(UartTtyDevice* dev) {
-    size_t capacity = dev->buffer_capacity * 3 / 2;
+    size_t capacity = dev->buffer_capacity == 0
+        ? INITIAL_TTY_BUFFER_CAPACITY : dev->buffer_capacity * 3 / 2;
     dev->buffer = krealloc(dev->buffer, capacity);
     if (dev->buffer_capacity < dev->buffer_start + dev->buffer_count) {
         size_t to_move = dev->buffer_start - dev->buffer_capacity + dev->buffer_count;
@@ -222,7 +225,7 @@ UartTtyDevice* createUartTtyDevice(void* uart, UartWriteFunction write, UartRead
     initSpinLock(&dev->lock);
     // TODO: Init to correct defaults
     memset(&dev->ctrl, 0, sizeof(Termios));
-    dev->ctrl.iflag = IGNCR;
+    dev->ctrl.iflag = ICRNL;
     dev->ctrl.lflag = ECHO;
     return dev;
 }

@@ -10,6 +10,7 @@
 #include "interrupt/com.h"
 #include "interrupt/syscall.h"
 #include "interrupt/trap.h"
+#include "interrupt/plic.h"
 #include "kernel/init.h"
 #include "kernel/time.h"
 #include "process/syscall.h"

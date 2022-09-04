@@ -12,7 +12,7 @@ static Uart16550 serial_mmio;
 
 Error initBoardBaselineDevices() {
     // Initialize the uart device to enable logging
-    serial_mmio.base_address = (void*)memory_map[VIRT_UART0].base;
+    serial_mmio.base_address = (void*)memory_map[MEM_UART0].base;
     CHECKED(initUart16550(&serial_mmio));
     return simpleError(SUCCESS);
 }
