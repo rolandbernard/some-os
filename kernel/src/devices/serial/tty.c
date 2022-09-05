@@ -79,26 +79,31 @@ static void uartTtyResizeBuffer(UartTtyDevice* dev) {
 }
 
 static Error basicTtyWrite(UartTtyDevice* dev, char character) {
-    // TODO: Implement at least the following flags
-    // * ONLCR
-    // * OCRNL
-    // * ONOCR
-    // * ONLRET
-    Error err;
-    do {
-        err = dev->write_func(dev->uart_data, character);
-    } while (err.kind == EBUSY);
-    return err;
+    Error error = simpleError(SUCCESS);
+    if (character == '\r' && (dev->ctrl.oflag & ONOCR) != 0) {
+        return simpleError(SUCCESS);
+    }
+    if (character == '\r' && (dev->ctrl.oflag & OCRNL) != 0) {
+        character = '\n';
+    }
+    if (character == '\n' && (dev->ctrl.oflag & ONLCR) != 0) {
+        do {
+            error = dev->write_func(dev->uart_data, '\r');
+        } while (error.kind == EBUSY);
+    }
+    if (!isError(error)) {
+        do {
+            error = dev->write_func(dev->uart_data, character);
+        } while (error.kind == EBUSY);
+    }
+    return error;
 }
 
 static Error basicTtyRead(UartTtyDevice* dev) {
     // TODO: Implement at least the following flags
     // * ISIG
     // * ICANON
-    // * ECHO
     // * ECHOE
-    // * ECHOK
-    // * ECHONL
     // * VTIME
     // * VMIN
     // * VEOF
@@ -116,7 +121,7 @@ static Error basicTtyRead(UartTtyDevice* dev) {
         if (*new == '\r') {
             if ((dev->ctrl.iflag & IGNCR) != 0) {
                 return error;
-            } else if ((dev->ctrl.iflag % ICRNL) != 0) {
+            } else if ((dev->ctrl.iflag & ICRNL) != 0) {
                 *new = '\n';
             }
         } else if (*new == '\n') {
@@ -124,8 +129,20 @@ static Error basicTtyRead(UartTtyDevice* dev) {
                 *new = '\r';
             }
         }
+        if (*new == dev->ctrl.cc[VERASE] && (dev->ctrl.lflag & ECHOE) != 0 && (dev->ctrl.lflag & ICANON) != 0) {
+            if (dev->buffer_count > 0) {
+                basicTtyWrite(dev, '\b');
+                basicTtyWrite(dev, 0);
+                basicTtyWrite(dev, '\b');
+                dev->buffer_count--;
+            }
+            return error;
+        }
         dev->buffer_count++;
-        if ((dev->ctrl.lflag & ECHO) != 0) {
+        if (
+            (dev->ctrl.lflag & ECHO) != 0
+            || ((dev->ctrl.lflag & ECHONL) != 0 && (dev->ctrl.lflag & ICANON) != 0 && *new == '\n')
+        ) {
             basicTtyWrite(dev, *new);
         }
     }
@@ -157,13 +174,15 @@ static Error uartTtyWriteFunction(UartTtyDevice* dev, VirtPtr buffer, size_t siz
 static Error basicUartTtyIoctlFunction(UartTtyDevice* dev, size_t request, VirtPtr argp, uintptr_t* res) {
     switch (request) {
         case TCGETS:
-            return simpleError(ENOTSUP);
+            memcpyBetweenVirtPtr(argp, virtPtrForKernel(&dev->ctrl), sizeof(Termios));
+            return simpleError(SUCCESS);
         case TCSETSF:
             dev->buffer_count = 0;
             // fall through
-        case TCSETS:
         case TCSETSW:
-            return simpleError(ENOTSUP);
+        case TCSETS:
+            memcpyBetweenVirtPtr(virtPtrForKernel(&dev->ctrl), argp, sizeof(Termios));
+            return simpleError(SUCCESS);
         case TIOCGPGRP:
             return simpleError(ENOTSUP);
         case TIOCSPGRP:
@@ -226,7 +245,9 @@ UartTtyDevice* createUartTtyDevice(void* uart, UartWriteFunction write, UartRead
     // TODO: Init to correct defaults
     memset(&dev->ctrl, 0, sizeof(Termios));
     dev->ctrl.iflag = ICRNL;
-    dev->ctrl.lflag = ECHO;
+    dev->ctrl.oflag = ONLCR | ONOCR;
+    dev->ctrl.lflag = ECHO | ECHOE | ICANON;
+    dev->ctrl.cc[VERASE] = '\x7f';
     return dev;
 }
 
