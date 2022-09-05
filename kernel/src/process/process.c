@@ -42,7 +42,7 @@ static bool basicProcessWait(Task* task) {
     ProcessWaitResult** current = &task->process->tree.waits;
     while (*current != NULL) {
         ProcessWaitResult* wait = *current;
-        if (wait_pid == 0 || wait_pid == (*current)->pid) {
+        if (wait_pid == 0 || wait_pid == -1 || wait_pid == (*current)->pid) {
             writeInt(
                 virtPtrForTask(task->frame.regs[REG_ARGUMENT_2], task),
                 sizeof(int) * 8, wait->status
@@ -68,7 +68,7 @@ void executeProcessWait(Task* task) {
     } else {
         bool has_child = false;
         Pid wait_pid = task->frame.regs[REG_ARGUMENT_1];
-        if (wait_pid == 0) {
+        if (wait_pid == 0 || wait_pid == -1) {
             has_child = task->process->tree.children != NULL;
         } else {
             Process* child = task->process->tree.children;

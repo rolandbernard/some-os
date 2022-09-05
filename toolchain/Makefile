@@ -6,7 +6,7 @@ TARGETS := gcc-no-headers binutils-no-headers newlib-no-headers binutils gcc new
 TARGET  := $(ARCH)-someos
 ECHO    := echo
 
-export CFLAGS_FOR_TARGET :=-mcmodel=medany -O0 -g
+export CFLAGS_FOR_TARGET := -mcmodel=medany -O0 -g
 # ==
 
 # == gcc-no-headers
