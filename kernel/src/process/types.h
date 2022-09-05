@@ -114,10 +114,9 @@ typedef enum {
 
 typedef struct {
     uintptr_t handler;
-    SignalSet mask;
-    int flags;
-    uintptr_t sigaction;
     uintptr_t restorer;
+    SignalSet mask;
+    SigActionFlags flags;
 } SignalHandler;
 
 typedef struct PendingSignal_s {
@@ -128,7 +127,7 @@ typedef struct PendingSignal_s {
 typedef struct {
     PendingSignal* signals;
     PendingSignal* signals_tail;
-    SignalHandler* handlers[SIG_COUNT];
+    SignalHandler handlers[SIG_COUNT];
     Signal current_signal;
     uintptr_t restore_frame;
     Time alarm_at;

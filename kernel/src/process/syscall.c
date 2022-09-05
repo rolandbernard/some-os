@@ -141,7 +141,13 @@ SyscallReturn waitSyscall(TrapFrame* frame) {
     return WAIT;
 }
 
-typedef SignalHandler SignalAction;
+typedef struct {
+    uintptr_t handler;
+    SignalSet mask;
+    int flags;
+    uintptr_t sigaction;
+    uintptr_t restorer;
+} SignalAction;
 
 SyscallReturn sigactionSyscall(TrapFrame* frame) {
     assert(frame->hart != NULL);
@@ -152,32 +158,27 @@ SyscallReturn sigactionSyscall(TrapFrame* frame) {
         SYSCALL_RETURN(-EINVAL);
     } else {
         lockSpinLock(&task->process->lock);
-        SignalAction oldaction = {
-            .handler = 0,
-            .mask = 0,
-            .flags = 0,
-            .sigaction = 0,
-            .restorer = 0,
-        };
-        if (task->process->signals.handlers[sig] != SIG_DFL && task->process->signals.handlers[sig] != SIG_IGN) {
-            oldaction = *task->process->signals.handlers[sig];
-        }
-        SignalAction newaction;
         VirtPtr new = virtPtrForTask(SYSCALL_ARG(1), task);
         VirtPtr old = virtPtrForTask(SYSCALL_ARG(2), task);
+        SignalHandler* handler = &task->process->signals.handlers[sig];
+        SignalAction oldaction = {
+            .handler = handler->handler,
+            .mask = handler->mask,
+            .flags = handler->flags,
+            .sigaction = handler->handler,
+            .restorer = handler->restorer,
+        };
+        SignalAction newaction;
         if (new.address != 0) {
             memcpyBetweenVirtPtr(virtPtrForKernel(&newaction), new, sizeof(SignalAction));
-            if (newaction.handler == (uintptr_t)SIG_DFL || newaction.handler == (uintptr_t)SIG_IGN) {
-                if (task->process->signals.handlers[sig] != SIG_DFL && task->process->signals.handlers[sig] != SIG_IGN) {
-                    dealloc(task->process->signals.handlers[sig]);
-                }
-                task->process->signals.handlers[sig] = (SignalHandler*)newaction.handler;
+            if ((newaction.flags & SA_SIGINFO) == 0) {
+                handler->handler = newaction.handler;
             } else {
-                if (task->process->signals.handlers[sig] == SIG_DFL || task->process->signals.handlers[sig] == SIG_IGN) {
-                    task->process->signals.handlers[sig] = kalloc(sizeof(SignalHandler));
-                }
-                *task->process->signals.handlers[sig] = newaction;
+                handler->handler = newaction.sigaction;
             }
+            handler->restorer = newaction.restorer;
+            handler->flags = newaction.flags;
+            handler->mask = newaction.mask;
         }
         unlockSpinLock(&task->process->lock);
         if (old.address != 0) {
