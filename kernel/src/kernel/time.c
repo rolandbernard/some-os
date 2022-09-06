@@ -8,7 +8,7 @@ uint32_t getUnixTime() {
 
 #define CLOCK_TO_NANOS (1000000000UL / CLOCKS_PER_SEC)
 
-uint64_t getNanoseconds() {
+Time getNanoseconds() {
     // TODO: get the actual time
     return getTime() * CLOCK_TO_NANOS;
 }

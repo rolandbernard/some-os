@@ -27,6 +27,7 @@ SyscallReturn sleepSyscall(TrapFrame* frame) {
         task->sched.sleeping_until = end;
         moveTaskToState(task, SLEEPING);
         enqueueTask(task);
+        setTimeoutTime(end, NULL, NULL); // Make sure we wake up in time
         return WAIT;
     }
 }

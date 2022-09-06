@@ -11,7 +11,15 @@
 #include "task/spinlock.h"
 #include "task/harts.h"
 
-#define MIN_TIME (CLOCKS_PER_SEC / 100)
+#ifdef DEBUG
+// This makes debugging simpler, but is in no way safe.
+#define MAX_TIME (CLOCKS_PER_SEC << 10)
+#else
+#define MAX_TIME (CLOCKS_PER_SEC / 100)
+#endif
+
+// #define MAX_IDLE_TIME (CLOCKS_PER_SEC / 500)
+#define MAX_IDLE_TIME CLOCKS_PER_SEC
 
 typedef struct TimeoutEntry_s {
     struct TimeoutEntry_s* next;
@@ -26,13 +34,17 @@ static SpinLock timeout_lock;
 static TimeoutEntry* timeouts = NULL;
 
 Timeout setTimeout(Time delay, TimeoutFunction function, void* udata) {
+    return setTimeoutTime(getTime() + delay, function, udata);
+}
+
+Timeout setTimeoutTime(Time time, TimeoutFunction function, void* udata) {
     lockSpinLock(&timeout_lock);
     Timeout id = next_id;
     next_id++;
     unlockSpinLock(&timeout_lock);
     TimeoutEntry* entry = kalloc(sizeof(TimeoutEntry));
     entry->id = id;
-    entry->time = getTime() + delay;
+    entry->time = time;
     entry->function = function;
     entry->udata = udata;
     lockSpinLock(&timeout_lock);
@@ -61,13 +73,8 @@ void setTimeCmp(Time time) {
     *(volatile Time*)(memory_map[MEM_CLINT].base + 0x4000 + 8 * getCurrentHartId()) = time;
 }
 
-void initTimerInterrupt() {
-    setTimeCmp(getTime() + MIN_TIME);
-}
-
 void handleTimerInterrupt() {
     Time time = getTime();
-    Time min = UINT64_MAX;
     TimeoutEntry* to_call = NULL;
     lockSpinLock(&timeout_lock);
     TimeoutEntry** current = &timeouts;
@@ -78,9 +85,6 @@ void handleTimerInterrupt() {
             to_remove->next = to_call;
             to_call = to_remove;
         } else {
-            if ((*current)->time < min) {
-                min = (*current)->time;
-            }
             current = &(*current)->next;
         }
     }
@@ -88,14 +92,32 @@ void handleTimerInterrupt() {
     while (to_call != NULL) {
         TimeoutEntry* entry = to_call;
         to_call = entry->next;
-        to_call->function(time, to_call->udata);
-        dealloc(to_call);
+        if (entry->function != NULL) {
+            entry->function(time, entry->udata);
+        }
+        dealloc(entry);
     }
-    if (min < time + MIN_TIME) {
-        setTimeCmp(min);
+}
+
+Time setPreemptionTimer(Task* task) {
+    Time time = getTime();
+    Time next = UINT64_MAX;
+    lockSpinLock(&timeout_lock);
+    TimeoutEntry* current = timeouts;
+    while (current != NULL) {
+        if (current->time < next) {
+            next = current->time;
+        }
+        current = current->next;
+    }
+    unlockSpinLock(&timeout_lock);
+    Time max = task->frame.hart->idle_task == task ? MAX_IDLE_TIME : MAX_TIME;
+    if (next < time + max) {
+        setTimeCmp(next);
     } else {
-        setTimeCmp(time + MIN_TIME);
+        setTimeCmp(time + max);
     }
+    return time;
 }
 
 Time getTime() {

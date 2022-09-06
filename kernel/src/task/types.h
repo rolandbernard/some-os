@@ -4,8 +4,8 @@
 #include <stdint.h>
 #include <stddef.h>
 
+#include "kernel/time.h"
 #include "task/spinlock.h"
-#include "interrupt/timer.h"
 
 struct HartFrame_s;
 

@@ -25,7 +25,6 @@ Error initAllSystems() {
 void initHart(int hartid) {
     setupHartFrame(hartid);
     initTraps();
-    initTimerInterrupt();
     KERNEL_SUCCESS("Initialized hart %i", hartid);
 }
 

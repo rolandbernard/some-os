@@ -4,22 +4,24 @@
 #include <stdint.h>
 
 #include "error/error.h"
+#include "task/types.h"
 
 #define CLOCKS_PER_SEC 10000000UL // 10Mhz
 
 typedef uint64_t Timeout;
-typedef uint64_t Time;
 typedef void (*TimeoutFunction)(Time time, void* udata);
 
-void initTimerInterrupt();
-
 void handleTimerInterrupt();
+
+Time setPreemptionTimer(Task* task);
 
 Time getTime();
 
 void setTimeCmp(Time time);
 
 Timeout setTimeout(Time delay, TimeoutFunction function, void* udata);
+
+Timeout setTimeoutTime(Time time, TimeoutFunction function, void* udata);
 
 void clearTimeout(Timeout timeout);
 

@@ -60,7 +60,7 @@ noreturn void enterTask(Task* task) {
     hart->frame.regs[REG_STACK_POINTER] = (uintptr_t)hart->stack_top;
     assert(hart->spinlocks_locked == 0);
     task->frame.hart = hart;
-    task->times.entered = getTime();
+    task->times.entered = setPreemptionTimer(task);
     if (task->process == NULL) {
         enterKernelMode(&task->frame);
     } else {

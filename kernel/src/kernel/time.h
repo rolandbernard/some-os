@@ -3,8 +3,10 @@
 
 #include "stdint.h"
 
+typedef uint64_t Time;
+
 uint32_t getUnixTime();
 
-uint64_t getNanoseconds();
+Time getNanoseconds();
 
 #endif
