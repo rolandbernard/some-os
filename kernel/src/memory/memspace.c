@@ -93,7 +93,7 @@ uintptr_t virtToPhys(MemorySpace* mem, uintptr_t vaddr, bool write, bool allow_a
 }
 
 static void freePageEntryData(PageTableEntry* entry) {
-    if (!entry->g) {
+    if ((entry->bits & PAGE_ENTRY_GLOBAL) == 0) {
         void* phy = (void*)((uintptr_t)entry->paddr << 12);
         if (phy != zero_page) {
             lockSpinLock(&global_page_lock);
@@ -123,7 +123,7 @@ static void freePagesInTable(PageTable* table, int level) {
         for (int i = 0; i < PAGE_TABLE_SIZE; i++) {
             PageTableEntry* entry = &table->entries[i];
             if (entry->v) {
-                if ((entry->bits & 0b1110) == 0) {
+                if ((entry->bits & PAGE_ENTRY_RWX) == 0) {
                     PageTable* table = (PageTable*)((uintptr_t)entry->paddr << 12);
                     freePagesInTable(table, level - 1);
                     deallocPage(table);
@@ -146,7 +146,7 @@ void deallocMemorySpace(MemorySpace* mem) {
 }
 
 static bool copyMemoryPageEntry(PageTableEntry* dst, PageTableEntry* src) {
-    if ((src->bits & PAGE_ENTRY_USER) != 0) {
+    if ((src->bits & PAGE_ENTRY_GLOBAL) == 0) {
         void* phy = (void*)((uintptr_t)src->paddr << 12);
         if (phy != zero_page) {
             lockSpinLock(&global_page_lock);
@@ -170,7 +170,7 @@ static bool copyAllPagesAndAllocUsers(PageTable* dest, PageTable* src) {
         PageTableEntry* entry = &src->entries[i];
         dest->entries[i] = src->entries[i];
         if (entry->v) {
-            if ((entry->bits & 0b1110) == 0) {
+            if ((entry->bits & PAGE_ENTRY_RWX) == 0) {
                 PageTable* src_table = (PageTable*)((uintptr_t)entry->paddr << 12);
                 PageTable* dst_table = createPageTable();
                 if (dst_table == NULL) {

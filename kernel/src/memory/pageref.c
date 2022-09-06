@@ -32,7 +32,7 @@ static void testForResize(PageRefTable* table) {
     } else if (table->capacity > MIN_TABLE_CAPACITY && table->count * 4 < table->capacity) {
         rebuildPageRefTable(table, table->capacity / 2);
     } else if (table->count * 3 > table->capacity * 2) {
-        rebuildPageRefTable(table, table->capacity + table->capacity / 2);
+        rebuildPageRefTable(table, table->capacity * 3 / 2);
     }
 }
 

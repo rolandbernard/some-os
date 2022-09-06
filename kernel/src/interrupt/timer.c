@@ -18,7 +18,6 @@
 #define MAX_TIME (CLOCKS_PER_SEC / 100)
 #endif
 
-// #define MAX_IDLE_TIME (CLOCKS_PER_SEC / 500)
 #define MAX_IDLE_TIME CLOCKS_PER_SEC
 
 typedef struct TimeoutEntry_s {
