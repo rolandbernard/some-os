@@ -99,6 +99,17 @@ void deallocPages(PageAllocation alloc) {
         memory->next = NULL;
         memory->size = alloc.size;
         FreePage** current = &free_pages.first;
+#ifdef DEBUG
+        // Small test to prevent double frees
+        while (*current != NULL) {
+            assert(
+                alloc.ptr + alloc.size <= (void*)(*current)
+                || alloc.ptr > (void*)(*current) + (*current)->size
+            );
+            current = &(*current)->next;
+        }
+        current = &free_pages.first;
+#endif
         while (*current != NULL) {
             uintptr_t current_ptr = (uintptr_t)*current;
             uintptr_t memory_ptr = (uintptr_t)memory;

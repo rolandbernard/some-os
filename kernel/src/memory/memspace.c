@@ -93,7 +93,7 @@ uintptr_t virtToPhys(MemorySpace* mem, uintptr_t vaddr, bool write, bool allow_a
 }
 
 static void freePageEntryData(PageTableEntry* entry) {
-    if ((entry->bits  & PAGE_ENTRY_USER) != 0) {
+    if (!entry->g) {
         void* phy = (void*)((uintptr_t)entry->paddr << 12);
         if (phy != zero_page) {
             lockSpinLock(&global_page_lock);
