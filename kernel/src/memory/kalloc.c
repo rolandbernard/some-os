@@ -12,7 +12,7 @@
 #include "task/syscall.h"
 #include "util/util.h"
 
-#define KALLOC_MIN_PAGES_TO_FREE 8
+#define KALLOC_MIN_PAGES_TO_FREE 32
 #define KALLOC_MEM_ALIGN 8
 #define KALLOC_MIN_FREE_MEM sizeof(FreeMemory)
 
@@ -39,13 +39,19 @@ static AllocatedMemory* allocated = NULL;
 
 static void insertFreeMemory(FreeMemory* memory) {
     FreeMemory** current = &first_free;
+#ifdef DEBUG
+    // Small test to prevent double frees
     while (*current != NULL) {
-        uintptr_t current_ptr = (uintptr_t)*current;
-        uintptr_t memory_ptr = (uintptr_t)memory;
-        if (memory_ptr + memory->size == current_ptr) {
-            memory->size += (*current)->size;
-            *current = (*current)->next;
-        } else if (current_ptr + (*current)->size == memory_ptr) {
+        assert(
+            (void*)memory + memory->size <= (void*)(*current)
+            || (void*)memory >= (void*)(*current) + (*current)->size
+        );
+        current = &(*current)->next;
+    }
+    current = &first_free;
+#endif
+    while ((*current) != NULL && (void*)(*current) < (void*)memory) {
+        if ((void*)(*current) + (*current)->size == (void*)memory) {
             (*current)->size += memory->size;
             memory = *current;
             *current = (*current)->next;
@@ -53,8 +59,13 @@ static void insertFreeMemory(FreeMemory* memory) {
             current = &(*current)->next;
         }
     }
-    memory->next = first_free;
-    first_free = memory;
+    if ((*current) != NULL && (void*)memory + memory->size == (*current)) {
+        memory->next = (*current)->next;
+        memory->size += (*current)->size;
+    } else {
+        memory->next = (*current);
+    }
+    *current = memory;
 }
 
 static void addNewMemory(size_t size) {

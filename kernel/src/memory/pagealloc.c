@@ -95,37 +95,36 @@ void deallocPages(PageAllocation alloc) {
             && alloc.ptr + alloc.size * PAGE_SIZE <= (void*)__heap_end
         );
         lockSpinLock(&alloc_lock);
-        FreePage* memory = alloc.ptr;
-        memory->next = NULL;
-        memory->size = alloc.size;
         FreePage** current = &free_pages.first;
 #ifdef DEBUG
         // Small test to prevent double frees
         while (*current != NULL) {
             assert(
-                alloc.ptr + alloc.size <= (void*)(*current)
-                || alloc.ptr > (void*)(*current) + (*current)->size
+                alloc.ptr + alloc.size * PAGE_SIZE <= (void*)(*current)
+                || alloc.ptr >= (void*)(*current) + (*current)->size * PAGE_SIZE
             );
             current = &(*current)->next;
         }
         current = &free_pages.first;
 #endif
-        while (*current != NULL) {
-            uintptr_t current_ptr = (uintptr_t)*current;
-            uintptr_t memory_ptr = (uintptr_t)memory;
-            if (memory_ptr + memory->size * PAGE_SIZE == current_ptr) {
-                memory->size += (*current)->size;
-                *current = (*current)->next;
-            } else if (current_ptr + (*current)->size * PAGE_SIZE == memory_ptr) {
-                (*current)->size += memory->size;
-                memory = *current;
+        while ((*current) != NULL && (void*)(*current) < alloc.ptr) {
+            if ((void*)(*current) + (*current)->size * PAGE_SIZE == alloc.ptr) {
+                alloc.ptr = (void*)(*current);
+                alloc.size += (*current)->size;
                 *current = (*current)->next;
             } else {
                 current = &(*current)->next;
             }
         }
-        memory->next = free_pages.first;
-        free_pages.first = memory;
+        FreePage* memory = alloc.ptr;
+        memory->size = alloc.size;
+        if ((*current) != NULL && alloc.ptr + alloc.size * PAGE_SIZE == (*current)) {
+            memory->next = (*current)->next;
+            memory->size += (*current)->size;
+        } else {
+            memory->next = (*current);
+        }
+        *current = memory;
         unlockSpinLock(&alloc_lock);
     }
 }
