@@ -19,7 +19,7 @@ void signalHandler(int signal) {
         if (WIFEXITED(status)) {
             USPACE_DEBUG("Child exited with %i", WEXITSTATUS(status));
         } else if (WIFSIGNALED(status)) {
-            USPACE_DEBUG("Child signaled with %i", WSTOPSIG(status));
+            USPACE_DEBUG("Child signaled with %i %s", WSTOPSIG(status), strsignal(WSTOPSIG(status)));
         }
     }
 }

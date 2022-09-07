@@ -11,7 +11,7 @@ static void rebuildPageRefTable(PageRefTable* table, size_t new_size) {
     size_t* new_values = zalloc(new_size * sizeof(size_t));
     for (size_t i = 0; i < table->capacity; i++) {
         if (table->values[i] > 1) {
-            size_t idx = hashInt64(table->values[i]) % new_size;
+            size_t idx = hashInt64(table->keys[i]) % new_size;
             while (new_values[idx] >= 1) {
                 idx = (idx + 1) % new_size;
             }

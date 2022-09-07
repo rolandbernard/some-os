@@ -29,8 +29,8 @@ uint64_t hashInt64(uint64_t x) {
 }
 
 uint32_t hashInt32(uint32_t x) {
-    x = (x ^ (x >> 15)) * 0xd168aaad;
-    x = (x ^ (x >> 15)) * 0xaf723597;
+    x = (x ^ (x >> 15)) * UINT32_C(0xd168aaad);
+    x = (x ^ (x >> 15)) * UINT32_C(0xaf723597);
     x = (x ^ (x >> 15));
     return x;
 }
