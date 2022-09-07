@@ -33,23 +33,27 @@ typedef struct AllocatedMemory_s {
 static FreeMemory small_buffer[1024] = { { .size = sizeof(small_buffer) } };
 static FreeMemory* first_free = small_buffer;
 static SpinLock kalloc_lock;
+
 #ifdef DEBUG
 static AllocatedMemory* allocated = NULL;
+
+static FreeMemory* findOverlappingFreeMemory(void* start, size_t size) {
+    // Small test to prevent double frees
+    FreeMemory* current = first_free;
+    while (current != NULL) {
+        assert(
+            start + size <= (void*)current
+            || start >= (void*)current + current->size
+        );
+        current = current->next;
+    }
+    return NULL;
+}
 #endif
 
-static void insertFreeMemory(FreeMemory* memory) {
+static FreeMemory** insertFreeMemory(FreeMemory* memory) {
+    assert(findOverlappingFreeMemory(memory, memory->size) == NULL);
     FreeMemory** current = &first_free;
-#ifdef DEBUG
-    // Small test to prevent double frees
-    while (*current != NULL) {
-        assert(
-            (void*)memory + memory->size <= (void*)(*current)
-            || (void*)memory >= (void*)(*current) + (*current)->size
-        );
-        current = &(*current)->next;
-    }
-    current = &first_free;
-#endif
     while ((*current) != NULL && (void*)(*current) < (void*)memory) {
         if ((void*)(*current) + (*current)->size == (void*)memory) {
             (*current)->size += memory->size;
@@ -66,15 +70,17 @@ static void insertFreeMemory(FreeMemory* memory) {
         memory->next = (*current);
     }
     *current = memory;
+    return current;
 }
 
-static void addNewMemory(size_t size) {
+static FreeMemory** addNewMemory(size_t size) {
     size = (size + PAGE_SIZE - 1) / PAGE_SIZE;
-    FreeMemory* mem = (FreeMemory*)allocPages(size).ptr;
-    if (mem != NULL && size > 0) {
-        mem->size = size * PAGE_SIZE;
-        insertFreeMemory(mem);
+    FreeMemory* memory = (FreeMemory*)allocPages(size).ptr;
+    if (memory != NULL && size > 0) {
+        memory->size = size * PAGE_SIZE;
+        return insertFreeMemory(memory);
     }
+    return NULL;
 }
 
 static FreeMemory** findFreeMemoryThatFits(size_t size) {
@@ -103,8 +109,7 @@ void* kalloc(size_t size) {
         size_t alloc_size = kallocActualSizeFor(size);
         FreeMemory** memory = findFreeMemoryThatFits(alloc_size);
         if (memory == NULL) {
-            addNewMemory(alloc_size);
-            memory = findFreeMemoryThatFits(alloc_size);
+            memory = addNewMemory(alloc_size);
         }
         void* ret = NULL;
         if (memory != NULL) {
@@ -137,52 +142,47 @@ void* zalloc(size_t size) {
     return mem;
 }
 
-static void tryFreeingOldMemory() {
-    FreeMemory** current = &first_free;
-    while ((*current) != NULL) {
-        uintptr_t mem_start = (uintptr_t)*current;
-        uintptr_t mem_end = mem_start + (*current)->size;
-        uintptr_t page_start;
-        uintptr_t page_end;
-        if ((mem_start & -PAGE_SIZE) == mem_start) {
-            page_start = mem_start;
+static void tryFreeingOldMemory(FreeMemory** memory) {
+    uintptr_t mem_start = (uintptr_t)*memory;
+    uintptr_t mem_end = mem_start + (*memory)->size;
+    uintptr_t page_start;
+    uintptr_t page_end;
+    if ((mem_start & -PAGE_SIZE) == mem_start) {
+        page_start = mem_start;
+    } else {
+        page_start = (mem_start + KALLOC_MIN_FREE_MEM + PAGE_SIZE - 1) & -PAGE_SIZE;
+    }
+    if ((mem_end & -PAGE_SIZE) == mem_end) {
+        page_end = mem_end;
+    } else {
+        page_end = (mem_end - KALLOC_MIN_FREE_MEM) & -PAGE_SIZE;
+    }
+    if (
+        (mem_end <= (uintptr_t)small_buffer || mem_start >= (uintptr_t)small_buffer + sizeof(small_buffer)) // Do not free the small_buffer memory
+        &&  ((mem_start == page_start && mem_end == page_end) // If this will not create any additional fragmentation
+            || page_end >= page_start + KALLOC_MIN_PAGES_TO_FREE * PAGE_SIZE) // Or free more than a minimum number of pages
+    ) {
+        PageAllocation alloc = {
+            .ptr = (void*)page_start,
+            .size = (page_end - page_start) / PAGE_SIZE,
+        };
+        if (page_start == mem_start && page_end == mem_end) {
+            *memory = (*memory)->next;
+        } else if (mem_end == page_end) {
+            (*memory)->size = page_start - mem_start;
+        } else if (mem_start == page_start) {
+            FreeMemory* next = (FreeMemory*)page_end;
+            next->next = (*memory)->next;
+            next->size = mem_end - page_end;
+            *memory = next;
         } else {
-            page_start = (mem_start + KALLOC_MIN_FREE_MEM + PAGE_SIZE - 1) & -PAGE_SIZE;
+            (*memory)->size = page_start - mem_start;
+            FreeMemory* next = (FreeMemory*)page_end;
+            next->next = (*memory)->next;
+            next->size = mem_end - page_end;
+            (*memory)->next = next;
         }
-        if ((mem_end & -PAGE_SIZE) == mem_end) {
-            page_end = mem_end;
-        } else {
-            page_end = (mem_end - KALLOC_MIN_FREE_MEM) & -PAGE_SIZE;
-        }
-        if (
-            (mem_end <= (uintptr_t)small_buffer || mem_start >= (uintptr_t)small_buffer + sizeof(small_buffer)) // Do not free the small_buffer memory
-            &&  ((mem_start == page_start && mem_end == page_end) // If this will not create any additional fragmentation
-                || page_end >= page_start + KALLOC_MIN_PAGES_TO_FREE * PAGE_SIZE) // Or free more than a minimum number of pages
-        ) {
-            PageAllocation alloc = {
-                .ptr = (void*)page_start,
-                .size = (page_end - page_start) / PAGE_SIZE,
-            };
-            if (page_start == mem_start && page_end == mem_end) {
-                *current = (*current)->next;
-            } else if (mem_end == page_end) {
-                (*current)->size = page_start - mem_start;
-            } else if (mem_start == page_start) {
-                FreeMemory* next = (FreeMemory*)page_end;
-                next->next = (*current)->next;
-                next->size = mem_end - page_end;
-                *current = next;
-            } else {
-                (*current)->size = page_start - mem_start;
-                FreeMemory* next = (FreeMemory*)page_end;
-                next->next = (*current)->next;
-                next->size = mem_end - page_end;
-                (*current)->next = next;
-            }
-            deallocPages(alloc);
-        } else {
-            current = &(*current)->next;
-        }
+        deallocPages(alloc);
     }
 }
 
@@ -210,38 +210,9 @@ void dealloc(void* ptr) {
     if (ptr != NULL) {
         lockSpinLock(&kalloc_lock);
         FreeMemory* mem = (FreeMemory*)findAllocatedMemoryFor(ptr, true);
-        insertFreeMemory(mem);
-        tryFreeingOldMemory();
+        tryFreeingOldMemory(insertFreeMemory(mem));
         unlockSpinLock(&kalloc_lock);
     }
-}
-
-static FreeMemory** findFreeMemoryBefore(AllocatedMemory* memory) {
-    FreeMemory** current = &first_free;
-    while (*current != NULL) {
-        uintptr_t current_ptr = (uintptr_t)*current;
-        uintptr_t memory_ptr = (uintptr_t)memory;
-        if (current_ptr + (*current)->size == memory_ptr) {
-            return current;
-        } else {
-            current = &(*current)->next;
-        }
-    }
-    return NULL;
-}
-
-static FreeMemory** findFreeMemoryAfter(AllocatedMemory* memory) {
-    FreeMemory** current = &first_free;
-    while (*current != NULL) {
-        uintptr_t current_ptr = (uintptr_t)*current;
-        uintptr_t memory_ptr = (uintptr_t)memory;
-        if (memory_ptr + memory->size == current_ptr) {
-            return current;
-        } else {
-            current = &(*current)->next;
-        }
-    }
-    return NULL;
 }
 
 void* krealloc(void* ptr, size_t size) {
@@ -253,58 +224,55 @@ void* krealloc(void* ptr, size_t size) {
     } else {
         size_t alloc_size = kallocActualSizeFor(size);
         lockSpinLock(&kalloc_lock);
-        AllocatedMemory* mem = findAllocatedMemoryFor(ptr, false);
-        FreeMemory** before = findFreeMemoryBefore(mem);
-        FreeMemory** after = findFreeMemoryAfter(mem);
-        size_t old_size = mem->size;
-        if (before != NULL) {
-            old_size += (*before)->size;
-        }
-        if (after != NULL) {
-            old_size += (*after)->size;
-        }
-        if (old_size >= alloc_size) {
-            AllocatedMemory* start = findAllocatedMemoryFor(ptr, true);
-            if (before != NULL) {
-                start = (AllocatedMemory*)*before;
-            }
-            if (before != NULL && after == &(*before)->next) {
-                *before = (*after)->next;
-            } else if (after != NULL && before == &(*after)->next) {
-                *after = (*before)->next;
+        AllocatedMemory* memory = findAllocatedMemoryFor(ptr, true);
+        size_t copy_size = umin(memory->size - sizeof(AllocatedMemory), size);
+        FreeMemory* free_mem = (FreeMemory*)memory;
+        size_t free_size = memory->size;
+        assert(findOverlappingFreeMemory(memory, memory->size) == NULL);
+        FreeMemory** current = &first_free;
+        while ((*current) != NULL && (void*)(*current) < (void*)free_mem) {
+            if ((void*)(*current) + (*current)->size == (void*)free_mem) {
+                free_size += (*current)->size;
+                free_mem = *current;
+                *current = (*current)->next;
             } else {
-                if (before != NULL) {
-                    *before = (*before)->next;
-                }
-                if (after != NULL) {
-                    *after = (*after)->next;
-                }
+                current = &(*current)->next;
             }
-            memmove(start->bytes, ptr, umin(mem->size - sizeof(AllocatedMemory), size));
-            if (old_size < alloc_size + KALLOC_MIN_FREE_MEM) {
-                start->size = old_size;
+        }
+        if ((*current) != NULL && (void*)free_mem + free_size == (*current)) {
+            free_size += (*current)->size;
+            *current = (*current)->next;
+        }
+        if (size >= alloc_size) {
+            AllocatedMemory* alloc_mem = (AllocatedMemory*)free_mem;
+            if (alloc_mem != memory) {
+                memmove(alloc_mem->bytes, ptr, copy_size);
+            }
+            if (free_size < alloc_size + KALLOC_MIN_FREE_MEM) {
+                alloc_mem->size = free_size;
             } else {
-                FreeMemory* next = (FreeMemory*)((uintptr_t)start + alloc_size);
-                next->next = first_free;
-                next->size = old_size - alloc_size;
-                first_free = next;
-                start->size = alloc_size;
+                free_mem = (FreeMemory*)((void*)free_mem + alloc_size);
+                free_mem->next = *current;
+                free_mem->size = free_size - alloc_size;
+                *current = free_mem;
+                tryFreeingOldMemory(current);
+                alloc_mem->size = alloc_size;
             }
-            tryFreeingOldMemory();
 #ifdef DEBUG
-            mem->next = allocated;
-            allocated = mem;
+            alloc_mem->next = allocated;
+            allocated = alloc_mem;
 #endif
             unlockSpinLock(&kalloc_lock);
-            return start->bytes;
+            return alloc_mem->bytes;
         } else {
+            void* new_ptr = kalloc(size);
+            memmove(new_ptr, ptr, copy_size);
+            free_mem->next = *current;
+            free_mem->size = free_size;
+            *current = free_mem;
+            tryFreeingOldMemory(current);
             unlockSpinLock(&kalloc_lock);
-            void* ret = kalloc(size);
-            if (ret != NULL) {
-                memcpy(ret, ptr, umin(mem->size - sizeof(AllocatedMemory), size));
-            }
-            dealloc(ptr);
-            return ret;
+            return new_ptr;
         }
     }
 }
@@ -315,10 +283,6 @@ size_t kallocSize(void* ptr) {
     } else {
         lockSpinLock(&kalloc_lock);
         AllocatedMemory* mem = findAllocatedMemoryFor(ptr, false);
-#ifdef DEBUG
-        mem->next = allocated;
-        allocated = mem;
-#endif
         unlockSpinLock(&kalloc_lock);
         return mem->size;
     }
