@@ -14,8 +14,10 @@ static void handleInterrupt(ExternalInterrupt id, void* udata) {
 }
 
 Error initVirtIOBlockDevice(int dev_id, volatile VirtIODeviceLayout* base, VirtIODevice** output) {
+#ifdef DEBUG
     VirtIOBlockDeviceLayout* mmio = (VirtIOBlockDeviceLayout*)base;
     assert(mmio->config.blk_size == BLOCK_SECTOR_SIZE); // TODO: actually use the data in mmio->config?
+#endif
     VirtIOBlockDevice* device = zalloc(sizeof(VirtIOBlockDevice));
     assert(device != NULL);
     device->virtio.type = base->device_id;

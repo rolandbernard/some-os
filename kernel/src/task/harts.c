@@ -36,8 +36,10 @@ int hartIdToIndex(int hartid) {
 }
 
 HartFrame* setupHartFrame(int hartid) {
+#ifdef DEBUG
     HartFrame* existing = getCurrentHartFrame();
     assert(existing == NULL);
+#endif
     HartFrame* hart = zalloc(sizeof(HartFrame));
     hart->stack_top = (uintptr_t)kalloc(HART_STACK_SIZE) + HART_STACK_SIZE;
     initKernelTrapFrame(&hart->frame, hart->stack_top, 0);

@@ -38,14 +38,14 @@ static void logDebugLocation(uintptr_t addr) {
         STYLE_DEBUG " ∟ hart %i at \e[m" STYLE_DEBUG_EXT "%p\e[m",
         hart != NULL ? hart->hartid : 0, addr
     );
-    SymbolDebugInfo* symb_info = searchSymbolDebugInfo(addr - 1);
+    const SymbolDebugInfo* symb_info = searchSymbolDebugInfo(addr - 1);
     if (symb_info != NULL) {
         unsafeLogKernelMessage(
             STYLE_DEBUG " (\e[m" STYLE_DEBUG_EXT "%s\e[m" STYLE_DEBUG "+%p)\e[m",
             symb_info->symbol, addr - symb_info->addr
         );
     }
-    LineDebugInfo* line_info = searchLineDebugInfo(addr - 1);
+    const LineDebugInfo* line_info = searchLineDebugInfo(addr - 1);
     if (line_info != NULL) {
         unsafeLogKernelMessage(STYLE_DEBUG_LOC " %s:%d", line_info->file, line_info->line);
     }

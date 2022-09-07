@@ -12,7 +12,7 @@
 
 #define BACKTRACE() logBacktrace();
 #else
-#define BABACKTRACE()
+#define BACKTRACE()
 #endif
 
 extern UnsafeLock global_panic_lock;
