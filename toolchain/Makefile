@@ -6,7 +6,11 @@ TARGETS := gcc-no-headers binutils-no-headers newlib-no-headers binutils gcc new
 TARGET  := $(ARCH)-someos
 ECHO    := echo
 
+ifeq ($(BUILD),debug)
 export CFLAGS_FOR_TARGET := -mcmodel=medany -O0 -g
+else
+export CFLAGS_FOR_TARGET := -mcmodel=medany -O2
+endif
 # ==
 
 # == gcc-no-headers

@@ -3,7 +3,7 @@ include ./config.mk
 
 # == General
 ECHO := echo
-SUBS := toolchain kernel userspace
+SUBS := programs toolchain kernel userspace
 
 $(foreach SUB, $(SUBS), $(eval TARGET.$(SUB) := $(BUILD_DIR)/$(SUB).flag))
 TARGET.sysroot := $(BUILD_DIR)/sysroot.flag
@@ -38,7 +38,7 @@ $(BUILD_DIR)/%.flag:
 	@$(ECHO) "Building $*"
 	$(MAKE) -C $(ROOT_DIR)/$* FLAG=$(BUILD_DIR)/$*.flag
 
-$(TARGET.sysroot): $(TARGET.userspace) $(MAKEFILE_LIST)
+$(TARGET.sysroot): $(TARGET.userspace) $(TARGET.programs) $(MAKEFILE_LIST)
 	@$(ECHO) "Building sysroot"
 	mkdir -p $(SYSROOT_DIR)/dev
 	mkdir -p $(SYSROOT_DIR)/bin
