@@ -15,9 +15,13 @@
 #define INITIAL_TTY_BUFFER_CAPACITY 512
 #define MAX_TTY_BUFFER_CAPACITY 4096
 
+static char getBuffer(UartTtyDevice* dev, size_t index) {
+    return dev->buffer[(dev->buffer_start + index) % dev->buffer_capacity];
+}
+
 static size_t bufferLineLength(UartTtyDevice* dev) {
     for (size_t i = 0; i < dev->buffer_count; i++) {
-        char c = dev->buffer[(dev->buffer_start + i) % dev->buffer_capacity];
+        char c = getBuffer(dev, i);
         if (c == '\n' || c == dev->ctrl.cc[VEOL]) {
             return i + 1;
         } else if (c == dev->ctrl.cc[VEOF]) {
@@ -30,7 +34,7 @@ static size_t bufferLineLength(UartTtyDevice* dev) {
 static bool canReturnRead(UartTtyDevice* dev, Task* task) {
     return dev->buffer_count > 0 && (
         (dev->ctrl.lflag & ICANON) == 0
-        || dev->buffer[dev->buffer_start] == dev->ctrl.cc[VEOF]
+        || getBuffer(dev, 0) == dev->ctrl.cc[VEOF]
         || dev->line_delim_count > 0);
 }
 
@@ -64,7 +68,7 @@ static Error uartTtyReadOrWait(UartTtyDevice* dev, VirtPtr buffer, size_t size, 
         size_t size_available = (dev->ctrl.lflag & ICANON) != 0 ? bufferLineLength(dev) : dev->buffer_count;
         size_t length = umin(size_available, size);
         for (size_t i = 0; i < length; i++) {
-            char c = dev->buffer[(dev->buffer_start + i) % dev->buffer_capacity];
+            char c = getBuffer(dev, i);
             if (c == '\n' || c == dev->ctrl.cc[VEOL] || c == dev->ctrl.cc[VEOF]) {
                 dev->line_delim_count--;
             }
@@ -81,6 +85,10 @@ static Error uartTtyReadOrWait(UartTtyDevice* dev, VirtPtr buffer, size_t size, 
         }
         dev->buffer_start = (dev->buffer_start + length) % dev->buffer_capacity;
         dev->buffer_count -= length;
+        if ((dev->ctrl.lflag & ICANON) != 0 && dev->buffer_count > 0 && getBuffer(dev, 0) == dev->ctrl.cc[VEOF]) {
+            dev->line_delim_count--;
+            dev->buffer_count--;
+        }
         unlockSpinLock(&dev->lock);
         criticalReturn(task);
         *read = length;
@@ -181,7 +189,7 @@ static Error basicTtyRead(UartTtyDevice* dev) {
             if (dev->buffer_count > 0) {
                 dev->buffer_count--;
                 size_t count = (dev->ctrl.lflag & ECHOCTL) != 0
-                    && isTerminalSpecialChar(dev->buffer[dev->buffer_count]) ? 2 : 1;
+                    && isTerminalSpecialChar(getBuffer(dev, dev->buffer_count)) ? 2 : 1;
                 for (size_t i = 0; i < count; i++) {
                     basicTtyWrite(dev, '\b');
                     basicTtyWrite(dev, ' ');
