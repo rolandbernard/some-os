@@ -7,3 +7,6 @@
 [submodule "toolchain/gcc"]
 	path = toolchain/gcc
 	url = https://github.com/rolandbernard/gcc
+[submodule "programs/bash"]
+	path = programs/bash
+	url = https://github.com/rolandbernard/bash
