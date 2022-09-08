@@ -51,6 +51,7 @@
 #define NOFLSH 0000200
 #define IEXTEN 0000400
 #define TOSTOP 0001000
+#define ECHOCTL 0002000
 
 #define VINTR 0
 #define VQUIT 1

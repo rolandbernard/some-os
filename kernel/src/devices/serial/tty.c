@@ -13,6 +13,40 @@
 #include "util/util.h"
 
 #define INITIAL_TTY_BUFFER_CAPACITY 512
+#define MAX_TTY_BUFFER_CAPACITY 4096
+
+static size_t bufferLineLength(UartTtyDevice* dev) {
+    for (size_t i = 0; i < dev->buffer_count; i++) {
+        char c = dev->buffer[(dev->buffer_start + i) % dev->buffer_capacity];
+        if (c == '\n' || c == dev->ctrl.cc[VEOL]) {
+            return i + 1;
+        } else if (c == dev->ctrl.cc[VEOF]) {
+            return i;
+        }
+    }
+    return 0;
+}
+
+static bool canReturnRead(UartTtyDevice* dev, Task* task) {
+    return dev->buffer_count > 0 && (
+        (dev->ctrl.lflag & ICANON) == 0
+        || dev->buffer[dev->buffer_start] == dev->ctrl.cc[VEOF]
+        || dev->line_delim_count > 0);
+}
+
+static void wakeupIfRequired(UartTtyDevice* dev) {
+    Task** current = &dev->blocked;
+    while (*current != NULL) {
+        if (canReturnRead(dev, *current)) {
+            Task* wakeup = *current;
+            *current = wakeup->sched.sched_next;
+            moveTaskToState(wakeup, ENQUABLE);
+            enqueueTask(wakeup);
+        } else {
+            current = &(*current)->sched.sched_next;
+        }
+    }
+}
 
 static void waitForReadOperation(void* _, Task* task, UartTtyDevice* dev) {
     moveTaskToState(task, WAITING);
@@ -26,19 +60,15 @@ static void waitForReadOperation(void* _, Task* task, UartTtyDevice* dev) {
 static Error uartTtyReadOrWait(UartTtyDevice* dev, VirtPtr buffer, size_t size, size_t* read, bool block) {
     Task* task = criticalEnter();
     lockSpinLock(&dev->lock);
-    if (dev->buffer_count == 0) {
-        if (block) {
-            assert(task != NULL);
-            if (saveToFrame(&task->frame)) {
-                callInHart((void*)waitForReadOperation, task, dev);
+    if (canReturnRead(dev, task)) {
+        size_t size_available = (dev->ctrl.lflag & ICANON) != 0 ? bufferLineLength(dev) : dev->buffer_count;
+        size_t length = umin(size_available, size);
+        for (size_t i = 0; i < length; i++) {
+            char c = dev->buffer[(dev->buffer_start + i) % dev->buffer_capacity];
+            if (c == '\n' || c == dev->ctrl.cc[VEOL] || c == dev->ctrl.cc[VEOF]) {
+                dev->line_delim_count--;
             }
-        } else {
-            unlockSpinLock(&dev->lock);
-            criticalReturn(task);
         }
-        return simpleError(EAGAIN);
-    } else {
-        size_t length = umin(dev->buffer_count, size);
         if (dev->buffer_capacity < dev->buffer_start + length) {
             // We need to wrap around
             size_t first = dev->buffer_capacity - dev->buffer_start;
@@ -55,6 +85,17 @@ static Error uartTtyReadOrWait(UartTtyDevice* dev, VirtPtr buffer, size_t size, 
         criticalReturn(task);
         *read = length;
         return simpleError(SUCCESS);
+    } else {
+        if (block) {
+            assert(task != NULL);
+            if (saveToFrame(&task->frame)) {
+                callInHart((void*)waitForReadOperation, task, dev);
+            }
+        } else {
+            unlockSpinLock(&dev->lock);
+            criticalReturn(task);
+        }
+        return simpleError(EAGAIN);
     }
 }
 
@@ -69,13 +110,18 @@ static Error uartTtyReadFunction(UartTtyDevice* dev, VirtPtr buffer, size_t size
 static void uartTtyResizeBuffer(UartTtyDevice* dev) {
     size_t capacity = dev->buffer_capacity == 0
         ? INITIAL_TTY_BUFFER_CAPACITY : dev->buffer_capacity * 3 / 2;
-    dev->buffer = krealloc(dev->buffer, capacity);
-    if (dev->buffer_capacity < dev->buffer_start + dev->buffer_count) {
-        size_t to_move = dev->buffer_start - dev->buffer_capacity + dev->buffer_count;
-        assert(dev->buffer_capacity + to_move <= capacity);
-        memmove(dev->buffer + dev->buffer_capacity, dev->buffer, to_move);
+    if (capacity > MAX_TTY_BUFFER_CAPACITY) {
+        capacity = MAX_TTY_BUFFER_CAPACITY;
     }
-    dev->buffer_capacity = capacity;
+    if (capacity != dev->buffer_capacity) {
+        dev->buffer = krealloc(dev->buffer, capacity);
+        if (dev->buffer_capacity < dev->buffer_start + dev->buffer_count) {
+            size_t to_move = dev->buffer_start - dev->buffer_capacity + dev->buffer_count;
+            assert(dev->buffer_capacity + to_move <= capacity);
+            memmove(dev->buffer + dev->buffer_capacity, dev->buffer, to_move);
+        }
+        dev->buffer_capacity = capacity;
+    }
 }
 
 static Error basicTtyWrite(UartTtyDevice* dev, char character) {
@@ -99,21 +145,23 @@ static Error basicTtyWrite(UartTtyDevice* dev, char character) {
     return error;
 }
 
+static bool isTerminalSpecialChar(char c) {
+    return c < 0x20 && c >= 2 && c != '\t' && c != '\n';
+}
+
 static Error basicTtyRead(UartTtyDevice* dev) {
     // TODO: Implement at least the following flags
     // * ISIG
-    // * ICANON
-    // * ECHOE
     // * VTIME
     // * VMIN
-    // * VEOF
-    // * VEOL
-    // * VERASE
     // * VINTR
     // * VKILL
     // * VQUIT
     if (dev->buffer_count == dev->buffer_capacity) {
         uartTtyResizeBuffer(dev);
+    }
+    if (dev->buffer_count == dev->buffer_capacity) {
+        dev->buffer_count--; // Input is truncated after this
     }
     char* new = dev->buffer + (dev->buffer_start + dev->buffer_count) % dev->buffer_capacity;
     Error error = dev->read_func(dev->uart_data, new);
@@ -131,19 +179,32 @@ static Error basicTtyRead(UartTtyDevice* dev) {
         }
         if (*new == dev->ctrl.cc[VERASE] && (dev->ctrl.lflag & ECHOE) != 0 && (dev->ctrl.lflag & ICANON) != 0) {
             if (dev->buffer_count > 0) {
-                basicTtyWrite(dev, '\b');
-                basicTtyWrite(dev, 0);
-                basicTtyWrite(dev, '\b');
                 dev->buffer_count--;
+                size_t count = (dev->ctrl.lflag & ECHOCTL) != 0
+                    && isTerminalSpecialChar(dev->buffer[dev->buffer_count]) ? 2 : 1;
+                for (size_t i = 0; i < count; i++) {
+                    basicTtyWrite(dev, '\b');
+                    basicTtyWrite(dev, ' ');
+                    basicTtyWrite(dev, '\b');
+                }
             }
             return error;
         }
+        if (*new == '\n' || *new == dev->ctrl.cc[VEOL] || *new == dev->ctrl.cc[VEOF]) {
+            dev->line_delim_count++;
+        }
         dev->buffer_count++;
         if (
-            (dev->ctrl.lflag & ECHO) != 0
-            || ((dev->ctrl.lflag & ECHONL) != 0 && (dev->ctrl.lflag & ICANON) != 0 && *new == '\n')
+            ((dev->ctrl.lflag & ECHO) != 0
+                || ((dev->ctrl.lflag & ECHONL) != 0 && (dev->ctrl.lflag & ICANON) != 0 && *new == '\n'))
+            && ((dev->ctrl.lflag & ICANON) == 0 || *new != dev->ctrl.cc[VEOF])
         ) {
-            basicTtyWrite(dev, *new);
+            if ((dev->ctrl.lflag & ECHOCTL) != 0 && isTerminalSpecialChar(*new)) {
+                basicTtyWrite(dev, '^');
+                basicTtyWrite(dev, *new + 0x40);
+            } else {
+                basicTtyWrite(dev, *new);
+            }
         }
     }
     return error;
@@ -182,6 +243,7 @@ static Error basicUartTtyIoctlFunction(UartTtyDevice* dev, size_t request, VirtP
         case TCSETSW:
         case TCSETS:
             memcpyBetweenVirtPtr(virtPtrForKernel(&dev->ctrl), argp, sizeof(Termios));
+            wakeupIfRequired(dev); // Wakeup might be cause by change of flags.
             return simpleError(SUCCESS);
         case TIOCGPGRP:
             return simpleError(ENOTSUP);
@@ -213,12 +275,7 @@ void uartTtyDataReady(UartTtyDevice* dev) {
     do {
         error = basicTtyRead(dev);
     } while (!isError(error));
-    while (dev->blocked != NULL) {
-        Task* wakeup = dev->blocked;
-        dev->blocked = wakeup->sched.sched_next;
-        moveTaskToState(wakeup, ENQUABLE);
-        enqueueTask(wakeup);
-    }
+    wakeupIfRequired(dev);
     unlockSpinLock(&dev->lock);
 }
 
@@ -242,12 +299,18 @@ UartTtyDevice* createUartTtyDevice(void* uart, UartWriteFunction write, UartRead
     dev->buffer = NULL;
     dev->blocked = NULL;
     initSpinLock(&dev->lock);
-    // TODO: Init to correct defaults
     memset(&dev->ctrl, 0, sizeof(Termios));
     dev->ctrl.iflag = ICRNL;
-    dev->ctrl.oflag = ONLCR | ONOCR;
-    dev->ctrl.lflag = ECHO | ECHOE | ICANON;
+    dev->ctrl.oflag = ONLCR | ONOCR | OPOST;
+    dev->ctrl.lflag = ECHO | ECHOE | ECHONL | ECHOCTL | ICANON | ISIG;
     dev->ctrl.cc[VERASE] = '\x7f';
+    dev->ctrl.cc[VEOF] = '\x04';
+    dev->ctrl.cc[VEOL] = '\x00';
+    dev->ctrl.cc[VINTR] = '\x03';
+    dev->ctrl.cc[VKILL] = '\x15';
+    dev->ctrl.cc[VQUIT] = '\x1c';
+    dev->ctrl.cc[VTIME] = 0;
+    dev->ctrl.cc[VMIN] = 1;
     return dev;
 }
 
