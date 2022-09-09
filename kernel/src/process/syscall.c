@@ -233,22 +233,45 @@ SyscallReturn sigprocmaskSyscall(TrapFrame* frame) {
     SYSCALL_RETURN(old);
 }
 
+typedef struct {
+    TrapFrame* frame;
+    size_t found;
+    size_t allowed;
+} KillRequest;
+
 static int killSyscallCallback(Process* process, void* udata) {
-    Task* task = (Task*)udata;
+    KillRequest* request = (KillRequest*)udata;
+    TrapFrame* frame = request->frame;;
+    assert(frame->hart != NULL);
+    Task* task = (Task*)frame;
+    assert(task->process != NULL);
+    Pid pid = SYSCALL_ARG(0);
     lockSpinLock(&task->process->user.lock);
     if (
-        task->process->user.euid == 0
-        || process->user.euid == task->process->user.suid
-        || process->user.euid == task->process->user.ruid
-        || process->user.ruid == task->process->user.suid
-        || process->user.ruid == task->process->user.ruid
+        pid == -1
+        || (pid > 0 && process->pid == pid)
+        || (pid == 0 && process->pgid == task->process->pgid)
+        || (pid < -1 && process->pgid == -pid)
     ) {
-        unlockSpinLock(&task->process->user.lock);
-        addSignalToProcess(process, task->frame.regs[REG_ARGUMENT_2]);
-        return -SUCCESS;
+        request->found++;
+        if (
+            task->process->user.euid == 0
+            || process->user.euid == task->process->user.suid
+            || process->user.euid == task->process->user.ruid
+            || process->user.ruid == task->process->user.suid
+            || process->user.ruid == task->process->user.ruid
+        ) {
+            request->allowed++;
+            unlockSpinLock(&task->process->user.lock);
+            addSignalToProcess(process, SYSCALL_ARG(1));
+            return -SUCCESS;
+        } else {
+            unlockSpinLock(&task->process->user.lock);
+            return -EPERM;
+        }
     } else {
         unlockSpinLock(&task->process->user.lock);
-        return -EPERM;
+        return -ESRCH;
     }
 }
 
@@ -256,8 +279,23 @@ SyscallReturn killSyscall(TrapFrame* frame) {
     assert(frame->hart != NULL);
     Task* task = (Task*)frame;
     assert(task->process != NULL);
-    Pid pid = SYSCALL_ARG(0);
-    SYSCALL_RETURN(doForProcessWithPid(pid, killSyscallCallback, task));
+    KillRequest request = {
+        .frame = frame,
+        .found = 0,
+        .allowed = 0,
+    };
+    if (SYSCALL_ARG(1) >= SIG_COUNT) {
+        SYSCALL_RETURN(-EINVAL);
+    } else {
+        doForAllProcess(killSyscallCallback, &request);
+        if (request.found == 0) {
+            SYSCALL_RETURN(-ESRCH);
+        } else if (request.allowed == 0) {
+            SYSCALL_RETURN(-EPERM);
+        } else {
+            SYSCALL_RETURN(-SUCCESS);
+        }
+    }
 }
 
 SyscallReturn setUidSyscall(TrapFrame* frame) {
