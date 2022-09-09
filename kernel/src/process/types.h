@@ -138,6 +138,8 @@ typedef struct {
 typedef struct Process_s {
     SpinLock lock;
     Pid pid;
+    Pid sid;
+    Pid pgid;
     int status; // This is the status returned from wait
     Task* tasks;
     TaskTimes times;

@@ -175,6 +175,9 @@ Process* createUserProcess(Process* parent) {
     Process* process = zalloc(sizeof(Process));
     if (process != NULL) {
         if (parent != NULL) {
+            // Copy session id and process group id
+            process->sid = parent->sid;
+            process->pgid = parent->pgid;
             // Copy signal handler data, but not pending signals
             process->signals.current_signal = parent->signals.current_signal;
             process->signals.restore_frame = parent->signals.restore_frame;
@@ -301,7 +304,7 @@ void removeProcessTask(Task* task) {
     }
 }
 
-int doForProcessWithPid(int pid, ProcessFindCallback callback, void* udata) {
+int doForProcessWithPid(Pid pid, ProcessFindCallback callback, void* udata) {
     lockSpinLock(&process_lock);
     Process* current = global_first;
     while (current != NULL) {
@@ -313,6 +316,16 @@ int doForProcessWithPid(int pid, ProcessFindCallback callback, void* udata) {
     }
     unlockSpinLock(&process_lock);
     return -ESRCH;
+}
+
+void doForAllProcess(ProcessFindCallback callback, void* udata) {
+    lockSpinLock(&process_lock);
+    Process* current = global_first;
+    while (current != NULL) {
+        callback(current, udata);
+        current = current->tree.global_next;
+    }
+    unlockSpinLock(&process_lock);
 }
 
 void handleProcessTaskWakeup(Task* task) {

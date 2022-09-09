@@ -74,6 +74,10 @@ SyscallFunction user_syscalls[] = {
     [SYSCALL_IOCTL] = ioctlSyscall,
     [SYSCALL_ISATTY] = isattySyscall,
     [SYSCALL_NANOSECONDS] = nanosecondsSyscall,
+    [SYSCALL_SETPGID] = setPgidSyscall,
+    [SYSCALL_GETPGID] = getPgidSyscall,
+    [SYSCALL_SETSID] = setSidSyscall,
+    [SYSCALL_GETSID] = getSidSyscall,
 };
 
 SyscallFunction kernel_syscalls[] = {

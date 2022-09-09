@@ -233,7 +233,7 @@ SyscallReturn sigprocmaskSyscall(TrapFrame* frame) {
     SYSCALL_RETURN(old);
 }
 
-int killSyscallCallback(Process* process, void* udata) {
+static int killSyscallCallback(Process* process, void* udata) {
     Task* task = (Task*)udata;
     lockSpinLock(&task->process->user.lock);
     if (
@@ -255,7 +255,8 @@ int killSyscallCallback(Process* process, void* udata) {
 SyscallReturn killSyscall(TrapFrame* frame) {
     assert(frame->hart != NULL);
     Task* task = (Task*)frame;
-    int pid = SYSCALL_ARG(0);
+    assert(task->process != NULL);
+    Pid pid = SYSCALL_ARG(0);
     SYSCALL_RETURN(doForProcessWithPid(pid, killSyscallCallback, task));
 }
 
@@ -436,6 +437,98 @@ SyscallReturn setREGidSyscall(TrapFrame* frame) {
     } else {
         unlockSpinLock(&task->process->user.lock);
         SYSCALL_RETURN(-EPERM);
+    }
+}
+
+SyscallReturn setSidSyscall(TrapFrame* frame) {
+    assert(frame->hart != NULL);
+    Task* task = (Task*)frame;
+    assert(task->process != NULL);
+    lockSpinLock(&task->process->lock);
+    if (task->process->pid == task->process->pgid) {
+        unlockSpinLock(&task->process->lock);
+        SYSCALL_RETURN(-EPERM);
+    } else {
+        task->process->sid = task->process->pid;
+        task->process->pgid = task->process->pid;
+        unlockSpinLock(&task->process->lock);
+        SYSCALL_RETURN(task->process->pid);
+    }
+}
+
+static int getSidSyscallCallback(Process* process, void* udata) {
+    lockSpinLock(&process->lock);
+    Pid result = process->sid;
+    unlockSpinLock(&process->lock);
+    return result;
+}
+
+SyscallReturn getSidSyscall(TrapFrame* frame) {
+    assert(frame->hart != NULL);
+    Task* task = (Task*)frame;
+    assert(task->process != NULL);
+    Pid pid = SYSCALL_ARG(0);
+    if (pid == 0) {
+        SYSCALL_RETURN(getSidSyscallCallback(task->process, task));
+    } else {
+        SYSCALL_RETURN(doForProcessWithPid(pid, getSidSyscallCallback, task));
+    }
+}
+
+static int setPgidSyscallCallback(Process* process, void* udata) {
+    TrapFrame* frame = (TrapFrame*)udata;
+    assert(frame->hart != NULL);
+    Task* task = (Task*)frame;
+    assert(task->process != NULL);
+    if (process != task->process && process->tree.parent != task->process) {
+        return -ESRCH;
+    }
+    Pid pgid = SYSCALL_ARG(1);
+    Pid new_sid;
+    if (pgid == 0) {
+        pgid = process->pid;
+        new_sid = process->sid;
+    } else {
+        new_sid = doForProcessWithPid(pgid, getSidSyscallCallback, task);
+        if (new_sid < 0) {
+            return new_sid;
+        }
+    }
+    if (process->sid != new_sid) {
+        return -EPERM;
+    }
+    process->pgid = pgid;
+    return 0;
+}
+
+SyscallReturn setPgidSyscall(TrapFrame* frame) {
+    assert(frame->hart != NULL);
+    Task* task = (Task*)frame;
+    assert(task->process != NULL);
+    Pid pid = SYSCALL_ARG(0);
+    if (pid == 0) {
+        SYSCALL_RETURN(setPgidSyscallCallback(task->process, task));
+    } else {
+        SYSCALL_RETURN(doForProcessWithPid(pid, setPgidSyscallCallback, task));
+    }
+}
+
+static int getPgidSyscallCallback(Process* process, void* udata) {
+    lockSpinLock(&process->lock);
+    Pid result = process->pgid;
+    unlockSpinLock(&process->lock);
+    return result;
+}
+
+SyscallReturn getPgidSyscall(TrapFrame* frame) {
+    assert(frame->hart != NULL);
+    Task* task = (Task*)frame;
+    assert(task->process != NULL);
+    Pid pid = SYSCALL_ARG(0);
+    if (pid == 0) {
+        SYSCALL_RETURN(getPgidSyscallCallback(task->process, task));
+    } else {
+        SYSCALL_RETURN(doForProcessWithPid(pid, getPgidSyscallCallback, task));
     }
 }
 

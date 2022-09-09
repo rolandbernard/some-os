@@ -223,7 +223,7 @@ static Error basicTtyRead(UartTtyDevice* dev) {
             }
             return error;
         }
-        if ((dev->ctrl.lflag & ISIG) != 0 && (*new == dev->ctrl.cc[VINTR] || *new == dev->ctrl.cc[VQUIT])) {
+        if ((dev->ctrl.lflag & ISIG) != 0 && (*new == dev->ctrl.cc[VINTR] || *new == dev->ctrl.cc[VQUIT] || *new == dev->ctrl.cc[VSUSP])) {
             // TODO: signal processes (add process group id and session id first)
             return error;
         }
@@ -347,6 +347,7 @@ UartTtyDevice* createUartTtyDevice(void* uart, UartWriteFunction write, UartRead
     dev->ctrl.cc[VINTR] = '\x05';
     dev->ctrl.cc[VKILL] = '\x15';
     dev->ctrl.cc[VQUIT] = '\x1c';
+    dev->ctrl.cc[VSUSP] = '\x1a';
     dev->ctrl.cc[VTIME] = 0;
     dev->ctrl.cc[VMIN] = 1;
     return dev;

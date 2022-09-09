@@ -47,4 +47,12 @@ SyscallReturn setREUidSyscall(TrapFrame* frame);
 
 SyscallReturn setREGidSyscall(TrapFrame* frame);
 
+SyscallReturn setSidSyscall(TrapFrame* frame);
+
+SyscallReturn getSidSyscall(TrapFrame* frame);
+
+SyscallReturn setPgidSyscall(TrapFrame* frame);
+
+SyscallReturn getPgidSyscall(TrapFrame* frame);
+
 #endif

@@ -11,18 +11,20 @@
 #include "task/task.h"
 
 void addSignalToProcess(Process* process, Signal signal) {
-    PendingSignal* entry = kalloc(sizeof(PendingSignal));
-    entry->signal = signal;
-    entry->next = NULL;
-    lockSpinLock(&process->lock);
-    if (process->signals.signals_tail == NULL) {
-        process->signals.signals_tail = entry;
-        process->signals.signals = entry;
-    } else {
-        process->signals.signals_tail->next = entry;
-        process->signals.signals_tail = entry;
+    if (signal > SIGNONE && signal < SIG_COUNT) {
+        PendingSignal* entry = kalloc(sizeof(PendingSignal));
+        entry->signal = signal;
+        entry->next = NULL;
+        lockSpinLock(&process->lock);
+        if (process->signals.signals_tail == NULL) {
+            process->signals.signals_tail = entry;
+            process->signals.signals = entry;
+        } else {
+            process->signals.signals_tail->next = entry;
+            process->signals.signals_tail = entry;
+        }
+        unlockSpinLock(&process->lock);
     }
-    unlockSpinLock(&process->lock);
 }
 
 typedef struct {
@@ -49,7 +51,7 @@ static bool handleActualSignal(Task* task, Signal signal) {
         // We don't actually have a stop at the moment
         exitProcess(task->process, signal, 0);
         return false;
-    } else if (signal >= SIG_COUNT || signal == 0) {
+    } else if (signal >= SIG_COUNT || signal == SIGNONE) {
         // This is an invalid signal, ignore for now
         return true;
     } else if (action->handler == SIG_DFL) {

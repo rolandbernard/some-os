@@ -37,6 +37,8 @@ void exitProcess(Process* process, Signal signal, int exit);
 
 typedef int (*ProcessFindCallback)(Process* process, void* udata);
 
-int doForProcessWithPid(int pid, ProcessFindCallback callback, void* udata);
+int doForProcessWithPid(Pid pid, ProcessFindCallback callback, void* udata);
+
+void doForAllProcess(ProcessFindCallback callback, void* udata);
 
 #endif
