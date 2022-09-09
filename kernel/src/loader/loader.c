@@ -14,6 +14,7 @@
 #include "memory/pagealloc.h"
 #include "memory/virtmem.h"
 #include "process/process.h"
+#include "process/signals.h"
 #include "task/schedule.h"
 #include "task/task.h"
 #include "task/types.h"
@@ -120,6 +121,8 @@ Error loadProgramInto(Task* task, const char* path, VirtPtr args, VirtPtr envs) 
     task->frame.regs[REG_ARGUMENT_2] = envs_addr;
     // Close files with CLOEXEC flag
     closeExecProcessFiles(task->process);
+    // Reset signal handlers
+    clearSignals(task->process);
     return simpleError(SUCCESS);
 }
 

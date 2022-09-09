@@ -13,4 +13,6 @@ bool handlePendingSignals(Task* task);
 
 void returnFromSignal(Task* process);
 
+void clearSignals(Process* process);
+
 #endif

@@ -39,22 +39,25 @@ SpinLock process_lock;
 
 static bool basicProcessWait(Task* task) {
     Pid wait_pid = task->frame.regs[REG_ARGUMENT_1];
-    ProcessWaitResult** current = &task->process->tree.waits;
+    Process** current = &task->process->tree.children;
     while (*current != NULL) {
-        ProcessWaitResult* wait = *current;
-        if (wait_pid <= 0 || wait_pid == (*current)->pid) {
+        Process* waiting = *current;
+        if (waiting->tasks == NULL && (wait_pid <= 0 || wait_pid == waiting->pid)) {
             writeInt(
                 virtPtrForTask(task->frame.regs[REG_ARGUMENT_2], task),
-                sizeof(int) * 8, wait->status
+                sizeof(int) * 8, waiting->status
             );
-            task->times.user_child_time += wait->user_time;
-            task->times.system_child_time += wait->system_time;
-            task->frame.regs[REG_ARGUMENT_0] = wait->pid;
-            *current = wait->next;
-            dealloc(wait);
+            task->times.user_child_time += waiting->times.user_time + waiting->times.user_child_time;
+            task->times.system_child_time += waiting->times.system_time + waiting->times.system_child_time;
+            task->frame.regs[REG_ARGUMENT_0] = waiting->pid;
+            *current = waiting->tree.child_next;
+            if (*current != NULL) {
+                (*current)->tree.child_prev = waiting->tree.child_prev;
+            }
+            deallocProcess(waiting);
             return true;
         } else {
-            current = &wait->next;
+            current = &waiting->tree.child_next;
         }
     }
     return false;
@@ -110,47 +113,33 @@ static void registerProcess(Process* process) {
 static void unregisterProcess(Process* process) {
     lockSpinLock(&process_lock); 
     if (process->tree.parent != NULL) {
-        // Add wait information to the parent
-        Process* parent = process->tree.parent;
-        ProcessWaitResult* current = process->tree.waits;
-        while (current != NULL) {
-            ProcessWaitResult* wait = current;
-            current = wait->next;
-            wait->next = parent->tree.waits;
-            parent->tree.waits = wait->next;
-        }
-        ProcessWaitResult* new_entry = kalloc(sizeof(ProcessWaitResult));
-        new_entry->pid = process->pid;
-        new_entry->status = process->status;
-        new_entry->user_time = process->times.user_time + process->times.user_child_time;
-        new_entry->system_time = process->times.system_time + process->times.system_child_time;
-        new_entry->next = parent->tree.waits;
-        parent->tree.waits = new_entry;
-        addSignalToProcess(parent, SIGCHLD);
-        // Remove child from parent
-        if (process->tree.child_prev == NULL) {
-            parent->tree.children = process->tree.child_next;
-        } else {
-            process->tree.child_prev->tree.child_next = process->tree.child_next;
-        }
-    } else {
-        // Free pending waits
-        ProcessWaitResult* current = process->tree.waits;
-        while (current != NULL) {
-            ProcessWaitResult* wait = current;
-            current = wait->next;
-            dealloc(wait);
-        }
-    }
-    // Reparent children
-    Process* child = process->tree.children;
-    while (child != NULL) {
-        child->tree.parent = process->tree.parent;
-        if (process->tree.parent != NULL) {
+        // Reparent children
+        Process* child = process->tree.children;
+        while (child != NULL) {
+            child->tree.parent = process->tree.parent;
             child->tree.child_next = process->tree.parent->tree.children;
             process->tree.parent->tree.children = child;
+            child = child->tree.child_next;
         }
-        child = child->tree.child_next;
+        // Remove child from parent
+        if (process->tree.child_prev == NULL) {
+            process->tree.parent->tree.children = process->tree.child_next;
+            if (process->tree.parent->tree.children != NULL) {
+                process->tree.parent->tree.children->tree.child_prev = NULL;
+            }
+        } else {
+            process->tree.child_prev->tree.child_next = process->tree.child_next;
+            process->tree.child_next->tree.child_prev = process->tree.child_prev;
+        }
+    } else {
+        Process* child = process->tree.children;
+        while (child != NULL) {
+            child->tree.parent = NULL;
+            if (child->tasks == NULL) {
+                deallocProcess(child);
+            }
+            child = child->tree.child_next;
+        }
     }
     if (process->tree.global_prev == NULL) {
         global_first = process->tree.global_next;
@@ -179,12 +168,9 @@ Process* createUserProcess(Process* parent) {
             process->sid = parent->sid;
             process->pgid = parent->pgid;
             // Copy signal handler data, but not pending signals
-            process->signals.current_signal = parent->signals.current_signal;
-            process->signals.restore_frame = parent->signals.restore_frame;
-            memcpy(
-                process->signals.handlers, parent->signals.handlers,
-                sizeof(parent->signals.handlers)
-            );
+            memcpy(&process->signals, &parent->signals, sizeof(parent->signals));
+            process->signals.signals = NULL;
+            process->signals.signals_tail = NULL;
             // Copy resource information
             lockTaskLock(&parent->resources.lock);
             process->resources.cwd = stringClone(parent->resources.cwd);
@@ -275,7 +261,7 @@ void deallocProcess(Process* process) {
 }
 
 void exitProcess(Process* process, Signal signal, int exit) {
-    process->status = (exit & 0xff) | (signal << 8);
+    process->status = (exit & 0xff) | ((signal & 0xff) << 8);
     terminateAllProcessTasks(process);
 }
 
@@ -297,8 +283,13 @@ void removeProcessTask(Task* task) {
     process->times.system_child_time += task->times.system_child_time;
     task->process = NULL;
     if (process->tasks == NULL) {
-        unlockSpinLock(&process->lock);
-        deallocProcess(process);
+        if (process->tree.parent == NULL) {
+            unlockSpinLock(&process->lock);
+            deallocProcess(process);
+        } else {
+            addSignalToProcess(process->tree.parent, SIGCHLD);
+            unlockSpinLock(&process->lock);
+        }
     } else {
         unlockSpinLock(&process->lock);
     }

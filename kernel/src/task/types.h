@@ -85,7 +85,7 @@ typedef enum {
     READY,
     WAITING,
     TERMINATED,
-// Special wait
+// Special wait (TODO: make them less special)
     SLEEPING,
     PAUSED,
     WAIT_CHLD,

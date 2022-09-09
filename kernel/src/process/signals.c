@@ -159,3 +159,14 @@ void returnFromSignal(Task* task) {
     unlockSpinLock(&task->process->lock);
 }
 
+void clearSignals(Process* process) {
+    lockSpinLock(&process->lock);
+    while (process->signals.signals != NULL) {
+        PendingSignal* signal = process->signals.signals;
+        process->signals.signals = signal->next;
+        dealloc(signal);
+    }
+    memset(process->signals.handlers, 0, sizeof(process->signals.handlers));
+    unlockSpinLock(&process->lock);
+}
+

@@ -37,16 +37,7 @@ typedef struct {
     SpinLock lock;
 } ProcessUser;
 
-typedef struct ProcessWaitResult_s {
-    int pid;
-    int status;
-    Time user_time;
-    Time system_time;
-    struct ProcessWaitResult_s* next;
-} ProcessWaitResult;
-
 typedef struct {
-    ProcessWaitResult* waits;
     struct Process_s* parent;
     struct Process_s* children;
     struct Process_s* child_next; // Next and prev to be able to remove only knowing the process we want to remove
