@@ -31,25 +31,41 @@ static size_t bufferLineLength(UartTtyDevice* dev) {
     return 0;
 }
 
-static bool canReturnRead(UartTtyDevice* dev, Task* task) {
-    return dev->buffer_count > 0 && (
-        (dev->ctrl.lflag & ICANON) == 0
-        || getBuffer(dev, 0) == dev->ctrl.cc[VEOF]
-        || dev->line_delim_count > 0);
+static bool canReturnRead(UartTtyDevice* dev) {
+    if ((dev->ctrl.lflag & ICANON) == 0) {
+        if (dev->ctrl.cc[VTIME] == 0) {
+            return dev->buffer_count >= dev->ctrl.cc[VMIN];
+        } else {
+            return dev->buffer_count >= umax(dev->ctrl.cc[VMIN], 1)
+               || (dev->buffer_count >= umin(dev->ctrl.cc[VMIN], 1)
+                   && dev->last_byte + dev->ctrl.cc[VTIME] * CLOCKS_PER_SEC / 10 < getTime());
+        }
+    } else {
+        return dev->line_delim_count > 0;
+    }
 }
 
-static void wakeupIfRequired(UartTtyDevice* dev) {
-    Task** current = &dev->blocked;
-    while (*current != NULL) {
-        if (canReturnRead(dev, *current)) {
-            Task* wakeup = *current;
-            *current = wakeup->sched.sched_next;
+static bool wakeupIfRequired(UartTtyDevice* dev) {
+    if (canReturnRead(dev)) {
+        while (dev->blocked != NULL) {
+            Task* wakeup = dev->blocked;
+            dev->blocked = wakeup->sched.sched_next;
             moveTaskToState(wakeup, ENQUABLE);
             enqueueTask(wakeup);
-        } else {
-            current = &(*current)->sched.sched_next;
         }
+        return true;
+    } else {
+        return false;
     }
+}
+
+static void checkForWakeup(Time time, void* udata) {
+    UartTtyDevice* dev = (UartTtyDevice*)udata;
+    lockSpinLock(&dev->lock);
+    if (!wakeupIfRequired(dev)) {
+        setTimeout(dev->ctrl.cc[VTIME] * CLOCKS_PER_SEC / 10, checkForWakeup, dev);
+    }
+    unlockSpinLock(&dev->lock);
 }
 
 static void waitForReadOperation(void* _, Task* task, UartTtyDevice* dev) {
@@ -57,6 +73,9 @@ static void waitForReadOperation(void* _, Task* task, UartTtyDevice* dev) {
     enqueueTask(task);
     task->sched.sched_next = dev->blocked;
     dev->blocked = task;
+    if ((dev->ctrl.lflag & ICANON) == 0 && dev->ctrl.cc[VTIME] != 0 && dev->blocked == NULL) {
+        setTimeout(dev->ctrl.cc[VTIME] * CLOCKS_PER_SEC / 10, checkForWakeup, dev);
+    }
     unlockSpinLock(&dev->lock);
     runNextTask();
 }
@@ -64,7 +83,10 @@ static void waitForReadOperation(void* _, Task* task, UartTtyDevice* dev) {
 static Error uartTtyReadOrWait(UartTtyDevice* dev, VirtPtr buffer, size_t size, size_t* read, bool block) {
     Task* task = criticalEnter();
     lockSpinLock(&dev->lock);
-    if (canReturnRead(dev, task)) {
+    if ((dev->ctrl.lflag & ICANON) == 0 && dev->ctrl.cc[VTIME] != 0 && dev->blocked == NULL) {
+        dev->last_byte = getTime();
+    }
+    if (canReturnRead(dev)) {
         size_t size_available = (dev->ctrl.lflag & ICANON) != 0 ? bufferLineLength(dev) : dev->buffer_count;
         size_t length = umin(size_available, size);
         for (size_t i = 0; i < length; i++) {
@@ -157,14 +179,20 @@ static bool isTerminalSpecialChar(char c) {
     return c < 0x20 && c >= 2 && c != '\t' && c != '\n';
 }
 
+static void eraseLastCharacter(UartTtyDevice* dev) {
+    if (dev->buffer_count > 0) {
+        dev->buffer_count--;
+        size_t count = (dev->ctrl.lflag & ECHOCTL) != 0
+            && isTerminalSpecialChar(getBuffer(dev, dev->buffer_count)) ? 2 : 1;
+        for (size_t i = 0; i < count; i++) {
+            basicTtyWrite(dev, '\b');
+            basicTtyWrite(dev, ' ');
+            basicTtyWrite(dev, '\b');
+        }
+    }
+}
+
 static Error basicTtyRead(UartTtyDevice* dev) {
-    // TODO: Implement at least the following flags
-    // * ISIG
-    // * VTIME
-    // * VMIN
-    // * VINTR
-    // * VKILL
-    // * VQUIT
     if (dev->buffer_count == dev->buffer_capacity) {
         uartTtyResizeBuffer(dev);
     }
@@ -185,17 +213,18 @@ static Error basicTtyRead(UartTtyDevice* dev) {
                 *new = '\r';
             }
         }
-        if (*new == dev->ctrl.cc[VERASE] && (dev->ctrl.lflag & ECHOE) != 0 && (dev->ctrl.lflag & ICANON) != 0) {
-            if (dev->buffer_count > 0) {
-                dev->buffer_count--;
-                size_t count = (dev->ctrl.lflag & ECHOCTL) != 0
-                    && isTerminalSpecialChar(getBuffer(dev, dev->buffer_count)) ? 2 : 1;
-                for (size_t i = 0; i < count; i++) {
-                    basicTtyWrite(dev, '\b');
-                    basicTtyWrite(dev, ' ');
-                    basicTtyWrite(dev, '\b');
-                }
+        if ((dev->ctrl.lflag & ECHOE) != 0 && (dev->ctrl.lflag & ICANON) != 0 && *new == dev->ctrl.cc[VERASE]) {
+            eraseLastCharacter(dev);
+            return error;
+        }
+        if ((dev->ctrl.lflag & ECHOK) != 0 && (dev->ctrl.lflag & ICANON) != 0 && *new == dev->ctrl.cc[VKILL]) {
+            while (dev->buffer_count > 0) {
+                eraseLastCharacter(dev);
             }
+            return error;
+        }
+        if ((dev->ctrl.lflag & ISIG) != 0 && (*new == dev->ctrl.cc[VINTR] || *new == dev->ctrl.cc[VQUIT])) {
+            // TODO: signal processes (add process group id and session id first)
             return error;
         }
         if (*new == '\n' || *new == dev->ctrl.cc[VEOL] || *new == dev->ctrl.cc[VEOF]) {
@@ -283,6 +312,7 @@ void uartTtyDataReady(UartTtyDevice* dev) {
     do {
         error = basicTtyRead(dev);
     } while (!isError(error));
+    dev->last_byte = getTime();
     wakeupIfRequired(dev);
     unlockSpinLock(&dev->lock);
 }
@@ -310,11 +340,11 @@ UartTtyDevice* createUartTtyDevice(void* uart, UartWriteFunction write, UartRead
     memset(&dev->ctrl, 0, sizeof(Termios));
     dev->ctrl.iflag = ICRNL;
     dev->ctrl.oflag = ONLCR | ONOCR | OPOST;
-    dev->ctrl.lflag = ECHO | ECHOE | ECHONL | ECHOCTL | ICANON | ISIG;
+    dev->ctrl.lflag = ECHO | ECHOK | ECHOE | ECHONL | ECHOCTL | ICANON | ISIG;
     dev->ctrl.cc[VERASE] = '\x7f';
     dev->ctrl.cc[VEOF] = '\x04';
     dev->ctrl.cc[VEOL] = '\x00';
-    dev->ctrl.cc[VINTR] = '\x03';
+    dev->ctrl.cc[VINTR] = '\x05';
     dev->ctrl.cc[VKILL] = '\x15';
     dev->ctrl.cc[VQUIT] = '\x1c';
     dev->ctrl.cc[VTIME] = 0;

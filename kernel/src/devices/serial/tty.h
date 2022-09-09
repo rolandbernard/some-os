@@ -24,6 +24,7 @@ typedef struct {
     size_t buffer_count;
     size_t buffer_capacity;
     size_t line_delim_count;
+    Time last_byte;
     Termios ctrl;
     SpinLock lock;
     Task* blocked;
