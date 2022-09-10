@@ -115,7 +115,6 @@ static void awakenTasks() {
 }
 
 noreturn void runNextTask() {
-    awakenTasks();
     Task* current = NULL;
     current = getCurrentTask();
     if (current != NULL) {
@@ -129,6 +128,7 @@ noreturn void runNextTask() {
 
 noreturn void runNextTaskFrom(HartFrame* hart) {
     for (;;) {
+        awakenTasks();
         Task* next = NULL;
         while (next == NULL) {
             next = pullTaskForHart(hart);
