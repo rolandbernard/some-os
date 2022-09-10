@@ -11,6 +11,7 @@
 void startProgram(const char* name) {
     int pid = fork();
     if (pid == 0) {
+        setsid();
         execl(name, name, NULL);
         USPACE_ERROR("Failed to start `%s`: %s", name, strerror(errno));
         exit(1);
@@ -24,6 +25,7 @@ void startProgram(const char* name) {
 int runProgram(const char* name) {
     int pid = fork();
     if (pid == 0) {
+        setsid();
         execl(name, name, NULL);
         USPACE_ERROR("Failed to start `%s`: %s", name, strerror(errno));
         exit(1);

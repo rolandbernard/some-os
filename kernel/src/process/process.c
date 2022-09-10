@@ -43,7 +43,7 @@ SpinLock process_lock;
 static Error basicProcessWait(Task* task) {
     size_t found = 0;
     Pid pid = task->frame.regs[REG_ARGUMENT_1];
-    int flags = task->frame.regs[REG_ARGUMENT_2];
+    int flags = task->frame.regs[REG_ARGUMENT_3];
     Process** current = &task->process->tree.children;
     while (*current != NULL) {
         Process* child = *current;
