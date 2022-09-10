@@ -8,6 +8,7 @@
 #include "devices/serial/ttyctl.h"
 #include "error/error.h"
 #include "interrupt/plic.h"
+#include "process/types.h"
 #include "task/spinlock.h"
 #include "task/task.h"
 
@@ -26,6 +27,7 @@ typedef struct {
     size_t line_delim_count;
     Time last_byte;
     Termios ctrl;
+    Pid process_group;
     SpinLock lock;
     Task* blocked;
 } UartTtyDevice;

@@ -224,7 +224,13 @@ static Error basicTtyRead(UartTtyDevice* dev) {
             return error;
         }
         if ((dev->ctrl.lflag & ISIG) != 0 && (*new == dev->ctrl.cc[VINTR] || *new == dev->ctrl.cc[VQUIT] || *new == dev->ctrl.cc[VSUSP])) {
-            // TODO: signal processes (add process group id and session id first)
+            if (*new == dev->ctrl.cc[VINTR]) {
+                signalProcessGroup(dev->process_group, SIGINT);
+            } else if (*new == dev->ctrl.cc[VQUIT]) {
+                signalProcessGroup(dev->process_group, SIGQUIT);
+            } else if (*new == dev->ctrl.cc[VSUSP]) {
+                signalProcessGroup(dev->process_group, SIGTSTP);
+            }
             return error;
         }
         if (*new == '\n' || *new == dev->ctrl.cc[VEOL] || *new == dev->ctrl.cc[VEOF]) {
@@ -280,19 +286,21 @@ static Error basicUartTtyIoctlFunction(UartTtyDevice* dev, size_t request, VirtP
         case TCSETSW:
         case TCSETS:
             memcpyBetweenVirtPtr(virtPtrForKernel(&dev->ctrl), argp, sizeof(Termios));
-            wakeupIfRequired(dev); // Wakeup might be cause by change of flags.
+            wakeupIfRequired(dev); // Wakeup might be caused by change of flags.
             return simpleError(SUCCESS);
         case TIOCGPGRP:
-            return simpleError(ENOTSUP);
+            writeInt(argp, sizeof(Pid) * 8, dev->process_group);
+            return simpleError(SUCCESS);
         case TIOCSPGRP:
-            return simpleError(ENOTSUP);
+            dev->process_group = readInt(argp, sizeof(Pid) * 8);
+            return simpleError(SUCCESS);
         case TCXONC:
             return simpleError(ENOTSUP);
         case TCFLSH:
             dev->buffer_count = 0;
             return simpleError(SUCCESS);
         case FIONREAD:
-            *res = dev->buffer_count;
+            writeInt(argp, sizeof(int) * 8, dev->buffer_count);
             return simpleError(SUCCESS);
         default:
             return simpleError(ENOTTY);
@@ -350,6 +358,7 @@ UartTtyDevice* createUartTtyDevice(void* uart, UartWriteFunction write, UartRead
     dev->ctrl.cc[VSUSP] = '\x1a';
     dev->ctrl.cc[VTIME] = 0;
     dev->ctrl.cc[VMIN] = 1;
+    dev->process_group = 1; // Just give it to the init process
     return dev;
 }
 

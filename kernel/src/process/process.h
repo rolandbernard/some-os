@@ -41,4 +41,6 @@ int doForProcessWithPid(Pid pid, ProcessFindCallback callback, void* udata);
 
 void doForAllProcess(ProcessFindCallback callback, void* udata);
 
+void signalProcessGroup(Pid pgid, Signal signal);
+
 #endif

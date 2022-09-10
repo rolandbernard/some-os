@@ -1,7 +1,9 @@
 #ifndef _UTIL_H_
 #define _UTIL_H_
 
-void startProgram(const char* name);
+#include <stdbool.h>
+
+void startProgram(const char* name, bool give_terminal);
 
 int runProgram(const char* name);
 

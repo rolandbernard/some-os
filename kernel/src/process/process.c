@@ -176,6 +176,8 @@ Pid allocateNewPid() {
 Process* createUserProcess(Process* parent) {
     Process* process = zalloc(sizeof(Process));
     if (process != NULL) {
+        process->pid = allocateNewPid();
+        process->tree.parent = parent;
         if (parent != NULL) {
             // Copy session id and process group id
             process->sid = parent->sid;
@@ -203,11 +205,13 @@ Process* createUserProcess(Process* parent) {
             // Copy files
             forkFileDescriptors(process, parent);
         } else {
+            // Set session id and process group id to the pid (probably 1)
+            process->sid = process->pid;
+            process->pgid = process->pid;
+            // Create a new memory space
             process->memory.mem = createMemorySpace();
             process->resources.cwd = stringClone("/");
         }
-        process->pid = allocateNewPid();
-        process->tree.parent = parent;
         registerProcess(process);
     }
     return process;
@@ -327,6 +331,18 @@ void doForAllProcess(ProcessFindCallback callback, void* udata) {
     Process* current = global_first;
     while (current != NULL) {
         callback(current, udata);
+        current = current->tree.global_next;
+    }
+    unlockSpinLock(&process_lock);
+}
+
+void signalProcessGroup(Pid pgid, Signal signal) {
+    lockSpinLock(&process_lock);
+    Process* current = global_first;
+    while (current != NULL) {
+        if (current->pgid == pgid) {
+            addSignalToProcess(current, signal);
+        }
         current = current->tree.global_next;
     }
     unlockSpinLock(&process_lock);
