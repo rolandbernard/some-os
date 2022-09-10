@@ -37,60 +37,73 @@ static Pid next_pid = 1;
 static Process* global_first = NULL;
 SpinLock process_lock;
 
-static bool basicProcessWait(Task* task) {
-    Pid wait_pid = task->frame.regs[REG_ARGUMENT_1];
+#define WNOHANG 1
+#define WUNTRACED 2
+
+static Error basicProcessWait(Task* task) {
+    size_t found = 0;
+    Pid pid = task->frame.regs[REG_ARGUMENT_1];
+    int flags = task->frame.regs[REG_ARGUMENT_2];
     Process** current = &task->process->tree.children;
     while (*current != NULL) {
-        Process* waiting = *current;
-        if (waiting->tasks == NULL && (wait_pid <= 0 || wait_pid == waiting->pid)) {
-            writeInt(
-                virtPtrForTask(task->frame.regs[REG_ARGUMENT_2], task),
-                sizeof(int) * 8, waiting->status
-            );
-            task->times.user_child_time += waiting->times.user_time + waiting->times.user_child_time;
-            task->times.system_child_time += waiting->times.system_time + waiting->times.system_child_time;
-            task->frame.regs[REG_ARGUMENT_0] = waiting->pid;
-            *current = waiting->tree.child_next;
-            if (*current != NULL) {
-                (*current)->tree.child_prev = waiting->tree.child_prev;
+        Process* child = *current;
+        if (
+            pid == -1
+            || (pid == 0 && task->process->pgid == child->pgid)
+            || (pid < -1 && task->process->pgid == -pid)
+            || (pid > 0 && child->pid == pid)
+        ) {
+            found++;
+            if (child->tasks == NULL) {
+                writeInt(
+                    virtPtrForTask(task->frame.regs[REG_ARGUMENT_2], task),
+                    sizeof(int) * 8, child->status
+                );
+                task->times.user_child_time += child->times.user_time + child->times.user_child_time;
+                task->times.system_child_time += child->times.system_time + child->times.system_child_time;
+                task->frame.regs[REG_ARGUMENT_0] = child->pid;
+                *current = child->tree.child_next;
+                if (*current != NULL) {
+                    (*current)->tree.child_prev = child->tree.child_prev;
+                }
+                deallocProcess(child);
+                return simpleError(SUCCESS);
             }
-            deallocProcess(waiting);
-            return true;
-        } else {
-            current = &waiting->tree.child_next;
         }
+        current = &child->tree.child_next;
     }
-    return false;
+    return simpleError(found != 0 ? ((flags & WNOHANG) != 0 ? EAGAIN : EINTR) : ECHILD);
 }
 
 void executeProcessWait(Task* task) {
     lockSpinLock(&process_lock); 
-    if (basicProcessWait(task)) {
-        unlockSpinLock(&process_lock); 
+    Error err = basicProcessWait(task);
+    unlockSpinLock(&process_lock);
+    if (!isError(err)) {
         moveTaskToState(task, ENQUABLE);
     } else {
-        bool has_child = false;
-        Pid wait_pid = task->frame.regs[REG_ARGUMENT_1];
-        if (wait_pid <= 0) {
-            has_child = task->process->tree.children != NULL;
-        } else {
-            Process* child = task->process->tree.children;
-            while (child != NULL && !has_child) {
-                if (child->pid == wait_pid) {
-                    has_child = true;
-                }
-                child = child->tree.child_next;
-            }
-        }
-        unlockSpinLock(&process_lock); 
-        if (has_child) {
-            task->frame.regs[REG_ARGUMENT_0] = -EINTR;
+        if (err.kind == EINTR) {
             moveTaskToState(task, WAIT_CHLD);
         } else {
-            task->frame.regs[REG_ARGUMENT_0] = -ECHILD;
+            task->frame.regs[REG_ARGUMENT_0] = -err.kind;
             moveTaskToState(task, ENQUABLE);
         }
     }
+}
+
+void handleProcessTaskWakeup(Task* task) {
+    if (task->sched.state == WAIT_CHLD) {
+        lockSpinLock(&process_lock); 
+        Error err = basicProcessWait(task);
+        unlockSpinLock(&process_lock); 
+        if (isError(err)) {
+            task->frame.regs[REG_ARGUMENT_0] = -err.kind;
+        }
+    }
+}
+
+bool shouldTaskWakeup(Task* task) {
+    return task->process->signals.signals != NULL;
 }
 
 static void registerProcess(Process* process) {
@@ -317,15 +330,5 @@ void doForAllProcess(ProcessFindCallback callback, void* udata) {
         current = current->tree.global_next;
     }
     unlockSpinLock(&process_lock);
-}
-
-void handleProcessTaskWakeup(Task* task) {
-    if (task->sched.state == WAIT_CHLD) {
-        basicProcessWait(task);
-    }
-}
-
-bool shouldTaskWakeup(Task* task) {
-    return task->process->signals.signals != NULL;
 }
 
