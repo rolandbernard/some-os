@@ -87,6 +87,28 @@ static bool testForkWaitNohang() {
     return true;
 }
 
+static bool testSigStopCont() {
+    int pid = fork();
+    ASSERT(pid != -1);
+    if (pid == 0) {
+        usleep(1000);
+        exit(0);
+    } else {
+        kill(pid, SIGSTOP);
+        usleep(10000);
+        int status;
+        int wait_pid = waitpid(-1, &status, WNOHANG);
+        ASSERT(wait_pid == -1);
+        kill(pid, SIGCONT);
+        wait_pid = wait(&status);
+        ASSERT(wait_pid == pid);
+        ASSERT(WIFEXITED(status));
+        ASSERT(!WIFSIGNALED(status));
+        ASSERT(WEXITSTATUS(status) == 0);
+    }
+    return true;
+}
+
 static bool testForkExecWait() {
     int pid = fork();
     ASSERT(pid != -1);
@@ -864,6 +886,7 @@ static bool runBasicSyscallTests() {
         TEST(testSyscallYield),
         TEST(testForkExitWait),
         TEST(testForkWaitNohang),
+        TEST(testSigStopCont),
         TEST(testForkExecWait),
         TEST(testClock),
         TEST(testUsleep),

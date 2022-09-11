@@ -35,6 +35,10 @@ void deallocProcess(Process* process);
 
 void exitProcess(Process* process, Signal signal, int exit);
 
+void stopProcess(Process* process, Signal signal);
+
+void continueProcess(Process* process, Signal signal);
+
 typedef int (*ProcessFindCallback)(Process* process, void* udata);
 
 int doForProcessWithPid(Pid pid, ProcessFindCallback callback, void* udata);

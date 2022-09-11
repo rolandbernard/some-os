@@ -16,6 +16,9 @@ void addSignalToProcess(Process* process, Signal signal) {
         entry->signal = signal;
         entry->next = NULL;
         lockSpinLock(&process->lock);
+        if (signal == SIGCONT) {
+            continueProcess(process, signal);
+        }
         if (process->signals.signals_tail == NULL) {
             process->signals.signals_tail = entry;
             process->signals.signals = entry;
@@ -47,18 +50,23 @@ typedef struct {
 
 static bool handleActualSignal(Task* task, Signal signal) {
     SignalHandler* action = &task->process->signals.handlers[signal];
-    if (signal == SIGKILL || signal == SIGSTOP) {
-        // We don't actually have a stop at the moment
+    if (signal == SIGKILL) {
         exitProcess(task->process, signal, 0);
+        return false;
+    } else if (signal == SIGSTOP) {
+        stopProcess(task->process, signal);
         return false;
     } else if (signal >= SIG_COUNT || signal == SIGNONE) {
         // This is an invalid signal, ignore for now
         return true;
     } else if (action->handler == SIG_DFL) {
         // Execute default action
-        if (signal == SIGCHLD || signal == SIGURG || signal == SIGWINCH || signal == SIGUSR1 || signal == SIGUSR2) {
+        if (signal == SIGCHLD || signal == SIGURG || signal == SIGWINCH || signal == SIGUSR1 || signal == SIGUSR2 || signal == SIGCONT) {
             // These are the only signals we ignore
             return true;
+        } else if (signal == SIGTSTP || signal == SIGTTIN || signal == SIGTTOU) {
+            stopProcess(task->process, signal);
+            return false;
         } else {
             exitProcess(task->process, signal, 0);
             return false;
@@ -94,7 +102,7 @@ static bool handleActualSignal(Task* task, Signal signal) {
         // Set argument to signal type
         task->frame.regs[REG_ARGUMENT_0] = signal;
         task->frame.regs[REG_ARGUMENT_1] = info_addres.address;
-        task->frame.regs[REG_ARGUMENT_2] = 0;
+        task->frame.regs[REG_ARGUMENT_2] = stack_pointer.address;
         // Set stack pointer to after the restore frame
         task->frame.regs[REG_STACK_POINTER] = stack_pointer.address;
         // Set return address to the restorer to be called after handler completion
@@ -166,7 +174,16 @@ void clearSignals(Process* process) {
         process->signals.signals = signal->next;
         dealloc(signal);
     }
-    memset(process->signals.handlers, 0, sizeof(process->signals.handlers));
+    process->signals.signals_tail = NULL;
+    process->signals.altstack = 0;
+    process->signals.current_signal = 0;
+    process->signals.restore_frame = 0;
+    for (size_t i = 0; i < SIG_COUNT; i++) {
+        process->signals.handlers->flags = 0;
+        if (process->signals.handlers->handler != SIG_IGN) {
+            process->signals.handlers->handler = SIG_DFL;
+        }
+    }
     unlockSpinLock(&process->lock);
 }
 

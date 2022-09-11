@@ -59,14 +59,15 @@ void enqueueTask(Task* task) {
             case READY: // Task has already been enqueued
             case RUNNING: // It is currently running
             case WAITING: // Task is already handled somewhere else
+            case STOPPED: // Enqueue these when we continue
                 unlockSpinLock(&task->sched.lock);
                 break;
             case TERMINATED: // Task can not be enqueue, it is only waiting to be freed.
                 unlockSpinLock(&task->sched.lock);
                 deallocTask(task);
                 break;
-            default:        // We don't know what to do
-                panic();    // These should not happen
+            case UNKNOWN:
+                panic(); // This should not happen
         }
     }
 }
@@ -224,7 +225,7 @@ Task* removeTaskFromQueue(ScheduleQueue* queue, Task* task) {
 void moveTaskToState(Task* task, TaskState state) {
     assert(task != NULL);
     lockSpinLock(&task->sched.lock);
-    if (task->sched.state != TERMINATED) {
+    if (task->sched.state != TERMINATED && (task->sched.state != STOPPED || state == TERMINATED)) {
         task->sched.state = state;
     }
     unlockSpinLock(&task->sched.lock);

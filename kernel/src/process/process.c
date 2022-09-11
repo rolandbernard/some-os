@@ -54,7 +54,9 @@ static Error basicProcessWait(Task* task) {
             || (pid > 0 && child->pid == pid)
         ) {
             found++;
+            lockSpinLock(&child->lock);
             if (child->tasks == NULL) {
+                unlockSpinLock(&child->lock);
                 writeInt(
                     virtPtrForTask(task->frame.regs[REG_ARGUMENT_2], task),
                     sizeof(int) * 8, child->status
@@ -68,6 +70,8 @@ static Error basicProcessWait(Task* task) {
                 }
                 deallocProcess(child);
                 return simpleError(SUCCESS);
+            } else {
+                unlockSpinLock(&child->lock);
             }
         }
         current = &child->tree.child_next;
@@ -237,25 +241,6 @@ void addTaskToProcess(Process* process, Task* task) {
     unlockSpinLock(&process->lock);
 }
 
-static void terminateProcessTask(Task* task) {
-    moveTaskToState(task, TERMINATED);
-    sendMessageToAll(YIELD_TASK, task);
-}
-
-void terminateAllProcessTasksBut(Process* process, Task* keep) {
-    Task* current = process->tasks;
-    while (current != NULL) {
-        if (current != keep) {
-            terminateProcessTask(current);
-        }
-        current = current->proc_next;
-    }
-}
-
-void terminateAllProcessTasks(Process* process) {
-    terminateAllProcessTasksBut(process, NULL);
-}
-
 static void processFinalizeTask(Process* process) {
     // This must be a task because it might include blocking operations.
     unregisterProcess(process);
@@ -277,9 +262,59 @@ void deallocProcess(Process* process) {
     }
 }
 
+static void moveProcessTaskToState(Task* task, TaskState state) {
+    moveTaskToState(task, state);
+    sendMessageToAll(YIELD_TASK, task);
+}
+
+static void moveAllProcessTasksToStateBut(Process* process, TaskState state, Task* keep) {
+    lockSpinLock(&process->lock);
+    Task* current = process->tasks;
+    while (current != NULL) {
+        if (current != keep) {
+            moveProcessTaskToState(current, state);
+        }
+        current = current->proc_next;
+    }
+    unlockSpinLock(&process->lock);
+}
+
+void terminateAllProcessTasksBut(Process* process, Task* keep) {
+    moveAllProcessTasksToStateBut(process, TERMINATED, keep);
+}
+
+void terminateAllProcessTasks(Process* process) {
+    moveAllProcessTasksToStateBut(process, TERMINATED, NULL);
+}
+
 void exitProcess(Process* process, Signal signal, int exit) {
+    lockSpinLock(&process->lock);
     process->status = (exit & 0xff) | ((signal & 0xff) << 8);
+    unlockSpinLock(&process->lock);
     terminateAllProcessTasks(process);
+}
+
+void stopProcess(Process* process, Signal signal) {
+    lockSpinLock(&process->lock);
+    process->status = ((signal & 0xff) << 8);
+    unlockSpinLock(&process->lock);
+    moveAllProcessTasksToStateBut(process, STOPPED, NULL);
+}
+
+void continueProcess(Process* process, Signal signal) {
+    lockSpinLock(&process->lock);
+    process->status = ((signal & 0xff) << 8);
+    Task* current = process->tasks;
+    while (current != NULL) {
+        lockSpinLock(&current->sched.lock);
+        if (current->sched.state == STOPPED) {
+            current->sched.state = ENQUABLE;
+            enqueueTask(current);
+        }
+        unlockSpinLock(&current->sched.lock);
+        current = current->proc_next;
+    }
+    unlockSpinLock(&process->lock);
 }
 
 void removeProcessTask(Task* task) {
