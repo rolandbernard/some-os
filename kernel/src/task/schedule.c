@@ -38,8 +38,6 @@ void enqueueTask(Task* task) {
         lockSpinLock(&task->sched.lock);
         switch (task->sched.state) {
             case SLEEPING:
-            case PAUSED:
-            case WAIT_CHLD:
                 addSleepingTask(task);
                 unlockSpinLock(&task->sched.lock);
                 break;
@@ -72,41 +70,17 @@ void enqueueTask(Task* task) {
     }
 }
 
-static void awakenTask(Task* task) {
-    lockSpinLock(&task->sched.lock);
-    if (task->sched.state == SLEEPING) {
-        Time time = getTime();
-        if (time >= task->sched.sleeping_until) {
-            task->frame.regs[REG_ARGUMENT_0] = 0;
-        } else {
-            task->frame.regs[REG_ARGUMENT_0] = task->sched.sleeping_until - time;
-        }
-    } else {
-        task->frame.regs[REG_ARGUMENT_0] = -EINTR;
-    }
-    if (task->process != NULL) {
-        handleProcessTaskWakeup(task);
-    }
-    unlockSpinLock(&task->sched.lock);
-    moveTaskToState(task, ENQUABLE);
-    enqueueTask(task);
-}
-
 static void awakenTasks() {
     lockSpinLock(&sleeping_lock);
-    Time time = getTime();
     Task** current = &sleeping;
     while (*current != NULL) {
         Task* task = *current;
         lockSpinLock(&task->sched.lock);
-        if (
-            (task->sched.state == SLEEPING && task->sched.sleeping_until <= time)
-            || (task->process != NULL && shouldTaskWakeup(task))
-            || task->sched.state == TERMINATED
-        ) {
+        if (task->sched.wakeup_function(task)) {
             unlockSpinLock(&task->sched.lock);
             *current = task->sched.sched_next;
-            awakenTask(task);
+            moveTaskToState(task, ENQUABLE);
+            enqueueTask(task);
         } else {
             unlockSpinLock(&task->sched.lock);
             current = &task->sched.sched_next;

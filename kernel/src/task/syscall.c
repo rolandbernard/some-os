@@ -12,6 +12,26 @@ SyscallReturn yieldSyscall(TrapFrame* frame) {
     SYSCALL_RETURN(0);
 }
 
+bool handleSleepWakeup(Task* task) {
+    Time time = getTime();
+    bool wakeup = time >= task->times.entered;
+    if (!wakeup && task->process != NULL) {
+        lockSpinLock(&task->process->lock); 
+        wakeup = task->process->signals.signals != NULL;
+        unlockSpinLock(&task->process->lock); 
+    }
+    if (wakeup) {
+        if (time >= task->times.entered) {
+            task->frame.regs[REG_ARGUMENT_0] = 0;
+        } else {
+            task->frame.regs[REG_ARGUMENT_0] = (task->times.entered - time) * (1000000000UL / CLOCKS_PER_SEC);
+        }
+        return true;
+    } else {
+        return false;
+    }
+}
+
 SyscallReturn sleepSyscall(TrapFrame* frame) {
     Time delay = SYSCALL_ARG(0) / (1000000000UL / CLOCKS_PER_SEC); // Argument is in nanoseconds
     Time end = getTime() + delay;
@@ -24,8 +44,11 @@ SyscallReturn sleepSyscall(TrapFrame* frame) {
     } else {
         // This is a task. We can put it into wait.
         Task* task = (Task*)frame;
-        task->sched.sleeping_until = end;
+        lockSpinLock(&task->sched.lock); 
+        task->times.entered = end;
+        task->sched.wakeup_function = handleSleepWakeup;
         moveTaskToState(task, SLEEPING);
+        unlockSpinLock(&task->sched.lock); 
         enqueueTask(task);
         setTimeoutTime(end, NULL, NULL); // Make sure we wake up in time
         return WAIT;

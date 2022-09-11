@@ -23,10 +23,6 @@ void terminateAllProcessTasksBut(Process* process, Task* keep);
 
 void executeProcessWait(Task* task);
 
-void finalProcessWait(Task* process);
-
-void handleProcessTaskWakeup(Task* task);
-
 void removeProcessTask(Task* task);
 
 bool shouldTaskWakeup(Task* task);

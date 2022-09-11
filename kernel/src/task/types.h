@@ -86,13 +86,12 @@ typedef enum {
     WAITING,
     STOPPED,
     TERMINATED,
-// Special wait (TODO: make them less special)
     SLEEPING,
-    PAUSED,
-    WAIT_CHLD,
 } TaskState;
 
 typedef uint8_t Priority;
+
+typedef bool (*SleepTryToWakeUp)(struct Task_s* task);
 
 typedef struct {
     // All data needed for scheduling
@@ -101,7 +100,7 @@ typedef struct {
     Time run_for;
     TaskState state;
     struct Task_s* sched_next; // Used for ready and waiting lists
-    Time sleeping_until;
+    SleepTryToWakeUp wakeup_function;
     SpinLock lock;
 } TaskSched;
 

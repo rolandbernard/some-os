@@ -79,6 +79,23 @@ static Error basicProcessWait(Task* task) {
     return simpleError(found != 0 ? ((flags & WNOHANG) != 0 ? EAGAIN : EINTR) : ECHILD);
 }
 
+bool handleProcessWaitWakeup(Task* task) {
+    lockSpinLock(&task->process->lock); 
+    if (task->process->signals.signals != NULL) {
+        lockSpinLock(&process_lock); 
+        Error err = basicProcessWait(task);
+        unlockSpinLock(&process_lock); 
+        if (isError(err)) {
+            task->frame.regs[REG_ARGUMENT_0] = -err.kind;
+        }
+        unlockSpinLock(&task->process->lock);
+        return true;
+    } else {
+        unlockSpinLock(&task->process->lock);
+        return false;
+    }
+}
+
 void executeProcessWait(Task* task) {
     lockSpinLock(&process_lock); 
     Error err = basicProcessWait(task);
@@ -87,27 +104,15 @@ void executeProcessWait(Task* task) {
         moveTaskToState(task, ENQUABLE);
     } else {
         if (err.kind == EINTR) {
-            moveTaskToState(task, WAIT_CHLD);
+            lockSpinLock(&task->sched.lock); 
+            task->sched.wakeup_function = handleProcessWaitWakeup;
+            moveTaskToState(task, SLEEPING);
+            unlockSpinLock(&task->sched.lock); 
         } else {
             task->frame.regs[REG_ARGUMENT_0] = -err.kind;
             moveTaskToState(task, ENQUABLE);
         }
     }
-}
-
-void handleProcessTaskWakeup(Task* task) {
-    if (task->sched.state == WAIT_CHLD) {
-        lockSpinLock(&process_lock); 
-        Error err = basicProcessWait(task);
-        unlockSpinLock(&process_lock); 
-        if (isError(err)) {
-            task->frame.regs[REG_ARGUMENT_0] = -err.kind;
-        }
-    }
-}
-
-bool shouldTaskWakeup(Task* task) {
-    return task->process->signals.signals != NULL;
 }
 
 static void registerProcess(Process* process) {
