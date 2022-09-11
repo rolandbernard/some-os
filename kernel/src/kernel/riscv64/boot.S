@@ -6,6 +6,7 @@
 _start:
 .cfi_startproc
 .cfi_undefined ra
+    mv s0, a1
     # Set global and stack pointe
     la gp, __global_pointer
     la sp, __stack_top
@@ -61,6 +62,7 @@ _start:
     la t0, runtimeInit
     csrw mepc, t0
     la ra, 3f
+    mv a0, s0
     mret
 3:
     wfi

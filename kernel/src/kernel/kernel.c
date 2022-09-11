@@ -13,6 +13,7 @@
 #include "interrupt/plic.h"
 #include "kernel/init.h"
 #include "kernel/time.h"
+#include "kernel/devtree.h"
 #include "process/syscall.h"
 #include "task/harts.h"
 #include "task/schedule.h"
@@ -21,7 +22,7 @@
 void kernelMain();
 void testingCode();
 
-void kernelInit() {
+void kernelInit(uint8_t* dtb) {
     // Initialize baseline devices
     Error status = initBaselineDevices();
     if (isError(status)) {
@@ -29,6 +30,13 @@ void kernelInit() {
         panic();
     } else {
         KERNEL_SUCCESS("Kernel started");
+    }
+    // TODO: move this to before initBaselineDevices
+    Error dt_status = initWithDeviceTree(dtb);
+    if (isError(dt_status)) {
+        KERNEL_WARNING("Failed to parse device tree: %s, falling back to static memory map", getErrorMessage(dt_status));
+    } else {
+        KERNEL_SUCCESS("Parsed device tree");
     }
     // Initialize kernel systems
     status = initAllSystems();

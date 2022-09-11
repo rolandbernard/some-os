@@ -2,6 +2,7 @@
 #define _ERROR_H_
 
 #include <stdbool.h>
+#include <stddef.h>
 
 #include "util/macro.h"
 
@@ -148,11 +149,7 @@ typedef struct {
 } Error;
 
 // Create error struct without a specific message
-#ifdef DEBUG
-#define simpleError(KIND) someError(KIND, __FILE__ ":" STRINGX(__LINE__))
-#else
 #define simpleError(KIND) someError(KIND, NULL)
-#endif
 
 // Create error struct with a message
 Error someError(ErrorKind kind, const char* details);

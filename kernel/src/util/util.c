@@ -49,3 +49,15 @@ uint64_t hashCombine(uint64_t first, uint64_t second) {
     return first ^ (second + 0x9e3779b9 + (first << 6) + (first >> 2));
 }
 
+uint16_t read16be(uint8_t* bytes) {
+    return ((uint16_t)bytes[0] << 8) | (uint32_t)bytes[1];
+}
+
+uint32_t read32be(uint8_t* bytes) {
+    return ((uint32_t)read16be(bytes) << 16) | (uint32_t)read16be(bytes + 2);
+}
+
+uint64_t read64be(uint8_t* bytes) {
+    return ((uint64_t)read32be(bytes) << 32) | (uint64_t)read32be(bytes + 4);
+}
+

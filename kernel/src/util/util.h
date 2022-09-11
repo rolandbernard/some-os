@@ -24,4 +24,10 @@ uint64_t hashString(const char* s);
 
 uint64_t hashCombine(uint64_t first, uint64_t second);
 
+uint16_t read16be(uint8_t* bytes);
+
+uint32_t read32be(uint8_t* bytes);
+
+uint64_t read64be(uint8_t* bytes);
+
 #endif

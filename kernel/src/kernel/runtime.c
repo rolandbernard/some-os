@@ -4,7 +4,7 @@
 
 #include "memory/virtmem.h"
 
-extern void kernelInit();
+extern void kernelInit(uint8_t* dtb);
 
 extern char __bss_start[];
 extern char __bss_end[];
@@ -21,10 +21,10 @@ typedef enum {
 
 BootState boot_state = UNINITIALIZED;
 
-void runtimeInit() {
+void runtimeInit(uint8_t* dtb) {
     clearBss();
     boot_state = BOOTED;
     memoryFence();
-    kernelInit();
+    kernelInit(dtb);
 }
 
