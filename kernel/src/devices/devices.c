@@ -108,7 +108,6 @@ Device* getNthDevice(size_t nth, bool* fst) {
 }
 
 CharDevice* getDefaultTtyDevice() {
-    initBaselineDevices();
     return (CharDevice*)getDeviceNamed("tty", 0);
 }
 

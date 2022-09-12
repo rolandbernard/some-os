@@ -20,9 +20,13 @@ static SpinLock kernel_log_lock;
 static Error logKernelMessageV(const char* fmt, va_list args) {
     // Logging happens to the default serial device
     CharDevice* tty = getDefaultTtyDevice();
-    FORMAT_STRINGV(string, fmt, args);
-    Error error = writeStringToTty(tty, string);
-    return error;
+    if (tty != NULL) {
+        FORMAT_STRINGV(string, fmt, args);
+        Error error = writeStringToTty(tty, string);
+        return error;
+    } else {
+        return someError(ENODEV, "There is no default tty device");
+    }
 }
 
 static void unsafeLogKernelMessage(const char* fmt, ...) {
