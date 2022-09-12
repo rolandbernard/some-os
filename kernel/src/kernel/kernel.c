@@ -31,10 +31,9 @@ void kernelInit(uint8_t* dtb) {
     } else {
         KERNEL_SUCCESS("Kernel started");
     }
-    // TODO: move this to before initBaselineDevices
-    Error dt_status = initWithDeviceTree(dtb);
-    if (isError(dt_status)) {
-        KERNEL_WARNING("Failed to parse device tree: %s, falling back to static memory map", getErrorMessage(dt_status));
+    status = initWithDeviceTree(dtb);
+    if (isError(status)) {
+        KERNEL_WARNING("Failed to parse device tree: %s, falling back to static memory map", getErrorMessage(status));
     } else {
         KERNEL_SUCCESS("Parsed device tree");
     }
