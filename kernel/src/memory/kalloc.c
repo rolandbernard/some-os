@@ -101,36 +101,41 @@ static size_t kallocActualSizeFor(size_t user_size) {
     );
 }
 
+static void* basicKalloc(size_t size) {
+    size_t alloc_size = kallocActualSizeFor(size);
+    FreeMemory** memory = findFreeMemoryThatFits(alloc_size);
+    if (memory == NULL) {
+        memory = addNewMemory(alloc_size);
+    }
+    void* ret = NULL;
+    if (memory != NULL) {
+        AllocatedMemory* mem = (AllocatedMemory*)*memory;
+        if ((*memory)->size < alloc_size + KALLOC_MIN_FREE_MEM) {
+            *memory = (*memory)->next;
+        } else {
+            FreeMemory* next = (FreeMemory*)((uintptr_t)*memory + alloc_size);
+            next->next = (*memory)->next;
+            next->size = (*memory)->size - alloc_size;
+            *memory = next;
+            mem->size = alloc_size;
+        }
+        ret = mem->bytes;
+#ifdef DEBUG
+        mem->next = allocated;
+        allocated = mem;
+#endif
+    }
+    return ret;
+}
+
 void* kalloc(size_t size) {
     if (size == 0) {
         return NULL;
     } else {
         lockSpinLock(&kalloc_lock);
-        size_t alloc_size = kallocActualSizeFor(size);
-        FreeMemory** memory = findFreeMemoryThatFits(alloc_size);
-        if (memory == NULL) {
-            memory = addNewMemory(alloc_size);
-        }
-        void* ret = NULL;
-        if (memory != NULL) {
-            AllocatedMemory* mem = (AllocatedMemory*)*memory;
-            if ((*memory)->size < alloc_size + KALLOC_MIN_FREE_MEM) {
-                *memory = (*memory)->next;
-            } else {
-                FreeMemory* next = (FreeMemory*)((uintptr_t)*memory + alloc_size);
-                next->next = (*memory)->next;
-                next->size = (*memory)->size - alloc_size;
-                *memory = next;
-                mem->size = alloc_size;
-            }
-            ret = mem->bytes;
-#ifdef DEBUG
-            mem->next = allocated;
-            allocated = mem;
-#endif
-        }
+        void* res = basicKalloc(size);
         unlockSpinLock(&kalloc_lock);
-        return ret;
+        return res;
     }
 }
 
@@ -243,7 +248,7 @@ void* krealloc(void* ptr, size_t size) {
             free_size += (*current)->size;
             *current = (*current)->next;
         }
-        if (size >= alloc_size) {
+        if (free_size >= alloc_size) {
             AllocatedMemory* alloc_mem = (AllocatedMemory*)free_mem;
             if (alloc_mem != memory) {
                 memmove(alloc_mem->bytes, ptr, copy_size);
@@ -265,7 +270,7 @@ void* krealloc(void* ptr, size_t size) {
             unlockSpinLock(&kalloc_lock);
             return alloc_mem->bytes;
         } else {
-            void* new_ptr = kalloc(size);
+            void* new_ptr = basicKalloc(size);
             memmove(new_ptr, ptr, copy_size);
             free_mem->next = *current;
             free_mem->size = free_size;
