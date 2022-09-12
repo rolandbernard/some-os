@@ -13,7 +13,6 @@
 #include "interrupt/plic.h"
 #include "kernel/init.h"
 #include "kernel/time.h"
-#include "kernel/devtree.h"
 #include "process/syscall.h"
 #include "task/harts.h"
 #include "task/schedule.h"
@@ -31,15 +30,8 @@ void kernelInit(uint8_t* dtb) {
     } else {
         KERNEL_SUCCESS("Kernel started");
     }
-    status = initWithDeviceTree(dtb);
-    if (isError(status)) {
-        KERNEL_ERROR("Failed to parse device tree: %s", getErrorMessage(status));
-        panic();
-    } else {
-        KERNEL_SUCCESS("Parsed device tree");
-    }
     // Initialize kernel systems
-    status = initAllSystems();
+    status = initAllSystems(dtb);
     if (isError(status)) {
         KERNEL_ERROR("Failed to initialize kernel: %s", getErrorMessage(status));
         panic();

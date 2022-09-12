@@ -5,13 +5,15 @@
 #include "error/log.h"
 #include "interrupt/plic.h"
 #include "interrupt/trap.h"
+#include "kernel/devtree.h"
 #include "memory/pagealloc.h"
 #include "memory/virtmem.h"
 #include "process/process.h"
 #include "task/harts.h"
 
-Error initAllSystems() {
+Error initAllSystems(uint8_t* dtb) {
     CHECKED(initPageAllocator());
+    CHECKED(initDeviceTree(dtb));
     CHECKED(initKernelVirtualMemory());
     initPrimaryHart();
     CHECKED(initPlic());

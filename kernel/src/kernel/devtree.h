@@ -5,6 +5,6 @@
 
 #include "error/error.h"
 
-Error initWithDeviceTree(uint8_t* dtb);
+Error initDeviceTree(uint8_t* dtb);
 
 #endif
