@@ -13,10 +13,6 @@
 Error initAllSystems() {
     CHECKED(initPageAllocator());
     CHECKED(initKernelVirtualMemory());
-    // kalloc is available from here on.
-#ifdef DEBUG
-    CHECKED(initBacktrace()); // This can not be done earlier because it uses allocation.
-#endif
     initPrimaryHart();
     CHECKED(initPlic());
     return simpleError(SUCCESS);
