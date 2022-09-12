@@ -21,32 +21,6 @@
 #define FDT_NOP 0x00000004
 #define FDT_END 0x00000009
 
-typedef struct {
-    uintptr_t addr;
-    uintptr_t size;
-} ReservedMemory;
-
-typedef struct {
-    char* name;
-    size_t len;
-    uint8_t* value;
-} DeviceTreeProperty;
-
-typedef struct DeviceTreeNode_s {
-    char* name;
-    size_t prop_count;
-    DeviceTreeProperty* props;
-    size_t node_count;
-    struct DeviceTreeNode_s* nodes;
-} DeviceTreeNode;
-
-typedef struct {
-    uint8_t* raw;
-    size_t reserved_count;
-    ReservedMemory* reserved_memory;
-    DeviceTreeNode root;
-} DeviceTree;
-
 static DeviceTree device_tree;
 
 static Error parseReservedMemoryRegions(uint8_t* mem_rsvmap) {
@@ -77,6 +51,7 @@ static uint8_t* parseDeviceTreeNode(uint8_t* dt_struct, char* dt_strings, Device
     memset(indent, ' ', 2 * depth);
     indent[2 * depth] = 0;
 #endif
+    node->device = NULL;
     node->prop_count = 0;
     node->props = NULL;
     node->node_count = 0;
@@ -161,5 +136,37 @@ Error initDeviceTree(uint8_t* dtb) {
     ));
     KERNEL_SUBSUCCESS("Initialized device tree information");
     return simpleError(SUCCESS);
+}
+
+DeviceTreeNode* findNodeAtPath(const char* path) {
+    DeviceTreeNode* current = &device_tree.root;
+    while (*path != 0 && current != NULL) {
+        DeviceTreeNode* next = NULL;
+        size_t segment_length = 0;
+        while (path[segment_length] != 0 && path[segment_length] != '/') {
+            segment_length++;
+        }
+        for (size_t i = 0; i < current->node_count; i++) {
+            if (strncmp(current->nodes[i].name, path, segment_length) == 0) {
+                next = &current->nodes[i];
+                break;
+            }
+        }
+        path += segment_length;
+        if (*path == '/') {
+            path++;
+        }
+        current = next;
+    }
+    return current;
+}
+
+DeviceTreeProperty* findNodeProperty(DeviceTreeNode* node, const char* prop) {
+    for (size_t i = 0; i < node->prop_count; i++) {
+        if (strcmp(node->props[i].name, prop) == 0) {
+            return &node->props[i];
+        }
+    }
+    return NULL;
 }
 
