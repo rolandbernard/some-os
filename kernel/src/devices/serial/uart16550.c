@@ -99,7 +99,7 @@ static Error initDeviceFor(DeviceTreeNode* node) {
 Error registerDriverUart16550() {
     Driver* driver = kalloc(sizeof(Driver));
     driver->name = "uart16550";
-    driver->flags = DRIVER_FLAGS_NONE;
+    driver->flags = DRIVER_FLAGS_MMIO;
     driver->check = checkDeviceCompatibility;
     driver->init = initDeviceFor;
     registerDriver(driver);

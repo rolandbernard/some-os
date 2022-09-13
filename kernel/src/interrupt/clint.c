@@ -41,7 +41,7 @@ static Error initDeviceFor(DeviceTreeNode* node) {
 Error registerDriverClint() {
     Driver* driver = kalloc(sizeof(Driver));
     driver->name = "riscv-clint";
-    driver->flags = DRIVER_FLAGS_INTERRUPT;
+    driver->flags = DRIVER_FLAGS_MMIO | DRIVER_FLAGS_INTERRUPT;
     driver->check = checkDeviceCompatibility;
     driver->init = initDeviceFor;
     registerDriver(driver);

@@ -143,7 +143,7 @@ static Error initDeviceFor(DeviceTreeNode* node) {
 Error registerDriverPlic() {
     Driver* driver = kalloc(sizeof(Driver));
     driver->name = "riscv-plic";
-    driver->flags = DRIVER_FLAGS_INTERRUPT;
+    driver->flags = DRIVER_FLAGS_MMIO | DRIVER_FLAGS_INTERRUPT;
     driver->check = checkDeviceCompatibility;
     driver->init = initDeviceFor;
     registerDriver(driver);

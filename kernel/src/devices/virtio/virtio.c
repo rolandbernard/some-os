@@ -106,7 +106,7 @@ static Error initDeviceFor(DeviceTreeNode* node) {
 Error registerDriverVirtIO() {
     Driver* driver = kalloc(sizeof(Driver));
     driver->name = "virtio-mmio";
-    driver->flags = DRIVER_FLAGS_NONE;
+    driver->flags = DRIVER_FLAGS_MMIO;
     driver->check = checkDeviceCompatibility;
     driver->init = initDeviceFor;
     registerDriver(driver);

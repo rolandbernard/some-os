@@ -2,6 +2,8 @@
 #include "memory/virtmem.h"
 
 #include "error/log.h"
+#include "kernel/devtree.h"
+#include "devices/driver.h"
 
 extern char __text_start[];
 extern char __text_end[];
@@ -15,10 +17,21 @@ extern char __stack_top[];
 PageTable* kernel_page_table;
 SpinLock kernel_page_table_lock;
 
-// static void identityMapMapedMemory(MemmapType type) {
-//     MemmapEntry entry = memory_map[type];
-//     mapPageRange(kernel_page_table, entry.base, entry.base + entry.size, entry.base, PAGE_ENTRY_READ | PAGE_ENTRY_WRITE);
-// }
+static Error identityMapDeviceNode(DeviceTreeNode* node, void* null) {
+    Driver* driver = findDriverForNode(node);
+    if (driver != NULL && (driver->flags & DRIVER_FLAGS_MMIO) != 0) {
+        DeviceTreeProperty* reg = findNodeProperty(node, "reg");
+        if (reg == NULL) {
+            return simpleError(SUCCESS);
+        }
+        for (size_t i = 0; 8 * i < reg->len; i += 2) {
+            uintptr_t base = readPropertyU64(reg, i);
+            uintptr_t size = readPropertyU64(reg, i + 1);
+            mapPageRange(kernel_page_table, base, base + size, base, PAGE_ENTRY_READ | PAGE_ENTRY_WRITE);
+        }
+    }
+    return simpleError(SUCCESS);
+}
 
 Error initKernelVirtualMemory() {
     lockSpinLock(&kernel_page_table_lock);
@@ -36,12 +49,8 @@ Error initKernelVirtualMemory() {
         kernel_page_table, (uintptr_t)__data_start, (uintptr_t)__stack_top,
         (uintptr_t)__data_start, PAGE_ENTRY_AD_RW
     );
-    // Identity map Devices
-    // TODO: use device tree to map all
-    // identityMapMapedMemory(MEM_UART0);
-    // identityMapMapedMemory(MEM_CLINT);
-    // identityMapMapedMemory(MEM_PLIC);
-    // identityMapMapedMemory(MEM_VIRTIO);
+    // Identity map memory mapped devices for which we find a driver
+    CHECKED(forAllDeviceTreeNodesDo(identityMapDeviceNode, NULL));
     setVirtualMemory(0, kernel_page_table);
     unlockSpinLock(&kernel_page_table_lock);
     KERNEL_SUBSUCCESS("Initialized kernel virtual memory");

@@ -37,7 +37,7 @@ static Driver* findDriverForCompat(const char* comp) {
     return NULL;
 }
 
-static Driver* findDriverForNode(DeviceTreeNode* node) {
+Driver* findDriverForNode(DeviceTreeNode* node) {
     Driver* driver = NULL;
     DeviceTreeProperty* prop = findNodeProperty(node, "compatible");
     if (prop != NULL) {
