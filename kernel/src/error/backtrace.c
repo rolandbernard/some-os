@@ -58,11 +58,12 @@ _Unwind_Reason_Code unwindTracingFunction(struct _Unwind_Context *ctx, void *uda
 }
 
 void logBacktrace() {
-    if (initialized) {
-        UnwindTraceData data = {
-            .depth = 0,
-        };
-        _Unwind_Backtrace(unwindTracingFunction, &data);
+    if (!initialized) {
+        initBacktrace();
     }
+    UnwindTraceData data = {
+        .depth = 0,
+    };
+    _Unwind_Backtrace(unwindTracingFunction, &data);
 }
 

@@ -358,6 +358,8 @@ UartTtyDevice* createUartTtyDevice(void* uart, UartWriteFunction write, UartRead
     dev->ctrl.cc[VSUSP] = '\x1a';
     dev->ctrl.cc[VTIME] = 0;
     dev->ctrl.cc[VMIN] = 1;
+    dev->last_byte = 0;
+    dev->line_delim_count = 0;
     dev->process_group = 1; // Just give it to the init process
     return dev;
 }

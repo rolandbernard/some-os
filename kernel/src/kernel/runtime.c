@@ -25,9 +25,6 @@ void runtimeInit(uint8_t* dtb) {
     clearBss();
     boot_state = BOOTED;
     memoryFence();
-#ifdef DEBUG
-    initBacktrace();
-#endif
     kernelInit(dtb);
 }
 

@@ -88,6 +88,7 @@ static Error initDeviceFor(DeviceTreeNode* node) {
         return simpleError(ENXIO);
     }
     Uart16550* dev = kalloc(sizeof(Uart16550));
+    initSpinLock(&dev->lock);
     dev->base_address = (uint8_t*)readPropertyU64(reg, 0);
     dev->interrupt = readPropertyU32OrDefault(findNodeProperty(node, "interrupts"), 0, 0);
     dev->ref_clock = readPropertyU32OrDefault(findNodeProperty(node, "clock-frequency"), 0, 0);
@@ -99,7 +100,7 @@ static Error initDeviceFor(DeviceTreeNode* node) {
 Error registerDriverUart16550() {
     Driver* driver = kalloc(sizeof(Driver));
     driver->name = "uart16550";
-    driver->flags = DRIVER_FLAGS_MMIO;
+    driver->flags = DRIVER_FLAGS_MMIO | DRIVER_FLAGS_STDOUT;
     driver->check = checkDeviceCompatibility;
     driver->init = initDeviceFor;
     registerDriver(driver);

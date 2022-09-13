@@ -33,7 +33,7 @@ void registerDevice(Device* device) {
     device->name_id = getDeviceNameId(device->name);
     if (device_count == device_capacity) {
         device_capacity = device_capacity == 0 ? 8 : device_capacity * 4 / 3;
-        devices = krealloc(devices, device_capacity);
+        devices = krealloc(devices, device_capacity * sizeof(Device*));
     }
     devices[device_count] = device;
     device_count++;
@@ -95,6 +95,8 @@ CharDevice* getStdoutDevice() {
 
 Error initStdoutDevice() {
     if (isError(initDriversForStdoutDevice())) {
+        KERNEL_WARNING("Failed to find stdout in the device tree");
+        // This should really not happen anymore
         return initBoardStdoutDevice();
     } else {
         return simpleError(SUCCESS);

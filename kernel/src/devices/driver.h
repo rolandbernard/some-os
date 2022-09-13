@@ -12,6 +12,7 @@ typedef enum {
     DRIVER_FLAGS_NONE = 0,
     DRIVER_FLAGS_INTERRUPT = (1 << 0), // These are initialized earlier
     DRIVER_FLAGS_MMIO = (1 << 1), // These must have there memory regions mapped first
+    DRIVER_FLAGS_STDOUT = (1 << 2), // If no stdout is specified, this driver may be chosen
 } DriverFlags;
 
 typedef struct Driver_s {
