@@ -10,19 +10,14 @@
 
 typedef struct {
     volatile uint8_t* base_address;
+    uint32_t ref_clock;
+    uint32_t reg_shift;
     ExternalInterrupt interrupt;
     SpinLock lock;
-    bool initialized;
 } Uart16550;
 
 // Initialize the given UART device
 Error initUart16550(Uart16550* uart);
-
-// Write a single character to the device
-Error writeUart16550(Uart16550* uart, char value);
-
-// Read a single character from the device, return NO_DATA if no data is available
-Error readUart16550(Uart16550* uart, char* value);
 
 Error registerUart16550(Uart16550* uart);
 

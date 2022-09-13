@@ -13,6 +13,8 @@ static Uart16550 serial_mmio;
 Error initBoardStdoutDevice() {
     // Initialize the uart device to enable logging
     serial_mmio.base_address = (void*)memory_map[MEM_UART0].base;
+    serial_mmio.interrupt = 10;
+    serial_mmio.ref_clock = 3686400;
     return initUart16550(&serial_mmio);
 }
 

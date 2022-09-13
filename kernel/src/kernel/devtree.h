@@ -41,8 +41,14 @@ DeviceTreeProperty* findNodeProperty(DeviceTreeNode* node, const char* prop);
 
 uint32_t readPropertyU32(DeviceTreeProperty* prop, size_t n);
 
-uint32_t readPropertyU64(DeviceTreeProperty* prop, size_t n);
+uint64_t readPropertyU64(DeviceTreeProperty* prop, size_t n);
 
 const char* readPropertyString(DeviceTreeProperty* prop, size_t n);
+
+uint32_t readPropertyU32OrDefault(DeviceTreeProperty* prop, size_t n, uint32_t def);
+
+uint64_t readPropertyU64OrDefault(DeviceTreeProperty* prop, size_t n, uint64_t def);
+
+const char* readPropertyStringOrDefault(DeviceTreeProperty* prop, size_t n, const char* def);
 
 #endif

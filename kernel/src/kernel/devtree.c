@@ -173,7 +173,7 @@ uint32_t readPropertyU32(DeviceTreeProperty* prop, size_t n) {
     return read32be(prop->value + 4 * n);
 }
 
-uint32_t readPropertyU64(DeviceTreeProperty* prop, size_t n) {
+uint64_t readPropertyU64(DeviceTreeProperty* prop, size_t n) {
     return read64be(prop->value + 8 * n);
 }
 
@@ -187,5 +187,18 @@ const char* readPropertyString(DeviceTreeProperty* prop, size_t n) {
         n--;
     }
     return off != prop->len ? (char*)prop->value + off : NULL;
+}
+
+uint32_t readPropertyU32OrDefault(DeviceTreeProperty* prop, size_t n, uint32_t def) {
+    return prop == NULL || prop->len <= 4 * n ? def : readPropertyU32(prop, n);
+}
+
+uint64_t readPropertyU64OrDefault(DeviceTreeProperty* prop, size_t n, uint64_t def) {
+    return prop == NULL || prop->len <= 8 * n ? def : readPropertyU64(prop, n);
+}
+
+const char* readPropertyStringOrDefault(DeviceTreeProperty* prop, size_t n, const char* def) {
+    const char* value = prop == NULL ? NULL : readPropertyString(prop, n);
+    return value == NULL ? def : value;
 }
 

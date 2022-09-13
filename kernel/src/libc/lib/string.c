@@ -36,3 +36,7 @@ size_t strlen(const char* s) {
     return length;
 }
 
+char* strstr(const char* s1, const char* s2) {
+    
+}
+
