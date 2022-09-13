@@ -1,7 +1,7 @@
 
 #include <stddef.h>
 
-#include "memory/memmap.h"
+#include "bsp/virt/memmap.h"
 
 const MemmapEntry memory_map[] = {
     [MEM_DEBUG]     = {        0x0,      0x100 },

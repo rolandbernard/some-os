@@ -2,49 +2,33 @@
 #include "devices/virtio/virtio.h"
 
 #include "devices/virtio/block.h"
-#include "memory/memmap.h"
 #include "memory/virtmem.h"
 #include "memory/virtptr.h"
+#include "interrupt/plic.h"
 
-static VirtIODevice* devices[VIRTIO_DEVICE_COUNT];
-
-typedef Error (*VirtIOInitFunction)(int id, volatile VirtIODeviceLayout* base, VirtIODevice** out);
-typedef Error (*VirtIORegisterFunction)(VirtIODevice* dev);
-
-typedef struct {
-    VirtIOInitFunction init;
-    const char* name;
-} VirtIODeviceInitEntry;
-
-static const VirtIODeviceInitEntry device_inits[VIRTIO_DEVICE_TYPE_END] = {
-    [VIRTIO_BLOCK] = {
-        .init = initVirtIOBlockDevice,
-        .name = "block",
-    },
-};
-
-Error initVirtIODevices() {
-    for (int i = 0; i < VIRTIO_DEVICE_COUNT; i++) {
-        volatile VirtIODeviceLayout* address =
-            (VirtIODeviceLayout*)(memory_map[MEM_VIRTIO].base + VIRTIO_MEM_STROBE * i);
-        VirtIODeviceType type = address->device_id;
-        if (address->magic_value == VIRTIO_MAGIC_NUMBER && type != 0) {
-            if (type < VIRTIO_DEVICE_TYPE_END && device_inits[type].init != NULL) {
-                Error error = device_inits[type].init(i, address, devices + i);
-                if (isError(error)) {
-                    KERNEL_ERROR(
-                        "Failed to initialize VirtIO %s device %i: %s", device_inits[type].name, i,
-                        getErrorMessage(error)
-                    );
-                } else {
-                    KERNEL_SUBSUCCESS("Initialized VirtIO %s device %i", device_inits[type].name, i);
-                }
+Error initVirtIODevice(uintptr_t base_address, ExternalInterrupt itr_id) {
+    volatile VirtIODeviceLayout* address = (VirtIODeviceLayout*)base_address;
+    VirtIODeviceType type = address->device_id;
+    if (address->magic_value == VIRTIO_MAGIC_NUMBER && type != 0) {
+        if (type == VIRTIO_BLOCK) {
+            Error error = initVirtIOBlockDevice(address, itr_id);
+            if (isError(error)) {
+                KERNEL_ERROR(
+                    "Failed to initialize VirtIO block device at %p: %s",
+                    base_address, getErrorMessage(error)
+                );
+                return error;
             } else {
-                KERNEL_WARNING("Unknown VirtIO device %i", i);
+                KERNEL_SUBSUCCESS("Initialized VirtIO block device %p", base_address);
+                return simpleError(SUCCESS);
             }
+        } else {
+            KERNEL_WARNING("Unsupported VirtIO device type %i at %p", type, base_address);
+            return simpleError(ENOTSUP);
         }
+    } else {
+        return someError(SUCCESS, "No device connected");
     }
-    return simpleError(SUCCESS);
 }
 
 Error setupVirtIOQueue(VirtIODevice* device) {
@@ -100,5 +84,9 @@ void sendRequestAt(VirtIODevice* device, uint16_t descriptor) {
     device->queue->available.index++;
     memoryFence();
     device->mmio->queue_notify = 0;
+}
+
+Error registerDriverVirtIO() {
+    return simpleError(ENOSYS);
 }
 

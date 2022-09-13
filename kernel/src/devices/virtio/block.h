@@ -5,6 +5,7 @@
 
 #include "devices/virtio/virtio.h"
 #include "task/spinlock.h"
+#include "interrupt/plic.h"
 
 #define BLOCK_SECTOR_SIZE 512
 #define BLOCK_MAX_REQUESTS (1 << 5)
@@ -104,7 +105,7 @@ typedef struct {
     bool read_only;
 } VirtIOBlockDevice;
 
-Error initVirtIOBlockDevice(int id, volatile VirtIODeviceLayout* base, VirtIODevice** output);
+Error initVirtIOBlockDevice(volatile VirtIODeviceLayout* base, ExternalInterrupt itr_id);
 
 Error registerVirtIOBlockDevice(VirtIOBlockDevice* dev);
 

@@ -9,12 +9,6 @@ typedef uint8_t InterruptPriority;
 typedef uint32_t ExternalInterrupt;
 typedef void (*ExternalInterruptFunction)(ExternalInterrupt id, void* udata);
 
-ExternalInterrupt getVirtIoInterruptId(int dev);
-
-ExternalInterrupt getUartInterruptId();
-
-Error initPlic();
-
 void handleExternalInterrupt();
 
 void setInterruptFunction(ExternalInterrupt id, ExternalInterruptFunction function, void* udata);
@@ -32,5 +26,7 @@ void setPlicPriorityThreshold(InterruptPriority priority);
 ExternalInterrupt nextInterrupt();
 
 void completeInterrupt(ExternalInterrupt id);
+
+Error registerDriverPlic();
 
 #endif

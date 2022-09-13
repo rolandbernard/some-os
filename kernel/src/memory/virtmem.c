@@ -1,7 +1,6 @@
 
 #include "memory/virtmem.h"
 
-#include "memory/memmap.h"
 #include "error/log.h"
 
 extern char __text_start[];
@@ -16,10 +15,10 @@ extern char __stack_top[];
 PageTable* kernel_page_table;
 SpinLock kernel_page_table_lock;
 
-static void identityMapMapedMemory(MemmapType type) {
-    MemmapEntry entry = memory_map[type];
-    mapPageRange(kernel_page_table, entry.base, entry.base + entry.size, entry.base, PAGE_ENTRY_READ | PAGE_ENTRY_WRITE);
-}
+// static void identityMapMapedMemory(MemmapType type) {
+//     MemmapEntry entry = memory_map[type];
+//     mapPageRange(kernel_page_table, entry.base, entry.base + entry.size, entry.base, PAGE_ENTRY_READ | PAGE_ENTRY_WRITE);
+// }
 
 Error initKernelVirtualMemory() {
     lockSpinLock(&kernel_page_table_lock);
@@ -37,11 +36,12 @@ Error initKernelVirtualMemory() {
         kernel_page_table, (uintptr_t)__data_start, (uintptr_t)__stack_top,
         (uintptr_t)__data_start, PAGE_ENTRY_AD_RW
     );
-    // Identity map UART
-    identityMapMapedMemory(MEM_UART0);
-    identityMapMapedMemory(MEM_CLINT);
-    identityMapMapedMemory(MEM_PLIC);
-    identityMapMapedMemory(MEM_VIRTIO);
+    // Identity map Devices
+    // TODO: use device tree to map all
+    // identityMapMapedMemory(MEM_UART0);
+    // identityMapMapedMemory(MEM_CLINT);
+    // identityMapMapedMemory(MEM_PLIC);
+    // identityMapMapedMemory(MEM_VIRTIO);
     setVirtualMemory(0, kernel_page_table);
     unlockSpinLock(&kernel_page_table_lock);
     KERNEL_SUBSUCCESS("Initialized kernel virtual memory");

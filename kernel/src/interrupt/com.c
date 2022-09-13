@@ -5,8 +5,7 @@
 
 #include "error/log.h"
 #include "error/panic.h"
-#include "kernel/init.h"
-#include "memory/memmap.h"
+#include "kernel/kernel.h"
 #include "task/harts.h"
 #include "task/schedule.h"
 #include "task/syscall.h"
@@ -17,14 +16,6 @@ static UnsafeLock message_write_lock;
 static UnsafeLock message_read_lock;
 static MessageType message_type;
 static void* message_data;
-
-void sendMachineSoftwareInterrupt(int hart) {
-    *(volatile uint32_t*)(memory_map[MEM_CLINT].base + hart * 0x4) = ~0;
-}
-
-void clearMachineSoftwareInterrupt(int hart) {
-    *(volatile uint32_t*)(memory_map[MEM_CLINT].base + hart * 0x4) = 0;
-}
 
 void sendMessageTo(int hartid, MessageType type, void* data) {
     Task* task = criticalEnter();

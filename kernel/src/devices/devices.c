@@ -6,28 +6,9 @@
 #include "devices/serial/uart16550.h"
 #include "devices/virtio/block.h"
 #include "devices/virtio/virtio.h"
+#include "devices/driver.h"
 #include "memory/kalloc.h"
-#include "memory/memmap.h"
 #include "util/text.h"
-
-extern Error initBoardBaselineDevices();
-extern Error initBoardDevices();
-
-static bool base_init = false;
-
-Error initBaselineDevices() {
-    if (!base_init) {
-        CHECKED(initBoardBaselineDevices());
-        base_init = true;
-    }
-    return simpleError(SUCCESS);
-}
-
-Error initDevices() {
-    CHECKED(initBoardDevices());
-    CHECKED(initVirtIODevices());
-    return simpleError(SUCCESS);
-}
 
 static SpinLock device_lock;
 static DeviceId next_device_id = 1;
@@ -86,21 +67,22 @@ Device* getDeviceNamed(const char* name, size_t name_id) {
 Device* getNthDevice(size_t nth, bool* fst) {
     lockSpinLock(&device_lock);
     for (size_t i = 0; i < device_count; i++) {
-        if (nth == 0) {
-            Device* dev = devices[i];
-            *fst = devices[i]->name_id == 0;
-            unlockSpinLock(&device_lock);
-            return dev;
-        }
-        nth--;
-        if (devices[i]->name_id == 0) {
+        Device* dev = devices[i];
+        if (dev->type != DEVICE_INTERNAL) {
             if (nth == 0) {
-                Device* dev = devices[i];
-                *fst = false;
+                *fst = devices[i]->name_id == 0;
                 unlockSpinLock(&device_lock);
                 return dev;
             }
             nth--;
+            if (devices[i]->name_id == 0) {
+                if (nth == 0) {
+                    *fst = false;
+                    unlockSpinLock(&device_lock);
+                    return dev;
+                }
+                nth--;
+            }
         }
     }
     unlockSpinLock(&device_lock);
@@ -109,5 +91,21 @@ Device* getNthDevice(size_t nth, bool* fst) {
 
 CharDevice* getDefaultTtyDevice() {
     return (CharDevice*)getDeviceNamed("tty", 0);
+}
+
+Error initStdoutDevice() {
+    if (isError(initDriversForStdoutDevice())) {
+        return initBoardStdoutDevice();
+    } else {
+        return simpleError(SUCCESS);
+    }
+}
+
+Error initInterruptDevice() {
+    return initDriversForStdoutDevice();
+}
+
+Error initDevices() {
+    return initDriversForDeviceTreeNodes();
 }
 

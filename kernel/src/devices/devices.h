@@ -5,6 +5,7 @@
 #include "error/error.h"
 
 typedef enum {
+    DEVICE_INTERNAL,
     DEVICE_BLOCK,
     DEVICE_CHAR,
 } DeviceType;
@@ -52,12 +53,6 @@ typedef struct CharDevice_s {
     const CharDeviceFunctions* functions;
 } CharDevice;
 
-// Initialize all devices that must be started befor initializing the kernel
-Error initBaselineDevices();
-
-// Initialize all devices
-Error initDevices();
-
 void registerDevice(Device* device);
 
 Device* getDeviceWithId(DeviceId id);
@@ -67,7 +62,16 @@ Device* getDeviceNamed(const char* name, size_t name_id);
 // This is only for use with the devfs implementation
 Device* getNthDevice(size_t nth, bool* fst);
 
-// Get the device to be used for kernel input/output
+// Get the device to be used for kernel output
 CharDevice* getDefaultTtyDevice();
+
+// Initialize the device for kernel stdout
+Error initStdoutDevice();
+
+Error initBoardStdoutDevice();
+
+Error initInterruptDevice();
+
+Error initDevices();
 
 #endif

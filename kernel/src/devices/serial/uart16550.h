@@ -6,9 +6,11 @@
 
 #include "error/error.h"
 #include "task/spinlock.h"
+#include "interrupt/plic.h"
 
 typedef struct {
     volatile uint8_t* base_address;
+    ExternalInterrupt interrupt;
     SpinLock lock;
     bool initialized;
 } Uart16550;
@@ -23,5 +25,7 @@ Error writeUart16550(Uart16550* uart, char value);
 Error readUart16550(Uart16550* uart, char* value);
 
 Error registerUart16550(Uart16550* uart);
+
+Error registerDriverUart16550();
 
 #endif

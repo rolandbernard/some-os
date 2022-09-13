@@ -27,6 +27,8 @@ static const VfsNodeFunctions file_functions = {
 
 static VfsFileType vfsTypeForDevice(Device* device) {
     switch (device->type) {
+        case DEVICE_INTERNAL:
+            return VFS_TYPE_UNKNOWN;
         case DEVICE_BLOCK:
             return VFS_TYPE_BLOCK;
         case DEVICE_CHAR:

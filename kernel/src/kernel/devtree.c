@@ -8,7 +8,6 @@
 #include "memory/kalloc.h"
 #include "util/util.h"
 
-#define DEBUG_LOG_DEVTREE
 #ifdef DEBUG_LOG_DEVTREE
 #define DEBUG_DEVTREE(FMT, ...) logKernelMessage(STYLE_DEBUG FMT "\e[m" __VA_OPT__(,) __VA_ARGS__);
 #else
@@ -51,7 +50,7 @@ static uint8_t* parseDeviceTreeNode(uint8_t* dt_struct, char* dt_strings, Device
     memset(indent, ' ', 2 * depth);
     indent[2 * depth] = 0;
 #endif
-    node->device = NULL;
+    node->driver = NULL;
     node->prop_count = 0;
     node->props = NULL;
     node->node_count = 0;
@@ -168,5 +167,25 @@ DeviceTreeProperty* findNodeProperty(DeviceTreeNode* node, const char* prop) {
         }
     }
     return NULL;
+}
+
+uint32_t readPropertyU32(DeviceTreeProperty* prop, size_t n) {
+    return read32be(prop->value + 4 * n);
+}
+
+uint32_t readPropertyU64(DeviceTreeProperty* prop, size_t n) {
+    return read64be(prop->value + 8 * n);
+}
+
+const char* readPropertyString(DeviceTreeProperty* prop, size_t n) {
+    size_t off = 0;
+    while (off < prop->len && n > 0) {
+        while (prop->value[off] != 0) {
+            off++;
+        }
+        off++;
+        n--;
+    }
+    return off != prop->len ? (char*)prop->value + off : NULL;
 }
 

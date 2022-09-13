@@ -19,7 +19,7 @@ typedef struct {
 
 typedef struct DeviceTreeNode_s {
     char* name;
-    Device* device;
+    struct Driver* driver;
     size_t prop_count;
     DeviceTreeProperty* props;
     size_t node_count;
@@ -38,5 +38,11 @@ Error initDeviceTree(uint8_t* dtb);
 DeviceTreeNode* findNodeAtPath(const char* path);
 
 DeviceTreeProperty* findNodeProperty(DeviceTreeNode* node, const char* prop);
+
+uint32_t readPropertyU32(DeviceTreeProperty* prop, size_t n);
+
+uint32_t readPropertyU64(DeviceTreeProperty* prop, size_t n);
+
+const char* readPropertyString(DeviceTreeProperty* prop, size_t n);
 
 #endif

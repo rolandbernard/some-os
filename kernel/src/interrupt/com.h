@@ -1,16 +1,14 @@
 #ifndef _INT_COM_H_
 #define _INT_COM_H_
 
+#include "interrupt/clint.h"
+
 typedef enum {
     NONE,
     INITIALIZE_HARTS,
     KERNEL_PANIC,
     YIELD_TASK,
 } MessageType;
-
-void sendMachineSoftwareInterrupt(int hart);
-
-void clearMachineSoftwareInterrupt(int hart);
 
 void sendMessageTo(int hartid, MessageType type, void* data);
 

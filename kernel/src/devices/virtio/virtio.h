@@ -10,7 +10,6 @@
 #include "memory/pagealloc.h"
 #include "memory/virtptr.h"
 
-#define VIRTIO_DEVICE_COUNT 8
 #define VIRTIO_MAGIC_NUMBER 0x74726976
 #define VIRTIO_MEM_STROBE 0x1000
 #define VIRTIO_RING_SIZE (1 << 7)
@@ -146,8 +145,6 @@ typedef struct {
     uint16_t ack_index;
 } VirtIODevice;
 
-Error initVirtIODevices();
-
 Error setupVirtIOQueue(VirtIODevice* device);
 
 uint16_t fillNextDescriptor(VirtIODevice* device, VirtIODescriptor descriptor);
@@ -155,5 +152,7 @@ uint16_t fillNextDescriptor(VirtIODevice* device, VirtIODescriptor descriptor);
 uint16_t addDescriptorsFor(VirtIODevice* device, VirtPtr buffer, size_t length, VirtIODescriptorFlags flags, bool write);
 
 void sendRequestAt(VirtIODevice* device, uint16_t descriptor);
+
+Error registerDriverVirtIO();
 
 #endif

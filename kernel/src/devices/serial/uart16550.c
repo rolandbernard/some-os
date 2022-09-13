@@ -80,10 +80,14 @@ Error registerUart16550(Uart16550* uart) {
     UartTtyDevice* dev = createUartTtyDevice(
         uart, (UartWriteFunction)writeUart16550, (UartReadFunction)readUart16550
     );
-    ExternalInterrupt itr_id = getUartInterruptId();
+    ExternalInterrupt itr_id = uart->interrupt;
     setInterruptFunction(itr_id, handleInterrupt, dev);
     setInterruptPriority(itr_id, 1);
     registerDevice((Device*)dev);
     return simpleError(SUCCESS);
+}
+
+Error registerDriverUart16550() {
+    return simpleError(ENOSYS);
 }
 
