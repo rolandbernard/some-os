@@ -1,4 +1,5 @@
 
+#include <stdbool.h>
 #include <stddef.h>
 
 int strcmp(const char* s1, const char* s2) {
@@ -37,6 +38,21 @@ size_t strlen(const char* s) {
 }
 
 char* strstr(const char* s1, const char* s2) {
-    
+    while (*s1 != 0) {
+        const char* st1 = s1;
+        const char* st2 = s2;
+        while (*st1 != 0 && *st2 != 0) {
+            if (*st1 != *st2) {
+                break;
+            }
+            st1++;
+            st2++;
+        }
+        if (*st2 == 0) {
+            return (char*)s1;
+        }
+        s1++;
+    }
+    return NULL;
 }
 

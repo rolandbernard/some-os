@@ -8,8 +8,14 @@ typedef bool (*DriverCompatibilityCheck)(const char* name);
 
 typedef Error (*DriverInitialization)(DeviceTreeNode* device_node);
 
-typedef struct {
+typedef enum {
+    DRIVER_FLAGS_NONE = 0,
+    DRIVER_FLAGS_INTERRUPT = (1 << 0), // These are initialized earlier
+} DriverFlags;
+
+typedef struct Driver_s {
     const char* name;
+    DriverFlags flags;
     DriverCompatibilityCheck check;
     DriverInitialization init;
 } Driver;
@@ -18,11 +24,9 @@ Error registerAllDrivers();
 
 void registerDriver(Driver* driver);
 
-Driver* findDriverForNode(DeviceTreeNode* node);
-
 Error initDriversForStdoutDevice();
 
-Error initDriversForInterruptDevice();
+Error initDriversForInterruptDevices();
 
 Error initDriversForDeviceTreeNodes();
 

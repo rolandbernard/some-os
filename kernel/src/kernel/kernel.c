@@ -47,17 +47,19 @@ Error initPrimaryHart() {
 void kernelMain();
 
 void kernelInit(uint8_t* dtb) {
+    // Initialize the page level allocator. (Needed for allocation)
+    KERNEL_INIT_TASK("Init page allocator", initPageAllocator());
     // Parse the device tree. (Needed for finding the output device)
     KERNEL_INIT_TASK("Initialize device tree", initDeviceTree(dtb));
     // Register drivers. (Needed for using the output device)
     KERNEL_INIT_TASK("Register drivers", registerAllDrivers());
-    // Initialize baseline devices (Kernel logs will not work before this)
-    KERNEL_INIT_TASK("Init baseline devices", initStdoutDevice());
-    // Initialize kernel systems
-    KERNEL_INIT_TASK("Init page allocator", initPageAllocator());
+    // Initialize interrupt devices. (Needed for using the other devices)
+    KERNEL_INIT_TASK("Init interrupt controller", initInterruptDevice());
+    // Initialize stdout device (Kernel logs will not work before the following)
+    KERNEL_INIT_TASK("Init stdout device", initStdoutDevice());
+    // Initialize the rest of the kernel
     KERNEL_INIT_TASK("Init kernel virtual memory", initKernelVirtualMemory());
     KERNEL_INIT_TASK("Init primary hart", initPrimaryHart());
-    KERNEL_INIT_TASK("Init interrupt controller", initInterruptDevice());
     // Wake up the remaining harts
     sendMessageToAll(INITIALIZE_HARTS, NULL);
     // Enqueue main process to start the init process

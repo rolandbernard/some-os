@@ -6,6 +6,7 @@
 
 #include "interrupt/plic.h"
 
+#include "devices/driver.h"
 #include "error/log.h"
 #include "memory/kalloc.h"
 #include "task/syscall.h"
@@ -119,13 +120,33 @@ void completeInterrupt(ExternalInterrupt id) {
     *(volatile ExternalInterrupt*)(plic_base_addr + 0x200004) = id;
 }
 
-Error initPlic() {
+static Error initPlic() {
     setPlicPriorityThreshold(0);
     KERNEL_SUBSUCCESS("Initialized PLIC");
     return simpleError(SUCCESS);
 }
 
+static bool checkDeviceCompatibility(const char* name) {
+    return strstr(name, "plic") != NULL;
+}
+
+static Error initDeviceFor(DeviceTreeNode* node) {
+    DeviceTreeProperty* reg = findNodeProperty(node, "reg");
+    if (reg == NULL) {
+        return simpleError(ENXIO);
+    }
+    plic_base_addr = readPropertyU64(reg, 0);
+    initPlic();
+    return simpleError(SUCCESS);
+}
+
 Error registerDriverPlic() {
-    return simpleError(ENOSYS);
+    Driver* driver = kalloc(sizeof(Driver));
+    driver->name = "riscv-plic";
+    driver->flags = DRIVER_FLAGS_INTERRUPT;
+    driver->check = checkDeviceCompatibility;
+    driver->init = initDeviceFor;
+    registerDriver(driver);
+    return simpleError(SUCCESS);
 }
 

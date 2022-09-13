@@ -85,19 +85,21 @@ static bool checkDeviceCompatibility(const char* name) {
 static Error initDeviceFor(DeviceTreeNode* node) {
     DeviceTreeProperty* reg = findNodeProperty(node, "reg");
     if (reg == NULL) {
-        return simpleError(ENODATA);
+        return simpleError(ENXIO);
     }
     Uart16550* dev = kalloc(sizeof(Uart16550));
     dev->base_address = (uint8_t*)readPropertyU64(reg, 0);
     dev->interrupt = readPropertyU32OrDefault(findNodeProperty(node, "interrupts"), 0, 0);
     dev->ref_clock = readPropertyU32OrDefault(findNodeProperty(node, "clock-frequency"), 0, 0);
     dev->reg_shift = readPropertyU32OrDefault(findNodeProperty(node, "reg-shift"), 0, 0);
+    registerUart16550(dev);
     return simpleError(SUCCESS);
 }
 
 Error registerDriverUart16550() {
     Driver* driver = kalloc(sizeof(Driver));
     driver->name = "uart16550";
+    driver->flags = DRIVER_FLAGS_NONE;
     driver->check = checkDeviceCompatibility;
     driver->init = initDeviceFor;
     registerDriver(driver);

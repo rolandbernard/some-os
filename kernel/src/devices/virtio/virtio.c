@@ -1,10 +1,14 @@
 
+#include <string.h>
+
 #include "devices/virtio/virtio.h"
 
+#include "devices/driver.h"
 #include "devices/virtio/block.h"
+#include "interrupt/plic.h"
+#include "memory/kalloc.h"
 #include "memory/virtmem.h"
 #include "memory/virtptr.h"
-#include "interrupt/plic.h"
 
 Error initVirtIODevice(uintptr_t base_address, ExternalInterrupt itr_id) {
     volatile VirtIODeviceLayout* address = (VirtIODeviceLayout*)base_address;
@@ -86,7 +90,26 @@ void sendRequestAt(VirtIODevice* device, uint16_t descriptor) {
     device->mmio->queue_notify = 0;
 }
 
+static bool checkDeviceCompatibility(const char* name) {
+    return strstr(name, "virtio,mmio") != NULL;
+}
+
+static Error initDeviceFor(DeviceTreeNode* node) {
+    DeviceTreeProperty* reg = findNodeProperty(node, "reg");
+    DeviceTreeProperty* intr = findNodeProperty(node, "interrupts");
+    if (reg == NULL || intr == NULL) {
+        return simpleError(ENXIO);
+    }
+    return initVirtIODevice(readPropertyU64(reg, 0), readPropertyU32(intr, 0));
+}
+
 Error registerDriverVirtIO() {
-    return simpleError(ENOSYS);
+    Driver* driver = kalloc(sizeof(Driver));
+    driver->name = "virtio-mmio";
+    driver->flags = DRIVER_FLAGS_NONE;
+    driver->check = checkDeviceCompatibility;
+    driver->init = initDeviceFor;
+    registerDriver(driver);
+    return simpleError(SUCCESS);
 }
 

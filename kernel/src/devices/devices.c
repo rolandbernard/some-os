@@ -32,7 +32,7 @@ void registerDevice(Device* device) {
     next_device_id++;
     device->name_id = getDeviceNameId(device->name);
     if (device_count == device_capacity) {
-        device_capacity = device_capacity == 0 ? 32 : device_capacity * 3 / 2;
+        device_capacity = device_capacity == 0 ? 8 : device_capacity * 4 / 3;
         devices = krealloc(devices, device_capacity);
     }
     devices[device_count] = device;
@@ -89,7 +89,7 @@ Device* getNthDevice(size_t nth, bool* fst) {
     return NULL;
 }
 
-CharDevice* getDefaultTtyDevice() {
+CharDevice* getStdoutDevice() {
     return (CharDevice*)getDeviceNamed("tty", 0);
 }
 
@@ -102,7 +102,7 @@ Error initStdoutDevice() {
 }
 
 Error initInterruptDevice() {
-    return initDriversForStdoutDevice();
+    return initDriversForInterruptDevices();
 }
 
 Error initDevices() {

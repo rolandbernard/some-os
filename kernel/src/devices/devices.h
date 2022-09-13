@@ -63,7 +63,7 @@ Device* getDeviceNamed(const char* name, size_t name_id);
 Device* getNthDevice(size_t nth, bool* fst);
 
 // Get the device to be used for kernel output
-CharDevice* getDefaultTtyDevice();
+CharDevice* getStdoutDevice();
 
 // Initialize the device for kernel stdout
 Error initStdoutDevice();

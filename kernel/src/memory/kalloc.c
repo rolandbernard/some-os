@@ -125,6 +125,7 @@ static void* basicKalloc(size_t size) {
         allocated = mem;
 #endif
     }
+    assert(ret != NULL); // This could be removed if we had better handling in the callers.
     return ret;
 }
 

@@ -19,7 +19,7 @@ static SpinLock kernel_log_lock;
 
 static Error logKernelMessageV(const char* fmt, va_list args) {
     // Logging happens to the default serial device
-    CharDevice* tty = getDefaultTtyDevice();
+    CharDevice* tty = getStdoutDevice();
     if (tty != NULL) {
         FORMAT_STRINGV(string, fmt, args);
         Error error = writeStringToTty(tty, string);

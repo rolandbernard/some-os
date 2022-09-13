@@ -137,6 +137,18 @@ Error initDeviceTree(uint8_t* dtb) {
     return simpleError(SUCCESS);
 }
 
+static Error forDeviceTreeNodesDo(DeviceTreeNode* node, DeviceTreeNodeCallback callback, void* udata) {
+    for (size_t i = 0; i < node->node_count; i++) {
+        CHECKED(callback(&node->nodes[i], udata));
+        forDeviceTreeNodesDo(&node->nodes[i], callback, udata);
+    }
+    return simpleError(SUCCESS);
+}
+
+Error forAllDeviceTreeNodesDo(DeviceTreeNodeCallback callback, void* udata) {
+    return forDeviceTreeNodesDo(&device_tree.root, callback, udata);
+}
+
 DeviceTreeNode* findNodeAtPath(const char* path) {
     DeviceTreeNode* current = &device_tree.root;
     while (*path != 0 && current != NULL) {
