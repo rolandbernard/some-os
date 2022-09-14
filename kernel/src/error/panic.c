@@ -11,6 +11,7 @@ UnsafeLock global_panic_lock;
 void notifyPanic() {
     sendMessageToAll(KERNEL_PANIC, NULL);
     panicUnlock();
+    panicFlushLogs();
 }
 
 noreturn void silentPanic() {

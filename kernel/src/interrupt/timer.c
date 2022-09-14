@@ -7,7 +7,6 @@
 
 #include "error/log.h"
 #include "memory/kalloc.h"
-#include "memory/memmap.h"
 #include "task/spinlock.h"
 #include "task/harts.h"
 
@@ -68,10 +67,6 @@ void clearTimeout(Timeout timeout) {
     unlockSpinLock(&timeout_lock);
 }
 
-void setTimeCmp(Time time) {
-    *(volatile Time*)(memory_map[MEM_CLINT].base + 0x4000 + 8 * getCurrentHartId()) = time;
-}
-
 void handleTimerInterrupt() {
     Time time = getTime();
     TimeoutEntry* to_call = NULL;
@@ -117,9 +112,5 @@ Time setPreemptionTimer(Task* task) {
         setTimeCmp(time + max);
     }
     return time;
-}
-
-Time getTime() {
-    return *(volatile Time*)(memory_map[MEM_CLINT].base + 0xbff8);
 }
 

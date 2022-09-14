@@ -8,7 +8,6 @@
 #include "memory/kalloc.h"
 #include "util/util.h"
 
-#define DEBUG_LOG_DEVTREE
 #ifdef DEBUG_LOG_DEVTREE
 #define DEBUG_DEVTREE(FMT, ...) logKernelMessage(STYLE_DEBUG FMT "\e[m" __VA_OPT__(,) __VA_ARGS__);
 #else
@@ -51,7 +50,7 @@ static uint8_t* parseDeviceTreeNode(uint8_t* dt_struct, char* dt_strings, Device
     memset(indent, ' ', 2 * depth);
     indent[2 * depth] = 0;
 #endif
-    node->device = NULL;
+    node->driver = NULL;
     node->prop_count = 0;
     node->props = NULL;
     node->node_count = 0;
@@ -138,6 +137,18 @@ Error initDeviceTree(uint8_t* dtb) {
     return simpleError(SUCCESS);
 }
 
+static Error forDeviceTreeNodesDo(DeviceTreeNode* node, DeviceTreeNodeCallback callback, void* udata) {
+    for (size_t i = 0; i < node->node_count; i++) {
+        CHECKED(callback(&node->nodes[i], udata));
+        forDeviceTreeNodesDo(&node->nodes[i], callback, udata);
+    }
+    return simpleError(SUCCESS);
+}
+
+Error forAllDeviceTreeNodesDo(DeviceTreeNodeCallback callback, void* udata) {
+    return forDeviceTreeNodesDo(&device_tree.root, callback, udata);
+}
+
 DeviceTreeNode* findNodeAtPath(const char* path) {
     DeviceTreeNode* current = &device_tree.root;
     while (*path != 0 && current != NULL) {
@@ -168,5 +179,38 @@ DeviceTreeProperty* findNodeProperty(DeviceTreeNode* node, const char* prop) {
         }
     }
     return NULL;
+}
+
+uint32_t readPropertyU32(DeviceTreeProperty* prop, size_t n) {
+    return read32be(prop->value + 4 * n);
+}
+
+uint64_t readPropertyU64(DeviceTreeProperty* prop, size_t n) {
+    return read64be(prop->value + 8 * n);
+}
+
+const char* readPropertyString(DeviceTreeProperty* prop, size_t n) {
+    size_t off = 0;
+    while (off < prop->len && n > 0) {
+        while (prop->value[off] != 0) {
+            off++;
+        }
+        off++;
+        n--;
+    }
+    return off != prop->len ? (char*)prop->value + off : NULL;
+}
+
+uint32_t readPropertyU32OrDefault(DeviceTreeProperty* prop, size_t n, uint32_t def) {
+    return prop == NULL || prop->len <= 4 * n ? def : readPropertyU32(prop, n);
+}
+
+uint64_t readPropertyU64OrDefault(DeviceTreeProperty* prop, size_t n, uint64_t def) {
+    return prop == NULL || prop->len <= 8 * n ? def : readPropertyU64(prop, n);
+}
+
+const char* readPropertyStringOrDefault(DeviceTreeProperty* prop, size_t n, const char* def) {
+    const char* value = prop == NULL ? NULL : readPropertyString(prop, n);
+    return value == NULL ? def : value;
 }
 

@@ -8,8 +8,8 @@
 #include "util/macro.h"
 #include "interrupt/syscall.h"
 
-// Initialize the log system
-Error initLogSystem();
+// Only for use after a panic. This will initialize the stdout device and write all cached logs.
+void panicFlushLogs();
 
 // Log the given message
 Error logKernelMessage(const char* fmt, ...);
@@ -45,7 +45,5 @@ void logKernelMessageWithDebugLocation(const char* fmt, ...);
 #define KERNEL_SUBSUCCESS(FMT, ...) KERNEL_INTERNAL_LOG(STYLE_SUB_SUCCESS "[>] " FMT __VA_OPT__(,) __VA_ARGS__)
 #define KERNEL_DEBUG(FMT, ...) KERNEL_INTERNAL_LOG(STYLE_DEBUG "[?] " FMT __VA_OPT__(,) __VA_ARGS__)
 #define KERNEL_DEBUG_LOC(FMT, ...) KERNEL_INTERNAL_LOG(STYLE_DEBUG_LOC "[?] " FMT __VA_OPT__(,) __VA_ARGS__)
-
-SyscallReturn printSyscall(TrapFrame* frame);
 
 #endif

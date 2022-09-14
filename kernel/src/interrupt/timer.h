@@ -5,6 +5,7 @@
 
 #include "error/error.h"
 #include "task/types.h"
+#include "interrupt/clint.h"
 
 #define CLOCKS_PER_SEC 10000000UL // 10Mhz
 
@@ -14,10 +15,6 @@ typedef void (*TimeoutFunction)(Time time, void* udata);
 void handleTimerInterrupt();
 
 Time setPreemptionTimer(Task* task);
-
-Time getTime();
-
-void setTimeCmp(Time time);
 
 Timeout setTimeout(Time delay, TimeoutFunction function, void* udata);
 

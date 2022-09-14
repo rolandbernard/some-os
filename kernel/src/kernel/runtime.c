@@ -4,8 +4,7 @@
 
 #include "error/backtrace.h"
 #include "memory/virtmem.h"
-
-extern void kernelInit(uint8_t* dtb);
+#include "kernel/kernel.h"
 
 extern char __bss_start[];
 extern char __bss_end[];
@@ -26,9 +25,6 @@ void runtimeInit(uint8_t* dtb) {
     clearBss();
     boot_state = BOOTED;
     memoryFence();
-#ifdef DEBUG
-    initBacktrace();
-#endif
     kernelInit(dtb);
 }
 
