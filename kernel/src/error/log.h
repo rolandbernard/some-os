@@ -8,6 +8,9 @@
 #include "util/macro.h"
 #include "interrupt/syscall.h"
 
+// Only for use after a panic. This will initialize the stdout device and write all cached logs.
+void panicFlushLogs();
+
 // Log the given message
 Error logKernelMessage(const char* fmt, ...);
 
