@@ -93,7 +93,7 @@ static Error initDeviceFor(DeviceTreeNode* node) {
     dev->interrupt = readPropertyU32OrDefault(findNodeProperty(node, "interrupts"), 0, 0);
     dev->ref_clock = readPropertyU32OrDefault(findNodeProperty(node, "clock-frequency"), 0, 0);
     dev->reg_shift = readPropertyU32OrDefault(findNodeProperty(node, "reg-shift"), 0, 0);
-    registerUart16550(dev);
+    initUart16550(dev);
     return simpleError(SUCCESS);
 }
 

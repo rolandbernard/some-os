@@ -104,12 +104,12 @@ void disableInterrupt(ExternalInterrupt id) {
 
 void setInterruptPriority(ExternalInterrupt id, InterruptPriority priority) {
     priority &= 0x111; // Maximum priority is 7
-    *((volatile uint32_t*)plic_base_addr + id) = priority;;
+    *((volatile uint32_t*)plic_base_addr + id) = priority;
 }
 
 void setPlicPriorityThreshold(InterruptPriority priority) {
     priority &= 0x111; // Maximum priority is 7
-    *(volatile uint32_t*)(plic_base_addr + 0x200000) = priority;;
+    *(volatile uint32_t*)(plic_base_addr + 0x200000) = priority;
 }
 
 ExternalInterrupt nextInterrupt() {
