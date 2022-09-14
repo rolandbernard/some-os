@@ -4,10 +4,11 @@
 
 #include "files/minix/super.h"
 
-#include "files/minix/node.h"
 #include "files/minix/maps.h"
+#include "files/minix/node.h"
 #include "files/vfs/cache.h"
 #include "files/vfs/file.h"
+#include "files/vfs/fs.h"
 #include "memory/kalloc.h"
 
 size_t offsetForINode(const MinixVfsSuperblock* sb, uint32_t inode) {
@@ -96,7 +97,8 @@ static const VfsSuperblockFunctions funcs = {
     .free_node = (VfsSuperblockFreeNodeFunction)minixFreeNode,
 };
 
-Error createMinixVfsSuperblock(VfsFile* block_device, VirtPtr data, MinixVfsSuperblock** ret) {
+Error createMinixVfsSuperblock(VfsFile* block_device, VirtPtr data, VfsSuperblock** ret) {
+    assert(block_device != NULL);
     MinixVfsSuperblock* sb = kalloc(sizeof(MinixVfsSuperblock));
     size_t tmp_size;
     CHECKED(
@@ -119,8 +121,17 @@ Error createMinixVfsSuperblock(VfsFile* block_device, VirtPtr data, MinixVfsSupe
         CHECKED(minixReadNode(sb, 1, (MinixVfsNode**)&sb->base.root_node), dealloc(sb));
         vfsCacheInit(&sb->base.nodes);
         vfsFileCopy(block_device);
-        *ret = sb;
+        *ret = (VfsSuperblock*)sb;
         return simpleError(SUCCESS);
     }
+}
+
+Error registerFsDriverMinix() {
+    VfsFilesystemDriver* driver = kalloc(sizeof(VfsFilesystemDriver));
+    driver->name = "minix";
+    driver->flags = VFS_DRIVER_FLAGS_NONE;
+    driver->create_superblock = createMinixVfsSuperblock;
+    vfsRegisterFilesystemDriver(driver);
+    return simpleError(SUCCESS);
 }
 

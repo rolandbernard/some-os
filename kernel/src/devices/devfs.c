@@ -9,6 +9,7 @@
 #include "files/special/blkfile.h"
 #include "files/special/chrfile.h"
 #include "files/vfs/cache.h"
+#include "files/vfs/fs.h"
 #include "kernel/time.h"
 #include "memory/kalloc.h"
 #include "task/syscall.h"
@@ -198,7 +199,7 @@ static const VfsSuperblockFunctions sb_functions = {
     .free_node = deviceFsFreeNode,
 };
 
-DeviceFilesystem* createDeviceFilesystem() {
+Error createDeviceSuperblock(VfsFile* file, VirtPtr data, VfsSuperblock** out) {
     DeviceFilesystem* sb = zalloc(sizeof(DeviceFilesystem));
     sb->base.id = 0;
     sb->base.ref_count = 1;
@@ -206,6 +207,16 @@ DeviceFilesystem* createDeviceFilesystem() {
     sb->base.root_node = createDeviceFsRootDirNode(sb);
     initTaskLock(&sb->base.lock);
     vfsCacheInit(&sb->base.nodes);
-    return sb;
+    *out = (VfsSuperblock*)sb;
+    return simpleError(SUCCESS);
+}
+
+Error registerFsDriverDevfs() {
+    VfsFilesystemDriver* driver = kalloc(sizeof(VfsFilesystemDriver));
+    driver->name = "dev";
+    driver->flags = VFS_DRIVER_FLAGS_NOFILE;
+    driver->create_superblock = createDeviceSuperblock;
+    vfsRegisterFilesystemDriver(driver);
+    return simpleError(SUCCESS);
 }
 

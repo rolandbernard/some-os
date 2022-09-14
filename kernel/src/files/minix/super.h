@@ -10,6 +10,8 @@ size_t offsetForZone(size_t zone);
 
 Error minixWriteNode(MinixVfsSuperblock* sb, MinixVfsNode* write);
 
-Error createMinixVfsSuperblock(VfsFile* block_device, VirtPtr data, MinixVfsSuperblock** ret);
+Error createMinixVfsSuperblock(VfsFile* block_device, VirtPtr data, VfsSuperblock** ret);
+
+Error registerFsDriverMinix();
 
 #endif

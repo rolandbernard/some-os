@@ -73,6 +73,8 @@ void kernelMain() {
     assert(getCurrentTask()->frame.hart != NULL);
     // Initialize devices
     KERNEL_INIT_TASK("Init devices", initDevices());
+    // Register filesystem drivers
+    KERNEL_INIT_TASK("Register fs drivers", registerAllFilesystemDrivers());
     // Initialize virtual filesystem
     KERNEL_INIT_TASK("Init vfs", vfsInit(&global_file_system));
     // Mount device filesystem

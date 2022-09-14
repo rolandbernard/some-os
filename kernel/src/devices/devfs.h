@@ -9,6 +9,8 @@ typedef struct {
     VfsSuperblock base;
 } DeviceFilesystem;
 
-DeviceFilesystem* createDeviceFilesystem();
+Error createDeviceSuperblock(VfsFile* file, VirtPtr data, VfsSuperblock** out);
+
+Error registerFsDriverDevfs();
 
 #endif
