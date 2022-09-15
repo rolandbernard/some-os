@@ -151,7 +151,9 @@ static void unregisterProcess(Process* process) {
             }
         } else {
             process->tree.child_prev->tree.child_next = process->tree.child_next;
-            process->tree.child_next->tree.child_prev = process->tree.child_prev;
+            if (process->tree.child_next != NULL) {
+                process->tree.child_next->tree.child_prev = process->tree.child_prev;
+            }
         }
     } else {
         Process* child = process->tree.children;
