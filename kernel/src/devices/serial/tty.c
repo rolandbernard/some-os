@@ -354,8 +354,8 @@ UartTtyDevice* createUartTtyDevice(void* uart, UartWriteFunction write, UartRead
     dev->ctrl.cc[VEOL] = '\x00';
     dev->ctrl.cc[VINTR] = '\x05';
     dev->ctrl.cc[VKILL] = '\x15';
-    dev->ctrl.cc[VQUIT] = '\x1c';
-    dev->ctrl.cc[VSUSP] = '\x1a';
+    dev->ctrl.cc[VQUIT] = '\x06';
+    dev->ctrl.cc[VSUSP] = '\x14';
     dev->ctrl.cc[VTIME] = 0;
     dev->ctrl.cc[VMIN] = 1;
     dev->last_byte = 0;

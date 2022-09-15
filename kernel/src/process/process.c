@@ -37,8 +37,12 @@ static Pid next_pid = 1;
 static Process* global_first = NULL;
 SpinLock process_lock;
 
-#define WNOHANG 1
-#define WUNTRACED 2
+#define WNOHANG     0b001
+#define WUNTRACED   0b010
+#define WCONTINUED  0b100
+
+#define STATUS_STOPPED 1
+#define STATUS_RESUMED 2
 
 static Error basicProcessWait(Task* task) {
     size_t found = 0;
@@ -55,12 +59,17 @@ static Error basicProcessWait(Task* task) {
         ) {
             found++;
             lockSpinLock(&child->lock);
-            if (child->tasks == NULL) {
+            if (
+                child->tasks == NULL
+                || ((flags & WUNTRACED) != 0 && (child->status >> 16) == STATUS_STOPPED)
+                || ((flags & WCONTINUED) != 0 && (child->status >> 16) == STATUS_RESUMED)
+            ) {
                 unlockSpinLock(&child->lock);
                 writeInt(
                     virtPtrForTask(task->frame.regs[REG_ARGUMENT_2], task),
                     sizeof(int) * 8, child->status
                 );
+                child->status &= 0xffff;
                 task->times.user_child_time += child->times.user_time + child->times.user_child_time;
                 task->times.system_child_time += child->times.system_time + child->times.system_child_time;
                 task->frame.regs[REG_ARGUMENT_0] = child->pid;
@@ -303,14 +312,17 @@ void exitProcess(Process* process, Signal signal, int exit) {
 
 void stopProcess(Process* process, Signal signal) {
     lockSpinLock(&process->lock);
-    process->status = ((signal & 0xff) << 8);
+    process->status = ((signal & 0xff) << 8) | STATUS_STOPPED << 16;
+    if (process->tree.parent != NULL) {
+        addSignalToProcess(process->tree.parent, SIGCHLD);
+    }
     unlockSpinLock(&process->lock);
     moveAllProcessTasksToStateBut(process, STOPPED, NULL);
 }
 
 void continueProcess(Process* process, Signal signal) {
     lockSpinLock(&process->lock);
-    process->status = ((signal & 0xff) << 8);
+    process->status = ((signal & 0xff) << 8) | STATUS_RESUMED << 16;
     Task* current = process->tasks;
     while (current != NULL) {
         lockSpinLock(&current->sched.lock);
@@ -320,6 +332,9 @@ void continueProcess(Process* process, Signal signal) {
         }
         unlockSpinLock(&current->sched.lock);
         current = current->proc_next;
+    }
+    if (process->tree.parent != NULL) {
+        addSignalToProcess(process->tree.parent, SIGCHLD);
     }
     unlockSpinLock(&process->lock);
 }
