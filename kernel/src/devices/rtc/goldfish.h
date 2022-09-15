@@ -5,14 +5,6 @@
 #include <stdint.h>
 
 #include "error/error.h"
-#include "task/spinlock.h"
-#include "interrupt/plic.h"
-
-typedef struct {
-    volatile uint8_t* base_address;
-    ExternalInterrupt interrupt;
-    SpinLock lock;
-} GoldfishRtc;
 
 Error registerDriverGoldfishRtc();
 

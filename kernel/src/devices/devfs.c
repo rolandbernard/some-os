@@ -28,14 +28,13 @@ static const VfsNodeFunctions file_functions = {
 
 static VfsFileType vfsTypeForDevice(Device* device) {
     switch (device->type) {
-        case DEVICE_INTERNAL:
-            return VFS_TYPE_UNKNOWN;
         case DEVICE_BLOCK:
             return VFS_TYPE_BLOCK;
         case DEVICE_CHAR:
             return VFS_TYPE_CHAR;
+        default:
+            return VFS_TYPE_UNKNOWN;
     }
-    return VFS_TYPE_UNKNOWN;
 }
 
 static VfsNode* createDeviceFsDevNode(DeviceFilesystem* sb, Device* device) {
@@ -52,7 +51,7 @@ static VfsNode* createDeviceFsDevNode(DeviceFilesystem* sb, Device* device) {
     node->stat.size = 0;
     node->stat.block_size = 0;
     node->stat.blocks = 0;
-    Time time = getNanoseconds();
+    Time time = getNanosecondsWithFallback();
     node->stat.atime = time;
     node->stat.mtime = time;
     node->stat.ctime = time;
@@ -153,7 +152,7 @@ static VfsNode* createDeviceFsRootDirNode(DeviceFilesystem* sb) {
     node->stat.size = 0;
     node->stat.block_size = 0;
     node->stat.blocks = 0;
-    Time time = getNanoseconds();
+    Time time = getNanosecondsWithFallback();
     node->stat.atime = time;
     node->stat.mtime = time;
     node->stat.ctime = time;

@@ -178,7 +178,7 @@ VfsPipeNode* createPipeNode() {
     memset(&node->base.stat, 0, sizeof(VfsStat));
     // Everything is allowed.
     node->base.stat.mode = TYPE_MODE(VFS_TYPE_UNKNOWN) | 0777;
-    Time time = getNanoseconds();
+    Time time = getNanosecondsWithFallback();
     node->base.stat.atime = time;
     node->base.stat.mtime = time;
     node->base.stat.ctime = time;

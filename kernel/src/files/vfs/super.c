@@ -36,7 +36,7 @@ Error vfsSuperWriteNode(VfsNode* write) {
         return simpleError(SUCCESS);
     } else {
         lockTaskLock(&write->lock);
-        write->stat.ctime = getNanoseconds();
+        write->stat.ctime = getNanosecondsWithFallback();
         // This could also just be marked dirty and written only when closing the node.
         Error err = write->superblock->functions->write_node(write->superblock, write);
         unlockTaskLock(&write->lock);

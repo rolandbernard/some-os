@@ -1,13 +1,14 @@
 #ifndef _DEVICES_H_
 #define _DEVICES_H_
 
-#include "memory/virtptr.h"
 #include "error/error.h"
+#include "kernel/time.h"
+#include "memory/virtptr.h"
 
 typedef enum {
-    DEVICE_INTERNAL,
     DEVICE_BLOCK,
     DEVICE_CHAR,
+    DEVICE_RTC,
 } DeviceType;
 
 typedef int DeviceId;
@@ -52,6 +53,21 @@ typedef struct CharDevice_s {
     Device base;
     const CharDeviceFunctions* functions;
 } CharDevice;
+
+struct RtcDevice_s;
+
+typedef Error (*RtcDeviceGetTimeFunction)(struct RtcDevice_s* dev, Time* time);
+typedef Error (*RtcDeviceSetTimeFunction)(struct RtcDevice_s* dev, Time time);
+
+typedef struct {
+    RtcDeviceGetTimeFunction get_time;
+    RtcDeviceSetTimeFunction set_time;
+} RtcDeviceFunctions;
+
+typedef struct RtcDevice_s {
+    Device base;
+    const RtcDeviceFunctions* functions;
+} RtcDevice;
 
 void registerDevice(Device* device);
 

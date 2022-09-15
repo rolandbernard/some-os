@@ -274,7 +274,7 @@ static Error vfsCreateNewNode(
     }
     new->stat.rdev = device;
     new->stat.size = 0;
-    Time time = getNanoseconds();
+    Time time = getNanosecondsWithFallback();
     new->stat.atime = time;
     new->stat.mtime = time;
     new->stat.ctime = time;

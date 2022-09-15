@@ -3,14 +3,20 @@
 
 #include "stdint.h"
 
+#include "error/error.h"
+
 typedef uint64_t Time;
 
-uint32_t getUnixTime();
+uint32_t getUnixTimeWithFallback();
 
-void setUnixTime(uint32_t time);
+Error getUnixTime(uint32_t* time);
 
-Time getNanoseconds();
+Error setUnixTime(uint32_t time);
 
-void setNanoseconds(Time nanos);
+Time getNanosecondsWithFallback();
+
+Error getNanoseconds(Time* nanos);
+
+Error setNanoseconds(Time nanos);
 
 #endif
