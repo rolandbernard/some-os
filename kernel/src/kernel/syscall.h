@@ -5,6 +5,8 @@
 
 SyscallReturn timesSyscall(TrapFrame* frame);
 
-SyscallReturn nanosecondsSyscall(TrapFrame* frame);
+SyscallReturn getNanosecondsSyscall(TrapFrame* frame);
+
+SyscallReturn setNanosecondsSyscall(TrapFrame* frame);
 
 #endif
