@@ -9,6 +9,7 @@
 #include "files/special/blkfile.h"
 #include "files/special/chrfile.h"
 #include "files/vfs/cache.h"
+#include "files/vfs/fs.h"
 #include "kernel/time.h"
 #include "memory/kalloc.h"
 #include "task/syscall.h"
@@ -27,14 +28,13 @@ static const VfsNodeFunctions file_functions = {
 
 static VfsFileType vfsTypeForDevice(Device* device) {
     switch (device->type) {
-        case DEVICE_INTERNAL:
-            return VFS_TYPE_UNKNOWN;
         case DEVICE_BLOCK:
             return VFS_TYPE_BLOCK;
         case DEVICE_CHAR:
             return VFS_TYPE_CHAR;
+        default:
+            return VFS_TYPE_UNKNOWN;
     }
-    return VFS_TYPE_UNKNOWN;
 }
 
 static VfsNode* createDeviceFsDevNode(DeviceFilesystem* sb, Device* device) {
@@ -51,7 +51,7 @@ static VfsNode* createDeviceFsDevNode(DeviceFilesystem* sb, Device* device) {
     node->stat.size = 0;
     node->stat.block_size = 0;
     node->stat.blocks = 0;
-    Time time = getNanoseconds();
+    Time time = getNanosecondsWithFallback();
     node->stat.atime = time;
     node->stat.mtime = time;
     node->stat.ctime = time;
@@ -152,7 +152,7 @@ static VfsNode* createDeviceFsRootDirNode(DeviceFilesystem* sb) {
     node->stat.size = 0;
     node->stat.block_size = 0;
     node->stat.blocks = 0;
-    Time time = getNanoseconds();
+    Time time = getNanosecondsWithFallback();
     node->stat.atime = time;
     node->stat.mtime = time;
     node->stat.ctime = time;
@@ -198,7 +198,7 @@ static const VfsSuperblockFunctions sb_functions = {
     .free_node = deviceFsFreeNode,
 };
 
-DeviceFilesystem* createDeviceFilesystem() {
+Error createDeviceSuperblock(VfsFile* file, VirtPtr data, VfsSuperblock** out) {
     DeviceFilesystem* sb = zalloc(sizeof(DeviceFilesystem));
     sb->base.id = 0;
     sb->base.ref_count = 1;
@@ -206,6 +206,16 @@ DeviceFilesystem* createDeviceFilesystem() {
     sb->base.root_node = createDeviceFsRootDirNode(sb);
     initTaskLock(&sb->base.lock);
     vfsCacheInit(&sb->base.nodes);
-    return sb;
+    *out = (VfsSuperblock*)sb;
+    return simpleError(SUCCESS);
+}
+
+Error registerFsDriverDevfs() {
+    VfsFilesystemDriver* driver = kalloc(sizeof(VfsFilesystemDriver));
+    driver->name = "dev";
+    driver->flags = VFS_DRIVER_FLAGS_NOFILE;
+    driver->create_superblock = createDeviceSuperblock;
+    vfsRegisterFilesystemDriver(driver);
+    return simpleError(SUCCESS);
 }
 

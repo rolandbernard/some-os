@@ -872,6 +872,24 @@ static bool testGettimeofday() {
     return true;
 }
 
+static bool testTime() {
+    struct timeval tv;
+    ASSERT(gettimeofday(&tv, NULL) == 0);
+    ASSERT(tv.tv_sec + 10 >= time(NULL) && tv.tv_sec <= time(NULL) + 10);
+    return true;
+}
+
+static bool testSettimeofday() {
+    struct timeval start = { .tv_sec = 123456, .tv_usec = 654321 };
+    ASSERT(settimeofday(&start, NULL) == 0);
+    usleep(10000);
+    struct timeval end;
+    ASSERT(gettimeofday(&end, NULL) == 0);
+    ASSERT((start.tv_sec * 1000000 + start.tv_usec) + 5000 < (end.tv_sec * 1000000 + end.tv_usec));
+    ASSERT((start.tv_sec * 1000000 + start.tv_usec) + 20000 > (end.tv_sec * 1000000 + end.tv_usec));
+    return true;
+}
+
 typedef bool (*TestFunction)();
 
 typedef struct {
@@ -943,6 +961,8 @@ static bool runBasicSyscallTests() {
         TEST(testUmaskMkdir),
         TEST(testUmaskFork),
         TEST(testGettimeofday),
+        TEST(testTime),
+        TEST(testSettimeofday),
     };
     bool result = true;
     for (size_t i = 0; i < sizeof(tests) / sizeof(tests[0]); i++) {

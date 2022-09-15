@@ -68,21 +68,19 @@ Device* getNthDevice(size_t nth, bool* fst) {
     lockSpinLock(&device_lock);
     for (size_t i = 0; i < device_count; i++) {
         Device* dev = devices[i];
-        if (dev->type != DEVICE_INTERNAL) {
+        if (nth == 0) {
+            *fst = devices[i]->name_id == 0;
+            unlockSpinLock(&device_lock);
+            return dev;
+        }
+        nth--;
+        if (devices[i]->name_id == 0) {
             if (nth == 0) {
-                *fst = devices[i]->name_id == 0;
+                *fst = false;
                 unlockSpinLock(&device_lock);
                 return dev;
             }
             nth--;
-            if (devices[i]->name_id == 0) {
-                if (nth == 0) {
-                    *fst = false;
-                    unlockSpinLock(&device_lock);
-                    return dev;
-                }
-                nth--;
-            }
         }
     }
     unlockSpinLock(&device_lock);

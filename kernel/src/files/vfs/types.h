@@ -225,4 +225,17 @@ typedef struct {
     TaskLock lock;
 } VirtualFilesystem;
 
+typedef Error (*VfsSuperblockCreation)(VfsFile* file, VirtPtr data, VfsSuperblock** sb);
+
+typedef enum {
+    VFS_DRIVER_FLAGS_NONE = 0,
+    VFS_DRIVER_FLAGS_NOFILE = (1 << 0),
+} VfsFsDriverFlags;
+
+typedef struct {
+    const char* name;
+    VfsFsDriverFlags flags;
+    VfsSuperblockCreation create_superblock;
+} VfsFilesystemDriver;
+
 #endif

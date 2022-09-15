@@ -31,7 +31,11 @@ SyscallReturn timesSyscall(TrapFrame* frame) {
     SYSCALL_RETURN(TIMES_CLOCK_SCALING(getTime()));
 }
 
-SyscallReturn nanosecondsSyscall(TrapFrame* frame) {
-    SYSCALL_RETURN(getNanoseconds());
+SyscallReturn getNanosecondsSyscall(TrapFrame* frame) {
+    SYSCALL_RETURN(getNanosecondsWithFallback());
+}
+
+SyscallReturn setNanosecondsSyscall(TrapFrame* frame) {
+    SYSCALL_RETURN(-setNanoseconds(SYSCALL_ARG(0)).kind);
 }
 

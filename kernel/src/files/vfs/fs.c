@@ -274,7 +274,7 @@ static Error vfsCreateNewNode(
     }
     new->stat.rdev = device;
     new->stat.size = 0;
-    Time time = getNanoseconds();
+    Time time = getNanosecondsWithFallback();
     new->stat.atime = time;
     new->stat.mtime = time;
     new->stat.ctime = time;
@@ -586,21 +586,36 @@ Error vfsUmount(VirtualFilesystem* fs, Process* process, const char* path) {
     }
 }
 
+static size_t fsdrivers_count = 0;
+static size_t fsdrivers_capacity = 0;
+static VfsFilesystemDriver** fsdrivers;
+
+void vfsRegisterFilesystemDriver(VfsFilesystemDriver* driver) {
+    if (fsdrivers_count == fsdrivers_capacity) {
+        fsdrivers_capacity = fsdrivers_capacity == 0 ? 8 : fsdrivers_capacity * 4 / 3;
+        fsdrivers = krealloc(fsdrivers, fsdrivers_capacity * sizeof(VfsFilesystemDriver*));
+    }
+    fsdrivers[fsdrivers_count] = driver;
+    fsdrivers_count++;
+}
+
 Error vfsCreateSuperblock(
     VirtualFilesystem* fs, Process* process, const char* path, const char* type, VirtPtr data, VfsSuperblock** ret
 ) {
-    if (strcmp(type, "minix") == 0) {
-        VfsFile* file;
-        CHECKED(vfsOpenAt(fs, process, NULL, path, VFS_OPEN_READ, 0, &file));
-        Error err = createMinixVfsSuperblock(file, data, (MinixVfsSuperblock**)ret);
-        vfsFileClose(file);
-        return err;
-    } else if (strcmp(type, "dev") == 0) {
-        *ret = (VfsSuperblock*)createDeviceFilesystem();
-        return simpleError(SUCCESS);
-    } else {
-        return simpleError(EINVAL);
+    for (size_t i = 0; i < fsdrivers_count; i++) {
+        if (strcmp(type, fsdrivers[i]->name) == 0) {
+            VfsFile* file = NULL;
+            if ((fsdrivers[i]->flags & VFS_DRIVER_FLAGS_NOFILE) == 0) {
+                CHECKED(vfsOpenAt(fs, process, NULL, path, VFS_OPEN_READ, 0, &file));
+            }
+            Error err = fsdrivers[i]->create_superblock(file, data, ret);
+            if (file != NULL) {
+                vfsFileClose(file);
+            }
+            return err;
+        }
     }
+    return simpleError(EINVAL);
 }
 
 static Error basicCanAccess(VfsStat* stat, struct Process_s* process, VfsAccessFlags flags) {
@@ -658,6 +673,12 @@ Error vfsInit(VirtualFilesystem* fs) {
     initTaskLock(&fs->lock);
     fs->root_mounted = NULL;
     fs->tmp_mounted = NULL;
+    return simpleError(SUCCESS);
+}
+
+Error registerAllFilesystemDrivers() {
+    CHECKED(registerFsDriverDevfs());
+    CHECKED(registerFsDriverMinix());
     return simpleError(SUCCESS);
 }
 

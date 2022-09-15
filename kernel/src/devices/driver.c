@@ -1,6 +1,7 @@
 
 #include "devices/driver.h"
 
+#include "devices/rtc/goldfish.h"
 #include "devices/serial/uart16550.h"
 #include "devices/virtio/virtio.h"
 #include "interrupt/clint.h"
@@ -16,6 +17,7 @@ Error registerAllDrivers() {
     CHECKED(registerDriverClint());
     CHECKED(registerDriverPlic());
     CHECKED(registerDriverVirtIO());
+    CHECKED(registerDriverGoldfishRtc());
     return simpleError(SUCCESS);
 }
 
