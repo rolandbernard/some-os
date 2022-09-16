@@ -38,6 +38,7 @@ SyscallReturn openSyscall(TrapFrame* frame) {
             int fd = putNewFileDescriptor(
                 task->process, -1, (flags & VFS_OPEN_CLOEXEC) != 0 ? VFS_DESC_CLOEXEC : 0, file, false
             );
+            vfsFileClose(file);
             SYSCALL_RETURN(fd);
         }
     } else {
@@ -332,6 +333,8 @@ SyscallReturn pipeSyscall(TrapFrame* frame) {
     file_write->flags = VFS_FILE_WRITE;
     int pipe_read = putNewFileDescriptor(task->process, -1, 0, (VfsFile*)file_read, false);
     int pipe_write = putNewFileDescriptor(task->process, -1, 0, (VfsFile*)file_write, false);
+    vfsFileClose(file_read);
+    vfsFileClose(file_write);
     VirtPtr arr = virtPtrForTask(SYSCALL_ARG(0), task);
     writeIntAt(arr, sizeof(int) * 8, 0, pipe_read);
     writeIntAt(arr, sizeof(int) * 8, 1, pipe_write);

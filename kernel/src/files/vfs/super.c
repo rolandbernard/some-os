@@ -73,6 +73,8 @@ Error vfsSuperCopyNode(VfsNode* node) {
 
 Error vfsSuperCloseNode(VfsNode* node) {
     if (node->superblock == NULL) {
+        // This is a special file (e.g. pipe, fifo, char, block)
+        // These are different, because they are not cached.
         lockTaskLock(&node->lock);
         node->ref_count--;
         if (node->ref_count == 0) {

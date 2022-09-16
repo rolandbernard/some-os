@@ -232,22 +232,22 @@ typedef struct {
 static Error minixTruncZoneWalkCallback(uint32_t* zone, bool* changed, size_t position, size_t size, bool pre, bool post, void* udata) {
     MinixTruncRequest* request = (MinixTruncRequest*)udata;
     if (*zone != 0) {
-        if (request->length < position + size) {
-            if (!pre && !post) { // Zero the rest of the zone
-                size_t block_offset = request->length % position;
-                size_t tmp_size = MINIX_BLOCK_SIZE - block_offset;
-                assert(MINIX_BLOCK_SIZE < PAGE_SIZE);
-                CHECKED(vfsFileWriteAt(
-                    SUPER(request->file)->block_device, NULL, virtPtrForKernel(zero_page),
-                    offsetForZone(*zone) + block_offset, tmp_size, &tmp_size
-                ));
-            }
-        } else {
-            if (post) { // Free the zone in the filesystem zone map
+        if (request->length <= position) {
+            if (post) { // In this case, we don't need these blocks at all anymore
+                // Free the zone in the filesystem zone map
                 CHECKED(freeMinixZone(SUPER(request->file), *zone));
                 *zone = 0;
                 *changed = true;
             }
+        } else if (!pre && !post) {
+            // We still need part of this zone. Zero the slice we don't need anymore
+            size_t block_offset = request->length % position;
+            size_t tmp_size = MINIX_BLOCK_SIZE - block_offset;
+            assert(MINIX_BLOCK_SIZE < PAGE_SIZE);
+            CHECKED(vfsFileWriteAt(
+                SUPER(request->file)->block_device, NULL, virtPtrForKernel(zero_page),
+                offsetForZone(*zone) + block_offset, tmp_size, &tmp_size
+            ));
         }
     }
     return simpleError(SUCCESS);

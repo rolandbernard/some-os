@@ -93,6 +93,7 @@ static void vfsCacheInsertNewNode(VfsNodeCache* cache, VfsNode* node) {
     size_t idx = insertIndexHashTable(cache, node);
     assert(cache->nodes[idx] == EMPTY || cache->nodes[idx] == DELETED);
     cache->nodes[idx] = node;
+    cache->count++;
 }
 
 void vfsCacheUnlock(VfsNodeCache* cache) {
@@ -119,6 +120,7 @@ size_t vfsCacheCloseNode(VfsNodeCache* cache, VfsNode* node) {
         size_t idx = findIndexHashTable(cache, node->superblock->id, node->stat.id);
         assert(cache->nodes[idx] == node);
         cache->nodes[idx] = DELETED;
+        cache->count--;
     }
     size_t refs = node->ref_count;
     unlockTaskLock(&cache->lock);

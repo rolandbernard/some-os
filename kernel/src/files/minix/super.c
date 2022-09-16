@@ -84,7 +84,7 @@ static Error minixNewNode(MinixVfsSuperblock* sb, size_t* id) {
 
 static Error minixFreeNode(MinixVfsSuperblock* sb, MinixVfsNode* free) {
     for (size_t i = 0; i < 10; i++) {
-        assert(free->zones[i] = 0); // All zones should have been freed already.
+        assert(free->zones[i] == 0); // All zones should have been freed already.
     }
     return freeMinixInode(sb, free->base.stat.id);
 }
