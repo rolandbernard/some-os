@@ -109,6 +109,14 @@ Error vfsFileIoctl(VfsFile* file, Process* process, size_t request, VirtPtr argp
     return vfsNodeIoctl(file->node, process, request, argp, out);
 }
 
+bool vfsFileWillBlock(VfsFile* file, Process* process, bool write) {
+    if ((file->flags & VFS_FILE_NONBLOCK) != 0) {
+        return false;
+    } else {
+        return vfsNodeWillBlock(file->node, process, write);
+    }
+}
+
 void vfsFileCopy(VfsFile* file) {
     lockTaskLock(&file->lock);
     file->ref_count++;

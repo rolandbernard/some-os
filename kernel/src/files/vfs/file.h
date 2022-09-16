@@ -26,6 +26,8 @@ Error vfsFileReaddir(VfsFile* file, Process* process, VirtPtr buffer, size_t len
 
 Error vfsFileIoctl(VfsFile* file, Process* process, size_t request, VirtPtr argp, uintptr_t* out);
 
+bool vfsFileWillBlock(VfsFile* file, Process* process, bool write);
+
 void vfsFileCopy(VfsFile* file);
 
 void vfsFileClose(VfsFile* file);

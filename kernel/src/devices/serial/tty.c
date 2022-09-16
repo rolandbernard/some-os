@@ -314,21 +314,15 @@ static Error uartTtyIoctlFunction(UartTtyDevice* dev, size_t request, VirtPtr ar
     return error;
 }
 
-void uartTtyDataReady(UartTtyDevice* dev) {
-    Error error;
-    lockSpinLock(&dev->lock);
-    do {
-        error = basicTtyRead(dev);
-    } while (!isError(error));
-    dev->last_byte = getTime();
-    wakeupIfRequired(dev);
-    unlockSpinLock(&dev->lock);
+static bool uartTtyWillBlockFunction(UartTtyDevice* dev, bool write) {
+    return !write && !canReturnRead(dev);
 }
 
 static const CharDeviceFunctions funcs = {
     .read = (CharDeviceReadFunction)uartTtyReadFunction,
     .write = (CharDeviceWriteFunction)uartTtyWriteFunction,
     .ioctl = (CharDeviceIoctlFunction)uartTtyIoctlFunction,
+    .will_block = (CharDeviceWillBlockFunction)uartTtyWillBlockFunction,
 };
 
 UartTtyDevice* createUartTtyDevice(void* uart, UartWriteFunction write, UartReadFunction read) {
@@ -362,6 +356,17 @@ UartTtyDevice* createUartTtyDevice(void* uart, UartWriteFunction write, UartRead
     dev->line_delim_count = 0;
     dev->process_group = 1; // Just give it to the init process
     return dev;
+}
+
+void uartTtyDataReady(UartTtyDevice* dev) {
+    Error error;
+    lockSpinLock(&dev->lock);
+    do {
+        error = basicTtyRead(dev);
+    } while (!isError(error));
+    dev->last_byte = getTime();
+    wakeupIfRequired(dev);
+    unlockSpinLock(&dev->lock);
 }
 
 Error writeStringToTty(CharDevice* dev, const char* str) {

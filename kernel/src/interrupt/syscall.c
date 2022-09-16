@@ -79,6 +79,7 @@ SyscallFunction user_syscalls[] = {
     [SYSCALL_SETSID] = setSidSyscall,
     [SYSCALL_GETSID] = getSidSyscall,
     [SYSCALL_SET_NANOSECONDS] = setNanosecondsSyscall,
+    [SYSCALL_SELECT] = selectSyscall,
 };
 
 SyscallFunction kernel_syscalls[] = {

@@ -20,6 +20,8 @@ Error vfsNodeLink(VfsNode* node, Process* process, const char* name, VfsNode* en
 
 Error vfsNodeIoctl(VfsNode* node, Process* process, size_t request, VirtPtr argp, uintptr_t* out);
 
+bool vfsNodeWillBlock(VfsNode* node, Process* process, bool write);
+
 void vfsNodeCopy(VfsNode* node);
 
 void vfsNodeClose(VfsNode* node);

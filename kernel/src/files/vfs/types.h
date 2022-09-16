@@ -173,6 +173,7 @@ typedef Error (*VfsNodeLookupFunction)(struct VfsNode_s* node, const char* name,
 typedef Error (*VfsNodeUnlinkFunction)(struct VfsNode_s* node, const char* name);
 typedef Error (*VfsNodeLinkFunction)(struct VfsNode_s* node, const char* name, struct VfsNode_s* entry);
 typedef Error (*VfsNodeIoctlFunction)(struct VfsNode_s* node, size_t request, VirtPtr argp, uintptr_t* out);
+typedef bool (*VfsNodeWillBlockFunction)(struct VfsNode_s* node, bool write);
 
 typedef struct {
     VfsNodeFreeFunction free;               // Free all information for the vfs node.
@@ -184,6 +185,7 @@ typedef struct {
     VfsNodeUnlinkFunction unlink;           // If this is a directory, remove the entry with name.
     VfsNodeLinkFunction link;               // If this is a directory, add entry at name.
     VfsNodeIoctlFunction ioctl;
+    VfsNodeWillBlockFunction will_block;
 } VfsNodeFunctions;
 
 typedef struct VfsNode_s {

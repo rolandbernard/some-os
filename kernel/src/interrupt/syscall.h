@@ -66,6 +66,7 @@ typedef enum {
     SYSCALL_SETPGID = 56,
     SYSCALL_GETPGID = 57,
     SYSCALL_SET_NANOSECONDS = 58,
+    SYSCALL_SELECT = 59,
 // Kernel only syscalls:
     SYSCALL_CRITICAL = 0 + KERNEL_ONLY_SYSCALL_OFFSET,
 } Syscalls;

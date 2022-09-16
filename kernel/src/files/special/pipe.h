@@ -37,6 +37,8 @@ bool freePipeSharedData(PipeSharedData* data, bool for_write);
 
 Error executePipeOperation(PipeSharedData* data, VirtPtr buffer, size_t size, bool write, size_t* ret, bool block);
 
+bool pipeWillBlock(PipeSharedData* data, bool write);
+
 VfsFile* createPipeFile(bool for_write);
 
 VfsFile* createPipeFileClone(VfsFile* file, bool for_write);

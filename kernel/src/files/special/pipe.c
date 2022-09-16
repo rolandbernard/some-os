@@ -120,7 +120,7 @@ Error executePipeOperation(PipeSharedData* data, VirtPtr buffer, size_t size, bo
         criticalReturn(task);
         *ret = 0;
         return simpleError(SUCCESS);
-    } else if (block || (write && currentWriteCapacity(data) >= size) || (!write && currentReadCapacity(data) != 0)) {
+    } else if (block || (write && currentWriteCapacity(data) >= size) || (!write && currentReadCapacity(data) > 0)) {
         WaitingPipeOperation op;
         op.buffer = buffer;
         op.size = size;
@@ -214,10 +214,27 @@ static Error pipeNodeWriteAt(VfsPipeNode* node, VirtPtr buff, size_t offset, siz
     return executePipeOperation(node->data, buff, length, true, written, block);
 }
 
+bool pipeWillBlock(PipeSharedData* data, bool write) {
+    bool result;
+    lockSpinLock(&data->lock);
+    if (write) {
+        result = currentWriteCapacity(data) == 0;
+    } else {
+        result = currentReadCapacity(data) == 0 && data->write_count > 0;
+    }
+    unlockSpinLock(&data->lock);
+    return result;
+}
+
+static bool pipeNodeWillBlock(VfsPipeNode* node, bool write) {
+    return pipeWillBlock(node->data, write);
+}
+
 static const VfsNodeFunctions funcs = {
     .free = (VfsNodeFreeFunction)pipeNodeFree,
     .read_at = (VfsNodeReadAtFunction)pipeNodeReadAt,
     .write_at = (VfsNodeWriteAtFunction)pipeNodeWriteAt,
+    .will_block = (VfsNodeWillBlockFunction)pipeNodeWillBlock,
 };
 
 VfsPipeNode* createPipeNode(PipeSharedData* data, bool for_write) {

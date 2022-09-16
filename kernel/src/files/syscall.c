@@ -110,8 +110,10 @@ SyscallReturn renameSyscall(TrapFrame* frame) {
     VfsFileDescriptor* desc = getFileDescriptor(task->process, fd);     \
     if (desc != NULL) {                                                 \
         if ((desc->file->flags & VFS_FILE_WRITE) == 0 && WRITE) {       \
+            vfsFileDescriptorClose(task->process, desc);                \
             SYSCALL_RETURN(-EBADF);                                     \
         } else if ((desc->file->flags & VFS_FILE_READ) == 0 && READ) {  \
+            vfsFileDescriptorClose(task->process, desc);                \
             SYSCALL_RETURN(-EBADF);                                     \
         }                                                               \
     } else {                                                            \
@@ -434,5 +436,93 @@ SyscallReturn isattySyscall(TrapFrame* frame) {
         vfsFileDescriptorClose(task->process, desc);
         SYSCALL_RETURN(-ENOTTY);
     }
+}
+
+static bool handleSelectWakeup(Task* task) {
+    TrapFrame* frame = (TrapFrame*)task;
+    if (task->process != NULL) {
+        lockSpinLock(&task->process->lock); 
+        if (task->process->signals.signals != NULL) {
+            unlockSpinLock(&task->process->lock); 
+            task->frame.regs[REG_ARGUMENT_0] = -EINTR;
+            return true;
+        } else {
+            unlockSpinLock(&task->process->lock); 
+        }
+    }
+    size_t num_ready = 0;
+    size_t num_fds = SYSCALL_ARG(0);
+    VirtPtr reads_ptr = virtPtrForTask(SYSCALL_ARG(1), task);
+    VirtPtr writes_ptr = virtPtrForTask(SYSCALL_ARG(2), task);
+    VirtPtr excepts_ptr = virtPtrForTask(SYSCALL_ARG(2), task);
+    uint64_t reads = readInt(reads_ptr, 64);
+    uint64_t writes = readInt(writes_ptr, 64);
+    for (size_t i = 0; i < num_fds; i++) {
+        if ((reads & (1UL << i)) != 0) {
+            VfsFileDescriptor* desc = getFileDescriptor(task->process, i);
+            if (desc == NULL) {
+                task->frame.regs[REG_ARGUMENT_0] = -EBADF;
+                return true;
+            } else if ((desc->file->flags & VFS_FILE_READ) == 0) {
+                vfsFileDescriptorClose(task->process, desc);
+                task->frame.regs[REG_ARGUMENT_0] = -EBADF;
+                return true;
+            } else {
+                if (vfsFileWillBlock(desc->file, task->process, false)) {
+                    num_ready++;
+                } else {
+                    reads &= ~(1UL << i);
+                }
+                vfsFileDescriptorClose(task->process, desc);
+            }
+        }
+        if ((writes & (1 << i)) != 0) {
+            VfsFileDescriptor* desc = getFileDescriptor(task->process, i);
+            if (desc == NULL) {
+                task->frame.regs[REG_ARGUMENT_0] = -EBADF;
+                return true;
+            } else if ((desc->file->flags & VFS_FILE_WRITE) == 0) {
+                vfsFileDescriptorClose(task->process, desc);
+                task->frame.regs[REG_ARGUMENT_0] = -EBADF;
+                return true;
+            } else {
+                if (vfsFileWillBlock(desc->file, task->process, true)) {
+                    num_ready++;
+                } else {
+                    writes &= ~(1UL << i);
+                }
+                vfsFileDescriptorClose(task->process, desc);
+            }
+        }
+    }
+    if (num_ready != 0) {
+        writeInt(reads_ptr, 64, reads);
+        writeInt(writes_ptr, 64, writes);
+        writeInt(excepts_ptr, 64, 0);
+        task->frame.regs[REG_ARGUMENT_0] = num_ready;
+        return true;
+    }
+    Time timeout = SYSCALL_ARG(4);
+    if (timeout != (Time)-1 && getTime() >= task->times.entered + (timeout / (1000000000UL / CLOCKS_PER_SEC))) {
+        writeInt(reads_ptr, 64, 0);
+        writeInt(writes_ptr, 64, 0);
+        writeInt(excepts_ptr, 64, 0);
+        task->frame.regs[REG_ARGUMENT_0] = 0;
+        return true;
+    }
+    return false;
+}
+
+SyscallReturn selectSyscall(TrapFrame* frame) {
+    assert(frame->hart != NULL);
+    Task* task = (Task*)frame;
+    assert(task->process != NULL);
+    lockSpinLock(&task->sched.lock); 
+    task->times.entered = getTime();
+    task->sched.wakeup_function = handleSelectWakeup;
+    moveTaskToState(task, SLEEPING);
+    unlockSpinLock(&task->sched.lock); 
+    enqueueTask(task);
+    return WAIT;
 }
 

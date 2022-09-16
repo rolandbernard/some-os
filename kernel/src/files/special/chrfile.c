@@ -33,11 +33,20 @@ static Error ttyNodeIoctl(VfsTtyNode* node, size_t request, VirtPtr argp, uintpt
     }
 }
 
+static bool ttyNodeWillBlock(VfsTtyNode* node, bool write) {
+    if (node->device->functions->will_block == NULL) {
+        return false;
+    } else {
+        return node->device->functions->will_block(node->device, write);
+    }
+}
+
 static const VfsNodeFunctions funcs = {
     .free = (VfsNodeFreeFunction)ttyNodeFree,
     .read_at = (VfsNodeReadAtFunction)ttyNodeReadAt,
     .write_at = (VfsNodeWriteAtFunction)ttyNodeWriteAt,
     .ioctl = (VfsNodeIoctlFunction)ttyNodeIoctl,
+    .will_block = (VfsNodeWillBlockFunction)ttyNodeWillBlock,
 };
 
 VfsTtyNode* createTtyNode(CharDevice* device, VfsNode* real_node) {
