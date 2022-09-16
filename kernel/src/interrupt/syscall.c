@@ -110,7 +110,7 @@ static const char* findSyscallName(Syscalls id) {
     if (func == NULL) {
         return NULL;
     } else {
-        SymbolDebugInfo* symb = searchSymbolDebugInfo((uintptr_t)func);
+        const SymbolDebugInfo* symb = searchSymbolDebugInfo((uintptr_t)func);
         return symb == NULL ? NULL : symb->symbol;
     }
 }

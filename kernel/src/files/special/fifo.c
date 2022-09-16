@@ -57,12 +57,12 @@ static void fifoNodeFree(VfsFifoNode* node) {
     dealloc(node);
 }
 
-static Error fifoNodeReadAt(VfsFifoNode* node, VirtPtr buff, size_t offset, size_t length, size_t* read) {
-    return executePipeOperation(node->data, buff, length, false, read);
+static Error fifoNodeReadAt(VfsFifoNode* node, VirtPtr buff, size_t offset, size_t length, size_t* read, bool block) {
+    return executePipeOperation(node->data, buff, length, false, read, block);
 }
 
-static Error fifoNodeWriteAt(VfsFifoNode* node, VirtPtr buff, size_t offset, size_t length, size_t* written) {
-    return executePipeOperation(node->data, buff, length, true, written);
+static Error fifoNodeWriteAt(VfsFifoNode* node, VirtPtr buff, size_t offset, size_t length, size_t* written, bool block) {
+    return executePipeOperation(node->data, buff, length, true, written, block);
 }
 
 static const VfsNodeFunctions funcs = {

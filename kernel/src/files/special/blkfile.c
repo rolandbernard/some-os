@@ -54,11 +54,11 @@ static Error genericBlockFileFunction(VfsBlockNode* node, bool write, VirtPtr bu
     return simpleError(SUCCESS);
 }
 
-static Error blkNodeReadAt(VfsBlockNode* node, VirtPtr buff, size_t offset, size_t length, size_t* read) {
+static Error blkNodeReadAt(VfsBlockNode* node, VirtPtr buff, size_t offset, size_t length, size_t* read, bool block) {
     return genericBlockFileFunction(node, false, buff, offset, length, read);
 }
 
-static Error blkNodeWriteAt(VfsBlockNode* node, VirtPtr buff, size_t offset, size_t length, size_t* written) {
+static Error blkNodeWriteAt(VfsBlockNode* node, VirtPtr buff, size_t offset, size_t length, size_t* written, bool block) {
     return genericBlockFileFunction(node, true, buff, offset, length, written);
 }
 

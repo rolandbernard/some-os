@@ -36,7 +36,7 @@ typedef enum {
     VFS_OPEN_CREAT       =   0x0200,
     VFS_OPEN_TRUNC       =   0x0400,
     VFS_OPEN_EXCL        =   0x0800,
-    // TODO: Add VFS_OPEN_NONBLOCK = 0x4000 (for pipe, fifo, chrfile)
+    VFS_OPEN_NONBLOCK    =   0x4000,
     VFS_OPEN_CLOEXEC     =  0x40000,
     VFS_OPEN_EXECUTE     = 0x100000,
     VFS_OPEN_DIRECTORY   = 0x200000,
@@ -74,6 +74,8 @@ typedef enum {
 typedef enum {
     VFS_FILE_READ = (1 << 0),
     VFS_FILE_WRITE = (1 << 1),
+    VFS_FILE_ACCESS = VFS_FILE_READ | VFS_FILE_WRITE,
+    VFS_FILE_NONBLOCK = (1 << 14),
 } VfsFileFlags;
 
 typedef enum {
@@ -163,8 +165,8 @@ typedef struct VfsSuperblock_s {
 } VfsSuperblock;
 
 typedef void (*VfsNodeFreeFunction)(struct VfsNode_s* node);
-typedef Error (*VfsNodeReadAtFunction)(struct VfsNode_s* node, VirtPtr buff, size_t offset, size_t length, size_t* read);
-typedef Error (*VfsNodeWriteAtFunction)(struct VfsNode_s* node, VirtPtr buff, size_t offset, size_t length, size_t* written);
+typedef Error (*VfsNodeReadAtFunction)(struct VfsNode_s* node, VirtPtr buff, size_t offset, size_t length, size_t* read, bool block);
+typedef Error (*VfsNodeWriteAtFunction)(struct VfsNode_s* node, VirtPtr buff, size_t offset, size_t length, size_t* written, bool block);
 typedef Error (*VfsNodeReaddirAtFunction)(struct VfsNode_s* node, VirtPtr buff, size_t offset, size_t length, size_t* read_file, size_t* written_buff);
 typedef Error (*VfsNodeTruncFunction)(struct VfsNode_s* node, size_t length);
 typedef Error (*VfsNodeLookupFunction)(struct VfsNode_s* node, const char* name, size_t* node_id);

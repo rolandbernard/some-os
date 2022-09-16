@@ -34,7 +34,7 @@ SyscallReturn openSyscall(TrapFrame* frame) {
         if (isError(err)) {
             SYSCALL_RETURN(-err.kind);
         } else {
-            file->flags = flags & VFS_OPEN_ACCESS_MODE;
+            file->flags = flags & (VFS_OPEN_ACCESS_MODE | VFS_FILE_NONBLOCK);
             int fd = putNewFileDescriptor(
                 task->process, -1, (flags & VFS_OPEN_CLOEXEC) != 0 ? VFS_DESC_CLOEXEC : 0, file, false
             );
@@ -391,7 +391,9 @@ SyscallReturn fcntlSyscall(TrapFrame* frame) {
             SYSCALL_RETURN(flags);
         }
         case VFS_FCNTL_SETFL: {
-            // We only have access mode flags for now, and those are ignored.
+            // Access mode flags must be preserved.
+            desc->file->flags = (SYSCALL_ARG(2) & VFS_FILE_NONBLOCK)
+                | (desc->file->flags & VFS_FILE_ACCESS);
             vfsFileDescriptorClose(task->process, desc);
             SYSCALL_RETURN(0);
         }

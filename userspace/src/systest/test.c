@@ -313,6 +313,52 @@ static bool testPipe() {
     return true;
 }
 
+static bool testPipeNonblock() {
+    int fds[2];
+    ASSERT(pipe(fds) == 0);
+    int pid = fork();
+    ASSERT(pid != -1);
+    if (pid == 0) {
+        fcntl(fds[0], F_SETFL, O_NONBLOCK);
+        char buffer[512] = "BUFFER INIT";
+        ASSERT_CHILD(read(fds[0], buffer, 512) == -1);
+        ASSERT_CHILD(strcmp(buffer, "BUFFER INIT") == 0);
+        read(fds[0], buffer, 512);
+        ASSERT_CHILD(errno == EAGAIN);
+        exit(0);
+    } else {
+        int status;
+        int wait_pid = wait(&status);
+        ASSERT(wait_pid == pid);
+        ASSERT(WIFEXITED(status));
+        ASSERT(WEXITSTATUS(status) == 0);
+    }
+    close(fds[0]);
+    close(fds[1]);
+    return true;
+}
+
+static bool testTtyNonblock() {
+    int pid = fork();
+    ASSERT(pid != -1);
+    if (pid == 0) {
+        fcntl(0, F_SETFL, O_NONBLOCK);
+        char buffer[512] = "BUFFER INIT";
+        ASSERT_CHILD(read(0, buffer, 512) == -1);
+        ASSERT_CHILD(strcmp(buffer, "BUFFER INIT") == 0);
+        read(0, buffer, 512);
+        ASSERT_CHILD(errno == EAGAIN);
+        exit(0);
+    } else {
+        int status;
+        int wait_pid = wait(&status);
+        ASSERT(wait_pid == pid);
+        ASSERT(WIFEXITED(status));
+        ASSERT(WEXITSTATUS(status) == 0);
+    }
+    return true;
+}
+
 static bool testPause() {
     int pid = fork();
     ASSERT(pid != -1);
@@ -754,10 +800,10 @@ static bool testFcntlGetFlags() {
     ASSERT((fcntl(fd, F_GETFD) & FD_CLOEXEC) != 0);
     ASSERT((fcntl(fd, F_GETFL) & O_ACCMODE) == FWRITE);
     close(fd);
-    fd = open("/tmp/test3.txt", O_RDWR);
+    fd = open("/tmp/test3.txt", O_RDWR | O_NONBLOCK);
     ASSERT(fd != -1);
     ASSERT((fcntl(fd, F_GETFD) & FD_CLOEXEC) == 0);
-    ASSERT((fcntl(fd, F_GETFL) & O_ACCMODE) == (FREAD | FWRITE));
+    ASSERT((fcntl(fd, F_GETFL) & (O_ACCMODE | O_NONBLOCK)) == (FREAD | FWRITE | FNONBLOCK));
     close(fd);
     return true;
 }
@@ -918,6 +964,8 @@ static bool runBasicSyscallTests() {
         TEST(testGetSetUid),
         TEST(testGetSetGid),
         TEST(testPipe),
+        TEST(testPipeNonblock),
+        TEST(testTtyNonblock),
         TEST(testPause),
         TEST(testPipeDup),
         TEST(testAccess),

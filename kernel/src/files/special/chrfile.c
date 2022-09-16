@@ -17,12 +17,12 @@ static void ttyNodeFree(VfsTtyNode* node) {
     dealloc(node);
 }
 
-static Error ttyNodeWriteAt(VfsTtyNode* node, VirtPtr buff, size_t offset, size_t length, size_t* written) {
+static Error ttyNodeWriteAt(VfsTtyNode* node, VirtPtr buff, size_t offset, size_t length, size_t* written, bool block) {
     return node->device->functions->write(node->device, buff, length, written);
 }
 
-static Error ttyNodeReadAt(VfsTtyNode* node, VirtPtr buff, size_t offset, size_t length, size_t* read) {
-    return node->device->functions->read(node->device, buff, length, read, true);
+static Error ttyNodeReadAt(VfsTtyNode* node, VirtPtr buff, size_t offset, size_t length, size_t* read, bool block) {
+    return node->device->functions->read(node->device, buff, length, read, block);
 }
 
 static Error ttyNodeIoctl(VfsTtyNode* node, size_t request, VirtPtr argp, uintptr_t* res) {

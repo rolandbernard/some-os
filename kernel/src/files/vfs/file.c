@@ -49,11 +49,11 @@ Error vfsFileWrite(VfsFile* file, Process* process, VirtPtr buffer, size_t lengt
 }
 
 Error vfsFileReadAt(VfsFile* file, Process* process, VirtPtr buffer, size_t offset, size_t length, size_t* read) {
-    return vfsNodeReadAt(file->node, process, buffer, offset, length, read);
+    return vfsNodeReadAt(file->node, process, buffer, offset, length, read, (file->flags & VFS_FILE_NONBLOCK) == 0);
 }
 
 Error vfsFileWriteAt(VfsFile* file, Process* process, VirtPtr buffer, size_t offset, size_t length, size_t* written) {
-    return vfsNodeWriteAt(file->node, process, buffer, offset, length, written);
+    return vfsNodeWriteAt(file->node, process, buffer, offset, length, written, (file->flags & VFS_FILE_NONBLOCK) == 0);
 }
 
 Error vfsFileStat(VfsFile* file, Process* process, VirtPtr ret) {
