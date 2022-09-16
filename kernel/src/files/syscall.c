@@ -459,39 +459,30 @@ static bool handleSelectWakeup(Task* task) {
     uint64_t writes = readInt(writes_ptr, 64);
     for (size_t i = 0; i < num_fds; i++) {
         if ((reads & (1UL << i)) != 0) {
-            VfsFileDescriptor* desc = getFileDescriptor(task->process, i);
-            if (desc == NULL) {
-                task->frame.regs[REG_ARGUMENT_0] = -EBADF;
-                return true;
-            } else if ((desc->file->flags & VFS_FILE_READ) == 0) {
-                vfsFileDescriptorClose(task->process, desc);
+            // TODO: This is safe only as long as we have only one task per process
+            VfsFileDescriptor* desc = getFileDescriptorUnsafe(task->process, i);
+            if (desc == NULL || (desc->file->flags & VFS_FILE_READ) == 0) {
                 task->frame.regs[REG_ARGUMENT_0] = -EBADF;
                 return true;
             } else {
-                if (vfsFileWillBlock(desc->file, task->process, false)) {
+                if (!vfsFileWillBlock(desc->file, task->process, false)) {
                     num_ready++;
                 } else {
                     reads &= ~(1UL << i);
                 }
-                vfsFileDescriptorClose(task->process, desc);
             }
         }
         if ((writes & (1 << i)) != 0) {
-            VfsFileDescriptor* desc = getFileDescriptor(task->process, i);
-            if (desc == NULL) {
-                task->frame.regs[REG_ARGUMENT_0] = -EBADF;
-                return true;
-            } else if ((desc->file->flags & VFS_FILE_WRITE) == 0) {
-                vfsFileDescriptorClose(task->process, desc);
+            VfsFileDescriptor* desc = getFileDescriptorUnsafe(task->process, i);
+            if (desc == NULL || (desc->file->flags & VFS_FILE_WRITE) == 0) {
                 task->frame.regs[REG_ARGUMENT_0] = -EBADF;
                 return true;
             } else {
-                if (vfsFileWillBlock(desc->file, task->process, true)) {
+                if (!vfsFileWillBlock(desc->file, task->process, true)) {
                     num_ready++;
                 } else {
                     writes &= ~(1UL << i);
                 }
-                vfsFileDescriptorClose(task->process, desc);
             }
         }
     }
@@ -517,12 +508,17 @@ SyscallReturn selectSyscall(TrapFrame* frame) {
     assert(frame->hart != NULL);
     Task* task = (Task*)frame;
     assert(task->process != NULL);
+    Time timeout = SYSCALL_ARG(4);
     lockSpinLock(&task->sched.lock); 
     task->times.entered = getTime();
     task->sched.wakeup_function = handleSelectWakeup;
     moveTaskToState(task, SLEEPING);
     unlockSpinLock(&task->sched.lock); 
     enqueueTask(task);
+    if (timeout != (Time)-1) {
+        // Make sure we wake up in time
+        setTimeoutTime(getTime() + timeout / (1000000000UL / CLOCKS_PER_SEC), NULL, NULL);
+    }
     return WAIT;
 }
 

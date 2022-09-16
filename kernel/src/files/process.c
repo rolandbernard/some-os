@@ -26,6 +26,18 @@ void vfsFileDescriptorClose(Process* process, VfsFileDescriptor* desc) {
     }
 }
 
+VfsFileDescriptor* getFileDescriptorUnsafe(Process* process, int fd) {
+    VfsFileDescriptor* current = process->resources.files;
+    while (current != NULL && current->id < fd) {
+        current = current->next;
+    }
+    if (current != NULL && current->id == fd) {
+        return current;
+    } else {
+        return NULL;
+    }
+}
+
 VfsFileDescriptor* getFileDescriptor(Process* process, int fd) {
     lockTaskLock(&process->resources.lock);
     VfsFileDescriptor* current = process->resources.files;
