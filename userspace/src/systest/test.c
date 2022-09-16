@@ -338,6 +338,16 @@ static bool testPipeNonblock() {
     return true;
 }
 
+static bool testPipeEOF() {
+    int fds[2];
+    ASSERT(pipe(fds) == 0);
+    close(fds[1]);
+    char buffer[512] = "BUFFER INIT";
+    ASSERT(read(fds[0], buffer, 512) == 0);
+    close(fds[0]);
+    return true;
+}
+
 static bool testTtyNonblock() {
     int pid = fork();
     ASSERT(pid != -1);
@@ -965,6 +975,7 @@ static bool runBasicSyscallTests() {
         TEST(testGetSetGid),
         TEST(testPipe),
         TEST(testPipeNonblock),
+        TEST(testPipeEOF),
         TEST(testTtyNonblock),
         TEST(testPause),
         TEST(testPipeDup),

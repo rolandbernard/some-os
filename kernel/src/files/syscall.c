@@ -327,8 +327,8 @@ SyscallReturn getcwdSyscall(TrapFrame* frame) {
 SyscallReturn pipeSyscall(TrapFrame* frame) {
     assert(frame->hart != NULL);
     Task* task = (Task*)frame;
-    VfsFile* file_read = createPipeFile();
-    VfsFile* file_write = createPipeFileClone(file_read);
+    VfsFile* file_read = createPipeFile(false);
+    VfsFile* file_write = createPipeFileClone(file_read, true);
     file_read->flags = VFS_FILE_READ;
     file_write->flags = VFS_FILE_WRITE;
     int pipe_read = putNewFileDescriptor(task->process, -1, 0, (VfsFile*)file_read, false);

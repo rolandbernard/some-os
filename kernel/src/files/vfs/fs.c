@@ -328,7 +328,7 @@ static Error vfsOpenNode(Process* process, VfsNode* node, char* path, VfsOpenFla
         dealloc(path);
     });
     if (MODE_TYPE(node->stat.mode) == VFS_TYPE_FIFO) {
-        *ret = createFifoFile(node->real_node, path);
+        *ret = createFifoFile(node->real_node, path, (flags & VFS_OPEN_WRITE) != 0);
         return simpleError(SUCCESS);
     } else if (MODE_TYPE(node->stat.mode) == VFS_TYPE_CHAR || MODE_TYPE(node->stat.mode) == VFS_TYPE_BLOCK) {
         Device* device = getDeviceWithId(node->stat.rdev);

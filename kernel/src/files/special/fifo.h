@@ -5,6 +5,6 @@
 
 #include "files/special/pipe.h"
 
-VfsFile* createFifoFile(VfsNode* node, char* path);
+VfsFile* createFifoFile(VfsNode* node, char* path, bool for_write);
 
 #endif

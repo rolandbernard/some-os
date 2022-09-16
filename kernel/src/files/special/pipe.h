@@ -18,6 +18,7 @@ typedef struct WaitingPipeOperation_s {
 
 typedef struct PipeSharedData_s {
     size_t ref_count;
+    size_t write_count;
     SpinLock lock;
     char* buffer;
     size_t read_pos;
@@ -28,16 +29,16 @@ typedef struct PipeSharedData_s {
     WaitingPipeOperation* waiting_writes_tail;
 } PipeSharedData;
 
-PipeSharedData* createPipeSharedData();
+PipeSharedData* createPipeSharedData(bool for_write);
 
-void copyPipeSharedData(PipeSharedData* data);
+void copyPipeSharedData(PipeSharedData* data, bool for_write);
 
-void freePipeSharedData(PipeSharedData* data);
+bool freePipeSharedData(PipeSharedData* data, bool for_write);
 
 Error executePipeOperation(PipeSharedData* data, VirtPtr buffer, size_t size, bool write, size_t* ret, bool block);
 
-VfsFile* createPipeFile();
+VfsFile* createPipeFile(bool for_write);
 
-VfsFile* createPipeFileClone(VfsFile* file);
+VfsFile* createPipeFileClone(VfsFile* file, bool for_write);
 
 #endif

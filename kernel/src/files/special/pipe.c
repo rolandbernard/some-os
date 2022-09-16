@@ -15,7 +15,7 @@
 // Shared data should be locked before calling this
 static void doOperationOnPipe(PipeSharedData* pipe) {
     for (;;) {
-        if (pipe->waiting_reads != NULL && pipe->count != 0) {
+        if (pipe->waiting_reads != NULL && (pipe->count != 0 || pipe->write_count == 0)) {
             // We can do some reading
             size_t length = umin(pipe->count, pipe->waiting_reads->size);
             if (PIPE_BUFFER_CAPACITY < pipe->read_pos + length) {
@@ -114,7 +114,13 @@ Error executePipeOperation(PipeSharedData* data, VirtPtr buffer, size_t size, bo
     Task* task = criticalEnter();
     assert(task != NULL);
     lockSpinLock(&data->lock);
-    if (block || (write && currentWriteCapacity(data) >= size) || (!write && currentReadCapacity(data) != 0)) {
+    if (currentReadCapacity(data) == 0 && data->write_count == 0) {
+        // EOF if there are no open file descriptors for writing
+        unlockSpinLock(&data->lock);
+        criticalReturn(task);
+        *ret = 0;
+        return simpleError(SUCCESS);
+    } else if (block || (write && currentWriteCapacity(data) >= size) || (!write && currentReadCapacity(data) != 0)) {
         WaitingPipeOperation op;
         op.buffer = buffer;
         op.size = size;
@@ -148,38 +154,54 @@ Error executePipeOperation(PipeSharedData* data, VirtPtr buffer, size_t size, bo
     }
 }
 
-PipeSharedData* createPipeSharedData() {
+PipeSharedData* createPipeSharedData(bool for_write) {
     PipeSharedData* data = zalloc(sizeof(PipeSharedData));
     data->ref_count = 1;
+    data->write_count = for_write ? 1 : 0;
     data->buffer = kalloc(PIPE_BUFFER_CAPACITY);
     return data;
 }
 
-void copyPipeSharedData(PipeSharedData* data) {
+void copyPipeSharedData(PipeSharedData* data, bool for_write) {
     lockSpinLock(&data->lock);
     data->ref_count++;
+    if (for_write) {
+        data->write_count++;
+    }
     unlockSpinLock(&data->lock);
 }
 
-void freePipeSharedData(PipeSharedData* data) {
+bool freePipeSharedData(PipeSharedData* data, bool for_write) {
     lockSpinLock(&data->lock);
     data->ref_count--;
+    if (for_write) {
+        assert(data->write_count > 0);
+        data->write_count--;
+        if (data->write_count == 0) {
+            // EOF all of the remaining reads
+            doOperationOnPipe(data);
+        }
+    }
+    assert(data->write_count <= data->ref_count);
     if (data->ref_count == 0) {
         unlockSpinLock(&data->lock);
         dealloc(data->buffer);
         dealloc(data);
+        return true;
     } else {
         unlockSpinLock(&data->lock);
+        return false;
     }
 }
 
 typedef struct {
     VfsNode base;
     PipeSharedData* data;
+    bool for_write;
 } VfsPipeNode;
 
 static void pipeNodeFree(VfsPipeNode* node) {
-    freePipeSharedData(node->data);
+    freePipeSharedData(node->data, node->for_write);
     dealloc(node);
 }
 
@@ -188,6 +210,7 @@ static Error pipeNodeReadAt(VfsPipeNode* node, VirtPtr buff, size_t offset, size
 }
 
 static Error pipeNodeWriteAt(VfsPipeNode* node, VirtPtr buff, size_t offset, size_t length, size_t* written, bool block) {
+    assert(node->for_write);
     return executePipeOperation(node->data, buff, length, true, written, block);
 }
 
@@ -197,7 +220,7 @@ static const VfsNodeFunctions funcs = {
     .write_at = (VfsNodeWriteAtFunction)pipeNodeWriteAt,
 };
 
-VfsPipeNode* createPipeNode() {
+VfsPipeNode* createPipeNode(PipeSharedData* data, bool for_write) {
     VfsPipeNode* node = kalloc(sizeof(VfsPipeNode));
     node->base.functions = &funcs;
     node->base.superblock = NULL;
@@ -209,17 +232,17 @@ VfsPipeNode* createPipeNode() {
     node->base.stat.mtime = time;
     node->base.stat.ctime = time;
     node->base.real_node = (VfsNode*)node;
-    node->base.ref_count = 0;
+    node->base.ref_count = 1;
     initTaskLock(&node->base.lock);
     node->base.mounted = NULL;
-    node->data = createPipeSharedData();
+    node->data = data;
+    node->for_write = for_write;
     return node;
 }
 
-static VfsFile* createPipeFileWithNode(VfsNode* node) {
-    vfsNodeCopy(node);
+static VfsFile* createPipeFileWithData(PipeSharedData* data, bool for_write) {
     VfsFile* file = kalloc(sizeof(VfsFile));
-    file->node = node;
+    file->node = (VfsNode*)createPipeNode(data, for_write);
     file->path = NULL;
     file->ref_count = 1;
     file->offset = 0;
@@ -228,11 +251,13 @@ static VfsFile* createPipeFileWithNode(VfsNode* node) {
     return file;
 }
 
-VfsFile* createPipeFile() {
-    return createPipeFileWithNode((VfsNode*)createPipeNode());
+VfsFile* createPipeFile(bool for_write) {
+    return createPipeFileWithData(createPipeSharedData(for_write), for_write);
 }
 
-VfsFile* createPipeFileClone(VfsFile* file) {
-    return createPipeFileWithNode(file->node);
+VfsFile* createPipeFileClone(VfsFile* file, bool for_write) {
+    PipeSharedData* data = ((VfsPipeNode*)file->node)->data;
+    copyPipeSharedData(data, for_write);
+    return createPipeFileWithData(data, for_write);
 }
 
