@@ -319,6 +319,7 @@ static VfsFile* vfsCreateFile(VfsNode* node, char* path, size_t offset) {
     file->offset = offset;
     file->flags = 0;
     initTaskLock(&file->lock);
+    initTaskLock(&file->ref_lock);
     return file;
 }
 

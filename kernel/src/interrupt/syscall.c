@@ -170,10 +170,10 @@ void runSyscall(TrapFrame* frame, bool is_kernel) {
             assert(frame->hart != NULL); // Only tasks can wait for async syscalls
             Task* task = (Task*)frame;
             moveTaskToState(task, WAITING);
-            Task* syscall_task = createKernelTask(syscallTask, SYSCALL_STACK_SIZE, task->sched.priority);
-            syscall_task->frame.regs[REG_ARGUMENT_0] = (uintptr_t)func;
-            syscall_task->frame.regs[REG_ARGUMENT_1] = (uintptr_t)frame;
-            enqueueTask(syscall_task);
+            task->sys_task = createKernelTask(syscallTask, SYSCALL_STACK_SIZE, task->sched.priority);
+            task->sys_task->frame.regs[REG_ARGUMENT_0] = (uintptr_t)func;
+            task->sys_task->frame.regs[REG_ARGUMENT_1] = (uintptr_t)frame;
+            enqueueTask(task->sys_task);
         }
     } else {
         frame->regs[REG_ARGUMENT_0] = -EINVAL;

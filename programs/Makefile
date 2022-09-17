@@ -15,8 +15,9 @@ endif
 
 # == bash
 PROJ_NAME.bash := bash
-CONF_ARGS.bash := --host=$(TARGET) --prefix=$(SYSROOT_DIR)
-INST_ARGS.bash := install
+CONF_ARGS.bash := --host=$(TARGET) --prefix=/
+MAKE_ARGS.bash := DESTDIR=$(SYSROOT_DIR)
+INST_ARGS.bash := DESTDIR=$(SYSROOT_DIR) install
 # ==
 
 .PHONY: $(TARGETS)

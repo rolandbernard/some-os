@@ -161,6 +161,7 @@ typedef struct VfsSuperblock_s {
     size_t id;
     size_t ref_count;
     TaskLock lock;
+    TaskLock ref_lock;
     VfsNodeCache nodes;
 } VfsSuperblock;
 
@@ -194,6 +195,7 @@ typedef struct VfsNode_s {
     VfsStat stat;
     size_t ref_count;
     TaskLock lock;
+    TaskLock ref_lock;
     VfsSuperblock* mounted; // If a filesystem is mounted at this node, this is not NULL.
     struct VfsNode_s* real_node; // node->real_node != node if node is a special file node (pipe/fifo/block/tty).
 } VfsNode;
@@ -207,6 +209,7 @@ typedef struct VfsFile_s {
     size_t offset;
     VfsFileFlags flags;
     TaskLock lock;
+    TaskLock ref_lock;
 } VfsFile;
 
 typedef struct VfsFileDescriptor_s {

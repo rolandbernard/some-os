@@ -57,6 +57,7 @@ static VfsNode* createDeviceFsDevNode(DeviceFilesystem* sb, Device* device) {
     node->stat.ctime = time;
     node->ref_count = 0;
     initTaskLock(&node->lock);
+    initTaskLock(&node->ref_lock);
     node->mounted = NULL;
     node->real_node = node;
     return node;
@@ -158,6 +159,7 @@ static VfsNode* createDeviceFsRootDirNode(DeviceFilesystem* sb) {
     node->stat.ctime = time;
     node->ref_count = 0;
     initTaskLock(&node->lock);
+    initTaskLock(&node->ref_lock);
     node->mounted = NULL;
     node->real_node = node;
     return node;
@@ -205,6 +207,7 @@ Error createDeviceSuperblock(VfsFile* file, VirtPtr data, VfsSuperblock** out) {
     sb->base.functions = &sb_functions;
     sb->base.root_node = createDeviceFsRootDirNode(sb);
     initTaskLock(&sb->base.lock);
+    initTaskLock(&sb->base.ref_lock);
     vfsCacheInit(&sb->base.nodes);
     *out = (VfsSuperblock*)sb;
     return simpleError(SUCCESS);

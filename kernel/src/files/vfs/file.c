@@ -118,20 +118,20 @@ bool vfsFileWillBlock(VfsFile* file, Process* process, bool write) {
 }
 
 void vfsFileCopy(VfsFile* file) {
-    lockTaskLock(&file->lock);
+    lockTaskLock(&file->ref_lock);
     file->ref_count++;
-    unlockTaskLock(&file->lock);
+    unlockTaskLock(&file->ref_lock);
 }
 
 void vfsFileClose(VfsFile* file) {
-    lockTaskLock(&file->lock);
+    lockTaskLock(&file->ref_lock);
     file->ref_count--;
     if (file->ref_count == 0) {
-        unlockTaskLock(&file->lock);
+        unlockTaskLock(&file->ref_lock);
         vfsNodeClose(file->node);
         dealloc(file);
     } else {
-        unlockTaskLock(&file->lock);
+        unlockTaskLock(&file->ref_lock);
     }
 }
 

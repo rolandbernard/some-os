@@ -61,6 +61,7 @@ VfsTtyNode* createTtyNode(CharDevice* device, VfsNode* real_node) {
     node->base.real_node = real_node;
     node->base.ref_count = 1;
     initTaskLock(&node->base.lock);
+    initTaskLock(&node->base.ref_lock);
     node->base.mounted = NULL;
     node->device = device;
     return node;
@@ -74,6 +75,7 @@ VfsFile* createCharDeviceFile(VfsNode* node, CharDevice* device, char* path) {
     file->offset = 0;
     file->flags = 0;
     initTaskLock(&file->lock);
+    initTaskLock(&file->ref_lock);
     return file;
 }
 

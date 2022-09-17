@@ -123,6 +123,7 @@ typedef struct Task_s {
     TaskTimes times;
     struct Process_s* process;
     struct Task_s* proc_next;
+    struct Task_s* sys_task;
 } Task;
 
 #endif

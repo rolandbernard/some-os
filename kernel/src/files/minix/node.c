@@ -373,6 +373,7 @@ MinixVfsNode* createMinixVfsNode(MinixVfsSuperblock* fs, uint32_t inode) {
     node->base.stat.rdev = 0;
     node->base.stat.block_size = MINIX_BLOCK_SIZE;
     initTaskLock(&node->base.lock);
+    initTaskLock(&node->base.ref_lock);
     initTaskLock(&node->lock);
     return node;
 }

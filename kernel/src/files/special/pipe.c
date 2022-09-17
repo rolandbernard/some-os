@@ -251,6 +251,7 @@ VfsPipeNode* createPipeNode(PipeSharedData* data, bool for_write) {
     node->base.real_node = (VfsNode*)node;
     node->base.ref_count = 1;
     initTaskLock(&node->base.lock);
+    initTaskLock(&node->base.ref_lock);
     node->base.mounted = NULL;
     node->data = data;
     node->for_write = for_write;
@@ -265,6 +266,7 @@ static VfsFile* createPipeFileWithData(PipeSharedData* data, bool for_write) {
     file->offset = 0;
     file->flags = 0;
     initTaskLock(&file->lock);
+    initTaskLock(&file->ref_lock);
     return file;
 }
 
