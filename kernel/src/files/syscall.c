@@ -454,7 +454,7 @@ static bool handleSelectWakeup(Task* task) {
     size_t num_fds = SYSCALL_ARG(0);
     VirtPtr reads_ptr = virtPtrForTask(SYSCALL_ARG(1), task);
     VirtPtr writes_ptr = virtPtrForTask(SYSCALL_ARG(2), task);
-    VirtPtr excepts_ptr = virtPtrForTask(SYSCALL_ARG(2), task);
+    VirtPtr excepts_ptr = virtPtrForTask(SYSCALL_ARG(3), task);
     uint64_t reads = readInt(reads_ptr, 64);
     uint64_t writes = readInt(writes_ptr, 64);
     for (size_t i = 0; i < num_fds; i++) {

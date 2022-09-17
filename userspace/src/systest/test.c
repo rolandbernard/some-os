@@ -348,6 +348,50 @@ static bool testPipeEOF() {
     return true;
 }
 
+static bool testPipeSelect() {
+    int fds[2];
+    ASSERT(pipe(fds) == 0);
+    fd_set reads;
+    fd_set writes;
+    fd_set errors;
+    FD_ZERO(&reads);
+    FD_ZERO(&writes);
+    FD_ZERO(&errors);
+    FD_SET(fds[0], &reads);
+    struct timeval timeout = {
+        .tv_sec = 0, .tv_usec = 0,
+    };
+    ASSERT(select(fds[0] + 1, &reads, &writes, &errors, &timeout) == 0);
+    ASSERT(!FD_ISSET(fds[0], &reads));
+    timeout.tv_sec = 0;
+    timeout.tv_usec = 10000;
+    struct timeval start;
+    ASSERT(gettimeofday(&start, NULL) == 0);
+    FD_SET(fds[0], &reads);
+    ASSERT(select(fds[0] + 1, &reads, &writes, &errors, &timeout) == 0);
+    ASSERT(!FD_ISSET(fds[0], &reads));
+    struct timeval end;
+    ASSERT(gettimeofday(&end, NULL) == 0);
+    ASSERT((start.tv_sec * 1000000 + start.tv_usec) + 5000 < (end.tv_sec * 1000000 + end.tv_usec));
+    ASSERT((start.tv_sec * 1000000 + start.tv_usec) + 20000 > (end.tv_sec * 1000000 + end.tv_usec));
+    ASSERT(write(fds[1], "hello world", 11) == 11);
+    FD_SET(fds[0], &reads);
+    ASSERT(select(fds[0] + 1, &reads, &writes, &errors, NULL) == 1);
+    ASSERT(FD_ISSET(fds[0], &reads));
+    FD_SET(fds[1], &writes);
+    ASSERT(select(fds[1] + 1, &reads, &writes, &errors, NULL) == 2);
+    ASSERT(FD_ISSET(fds[0], &reads));
+    ASSERT(FD_ISSET(fds[1], &writes));
+    close(fds[1]);
+    char buffer[11];
+    ASSERT(read(fds[0], buffer, 11) == 11);
+    FD_ZERO(&writes);
+    ASSERT(select(fds[0] + 1, &reads, &writes, &errors, NULL) == 1);
+    ASSERT(FD_ISSET(fds[0], &reads));
+    close(fds[0]);
+    return true;
+}
+
 static bool testTtyNonblock() {
     int pid = fork();
     ASSERT(pid != -1);
@@ -976,6 +1020,7 @@ static bool runBasicSyscallTests() {
         TEST(testPipe),
         TEST(testPipeNonblock),
         TEST(testPipeEOF),
+        TEST(testPipeSelect),
         TEST(testTtyNonblock),
         TEST(testPause),
         TEST(testPipeDup),
