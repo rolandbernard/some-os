@@ -76,6 +76,7 @@ clean:
 	$(MAKE) -C $(KERNEL_DIR) clean
 	$(MAKE) -C $(USERSPACE_DIR) clean
 	$(MAKE) -C $(TOOLCHAIN_DIR) clean
+	$(MAKE) -C $(PROGRAMS_DIR) clean
 	$(RM) -rf $(BUILD_DIR)
 	@$(ECHO) "Cleaned build directory."
 

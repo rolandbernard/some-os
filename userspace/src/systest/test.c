@@ -5,7 +5,7 @@
 #include <stdbool.h>
 #include <stdint.h>
 #include <stdlib.h>
-#include <sys/mman.h>
+#include <sys/mprotect.h>
 #include <sys/mount.h>
 #include <sys/stat.h>
 #include <sys/time.h>

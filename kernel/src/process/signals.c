@@ -85,7 +85,7 @@ static bool handleActualSignal(Task* task, Signal signal) {
         VirtPtr stack_pointer = virtPtrForTask(task->frame.regs[REG_STACK_POINTER], task);
         // Before these values that will be restored, we can but some other data
         PUSH_TO_VIRTPTR(stack_pointer, info);
-        VirtPtr info_addres = stack_pointer;
+        VirtPtr info_address = stack_pointer;
         PUSH_TO_VIRTPTR(stack_pointer, task->process->signals.mask);
         PUSH_TO_VIRTPTR(stack_pointer, task->process->signals.restore_frame);
         PUSH_TO_VIRTPTR(stack_pointer, task->process->signals.current_signal);
@@ -101,7 +101,7 @@ static bool handleActualSignal(Task* task, Signal signal) {
         task->frame.pc = action->handler;
         // Set argument to signal type
         task->frame.regs[REG_ARGUMENT_0] = signal;
-        task->frame.regs[REG_ARGUMENT_1] = info_addres.address;
+        task->frame.regs[REG_ARGUMENT_1] = info_address.address;
         task->frame.regs[REG_ARGUMENT_2] = stack_pointer.address;
         // Set stack pointer to after the restore frame
         task->frame.regs[REG_STACK_POINTER] = stack_pointer.address;
