@@ -41,8 +41,10 @@ SpinLock process_lock;
 #define WUNTRACED   0b010
 #define WCONTINUED  0b100
 
-#define STATUS_STOPPED 1
-#define STATUS_RESUMED 2
+#define STATUS_EXIT 0
+#define STATUS_TERM 1
+#define STATUS_STOP 2
+#define STATUS_CONT 3
 
 static Error basicProcessWait(Task* task) {
     size_t found = 0;
@@ -61,15 +63,15 @@ static Error basicProcessWait(Task* task) {
             lockSpinLock(&child->lock);
             if (
                 child->tasks == NULL
-                || ((flags & WUNTRACED) != 0 && (child->status >> 16) == STATUS_STOPPED)
-                || ((flags & WCONTINUED) != 0 && (child->status >> 16) == STATUS_RESUMED)
+                || ((flags & WUNTRACED) != 0 && (child->status >> 8) == STATUS_STOP)
+                || ((flags & WCONTINUED) != 0 && (child->status >> 8) == STATUS_CONT)
             ) {
                 unlockSpinLock(&child->lock);
                 writeInt(
                     virtPtrForTask(task->frame.regs[REG_ARGUMENT_2], task),
                     sizeof(int) * 8, child->status
                 );
-                child->status &= 0xffff;
+                child->status = 0; // After we have read the status, reset it.
                 task->times.user_child_time += child->times.user_time + child->times.user_child_time;
                 task->times.system_child_time += child->times.system_time + child->times.system_child_time;
                 task->frame.regs[REG_ARGUMENT_0] = child->pid;
@@ -305,14 +307,18 @@ void terminateAllProcessTasks(Process* process) {
 
 void exitProcess(Process* process, Signal signal, int exit) {
     lockSpinLock(&process->lock);
-    process->status = (exit & 0xff) | ((signal & 0xff) << 8);
+    if (signal == SIGNONE) {
+        process->status = (exit & 0xff) | (STATUS_EXIT << 8);
+    } else {
+        process->status = (signal & 0xff) | (STATUS_TERM << 8);
+    }
     unlockSpinLock(&process->lock);
     terminateAllProcessTasks(process);
 }
 
 void stopProcess(Process* process, Signal signal) {
     lockSpinLock(&process->lock);
-    process->status = ((signal & 0xff) << 8) | STATUS_STOPPED << 16;
+    process->status = (signal & 0xff) | (STATUS_STOP << 8);
     if (process->tree.parent != NULL) {
         addSignalToProcess(process->tree.parent, SIGCHLD);
     }
@@ -322,7 +328,7 @@ void stopProcess(Process* process, Signal signal) {
 
 void continueProcess(Process* process, Signal signal) {
     lockSpinLock(&process->lock);
-    process->status = ((signal & 0xff) << 8) | STATUS_RESUMED << 16;
+    process->status = (signal & 0xff) | (STATUS_CONT << 8);
     Task* current = process->tasks;
     while (current != NULL) {
         lockSpinLock(&current->sched.lock);

@@ -75,7 +75,7 @@ SyscallReturn exitSyscall(TrapFrame* frame) {
     assert(frame->hart != NULL);
     Task* task = (Task*)frame;
     if (task->process != NULL) {
-        exitProcess(task->process, 0, SYSCALL_ARG(0));
+        exitProcess(task->process, SIGNONE, SYSCALL_ARG(0));
     } else {
         moveTaskToState(task, TERMINATED);
     }
@@ -157,14 +157,6 @@ SyscallReturn waitSyscall(TrapFrame* frame) {
     return WAIT;
 }
 
-typedef struct {
-    uintptr_t handler;
-    SignalSet mask;
-    int flags;
-    uintptr_t sigaction;
-    uintptr_t restorer;
-} SignalAction;
-
 SyscallReturn sigactionSyscall(TrapFrame* frame) {
     assert(frame->hart != NULL);
     Task* task = (Task*)frame;
@@ -177,29 +169,14 @@ SyscallReturn sigactionSyscall(TrapFrame* frame) {
         VirtPtr new = virtPtrForTask(SYSCALL_ARG(1), task);
         VirtPtr old = virtPtrForTask(SYSCALL_ARG(2), task);
         SignalHandler* handler = &task->process->signals.handlers[sig];
-        SignalAction oldaction = {
-            .handler = handler->handler,
-            .mask = handler->mask,
-            .flags = handler->flags,
-            .sigaction = handler->handler,
-            .restorer = handler->restorer,
-        };
-        SignalAction newaction;
+        SignalHandler old_handler = *handler;
         if (new.address != 0) {
-            memcpyBetweenVirtPtr(virtPtrForKernel(&newaction), new, sizeof(SignalAction));
-            if ((newaction.flags & SA_SIGINFO) == 0) {
-                handler->handler = newaction.handler;
-            } else {
-                handler->handler = newaction.sigaction;
-            }
-            handler->restorer = newaction.restorer;
-            handler->flags = newaction.flags;
-            handler->mask = newaction.mask;
+            memcpyBetweenVirtPtr(virtPtrForKernel(handler), new, sizeof(SignalHandler));
+        }
+        if (old.address != 0) {
+            memcpyBetweenVirtPtr(old, virtPtrForKernel(&old_handler), sizeof(SignalHandler));
         }
         unlockSpinLock(&task->process->lock);
-        if (old.address != 0) {
-            memcpyBetweenVirtPtr(old, virtPtrForKernel(&oldaction), sizeof(SignalAction));
-        }
         SYSCALL_RETURN(-SUCCESS);
     }
 }
