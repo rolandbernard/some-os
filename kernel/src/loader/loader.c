@@ -21,12 +21,16 @@
 #include "util/util.h"
 
 static size_t stringArrayLength(VirtPtr addr) {
-    size_t length = 0;
-    while (readInt(addr, sizeof(uintptr_t) * 8) != 0) {
-        addr.address += sizeof(uintptr_t);
-        length++;
+    if (addr.address == 0) {
+        return 0;
+    } else {
+        size_t length = 0;
+        while (readInt(addr, sizeof(uintptr_t) * 8) != 0) {
+            addr.address += sizeof(uintptr_t);
+            length++;
+        }
+        return length;
     }
-    return length;
 }
 
 static uintptr_t pushString(VirtPtr stack_pointer, VirtPtr string) {
@@ -43,9 +47,9 @@ static uintptr_t pushStringArray(VirtPtr stack_pointer, VirtPtr array, size_t* s
         i--;
         stack_pointer.address = pushString(
             stack_pointer,
-            virtPtrFor(readIntAt(array, i, sizeof(uintptr_t) * 8), stack_pointer.table)
+            virtPtrFor(readIntAt(array, i, sizeof(uintptr_t) * 8), array.table)
         );
-        strings[length] = stack_pointer.address;
+        strings[i] = stack_pointer.address;
     }
     stack_pointer.address -= sizeof(uintptr_t);
     writeInt(stack_pointer, sizeof(uintptr_t) * 8, 0);
