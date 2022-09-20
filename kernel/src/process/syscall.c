@@ -101,9 +101,7 @@ SyscallReturn pauseSyscall(TrapFrame* frame) {
     task->frame.regs[REG_ARGUMENT_0] = -EINTR; // This is the only possible return value.
     lockSpinLock(&task->sched.lock); 
     task->sched.wakeup_function = handlePauseWakeup;
-    moveTaskToState(task, SLEEPING);
     unlockSpinLock(&task->sched.lock); 
-    enqueueTask(task);
     return WAIT;
 }
 
@@ -153,7 +151,6 @@ SyscallReturn waitSyscall(TrapFrame* frame) {
     Task* task = (Task*)frame;
     assert(task->process != NULL);
     executeProcessWait(task);
-    enqueueTask(task);
     return WAIT;
 }
 

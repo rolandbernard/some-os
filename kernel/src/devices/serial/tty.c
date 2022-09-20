@@ -49,8 +49,8 @@ static bool wakeupIfRequired(UartTtyDevice* dev) {
     if (canReturnRead(dev)) {
         while (dev->blocked != NULL) {
             Task* wakeup = dev->blocked;
-            dev->blocked = wakeup->sched.sched_next;
-            moveTaskToState(wakeup, ENQUABLE);
+            dev->blocked = wakeup->sched.locks_next;
+            awakenTask(wakeup);
             enqueueTask(wakeup);
         }
         return true;
@@ -69,9 +69,10 @@ static void checkForWakeup(Time time, void* udata) {
 }
 
 static void waitForReadOperation(void* _, Task* task, UartTtyDevice* dev) {
+    task->sched.wakeup_function = NULL;
     moveTaskToState(task, WAITING);
     enqueueTask(task);
-    task->sched.sched_next = dev->blocked;
+    task->sched.locks_next = dev->blocked;
     dev->blocked = task;
     if ((dev->ctrl.lflag & ICANON) == 0 && dev->ctrl.cc[VTIME] != 0 && dev->blocked == NULL) {
         setTimeout(dev->ctrl.cc[VTIME] * CLOCKS_PER_SEC / 10, checkForWakeup, dev);

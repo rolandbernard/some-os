@@ -512,9 +512,7 @@ SyscallReturn selectSyscall(TrapFrame* frame) {
     lockSpinLock(&task->sched.lock); 
     task->times.entered = getTime();
     task->sched.wakeup_function = handleSelectWakeup;
-    moveTaskToState(task, SLEEPING);
     unlockSpinLock(&task->sched.lock); 
-    enqueueTask(task);
     if (timeout != (Time)-1) {
         // Make sure we wake up in time
         setTimeoutTime(getTime() + timeout / (1000000000UL / CLOCKS_PER_SEC), NULL, NULL);

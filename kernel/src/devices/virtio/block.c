@@ -47,6 +47,7 @@ Error initVirtIOBlockDevice(volatile VirtIODeviceLayout* base, ExternalInterrupt
 }
 
 static void waitForBlockOperation(void* _, VirtIOBlockDevice* device, VirtIOBlockRequest* request) {
+    request->wakeup->sched.wakeup_function = NULL;
     moveTaskToState(request->wakeup, WAITING);
     enqueueTask(request->wakeup);
     sendRequestAt(&device->virtio, request->head);
@@ -121,7 +122,7 @@ void virtIOBlockFreePendingRequests(VirtIOBlockDevice* device) {
                 request->result = simpleError(EIO);
                 break;
         }
-        moveTaskToState(request->wakeup, ENQUABLE);
+        awakenTask(request->wakeup);
         enqueueTask(request->wakeup);
     }
 }

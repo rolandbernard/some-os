@@ -41,7 +41,7 @@ static void doOperationOnPipe(PipeSharedData* pipe) {
                     pipe->waiting_reads_tail = NULL;
                 }
                 if (op->wakeup != NULL) {
-                    moveTaskToState(op->wakeup, ENQUABLE);
+                    awakenTask(op->wakeup);
                     enqueueTask(op->wakeup);
                 }
             }
@@ -71,7 +71,7 @@ static void doOperationOnPipe(PipeSharedData* pipe) {
                     pipe->waiting_writes_tail = NULL;
                 }
                 if (op->wakeup != NULL) {
-                    moveTaskToState(op->wakeup, ENQUABLE);
+                    awakenTask(op->wakeup);
                     enqueueTask(op->wakeup);
                 }
             }
@@ -83,6 +83,7 @@ static void doOperationOnPipe(PipeSharedData* pipe) {
 }
 
 static void waitForPipeOperation(void* _, Task* task, PipeSharedData* data) {
+    task->sched.wakeup_function = NULL;
     moveTaskToState(task, WAITING);
     enqueueTask(task);
     doOperationOnPipe(data);

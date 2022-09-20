@@ -112,16 +112,17 @@ void executeProcessWait(Task* task) {
     Error err = basicProcessWait(task);
     unlockSpinLock(&process_lock);
     if (!isError(err)) {
-        moveTaskToState(task, ENQUABLE);
+        awakenTask(task);
+        enqueueTask(task);
     } else {
         if (err.kind == EINTR) {
             lockSpinLock(&task->sched.lock); 
             task->sched.wakeup_function = handleProcessWaitWakeup;
-            moveTaskToState(task, SLEEPING);
             unlockSpinLock(&task->sched.lock); 
         } else {
             task->frame.regs[REG_ARGUMENT_0] = -err.kind;
-            moveTaskToState(task, ENQUABLE);
+            awakenTask(task);
+            enqueueTask(task);
         }
     }
 }

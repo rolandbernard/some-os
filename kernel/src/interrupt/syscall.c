@@ -137,7 +137,7 @@ static void syscallTask(SyscallFunction func, TrapFrame* frame) {
     task->times.system_time += self->times.user_time + self->times.system_time;
     task->times.system_time += self->times.user_child_time + self->times.system_child_time;
     if (ret == CONTINUE) {
-        moveTaskToState(task, ENQUABLE);
+        awakenTask(task);
         enqueueTask(task);
     }
     callInHart((void*)syscallTaskEnd, self);
@@ -169,6 +169,7 @@ void runSyscall(TrapFrame* frame, bool is_kernel) {
         } else {
             assert(frame->hart != NULL); // Only tasks can wait for async syscalls
             Task* task = (Task*)frame;
+            task->sched.wakeup_function = NULL;
             moveTaskToState(task, WAITING);
             task->sys_task = createKernelTask(syscallTask, SYSCALL_STACK_SIZE, task->sched.priority);
             task->sys_task->frame.regs[REG_ARGUMENT_0] = (uintptr_t)func;
