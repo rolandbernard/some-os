@@ -79,7 +79,7 @@ $(OBJECT_DIR)/%.o: $(SOURCE_DIR)/% $(MAKEFILE_LIST) | $$(dir $$@)
 
 $(OBJECT_DIR)/%.compdb: $(SOURCE_DIR)/%
 	@echo "    {" > $@
-	@echo "        \"command\": \"cc  $(CCFLAGS) -c $<\"," >> $@
+	@echo "        \"command\": \"cc  $(CCFLAGS) $(CCJFLAGS) -c $<\"," >> $@
 	@echo "        \"directory\": \"$(BASE_DIR)\"," >> $@
 	@echo "        \"file\": \"$<\"" >> $@
 	@echo "    }," >> $@

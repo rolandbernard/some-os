@@ -4,6 +4,7 @@
 #include <fcntl.h>
 #include <stdbool.h>
 #include <stdint.h>
+#include <signal.h>
 #include <stdlib.h>
 #include <sys/mprotect.h>
 #include <sys/mount.h>
@@ -189,6 +190,57 @@ static bool testForkSleepKillWait() {
         ASSERT(!WIFEXITED(status));
         ASSERT(WIFSIGNALED(status));
         ASSERT(WTERMSIG(status) == SIGKILL);
+    }
+    return true;
+}
+
+static bool testForkSleepWait1() {
+    int pid = fork();
+    ASSERT(pid != -1);
+    if (pid == 0) {
+        ASSERT_CHILD(usleep(10000) == 0);
+        exit(12);
+    } else {
+        int status;
+        int wait_pid = wait(&status);
+        ASSERT(wait_pid == pid);
+        ASSERT(WIFEXITED(status));
+        ASSERT(WEXITSTATUS(status) == 12);
+    }
+    return true;
+}
+
+static bool testForkSleepWait2() {
+    int pid = fork();
+    ASSERT(pid != -1);
+    if (pid == 0) {
+        exit(12);
+    } else {
+        usleep(10000);
+        ASSERT(errno == EINTR);
+        int status;
+        int wait_pid = wait(&status);
+        ASSERT(wait_pid == pid);
+        ASSERT(WIFEXITED(status));
+        ASSERT(WEXITSTATUS(status) == 12);
+    }
+    return true;
+}
+
+static bool testForkSleepWait3() {
+    int pid = fork();
+    ASSERT(pid != -1);
+    if (pid == 0) {
+        ASSERT_CHILD(usleep(5000) == 0);
+        exit(12);
+    } else {
+        usleep(10000);
+        ASSERT(errno == EINTR);
+        int status;
+        int wait_pid = wait(&status);
+        ASSERT(wait_pid == pid);
+        ASSERT(WIFEXITED(status));
+        ASSERT(WEXITSTATUS(status) == 12);
     }
     return true;
 }
@@ -1011,6 +1063,9 @@ static bool runBasicSyscallTests() {
         TEST(testNanosleep),
         TEST(testForkKillWait),
         TEST(testForkSleepKillWait),
+        TEST(testForkSleepWait1),
+        TEST(testForkSleepWait2),
+        TEST(testForkSleepWait3),
         TEST(testSignal),
         TEST(testGetpid),
         TEST(testGetppid),

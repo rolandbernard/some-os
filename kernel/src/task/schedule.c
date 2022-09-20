@@ -15,22 +15,22 @@
 
 #define PRIORITY_DECREASE (CLOCKS_PER_SEC / 75)
 
-SpinLock sleeping_lock;
-Task* sleeping = NULL;
+SpinLock waiting_lock;
+Task* waiting = NULL;
 
 static void addWaitingTask(Task* task) {
-    lockSpinLock(&sleeping_lock);
-    assert(task != sleeping);
+    lockSpinLock(&waiting_lock);
+    assert(task != waiting);
 #ifdef DEBUG
-    Task* current = sleeping;
+    Task* current = waiting;
     while (current != NULL) {
         assert(current != task);
         current = current->sched.sched_next;
     }
 #endif
-    task->sched.sched_next = sleeping;
-    sleeping = task;
-    unlockSpinLock(&sleeping_lock);
+    task->sched.sched_next = waiting;
+    waiting = task;
+    unlockSpinLock(&waiting_lock);
 }
 
 void enqueueTask(Task* task) {
@@ -77,8 +77,8 @@ void enqueueTask(Task* task) {
 }
 
 static void awakenTasks() {
-    lockSpinLock(&sleeping_lock);
-    Task** current = &sleeping;
+    lockSpinLock(&waiting_lock);
+    Task** current = &waiting;
     while (*current != NULL) {
         Task* task = *current;
         lockSpinLock(&task->sched.lock);
@@ -92,7 +92,7 @@ static void awakenTasks() {
             current = &task->sched.sched_next;
         }
     }
-    unlockSpinLock(&sleeping_lock);
+    unlockSpinLock(&waiting_lock);
 }
 
 noreturn void runNextTask() {
@@ -217,8 +217,8 @@ void moveTaskToState(Task* task, TaskState state) {
 }
 
 void awakenTask(Task* task) {
-    lockSpinLock(&sleeping_lock);
-    Task** current = &sleeping;
+    lockSpinLock(&waiting_lock);
+    Task** current = &waiting;
     while (*current != NULL && *current != task) {
         current = &(*current)->sched.sched_next;
     }
@@ -230,6 +230,6 @@ void awakenTask(Task* task) {
         task->sched.state = ENQUABLE;
     }
     unlockSpinLock(&task->sched.lock);
-    unlockSpinLock(&sleeping_lock);
+    unlockSpinLock(&waiting_lock);
 }
 
