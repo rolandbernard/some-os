@@ -53,6 +53,7 @@ $(foreach TARGET, $(TARGETS), \
 	$(eval TARGET_SOURCES.$(TARGET) = $(filter-out $(DISABLED_SOURCES), $(TARGET_SOURCES.$(TARGET)))))
 $(foreach TARGET, $(TARGETS), \
 	$(eval TARGET_OBJECTS.$(TARGET) = $(patsubst $(SOURCE_DIR)/%, $(OBJECT_DIR)/%.o, $(TARGET_SOURCES.$(TARGET)))))
+COMPDBS          := $(patsubst $(SOURCE_DIR)/%, $(OBJECT_DIR)/%.compdb, $(ALL_SOURCES))
 ALL_OBJECTS      := $(patsubst $(SOURCE_DIR)/%, $(OBJECT_DIR)/%.o, $(ALL_SOURCES))
 OBJECTS          := $(patsubst $(SOURCE_DIR)/%, $(OBJECT_DIR)/%.o, $(COMMON_SOURCES))
 DEPENDENCIES     := $(ALL_OBJECTS:.o=.d)
@@ -61,7 +62,7 @@ BINARYS          := $(foreach TARGET, $(TARGETS), $(BINARY_DIR)/$(TARGET))
 
 .PHONY: build clean
 
-build: $(TARGETS)
+build: compile_commands.json $(TARGETS)
 	@$(FINISHED)
 	@$(ECHO) "Build successful."
 
@@ -75,6 +76,21 @@ $(BINARYS): $(BINARY_DIR)/%: $(OBJECTS) $$(TARGET_OBJECTS.$$*) $(LINK_SCRIPT) $(
 $(OBJECT_DIR)/%.o: $(SOURCE_DIR)/% $(MAKEFILE_LIST) | $$(dir $$@)
 	@$(ECHO) "Building $@"
 	$(CC) $(CCFLAGS) -c -o $@ $<
+
+$(OBJECT_DIR)/%.compdb: $(SOURCE_DIR)/%
+	@echo "    {" > $@
+	@echo "        \"command\": \"cc  $(CCFLAGS) -c $<\"," >> $@
+	@echo "        \"directory\": \"$(BASE_DIR)\"," >> $@
+	@echo "        \"file\": \"$<\"" >> $@
+	@echo "    }," >> $@
+
+compile_commands.json: $(COMPDBS)
+	@echo "[" > $@.tmp
+	@cat $^ >> $@.tmp
+	@sed '$$d' < $@.tmp > $@
+	@echo "    }" >> $@
+	@echo "]" >> $@
+	@rm $@.tmp
 
 clean:
 	$(RM) -rf $(BUILD_DIR)

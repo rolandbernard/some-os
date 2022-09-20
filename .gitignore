@@ -4,9 +4,11 @@ build/
 bin/
 mnt/
 tmp/
+.cache
 .vscode
 .vim*
 compile_flags.txt
+compile_commands.json
 hdd.dsk
 
 # Prerequisites
