@@ -79,7 +79,10 @@ static Error basicProcessWait(Task* task) {
                 if (*current != NULL) {
                     (*current)->tree.child_prev = child->tree.child_prev;
                 }
-                deallocProcess(child);
+                if (child->tasks == NULL) {
+                    // Only deallocate the process on exit or termination
+                    deallocProcess(child);
+                }
                 return simpleError(SUCCESS);
             } else {
                 unlockSpinLock(&child->lock);
