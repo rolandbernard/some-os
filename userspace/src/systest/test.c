@@ -216,7 +216,7 @@ static bool testForkSleepWait2() {
     if (pid == 0) {
         exit(12);
     } else {
-        usleep(10000);
+        usleep(100000);
         ASSERT(errno == EINTR);
         int status;
         int wait_pid = wait(&status);
@@ -234,7 +234,7 @@ static bool testForkSleepWait3() {
         ASSERT_CHILD(usleep(5000) == 0);
         exit(12);
     } else {
-        usleep(10000);
+        usleep(100000);
         ASSERT(errno == EINTR);
         int status;
         int wait_pid = wait(&status);

@@ -174,6 +174,7 @@ void runSyscall(TrapFrame* frame, bool is_kernel) {
             task->sys_task = createKernelTask(syscallTask, SYSCALL_STACK_SIZE, task->sched.priority);
             task->sys_task->frame.regs[REG_ARGUMENT_0] = (uintptr_t)func;
             task->sys_task->frame.regs[REG_ARGUMENT_1] = (uintptr_t)frame;
+            task->sys_task->sys_task = task;
             enqueueTask(task->sys_task);
         }
     } else {

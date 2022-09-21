@@ -90,7 +90,7 @@ typedef enum {
 
 typedef uint8_t Priority;
 
-typedef bool (*SleepTryToWakeUp)(struct Task_s* task);
+typedef bool (*SleepTryToWakeUp)(struct Task_s* task, void* udata);
 
 typedef struct {
     // All data needed for scheduling
@@ -101,6 +101,7 @@ typedef struct {
     struct Task_s* sched_next;  // Used for ready and waiting lists
     struct Task_s* locks_next;  // Used for lists in locks
     SleepTryToWakeUp wakeup_function;
+    void* wakeup_udata;
     SpinLock lock;
 } TaskSched;
 

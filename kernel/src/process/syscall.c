@@ -83,7 +83,7 @@ SyscallReturn exitSyscall(TrapFrame* frame) {
     return WAIT;
 }
 
-static bool handlePauseWakeup(Task* task) {
+static bool handlePauseWakeup(Task* task, void* _) {
     lockSpinLock(&task->process->lock); 
     if (task->process->signals.signals != NULL) {
         unlockSpinLock(&task->process->lock); 

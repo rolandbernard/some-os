@@ -82,7 +82,10 @@ static void awakenTasks() {
     while (*current != NULL) {
         Task* task = *current;
         lockSpinLock(&task->sched.lock);
-        if (task->sched.wakeup_function != NULL && task->sched.wakeup_function(task)) {
+        if (
+            task->sched.wakeup_function != NULL
+            && task->sched.wakeup_function(task, task->sched.wakeup_udata)
+        ) {
             task->sched.state = ENQUABLE;
             unlockSpinLock(&task->sched.lock);
             *current = task->sched.sched_next;

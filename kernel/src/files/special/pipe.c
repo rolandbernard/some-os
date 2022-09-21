@@ -82,8 +82,34 @@ static void doOperationOnPipe(PipeSharedData* pipe) {
     }
 }
 
+static bool handlePipeWakeup(Task* task, void* udata) {
+    lockSpinLock(&task->sys_task->process->lock); 
+    if (task->sys_task->process->signals.signals != NULL) {
+        PipeSharedData* data = (PipeSharedData*)udata;
+        lockSpinLock(&data->lock);
+        WaitingPipeOperation** current = &data->waiting_reads;
+        while (*current != NULL && (*current)->wakeup != task) {
+            current = &(*current)->next;
+        }
+        if (*current != NULL) {
+            *current = (*current)->next;
+            if (data->waiting_reads == NULL) {
+                data->waiting_reads_tail = NULL;
+            }
+        }
+        unlockSpinLock(&data->lock);
+        unlockSpinLock(&task->sys_task->process->lock); 
+        return true;
+    } else {
+        unlockSpinLock(&task->sys_task->process->lock); 
+        return false;
+    }
+}
+
 static void waitForPipeOperation(void* _, Task* task, PipeSharedData* data) {
-    task->sched.wakeup_function = NULL;
+    assert(task->process == NULL);
+    task->sched.wakeup_udata = data;
+    task->sched.wakeup_function = task->sys_task->process != NULL ? handlePipeWakeup : NULL;
     moveTaskToState(task, WAITING);
     enqueueTask(task);
     doOperationOnPipe(data);
@@ -147,7 +173,7 @@ Error executePipeOperation(PipeSharedData* data, VirtPtr buffer, size_t size, bo
             callInHart((void*)waitForPipeOperation, task, data);
         }
         *ret = op.written;
-        return simpleError(SUCCESS);
+        return simpleError(op.written != 0 ? SUCCESS : EINTR);
     } else {
         unlockSpinLock(&data->lock);
         criticalReturn(task);

@@ -68,8 +68,31 @@ static void checkForWakeup(Time time, void* udata) {
     unlockSpinLock(&dev->lock);
 }
 
+static bool handleTtyWakeup(Task* task, void* udata) {
+    lockSpinLock(&task->sys_task->process->lock); 
+    if (task->sys_task->process->signals.signals != NULL) {
+        UartTtyDevice* dev = (UartTtyDevice*)udata;
+        lockSpinLock(&dev->lock);
+        Task** current = &dev->blocked;
+        while (*current != NULL && *current != task) {
+            current = &(*current)->sched.locks_next;
+        }
+        if (*current == task) {
+            *current = (*current)->sched.locks_next;
+        }
+        unlockSpinLock(&dev->lock);
+        unlockSpinLock(&task->sys_task->process->lock); 
+        return true;
+    } else {
+        unlockSpinLock(&task->sys_task->process->lock); 
+        return false;
+    }
+}
+
 static void waitForReadOperation(void* _, Task* task, UartTtyDevice* dev) {
-    task->sched.wakeup_function = NULL;
+    assert(task->process == NULL);
+    task->sched.wakeup_udata = dev;
+    task->sched.wakeup_function = task->sys_task->process != NULL ? handleTtyWakeup : NULL;
     moveTaskToState(task, WAITING);
     enqueueTask(task);
     task->sched.locks_next = dev->blocked;
@@ -117,16 +140,28 @@ static Error uartTtyReadOrWait(UartTtyDevice* dev, VirtPtr buffer, size_t size, 
         *read = length;
         return simpleError(SUCCESS);
     } else {
+        if (task->sys_task->process != NULL) {
+            lockSpinLock(&task->sys_task->process->lock); 
+            if (task->sys_task->process->signals.signals != NULL) {
+                unlockSpinLock(&task->sys_task->process->lock); 
+                unlockSpinLock(&dev->lock);
+                criticalReturn(task);
+                return simpleError(EINTR);
+            } else {
+                unlockSpinLock(&task->sys_task->process->lock); 
+            }
+        }
         if (block) {
             assert(task != NULL);
             if (saveToFrame(&task->frame)) {
                 callInHart((void*)waitForReadOperation, task, dev);
             }
+            return simpleError(EAGAIN);
         } else {
             unlockSpinLock(&dev->lock);
             criticalReturn(task);
+            return simpleError(EAGAIN);
         }
-        return simpleError(EAGAIN);
     }
 }
 

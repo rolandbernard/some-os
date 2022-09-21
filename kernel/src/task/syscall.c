@@ -12,7 +12,7 @@ SyscallReturn yieldSyscall(TrapFrame* frame) {
     SYSCALL_RETURN(0);
 }
 
-static bool handleSleepWakeup(Task* task) {
+static bool handleSleepWakeup(Task* task, void* _) {
     Time time = getTime();
     bool wakeup = time >= task->times.entered;
     if (!wakeup && task->process != NULL) {

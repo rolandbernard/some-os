@@ -438,7 +438,7 @@ SyscallReturn isattySyscall(TrapFrame* frame) {
     }
 }
 
-static bool handleSelectWakeup(Task* task) {
+static bool handleSelectWakeup(Task* task, void* _) {
     TrapFrame* frame = (TrapFrame*)task;
     if (task->process != NULL) {
         lockSpinLock(&task->process->lock); 

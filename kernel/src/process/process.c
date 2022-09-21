@@ -90,7 +90,7 @@ static Error basicProcessWait(Task* task) {
     return simpleError(found != 0 ? ((flags & WNOHANG) != 0 ? EAGAIN : EINTR) : ECHILD);
 }
 
-static bool handleProcessWaitWakeup(Task* task) {
+static bool handleProcessWaitWakeup(Task* task, void* _) {
     lockSpinLock(&task->process->lock); 
     if (task->process->signals.signals != NULL) {
         lockSpinLock(&process_lock); 
