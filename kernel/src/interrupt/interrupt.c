@@ -92,7 +92,6 @@ void kernelTrap(uintptr_t cause, uintptr_t pc, uintptr_t val, TrapFrame* frame) 
 #endif
         }
         if (interrupt) {
-            frame->pc = pc;
             switch (code) {
                 case 0: // Software interrupt U-mode
                 case 1: // Software interrupt S-mode

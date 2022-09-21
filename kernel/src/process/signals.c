@@ -179,9 +179,9 @@ void clearSignals(Process* process) {
     process->signals.current_signal = 0;
     process->signals.restore_frame = 0;
     for (size_t i = 0; i < SIG_COUNT; i++) {
-        process->signals.handlers->flags = 0;
-        if (process->signals.handlers->handler != SIG_IGN) {
-            process->signals.handlers->handler = SIG_DFL;
+        process->signals.handlers[i].flags = 0;
+        if (process->signals.handlers[i].handler != SIG_IGN) {
+            process->signals.handlers[i].handler = SIG_DFL;
         }
     }
     unlockSpinLock(&process->lock);
