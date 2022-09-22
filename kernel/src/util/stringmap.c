@@ -52,9 +52,13 @@ static bool areKeysEqual(const char* in_table, const char* key) {
 
 void putToStringMap(StringMap* map, const char* key, void* value) {
     testForResize(map);
-    size_t idx = hashString(key) % map->capacity;
+    size_t start = hashString(key) % map->capacity;
+    size_t idx = start;
     while (map->keys[idx] != EMPTY && !areKeysEqual(map->keys[idx], key)) {
         idx = (idx + 1) % map->capacity;
+        if (idx == start) {
+            break;
+        }
     }
     if (areKeysEqual(map->keys[idx], key)) {
         map->values[idx] = value;
@@ -72,9 +76,13 @@ void putToStringMap(StringMap* map, const char* key, void* value) {
 
 void* getFromStringMap(StringMap* map, const char* key) {
     if (map->count != 0) {
-        size_t idx = hashString(key) % map->capacity;
+        size_t start = hashString(key) % map->capacity;
+        size_t idx = start;
         while (map->keys[idx] != EMPTY && !areKeysEqual(map->keys[idx], key)) {
             idx = (idx + 1) % map->capacity;
+            if (idx == start) {
+                break;
+            }
         }
         if (areKeysEqual(map->keys[idx], key)) {
             return map->values[idx];
@@ -88,9 +96,13 @@ void* getFromStringMap(StringMap* map, const char* key) {
 
 const char* getKeyFromStringMap(StringMap* map, const char* key) {
     if (map->count != 0) {
-        size_t idx = hashString(key) % map->capacity;
+        size_t start = hashString(key) % map->capacity;
+        size_t idx = start;
         while (map->keys[idx] != EMPTY && !areKeysEqual(map->keys[idx], key)) {
             idx = (idx + 1) % map->capacity;
+            if (idx == start) {
+                break;
+            }
         }
         if (areKeysEqual(map->keys[idx], key)) {
             return map->keys[idx];
@@ -104,9 +116,13 @@ const char* getKeyFromStringMap(StringMap* map, const char* key) {
 
 void deleteFromStringMap(StringMap* map, const char* key) {
     if (map->count != 0) {
-        size_t idx = hashString(key) % map->capacity;
+        size_t start = hashString(key) % map->capacity;
+        size_t idx = start;
         while (map->keys[idx] != EMPTY && !areKeysEqual(map->keys[idx], key)) {
             idx = (idx + 1) % map->capacity;
+            if (idx == start) {
+                break;
+            }
         }
         if (areKeysEqual(map->keys[idx], key)) {
             dealloc(map->keys[idx]);

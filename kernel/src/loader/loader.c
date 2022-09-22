@@ -79,7 +79,7 @@ static uintptr_t findStartBrk(MemorySpace* memspc) {
 
 Error loadProgramInto(Task* task, const char* path, VirtPtr args, VirtPtr envs) {
     VfsFile* file;
-    CHECKED(vfsOpenAt(&global_file_system, task->process, NULL, path, VFS_OPEN_EXECUTE, 0, &file));
+    CHECKED(vfsOpenAt(&global_file_system, task->process, NULL, path, VFS_OPEN_EXECUTE | VFS_OPEN_REGULAR, 0, &file));
     VfsStat stat;
     CHECKED(vfsFileStat(file, task->process, virtPtrForKernel(&stat)), vfsFileClose(file));
     MemorySpace* memory = createMemorySpace();
