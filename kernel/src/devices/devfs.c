@@ -89,7 +89,7 @@ static Error deviceFsDirReaddirAt(VfsNode* node, VirtPtr buff, size_t offset, si
             if (fst) {
                 written = writeDirectoryEntryNamed(dev->id + 1, dev->name, vfsTypeForDevice(dev), offset, buff, length);
             } else {
-                FORMAT_STRINGX(entry_name, "%s%zu", dev->name, dev->name_id);
+                FORMAT_STRINGX(entry_name, "%s%lu", dev->name, dev->name_id);
                 written = writeDirectoryEntryNamed(dev->id + 1, entry_name, vfsTypeForDevice(dev), offset, buff, length);
             }
         }

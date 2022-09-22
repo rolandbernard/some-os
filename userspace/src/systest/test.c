@@ -1032,6 +1032,8 @@ static bool testTime() {
 }
 
 static bool testSettimeofday() {
+    struct timeval old;
+    ASSERT(gettimeofday(&old, NULL) == 0);
     struct timeval start = { .tv_sec = 123456, .tv_usec = 654321 };
     ASSERT(settimeofday(&start, NULL) == 0);
     usleep(10000);
@@ -1039,6 +1041,7 @@ static bool testSettimeofday() {
     ASSERT(gettimeofday(&end, NULL) == 0);
     ASSERT((start.tv_sec * 1000000 + start.tv_usec) + 5000 < (end.tv_sec * 1000000 + end.tv_usec));
     ASSERT((start.tv_sec * 1000000 + start.tv_usec) + 20000 > (end.tv_sec * 1000000 + end.tv_usec));
+    ASSERT(settimeofday(&old, NULL) == 0);
     return true;
 }
 
