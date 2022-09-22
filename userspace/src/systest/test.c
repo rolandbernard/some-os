@@ -95,12 +95,12 @@ static bool testSigStopCont() {
         usleep(1000);
         exit(0);
     } else {
-        kill(pid, SIGSTOP);
+        ASSERT(kill(pid, SIGSTOP) == 0);
         usleep(10000);
         int status;
         int wait_pid = waitpid(-1, &status, WNOHANG);
         ASSERT(wait_pid == -1);
-        kill(pid, SIGCONT);
+        ASSERT(kill(pid, SIGCONT) == 0);
         wait_pid = wait(&status);
         ASSERT(wait_pid == pid);
         ASSERT(WIFEXITED(status));

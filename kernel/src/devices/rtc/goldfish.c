@@ -25,8 +25,8 @@ bool checkDeviceCompatibility(const char* str) {
 
 static Error goldfishRtcGetTime(GoldfishRtcDevice* dev, Time* time) {
     lockSpinLock(&dev->lock);
-    Time low = *(uint32_t*)(dev->base_address + GOLDFISH_RTC_TIME_LOW);
-    Time high = *(uint32_t*)(dev->base_address + GOLDFISH_RTC_TIME_HIGH);
+    Time low = *(volatile uint32_t*)(dev->base_address + GOLDFISH_RTC_TIME_LOW);
+    Time high = *(volatile uint32_t*)(dev->base_address + GOLDFISH_RTC_TIME_HIGH);
     *time = (high << 32) | low;
     unlockSpinLock(&dev->lock);
     return simpleError(SUCCESS);
@@ -34,8 +34,8 @@ static Error goldfishRtcGetTime(GoldfishRtcDevice* dev, Time* time) {
 
 static Error goldfishRtcSetTime(GoldfishRtcDevice* dev, Time time) {
     lockSpinLock(&dev->lock);
-    *(uint32_t*)(dev->base_address + GOLDFISH_RTC_TIME_HIGH) = time >> 32;
-    *(uint32_t*)(dev->base_address + GOLDFISH_RTC_TIME_LOW) = time & 0xffffffff;
+    *(volatile uint32_t*)(dev->base_address + GOLDFISH_RTC_TIME_HIGH) = time >> 32;
+    *(volatile uint32_t*)(dev->base_address + GOLDFISH_RTC_TIME_LOW) = time & 0xffffffff;
     unlockSpinLock(&dev->lock);
     return simpleError(SUCCESS);
 }
