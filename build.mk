@@ -25,8 +25,8 @@ WARNINGS := -Wall -Wextra -Wno-unused-parameter
 
 CCFLAGS.debug   += -O0 -g -DDEBUG -Werror
 LDFLAGS.debug   += -O0 -g
-CCFLAGS.release += -O3
-LDFLAGS.release += -O3
+CCFLAGS.release += -O3 -g
+LDFLAGS.release += -O3 -g
 
 CCFLAGS += $(CCFLAGS.$(BUILD)) $(WARNINGS) -MMD -MP -I$(SOURCE_DIR)
 CCFLAGS += $(foreach SWITCH, $(SWITCHES), -D$(shell echo $(SWITCH) | tr '[:lower:]' '[:upper:]'))
@@ -77,7 +77,7 @@ $(OBJECT_DIR)/%.o: $(SOURCE_DIR)/% $(MAKEFILE_LIST) | $$(dir $$@)
 	@$(ECHO) "Building $@"
 	$(CC) $(CCFLAGS) -c -o $@ $<
 
-$(OBJECT_DIR)/%.compdb: $(SOURCE_DIR)/%
+$(OBJECT_DIR)/%.compdb: $(SOURCE_DIR)/% | $$(dir $$@)
 	@echo "    {" > $@
 	@echo "        \"command\": \"cc  $(CCFLAGS) $(CCJFLAGS) -c $<\"," >> $@
 	@echo "        \"directory\": \"$(BASE_DIR)\"," >> $@

@@ -267,8 +267,7 @@ static int killSyscallCallback(Process* process, void* udata) {
 
 SyscallReturn killSyscall(TrapFrame* frame) {
     assert(frame->hart != NULL);
-    Task* task = (Task*)frame;
-    assert(task->process != NULL);
+    assert(((Task*)frame)->process != NULL);
     KillRequest request = {
         .frame = frame,
         .found = 0,
