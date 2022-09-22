@@ -68,6 +68,9 @@ static bool continueSearch(VfsNodeCache* table, size_t idx, size_t sb_id, size_t
 }
 
 static size_t findIndexHashTable(VfsNodeCache* table, size_t sb_id, size_t node_id) {
+    if (table->count == 0) {
+        return SIZE_MAX;
+    }
     size_t start = vfsNodeKeyHash(sb_id, node_id) % table->capacity;
     size_t first_free = SIZE_MAX;
     size_t idx = start;
