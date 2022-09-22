@@ -620,7 +620,11 @@ Error vfsCreateSuperblock(
 }
 
 static Error basicCanAccess(VfsStat* stat, struct Process_s* process, VfsAccessFlags flags) {
-    if (process == NULL || process->user.euid == 0) {
+    if ((flags & VFS_ACCESS_REG) != 0 && MODE_TYPE(stat->mode) != VFS_TYPE_REG) {
+        return simpleError(MODE_TYPE(stat->mode) == VFS_TYPE_DIR ? EISDIR : EINVAL);
+    } else if ((flags & VFS_ACCESS_DIR) != 0 && MODE_TYPE(stat->mode) != VFS_TYPE_DIR) {
+        return simpleError(ENOTDIR);
+    } else if (process == NULL || process->user.euid == 0) {
         // Kernel or uid 0 are allowed to do everything
         return simpleError(SUCCESS);
     } else if (
@@ -646,10 +650,6 @@ static Error basicCanAccess(VfsStat* stat, struct Process_s* process, VfsAccessF
         && ((stat->mode & VFS_MODE_O_X) == 0 || stat->uid != process->user.euid)
     ) {
         return simpleError(EACCES);
-    } else if ((flags & VFS_ACCESS_REG) != 0 && MODE_TYPE(stat->mode) != VFS_TYPE_REG) {
-        return simpleError(MODE_TYPE(stat->mode) == VFS_TYPE_DIR ? EISDIR : EINVAL);
-    } else if ((flags & VFS_ACCESS_DIR) != 0 && MODE_TYPE(stat->mode) != VFS_TYPE_DIR) {
-        return simpleError(ENOTDIR);
     } else {
         return simpleError(SUCCESS);
     }
