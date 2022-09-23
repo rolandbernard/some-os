@@ -215,14 +215,13 @@ static void testSigNoopHandler(int signal) {
 }
 
 static bool testForkSleepWait2() {
+    signal(SIGCHLD, testSigNoopHandler);
     int pid = fork();
     ASSERT(pid != -1);
-    signal(SIGCHLD, testSigNoopHandler);
     if (pid == 0) {
         exit(12);
     } else {
-        usleep(100000);
-        ASSERT(errno == EINTR);
+        usleep(10000);
         int status;
         int wait_pid = wait(&status);
         ASSERT(wait_pid == pid);
@@ -234,11 +233,12 @@ static bool testForkSleepWait2() {
 }
 
 static bool testForkSleepWait3() {
+    signal(SIGCHLD, testSigNoopHandler);
     int pid = fork();
     ASSERT(pid != -1);
-    signal(SIGCHLD, testSigNoopHandler);
     if (pid == 0) {
-        ASSERT_CHILD(usleep(5000) == 0);
+        // Sleep to wait for the parent to sleep so we can interrupt it.
+        ASSERT_CHILD(usleep(10000) == 0);
         exit(12);
     } else {
         usleep(100000);

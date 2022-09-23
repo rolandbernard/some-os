@@ -26,6 +26,7 @@ static bool shouldIgnoreSignal(Process* process, Signal signal) {
 }
 
 void addSignalToProcess(Process* process, Signal signal, Pid child_pid) {
+    // TODO: a stop and continue will interrupt system calls. It should not.
     if (signal == SIGCONT) {
         // This always continues the precess, even if the signal is blocked/ignored.
         // Is that the correct behaviour?
