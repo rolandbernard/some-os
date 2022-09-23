@@ -10,7 +10,7 @@
 #include "task/schedule.h"
 #include "task/task.h"
 
-void addSignalToProcess(Process* process, Signal signal) {
+PendingSignal* addSignalToProcess(Process* process, Signal signal) {
     if (signal > SIGNONE && signal < SIG_COUNT) {
         PendingSignal* entry = kalloc(sizeof(PendingSignal));
         entry->signal = signal;
@@ -27,6 +27,9 @@ void addSignalToProcess(Process* process, Signal signal) {
             process->signals.signals_tail = entry;
         }
         unlockSpinLock(&process->lock);
+        return entry;
+    } else {
+        return NULL;
     }
 }
 
@@ -183,6 +186,24 @@ void clearSignals(Process* process) {
         if (process->signals.handlers[i].handler != SIG_IGN) {
             process->signals.handlers[i].handler = SIG_DFL;
         }
+    }
+    unlockSpinLock(&process->lock);
+}
+
+void clearPendingChildSignals(Process* process, Pid child_pid) {
+    lockSpinLock(&process->lock);
+    PendingSignal** current = &process->signals.signals;
+    while (*current != NULL) {
+        PendingSignal* signal = *current;
+        if (signal->signal == SIGCHLD && signal->child_pid == child_pid) {
+            *current = signal->next;
+            dealloc(signal);
+        } else {
+            current = &signal->next;
+        }
+    }
+    if (process->signals.signals == NULL) {
+        process->signals.signals_tail = NULL;
     }
     unlockSpinLock(&process->lock);
 }

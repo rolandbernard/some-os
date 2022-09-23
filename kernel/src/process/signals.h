@@ -7,12 +7,14 @@
 #define SIG_DFL 0
 #define SIG_IGN 1
 
-void addSignalToProcess(Process* process, Signal signal);
+PendingSignal* addSignalToProcess(Process* process, Signal signal);
 
 bool handlePendingSignals(Task* task);
 
 void returnFromSignal(Task* process);
 
 void clearSignals(Process* process);
+
+void clearPendingChildSignals(Process* process, Pid child_pid);
 
 #endif

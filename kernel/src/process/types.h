@@ -109,6 +109,7 @@ typedef struct {
 typedef struct PendingSignal_s {
     struct PendingSignal_s* next;
     Signal signal;
+    Pid child_pid;
 } PendingSignal;
 
 typedef struct {
