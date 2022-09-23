@@ -210,9 +210,14 @@ static bool testForkSleepWait1() {
     return true;
 }
 
+static void testSigNoopHandler(int signal) {
+    // Do nothing.
+}
+
 static bool testForkSleepWait2() {
     int pid = fork();
     ASSERT(pid != -1);
+    signal(SIGCHLD, testSigNoopHandler);
     if (pid == 0) {
         exit(12);
     } else {
@@ -224,12 +229,14 @@ static bool testForkSleepWait2() {
         ASSERT(WIFEXITED(status));
         ASSERT(WEXITSTATUS(status) == 12);
     }
+    signal(SIGCHLD, SIG_DFL);
     return true;
 }
 
 static bool testForkSleepWait3() {
     int pid = fork();
     ASSERT(pid != -1);
+    signal(SIGCHLD, testSigNoopHandler);
     if (pid == 0) {
         ASSERT_CHILD(usleep(5000) == 0);
         exit(12);
@@ -242,6 +249,7 @@ static bool testForkSleepWait3() {
         ASSERT(WIFEXITED(status));
         ASSERT(WEXITSTATUS(status) == 12);
     }
+    signal(SIGCHLD, SIG_DFL);
     return true;
 }
 
@@ -468,6 +476,7 @@ static bool testTtyNonblock() {
 static bool testPause() {
     int pid = fork();
     ASSERT(pid != -1);
+    signal(SIGUSR1, testSigNoopHandler);
     if (pid == 0) {
         pause();
         exit(42);
@@ -480,6 +489,7 @@ static bool testPause() {
         ASSERT(!WIFSIGNALED(status));
         ASSERT(WEXITSTATUS(status) == 42);
     }
+    signal(SIGUSR1, SIG_DFL);
     return true;
 }
 

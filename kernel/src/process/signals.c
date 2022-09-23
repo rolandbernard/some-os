@@ -10,15 +10,33 @@
 #include "task/schedule.h"
 #include "task/task.h"
 
-PendingSignal* addSignalToProcess(Process* process, Signal signal) {
-    if (signal > SIGNONE && signal < SIG_COUNT) {
+static bool shouldIgnoreSignal(Process* process, Signal signal) {
+    SignalHandler* action = &process->signals.handlers[signal];
+    return signal != SIGKILL && signal != SIGSTOP
+           && (
+               action->handler == SIG_IGN
+               || (
+                   action->handler == SIG_DFL
+                   && (
+                       signal == SIGCHLD || signal == SIGURG || signal == SIGWINCH
+                       || signal == SIGUSR1 || signal == SIGUSR2 || signal == SIGCONT
+                   )
+               )
+           );
+}
+
+void addSignalToProcess(Process* process, Signal signal, Pid child_pid) {
+    if (signal == SIGCONT) {
+        // This always continues the precess, even if the signal is blocked/ignored.
+        // Is that the correct behaviour?
+        continueProcess(process, signal);
+    }
+    if (signal > SIGNONE && signal < SIG_COUNT && !shouldIgnoreSignal(process, signal)) {
         PendingSignal* entry = kalloc(sizeof(PendingSignal));
-        entry->signal = signal;
         entry->next = NULL;
+        entry->signal = signal;
+        entry->child_pid = child_pid;
         lockSpinLock(&process->lock);
-        if (signal == SIGCONT) {
-            continueProcess(process, signal);
-        }
         if (process->signals.signals_tail == NULL) {
             process->signals.signals_tail = entry;
             process->signals.signals = entry;
@@ -27,9 +45,6 @@ PendingSignal* addSignalToProcess(Process* process, Signal signal) {
             process->signals.signals_tail = entry;
         }
         unlockSpinLock(&process->lock);
-        return entry;
-    } else {
-        return NULL;
     }
 }
 

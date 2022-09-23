@@ -75,12 +75,12 @@ static Error basicProcessWait(Task* task) {
                 task->times.user_child_time += child->times.user_time + child->times.user_child_time;
                 task->times.system_child_time += child->times.system_time + child->times.system_child_time;
                 task->frame.regs[REG_ARGUMENT_0] = child->pid;
-                *current = child->tree.child_next;
-                if (*current != NULL) {
-                    (*current)->tree.child_prev = child->tree.child_prev;
-                }
                 clearPendingChildSignals(task->process, child->pid);
                 if (child->tasks == NULL) {
+                    *current = child->tree.child_next;
+                    if (*current != NULL) {
+                        (*current)->tree.child_prev = child->tree.child_prev;
+                    }
                     // Only deallocate the process on exit or termination
                     deallocProcess(child);
                 }
@@ -327,7 +327,7 @@ void stopProcess(Process* process, Signal signal) {
     lockSpinLock(&process->lock);
     process->status = (signal & 0xff) | (STATUS_STOP << 8);
     if (process->tree.parent != NULL) {
-        addSignalToProcess(process->tree.parent, SIGCHLD)->child_pid = process->pid;
+        addSignalToProcess(process->tree.parent, SIGCHLD, process->pid);
     }
     unlockSpinLock(&process->lock);
     moveAllProcessTasksToStateBut(process, STOPPED, NULL);
@@ -371,7 +371,7 @@ void removeProcessTask(Task* task) {
             unlockSpinLock(&process->lock);
             deallocProcess(process);
         } else {
-            addSignalToProcess(process->tree.parent, SIGCHLD)->child_pid = process->pid;
+            addSignalToProcess(process->tree.parent, SIGCHLD, process->pid);
             unlockSpinLock(&process->lock);
         }
     } else {
@@ -408,7 +408,7 @@ void signalProcessGroup(Pid pgid, Signal signal) {
     Process* current = global_first;
     while (current != NULL) {
         if (current->pgid == pgid) {
-            addSignalToProcess(current, signal);
+            addSignalToProcess(current, signal, 0);
         }
         current = current->tree.global_next;
     }

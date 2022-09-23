@@ -253,7 +253,7 @@ static int killSyscallCallback(Process* process, void* udata) {
         ) {
             request->allowed++;
             unlockSpinLock(&task->process->user.lock);
-            addSignalToProcess(process, SYSCALL_ARG(1));
+            addSignalToProcess(process, SYSCALL_ARG(1), 0);
             return -SUCCESS;
         } else {
             unlockSpinLock(&task->process->user.lock);
