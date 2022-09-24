@@ -108,9 +108,6 @@ ARG_SPEC_FUNCTION(argumentSpec, Arguments*, "ls [options] [file]...", {
     if (context->files.count == 0) {
         copyStringToList(&context->files, ".");
     }
-    if (context->reverse && context->filter == FILTER_ALL) {
-        context->filter = FILTER_ALMOST_ALL;
-    }
 })
 
 typedef struct {
@@ -118,6 +115,7 @@ typedef struct {
     nlink_t nlink;
     off_t size;
     time_t time;
+    dev_t rdev;
     char* name;
 } Entry;
 
@@ -128,6 +126,7 @@ Entry* entryForPath(const char* path, Arguments* args) {
         result->mode = stats.st_mode;
         result->nlink = stats.st_nlink;
         result->size = stats.st_size;
+        result->rdev = stats.st_rdev;
         result->time = stats.st_mtime;
     }
     result->name = strdup(basename(path));
@@ -139,11 +138,11 @@ int compareName(const void* a, const void* b) {
 }
 
 int compareSize(const void* a, const void* b) {
-    return (*(Entry* const*)b)->size - (*(Entry* const*)a)->size;
+    return (ssize_t)(*(Entry* const*)b)->size - (ssize_t)(*(Entry* const*)a)->size;
 }
 
 int compareTime(const void* a, const void* b) {
-    return (*(Entry* const*)b)->time - (*(Entry* const*)a)->time;
+    return (ssize_t)(*(Entry* const*)b)->time - (ssize_t)(*(Entry* const*)a)->time;
 }
 
 int compareNameReverse(const void* a, const void* b) {
@@ -158,15 +157,16 @@ int compareTimeReverse(const void* a, const void* b) {
     return -compareTime(a, b);
 }
 
-size_t formatSize(size_t size, bool si, char* unit) {
-    static const char units[] = {'B', 'K', 'M', 'G', 'T', 'P', 'E', 'Z', 'Y'};
+size_t formatSize(size_t size, bool si, const char** unit) {
+    static const char* units[] = {"", "K", "M", "G", "T", "P", "E", "Z", "Y"};
+    static const char* si_units[] = {"", "k", "M", "G", "T", "P", "E", "Z", "Y"};
     size_t base = si ? 1000 : 1024;
     size_t n = 0;
-    while (size > base) {
-        size /= base;
+    while (size > 9999) {
+        size = (size + base / 2) / base;
         n++;
     }
-    *unit = units[n];
+    *unit = si ? si_units[n] : units[n];
     return size;
 }
 
@@ -192,7 +192,10 @@ void listPath(const char* path, Arguments* args) {
                 char* entr_path = joinPaths(path, entr->d_name);
                 Entry* entry = entryForPath(entr_path, args);
                 addToList(&entries, entry);
-                if (args->recursive && (entry->mode & S_IFMT) == S_IFDIR) {
+                if (
+                    args->recursive && (entry->mode & S_IFMT) == S_IFDIR
+                    && strcmp(entr->d_name, ".") != 0 && strcmp(entr->d_name, "..") != 0
+                ) {
                     addToList(&args->files, entr_path);
                 } else {
                     free(entr_path);
@@ -227,13 +230,19 @@ void listPath(const char* path, Arguments* args) {
             if (entry->nlink > max_nlink) {
                 max_nlink = entry->nlink;
             }
+            if ((size_t)entry->rdev > max_size) {
+                max_size = entry->rdev;
+            }
             if (args->format == FORMAT_NONE) {
                 if ((size_t)entry->size > max_size) {
                     max_size = entry->size;
                 }
             } else {
-                char unit;
+                const char* unit;
                 size_t fmt_size = formatSize(entry->size, args->format == FORMAT_SI, &unit);
+                for (size_t i = 0; i < strlen(unit); i++) {
+                    fmt_size *= 10;
+                }
                 if (fmt_size > max_size) {
                     max_size = fmt_size;
                 }
@@ -270,18 +279,25 @@ void listPath(const char* path, Arguments* args) {
             } else {
                 strftime(time, sizeof(time), "%b %e %H:%M", tm);
             }
-            if (args->format == FORMAT_NONE) {
+            if (entry->rdev != 0) {
                 printf(
-                    "%s %*hu %*lu %s %s\n", mode, decimalWidth(max_nlink), entry->nlink,
-                    decimalWidth(max_size), entry->size, time, entry->name
+                    "%s %*hu %*u %s %s\n", mode, decimalWidth(max_nlink), entry->nlink,
+                    decimalWidth(max_size), entry->rdev, time, entry->name
                 );
             } else {
-                char unit;
-                size_t fmt_size = formatSize(entry->size, args->format == FORMAT_SI, &unit);
-                printf(
-                    "%s %*hu %*lu%c %s %s\n", mode, decimalWidth(max_nlink), entry->nlink,
-                    decimalWidth(max_size), fmt_size, unit, time, entry->name
-                );
+                if (args->format == FORMAT_NONE) {
+                    printf(
+                        "%s %*hu %*lu %s %s\n", mode, decimalWidth(max_nlink), entry->nlink,
+                        decimalWidth(max_size), entry->size, time, entry->name
+                    );
+                } else {
+                    const char* unit;
+                    size_t fmt_size = formatSize(entry->size, args->format == FORMAT_SI, &unit);
+                    printf(
+                        "%s %*hu %*lu%s %s %s\n", mode, decimalWidth(max_nlink), entry->nlink,
+                        decimalWidth(max_size) - (int)strlen(unit), fmt_size, unit, time, entry->name
+                    );
+                }
             }
         } else {
             printf("%s", entry->name);
@@ -298,16 +314,15 @@ void listPath(const char* path, Arguments* args) {
 }
 
 int main(int argc, const char* const* argv) {
-    Arguments args = {
-        .prog = argv[0],
-        .filter = FILTER_DEFAULT,
-        .sort = SORT_NAME,
-        .format = FORMAT_NONE,
-        .recursive = false,
-        .directory = false,
-        .long_fmt = false,
-        .reverse = false,
-    };
+    Arguments args;
+    args.prog = argv[0];
+    args.filter = FILTER_DEFAULT;
+    args.sort = SORT_NAME;
+    args.format = FORMAT_NONE;
+    args.recursive = false;
+    args.directory = false;
+    args.long_fmt = false;
+    args.reverse = false;
     initList(&args.files);
     ARG_PARSE_ARGS(argumentSpec, argc, argv, &args);
     for (size_t i = 0; i < args.files.count; i++) {
