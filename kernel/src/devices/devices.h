@@ -42,11 +42,13 @@ struct CharDevice_s;
 typedef Error (*CharDeviceReadFunction)(struct CharDevice_s* dev, VirtPtr buff, size_t size, size_t* read, bool block);
 typedef Error (*CharDeviceWriteFunction)(struct CharDevice_s* dev, VirtPtr buff, size_t size, size_t* written);
 typedef Error (*CharDeviceIoctlFunction)(struct CharDevice_s* dev, size_t request, VirtPtr argp, uintptr_t* res);
+typedef bool (*CharDeviceWillBlockFunction)(struct CharDevice_s* dev, bool write);
 
 typedef struct {
     CharDeviceReadFunction read;
     CharDeviceWriteFunction write;
     CharDeviceIoctlFunction ioctl;
+    CharDeviceWillBlockFunction will_block;
 } CharDeviceFunctions;
 
 typedef struct CharDevice_s {

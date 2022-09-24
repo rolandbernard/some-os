@@ -4,8 +4,9 @@
 #include <fcntl.h>
 #include <stdbool.h>
 #include <stdint.h>
+#include <signal.h>
 #include <stdlib.h>
-#include <sys/mman.h>
+#include <sys/mprotect.h>
 #include <sys/mount.h>
 #include <sys/stat.h>
 #include <sys/time.h>
@@ -94,12 +95,12 @@ static bool testSigStopCont() {
         usleep(1000);
         exit(0);
     } else {
-        kill(pid, SIGSTOP);
+        ASSERT(kill(pid, SIGSTOP) == 0);
         usleep(10000);
         int status;
         int wait_pid = waitpid(-1, &status, WNOHANG);
         ASSERT(wait_pid == -1);
-        kill(pid, SIGCONT);
+        ASSERT(kill(pid, SIGCONT) == 0);
         wait_pid = wait(&status);
         ASSERT(wait_pid == pid);
         ASSERT(WIFEXITED(status));
@@ -190,6 +191,65 @@ static bool testForkSleepKillWait() {
         ASSERT(WIFSIGNALED(status));
         ASSERT(WTERMSIG(status) == SIGKILL);
     }
+    return true;
+}
+
+static bool testForkSleepWait1() {
+    int pid = fork();
+    ASSERT(pid != -1);
+    if (pid == 0) {
+        ASSERT_CHILD(usleep(10000) == 0);
+        exit(12);
+    } else {
+        int status;
+        int wait_pid = wait(&status);
+        ASSERT(wait_pid == pid);
+        ASSERT(WIFEXITED(status));
+        ASSERT(WEXITSTATUS(status) == 12);
+    }
+    return true;
+}
+
+static void testSigNoopHandler(int signal) {
+    // Do nothing.
+}
+
+static bool testForkSleepWait2() {
+    signal(SIGCHLD, testSigNoopHandler);
+    int pid = fork();
+    ASSERT(pid != -1);
+    if (pid == 0) {
+        exit(12);
+    } else {
+        usleep(10000);
+        int status;
+        int wait_pid = wait(&status);
+        ASSERT(wait_pid == pid);
+        ASSERT(WIFEXITED(status));
+        ASSERT(WEXITSTATUS(status) == 12);
+    }
+    signal(SIGCHLD, SIG_DFL);
+    return true;
+}
+
+static bool testForkSleepWait3() {
+    signal(SIGCHLD, testSigNoopHandler);
+    int pid = fork();
+    ASSERT(pid != -1);
+    if (pid == 0) {
+        // Sleep to wait for the parent to sleep so we can interrupt it.
+        ASSERT_CHILD(usleep(10000) == 0);
+        exit(12);
+    } else {
+        usleep(100000);
+        ASSERT(errno == EINTR);
+        int status;
+        int wait_pid = wait(&status);
+        ASSERT(wait_pid == pid);
+        ASSERT(WIFEXITED(status));
+        ASSERT(WEXITSTATUS(status) == 12);
+    }
+    signal(SIGCHLD, SIG_DFL);
     return true;
 }
 
@@ -313,9 +373,110 @@ static bool testPipe() {
     return true;
 }
 
+static bool testPipeNonblock() {
+    int fds[2];
+    ASSERT(pipe(fds) == 0);
+    int pid = fork();
+    ASSERT(pid != -1);
+    if (pid == 0) {
+        fcntl(fds[0], F_SETFL, O_NONBLOCK);
+        char buffer[512] = "BUFFER INIT";
+        ASSERT_CHILD(read(fds[0], buffer, 512) == -1);
+        ASSERT_CHILD(strcmp(buffer, "BUFFER INIT") == 0);
+        read(fds[0], buffer, 512);
+        ASSERT_CHILD(errno == EAGAIN);
+        exit(0);
+    } else {
+        int status;
+        int wait_pid = wait(&status);
+        ASSERT(wait_pid == pid);
+        ASSERT(WIFEXITED(status));
+        ASSERT(WEXITSTATUS(status) == 0);
+    }
+    close(fds[0]);
+    close(fds[1]);
+    return true;
+}
+
+static bool testPipeEOF() {
+    int fds[2];
+    ASSERT(pipe(fds) == 0);
+    close(fds[1]);
+    char buffer[512] = "BUFFER INIT";
+    ASSERT(read(fds[0], buffer, 512) == 0);
+    close(fds[0]);
+    return true;
+}
+
+static bool testPipeSelect() {
+    int fds[2];
+    ASSERT(pipe(fds) == 0);
+    fd_set reads;
+    fd_set writes;
+    fd_set errors;
+    FD_ZERO(&reads);
+    FD_ZERO(&writes);
+    FD_ZERO(&errors);
+    FD_SET(fds[0], &reads);
+    struct timeval timeout = {
+        .tv_sec = 0, .tv_usec = 0,
+    };
+    ASSERT(select(fds[0] + 1, &reads, &writes, &errors, &timeout) == 0);
+    ASSERT(!FD_ISSET(fds[0], &reads));
+    timeout.tv_sec = 0;
+    timeout.tv_usec = 10000;
+    struct timeval start;
+    ASSERT(gettimeofday(&start, NULL) == 0);
+    FD_SET(fds[0], &reads);
+    ASSERT(select(fds[0] + 1, &reads, &writes, &errors, &timeout) == 0);
+    ASSERT(!FD_ISSET(fds[0], &reads));
+    struct timeval end;
+    ASSERT(gettimeofday(&end, NULL) == 0);
+    ASSERT((start.tv_sec * 1000000 + start.tv_usec) + 5000 < (end.tv_sec * 1000000 + end.tv_usec));
+    ASSERT((start.tv_sec * 1000000 + start.tv_usec) + 20000 > (end.tv_sec * 1000000 + end.tv_usec));
+    ASSERT(write(fds[1], "hello world", 11) == 11);
+    FD_SET(fds[0], &reads);
+    ASSERT(select(fds[0] + 1, &reads, &writes, &errors, NULL) == 1);
+    ASSERT(FD_ISSET(fds[0], &reads));
+    FD_SET(fds[1], &writes);
+    ASSERT(select(fds[1] + 1, &reads, &writes, &errors, NULL) == 2);
+    ASSERT(FD_ISSET(fds[0], &reads));
+    ASSERT(FD_ISSET(fds[1], &writes));
+    close(fds[1]);
+    char buffer[11];
+    ASSERT(read(fds[0], buffer, 11) == 11);
+    FD_ZERO(&writes);
+    ASSERT(select(fds[0] + 1, &reads, &writes, &errors, NULL) == 1);
+    ASSERT(FD_ISSET(fds[0], &reads));
+    close(fds[0]);
+    return true;
+}
+
+static bool testTtyNonblock() {
+    int pid = fork();
+    ASSERT(pid != -1);
+    if (pid == 0) {
+        fcntl(0, F_SETFL, O_NONBLOCK);
+        char buffer[512] = "BUFFER INIT";
+        ASSERT_CHILD(read(0, buffer, 512) == -1);
+        ASSERT_CHILD(strcmp(buffer, "BUFFER INIT") == 0);
+        read(0, buffer, 512);
+        ASSERT_CHILD(errno == EAGAIN);
+        exit(0);
+    } else {
+        int status;
+        int wait_pid = wait(&status);
+        ASSERT(wait_pid == pid);
+        ASSERT(WIFEXITED(status));
+        ASSERT(WEXITSTATUS(status) == 0);
+    }
+    return true;
+}
+
 static bool testPause() {
     int pid = fork();
     ASSERT(pid != -1);
+    signal(SIGUSR1, testSigNoopHandler);
     if (pid == 0) {
         pause();
         exit(42);
@@ -328,6 +489,7 @@ static bool testPause() {
         ASSERT(!WIFSIGNALED(status));
         ASSERT(WEXITSTATUS(status) == 42);
     }
+    signal(SIGUSR1, SIG_DFL);
     return true;
 }
 
@@ -754,10 +916,10 @@ static bool testFcntlGetFlags() {
     ASSERT((fcntl(fd, F_GETFD) & FD_CLOEXEC) != 0);
     ASSERT((fcntl(fd, F_GETFL) & O_ACCMODE) == FWRITE);
     close(fd);
-    fd = open("/tmp/test3.txt", O_RDWR);
+    fd = open("/tmp/test3.txt", O_RDWR | O_NONBLOCK);
     ASSERT(fd != -1);
     ASSERT((fcntl(fd, F_GETFD) & FD_CLOEXEC) == 0);
-    ASSERT((fcntl(fd, F_GETFL) & O_ACCMODE) == (FREAD | FWRITE));
+    ASSERT((fcntl(fd, F_GETFL) & (O_ACCMODE | O_NONBLOCK)) == (FREAD | FWRITE | FNONBLOCK));
     close(fd);
     return true;
 }
@@ -880,6 +1042,8 @@ static bool testTime() {
 }
 
 static bool testSettimeofday() {
+    struct timeval old;
+    ASSERT(gettimeofday(&old, NULL) == 0);
     struct timeval start = { .tv_sec = 123456, .tv_usec = 654321 };
     ASSERT(settimeofday(&start, NULL) == 0);
     usleep(10000);
@@ -887,6 +1051,7 @@ static bool testSettimeofday() {
     ASSERT(gettimeofday(&end, NULL) == 0);
     ASSERT((start.tv_sec * 1000000 + start.tv_usec) + 5000 < (end.tv_sec * 1000000 + end.tv_usec));
     ASSERT((start.tv_sec * 1000000 + start.tv_usec) + 20000 > (end.tv_sec * 1000000 + end.tv_usec));
+    ASSERT(settimeofday(&old, NULL) == 0);
     return true;
 }
 
@@ -911,6 +1076,9 @@ static bool runBasicSyscallTests() {
         TEST(testNanosleep),
         TEST(testForkKillWait),
         TEST(testForkSleepKillWait),
+        TEST(testForkSleepWait1),
+        TEST(testForkSleepWait2),
+        TEST(testForkSleepWait3),
         TEST(testSignal),
         TEST(testGetpid),
         TEST(testGetppid),
@@ -918,6 +1086,10 @@ static bool runBasicSyscallTests() {
         TEST(testGetSetUid),
         TEST(testGetSetGid),
         TEST(testPipe),
+        TEST(testPipeNonblock),
+        TEST(testPipeEOF),
+        TEST(testPipeSelect),
+        TEST(testTtyNonblock),
         TEST(testPause),
         TEST(testPipeDup),
         TEST(testAccess),

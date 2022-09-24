@@ -37,8 +37,14 @@ static Pid next_pid = 1;
 static Process* global_first = NULL;
 SpinLock process_lock;
 
-#define WNOHANG 1
-#define WUNTRACED 2
+#define WNOHANG     0b001
+#define WUNTRACED   0b010
+#define WCONTINUED  0b100
+
+#define STATUS_EXIT 0
+#define STATUS_TERM 1
+#define STATUS_STOP 2
+#define STATUS_CONT 3
 
 static Error basicProcessWait(Task* task) {
     size_t found = 0;
@@ -55,20 +61,29 @@ static Error basicProcessWait(Task* task) {
         ) {
             found++;
             lockSpinLock(&child->lock);
-            if (child->tasks == NULL) {
+            if (
+                child->tasks == NULL
+                || ((flags & WUNTRACED) != 0 && (child->status >> 8) == STATUS_STOP)
+                || ((flags & WCONTINUED) != 0 && (child->status >> 8) == STATUS_CONT)
+            ) {
                 unlockSpinLock(&child->lock);
                 writeInt(
                     virtPtrForTask(task->frame.regs[REG_ARGUMENT_2], task),
                     sizeof(int) * 8, child->status
                 );
+                child->status = 0; // After we have read the status, reset it.
                 task->times.user_child_time += child->times.user_time + child->times.user_child_time;
                 task->times.system_child_time += child->times.system_time + child->times.system_child_time;
                 task->frame.regs[REG_ARGUMENT_0] = child->pid;
-                *current = child->tree.child_next;
-                if (*current != NULL) {
-                    (*current)->tree.child_prev = child->tree.child_prev;
+                clearPendingChildSignals(task->process, child->pid);
+                if (child->tasks == NULL) {
+                    *current = child->tree.child_next;
+                    if (*current != NULL) {
+                        (*current)->tree.child_prev = child->tree.child_prev;
+                    }
+                    // Only deallocate the process on exit or termination
+                    deallocProcess(child);
                 }
-                deallocProcess(child);
                 return simpleError(SUCCESS);
             } else {
                 unlockSpinLock(&child->lock);
@@ -79,38 +94,41 @@ static Error basicProcessWait(Task* task) {
     return simpleError(found != 0 ? ((flags & WNOHANG) != 0 ? EAGAIN : EINTR) : ECHILD);
 }
 
-bool handleProcessWaitWakeup(Task* task) {
-    lockSpinLock(&task->process->lock); 
-    if (task->process->signals.signals != NULL) {
-        lockSpinLock(&process_lock); 
-        Error err = basicProcessWait(task);
-        unlockSpinLock(&process_lock); 
-        if (isError(err)) {
-            task->frame.regs[REG_ARGUMENT_0] = -err.kind;
-        }
-        unlockSpinLock(&task->process->lock);
+static bool handleProcessWaitWakeup(Task* task, void* _) {
+    lockSpinLock(&process_lock); 
+    Error err = basicProcessWait(task);
+    unlockSpinLock(&process_lock); 
+    if (!isError(err)) {
         return true;
     } else {
-        unlockSpinLock(&task->process->lock);
-        return false;
+        lockSpinLock(&task->process->lock);
+        if (task->process->signals.signals != NULL) {
+            task->frame.regs[REG_ARGUMENT_0] = -EINTR;
+            unlockSpinLock(&task->process->lock);
+            return true;
+        } else {
+            unlockSpinLock(&task->process->lock);
+            return false;
+        }
     }
 }
 
 void executeProcessWait(Task* task) {
-    lockSpinLock(&process_lock); 
+    lockSpinLock(&process_lock);
     Error err = basicProcessWait(task);
     unlockSpinLock(&process_lock);
     if (!isError(err)) {
-        moveTaskToState(task, ENQUABLE);
+        awakenTask(task);
+        enqueueTask(task);
     } else {
         if (err.kind == EINTR) {
             lockSpinLock(&task->sched.lock); 
             task->sched.wakeup_function = handleProcessWaitWakeup;
-            moveTaskToState(task, SLEEPING);
             unlockSpinLock(&task->sched.lock); 
         } else {
             task->frame.regs[REG_ARGUMENT_0] = -err.kind;
-            moveTaskToState(task, ENQUABLE);
+            awakenTask(task);
+            enqueueTask(task);
         }
     }
 }
@@ -151,7 +169,9 @@ static void unregisterProcess(Process* process) {
             }
         } else {
             process->tree.child_prev->tree.child_next = process->tree.child_next;
-            process->tree.child_next->tree.child_prev = process->tree.child_prev;
+            if (process->tree.child_next != NULL) {
+                process->tree.child_next->tree.child_prev = process->tree.child_prev;
+            }
         }
     } else {
         Process* child = process->tree.children;
@@ -294,21 +314,28 @@ void terminateAllProcessTasks(Process* process) {
 
 void exitProcess(Process* process, Signal signal, int exit) {
     lockSpinLock(&process->lock);
-    process->status = (exit & 0xff) | ((signal & 0xff) << 8);
+    if (signal == SIGNONE) {
+        process->status = (exit & 0xff) | (STATUS_EXIT << 8);
+    } else {
+        process->status = (signal & 0xff) | (STATUS_TERM << 8);
+    }
     unlockSpinLock(&process->lock);
     terminateAllProcessTasks(process);
 }
 
 void stopProcess(Process* process, Signal signal) {
     lockSpinLock(&process->lock);
-    process->status = ((signal & 0xff) << 8);
+    process->status = (signal & 0xff) | (STATUS_STOP << 8);
+    if (process->tree.parent != NULL) {
+        addSignalToProcess(process->tree.parent, SIGCHLD, process->pid);
+    }
     unlockSpinLock(&process->lock);
     moveAllProcessTasksToStateBut(process, STOPPED, NULL);
 }
 
 void continueProcess(Process* process, Signal signal) {
     lockSpinLock(&process->lock);
-    process->status = ((signal & 0xff) << 8);
+    process->status = (signal & 0xff) | (STATUS_CONT << 8);
     Task* current = process->tasks;
     while (current != NULL) {
         lockSpinLock(&current->sched.lock);
@@ -344,7 +371,7 @@ void removeProcessTask(Task* task) {
             unlockSpinLock(&process->lock);
             deallocProcess(process);
         } else {
-            addSignalToProcess(process->tree.parent, SIGCHLD);
+            addSignalToProcess(process->tree.parent, SIGCHLD, process->pid);
             unlockSpinLock(&process->lock);
         }
     } else {
@@ -381,7 +408,7 @@ void signalProcessGroup(Pid pgid, Signal signal) {
     Process* current = global_first;
     while (current != NULL) {
         if (current->pgid == pgid) {
-            addSignalToProcess(current, signal);
+            addSignalToProcess(current, signal, 0);
         }
         current = current->tree.global_next;
     }

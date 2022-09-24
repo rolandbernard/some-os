@@ -12,6 +12,7 @@ CC := $(ARCH)-someos-gcc
 
 # == Flags
 CCFLAGS += -I$(SYSROOT_DIR)/include
+CCJFLAGS += -D__someos__ --target=riscv64
 # ==
 
 include ../build.mk

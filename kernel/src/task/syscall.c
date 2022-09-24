@@ -12,7 +12,7 @@ SyscallReturn yieldSyscall(TrapFrame* frame) {
     SYSCALL_RETURN(0);
 }
 
-bool handleSleepWakeup(Task* task) {
+static bool handleSleepWakeup(Task* task, void* _) {
     Time time = getTime();
     bool wakeup = time >= task->times.entered;
     if (!wakeup && task->process != NULL) {
@@ -47,9 +47,7 @@ SyscallReturn sleepSyscall(TrapFrame* frame) {
         lockSpinLock(&task->sched.lock); 
         task->times.entered = end;
         task->sched.wakeup_function = handleSleepWakeup;
-        moveTaskToState(task, SLEEPING);
         unlockSpinLock(&task->sched.lock); 
-        enqueueTask(task);
         setTimeoutTime(end, NULL, NULL); // Make sure we wake up in time
         return WAIT;
     }

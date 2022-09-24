@@ -8,6 +8,8 @@ void vfsFileDescriptorCopy(Process* process, VfsFileDescriptor* desc);
 
 void vfsFileDescriptorClose(Process* process, VfsFileDescriptor* desc);
 
+VfsFileDescriptor* getFileDescriptorUnsafe(Process* process, int fd);
+
 VfsFileDescriptor* getFileDescriptor(Process* process, int fd);
 
 int putNewFileDescriptor(Process* process, int fd, int flags, VfsFile* file, bool replace);

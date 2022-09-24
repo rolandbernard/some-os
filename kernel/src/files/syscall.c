@@ -34,10 +34,11 @@ SyscallReturn openSyscall(TrapFrame* frame) {
         if (isError(err)) {
             SYSCALL_RETURN(-err.kind);
         } else {
-            file->flags = flags & VFS_OPEN_ACCESS_MODE;
+            file->flags = flags & (VFS_OPEN_ACCESS_MODE | VFS_FILE_NONBLOCK);
             int fd = putNewFileDescriptor(
                 task->process, -1, (flags & VFS_OPEN_CLOEXEC) != 0 ? VFS_DESC_CLOEXEC : 0, file, false
             );
+            vfsFileClose(file);
             SYSCALL_RETURN(fd);
         }
     } else {
@@ -109,8 +110,10 @@ SyscallReturn renameSyscall(TrapFrame* frame) {
     VfsFileDescriptor* desc = getFileDescriptor(task->process, fd);     \
     if (desc != NULL) {                                                 \
         if ((desc->file->flags & VFS_FILE_WRITE) == 0 && WRITE) {       \
+            vfsFileDescriptorClose(task->process, desc);                \
             SYSCALL_RETURN(-EBADF);                                     \
         } else if ((desc->file->flags & VFS_FILE_READ) == 0 && READ) {  \
+            vfsFileDescriptorClose(task->process, desc);                \
             SYSCALL_RETURN(-EBADF);                                     \
         }                                                               \
     } else {                                                            \
@@ -326,12 +329,14 @@ SyscallReturn getcwdSyscall(TrapFrame* frame) {
 SyscallReturn pipeSyscall(TrapFrame* frame) {
     assert(frame->hart != NULL);
     Task* task = (Task*)frame;
-    VfsFile* file_read = createPipeFile();
-    VfsFile* file_write = createPipeFileClone(file_read);
+    VfsFile* file_read = createPipeFile(false);
+    VfsFile* file_write = createPipeFileClone(file_read, true);
     file_read->flags = VFS_FILE_READ;
     file_write->flags = VFS_FILE_WRITE;
     int pipe_read = putNewFileDescriptor(task->process, -1, 0, (VfsFile*)file_read, false);
     int pipe_write = putNewFileDescriptor(task->process, -1, 0, (VfsFile*)file_write, false);
+    vfsFileClose(file_read);
+    vfsFileClose(file_write);
     VirtPtr arr = virtPtrForTask(SYSCALL_ARG(0), task);
     writeIntAt(arr, sizeof(int) * 8, 0, pipe_read);
     writeIntAt(arr, sizeof(int) * 8, 1, pipe_write);
@@ -391,7 +396,9 @@ SyscallReturn fcntlSyscall(TrapFrame* frame) {
             SYSCALL_RETURN(flags);
         }
         case VFS_FCNTL_SETFL: {
-            // We only have access mode flags for now, and those are ignored.
+            // Access mode flags must be preserved.
+            desc->file->flags = (SYSCALL_ARG(2) & VFS_FILE_NONBLOCK)
+                | (desc->file->flags & VFS_FILE_ACCESS);
             vfsFileDescriptorClose(task->process, desc);
             SYSCALL_RETURN(0);
         }
@@ -429,5 +436,87 @@ SyscallReturn isattySyscall(TrapFrame* frame) {
         vfsFileDescriptorClose(task->process, desc);
         SYSCALL_RETURN(-ENOTTY);
     }
+}
+
+static bool handleSelectWakeup(Task* task, void* _) {
+    TrapFrame* frame = (TrapFrame*)task;
+    if (task->process != NULL) {
+        lockSpinLock(&task->process->lock); 
+        if (task->process->signals.signals != NULL) {
+            unlockSpinLock(&task->process->lock); 
+            task->frame.regs[REG_ARGUMENT_0] = -EINTR;
+            return true;
+        } else {
+            unlockSpinLock(&task->process->lock); 
+        }
+    }
+    size_t num_ready = 0;
+    size_t num_fds = SYSCALL_ARG(0);
+    VirtPtr reads_ptr = virtPtrForTask(SYSCALL_ARG(1), task);
+    VirtPtr writes_ptr = virtPtrForTask(SYSCALL_ARG(2), task);
+    VirtPtr excepts_ptr = virtPtrForTask(SYSCALL_ARG(3), task);
+    uint64_t reads = readInt(reads_ptr, 64);
+    uint64_t writes = readInt(writes_ptr, 64);
+    for (size_t i = 0; i < num_fds; i++) {
+        if ((reads & (1UL << i)) != 0) {
+            // TODO: This is safe only as long as we have only one task per process
+            VfsFileDescriptor* desc = getFileDescriptorUnsafe(task->process, i);
+            if (desc == NULL || (desc->file->flags & VFS_FILE_READ) == 0) {
+                task->frame.regs[REG_ARGUMENT_0] = -EBADF;
+                return true;
+            } else {
+                if (!vfsFileWillBlock(desc->file, task->process, false)) {
+                    num_ready++;
+                } else {
+                    reads &= ~(1UL << i);
+                }
+            }
+        }
+        if ((writes & (1 << i)) != 0) {
+            VfsFileDescriptor* desc = getFileDescriptorUnsafe(task->process, i);
+            if (desc == NULL || (desc->file->flags & VFS_FILE_WRITE) == 0) {
+                task->frame.regs[REG_ARGUMENT_0] = -EBADF;
+                return true;
+            } else {
+                if (!vfsFileWillBlock(desc->file, task->process, true)) {
+                    num_ready++;
+                } else {
+                    writes &= ~(1UL << i);
+                }
+            }
+        }
+    }
+    if (num_ready != 0) {
+        writeInt(reads_ptr, 64, reads);
+        writeInt(writes_ptr, 64, writes);
+        writeInt(excepts_ptr, 64, 0);
+        task->frame.regs[REG_ARGUMENT_0] = num_ready;
+        return true;
+    }
+    Time timeout = SYSCALL_ARG(4);
+    if (timeout != (Time)-1 && getTime() >= task->times.entered + (timeout / (1000000000UL / CLOCKS_PER_SEC))) {
+        writeInt(reads_ptr, 64, 0);
+        writeInt(writes_ptr, 64, 0);
+        writeInt(excepts_ptr, 64, 0);
+        task->frame.regs[REG_ARGUMENT_0] = 0;
+        return true;
+    }
+    return false;
+}
+
+SyscallReturn selectSyscall(TrapFrame* frame) {
+    assert(frame->hart != NULL);
+    Task* task = (Task*)frame;
+    assert(task->process != NULL);
+    Time timeout = SYSCALL_ARG(4);
+    lockSpinLock(&task->sched.lock); 
+    task->times.entered = getTime();
+    task->sched.wakeup_function = handleSelectWakeup;
+    unlockSpinLock(&task->sched.lock); 
+    if (timeout != (Time)-1) {
+        // Make sure we wake up in time
+        setTimeoutTime(getTime() + timeout / (1000000000UL / CLOCKS_PER_SEC), NULL, NULL);
+    }
+    return WAIT;
 }
 

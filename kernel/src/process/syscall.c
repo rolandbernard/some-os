@@ -75,7 +75,7 @@ SyscallReturn exitSyscall(TrapFrame* frame) {
     assert(frame->hart != NULL);
     Task* task = (Task*)frame;
     if (task->process != NULL) {
-        exitProcess(task->process, 0, SYSCALL_ARG(0));
+        exitProcess(task->process, SIGNONE, SYSCALL_ARG(0));
     } else {
         moveTaskToState(task, TERMINATED);
     }
@@ -83,7 +83,7 @@ SyscallReturn exitSyscall(TrapFrame* frame) {
     return WAIT;
 }
 
-bool handlePauseWakeup(Task* task) {
+static bool handlePauseWakeup(Task* task, void* _) {
     lockSpinLock(&task->process->lock); 
     if (task->process->signals.signals != NULL) {
         unlockSpinLock(&task->process->lock); 
@@ -101,9 +101,7 @@ SyscallReturn pauseSyscall(TrapFrame* frame) {
     task->frame.regs[REG_ARGUMENT_0] = -EINTR; // This is the only possible return value.
     lockSpinLock(&task->sched.lock); 
     task->sched.wakeup_function = handlePauseWakeup;
-    moveTaskToState(task, SLEEPING);
     unlockSpinLock(&task->sched.lock); 
-    enqueueTask(task);
     return WAIT;
 }
 
@@ -153,17 +151,8 @@ SyscallReturn waitSyscall(TrapFrame* frame) {
     Task* task = (Task*)frame;
     assert(task->process != NULL);
     executeProcessWait(task);
-    enqueueTask(task);
     return WAIT;
 }
-
-typedef struct {
-    uintptr_t handler;
-    SignalSet mask;
-    int flags;
-    uintptr_t sigaction;
-    uintptr_t restorer;
-} SignalAction;
 
 SyscallReturn sigactionSyscall(TrapFrame* frame) {
     assert(frame->hart != NULL);
@@ -177,29 +166,14 @@ SyscallReturn sigactionSyscall(TrapFrame* frame) {
         VirtPtr new = virtPtrForTask(SYSCALL_ARG(1), task);
         VirtPtr old = virtPtrForTask(SYSCALL_ARG(2), task);
         SignalHandler* handler = &task->process->signals.handlers[sig];
-        SignalAction oldaction = {
-            .handler = handler->handler,
-            .mask = handler->mask,
-            .flags = handler->flags,
-            .sigaction = handler->handler,
-            .restorer = handler->restorer,
-        };
-        SignalAction newaction;
+        SignalHandler old_handler = *handler;
         if (new.address != 0) {
-            memcpyBetweenVirtPtr(virtPtrForKernel(&newaction), new, sizeof(SignalAction));
-            if ((newaction.flags & SA_SIGINFO) == 0) {
-                handler->handler = newaction.handler;
-            } else {
-                handler->handler = newaction.sigaction;
-            }
-            handler->restorer = newaction.restorer;
-            handler->flags = newaction.flags;
-            handler->mask = newaction.mask;
+            memcpyBetweenVirtPtr(virtPtrForKernel(handler), new, sizeof(SignalHandler));
+        }
+        if (old.address != 0) {
+            memcpyBetweenVirtPtr(old, virtPtrForKernel(&old_handler), sizeof(SignalHandler));
         }
         unlockSpinLock(&task->process->lock);
-        if (old.address != 0) {
-            memcpyBetweenVirtPtr(old, virtPtrForKernel(&oldaction), sizeof(SignalAction));
-        }
         SYSCALL_RETURN(-SUCCESS);
     }
 }
@@ -279,7 +253,7 @@ static int killSyscallCallback(Process* process, void* udata) {
         ) {
             request->allowed++;
             unlockSpinLock(&task->process->user.lock);
-            addSignalToProcess(process, SYSCALL_ARG(1));
+            addSignalToProcess(process, SYSCALL_ARG(1), 0);
             return -SUCCESS;
         } else {
             unlockSpinLock(&task->process->user.lock);
@@ -293,8 +267,7 @@ static int killSyscallCallback(Process* process, void* udata) {
 
 SyscallReturn killSyscall(TrapFrame* frame) {
     assert(frame->hart != NULL);
-    Task* task = (Task*)frame;
-    assert(task->process != NULL);
+    assert(((Task*)frame)->process != NULL);
     KillRequest request = {
         .frame = frame,
         .found = 0,

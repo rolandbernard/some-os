@@ -21,12 +21,12 @@ BINARY_DIR := $(BUILD_DIR)/$(BUILD)/bin
 # ==
 
 # == Common Flags
-WARNINGS := -Wall -Wextra -Wno-unused-parameter
+WARNINGS := -Wall -Wextra -Wno-unused-parameter -Wcast-qual
 
 CCFLAGS.debug   += -O0 -g -DDEBUG -Werror
 LDFLAGS.debug   += -O0 -g
-CCFLAGS.release += -O3
-LDFLAGS.release += -O3
+CCFLAGS.release += -O3 -g
+LDFLAGS.release += -O3 -g
 
 CCFLAGS += $(CCFLAGS.$(BUILD)) $(WARNINGS) -MMD -MP -I$(SOURCE_DIR)
 CCFLAGS += $(foreach SWITCH, $(SWITCHES), -D$(shell echo $(SWITCH) | tr '[:lower:]' '[:upper:]'))
@@ -53,6 +53,7 @@ $(foreach TARGET, $(TARGETS), \
 	$(eval TARGET_SOURCES.$(TARGET) = $(filter-out $(DISABLED_SOURCES), $(TARGET_SOURCES.$(TARGET)))))
 $(foreach TARGET, $(TARGETS), \
 	$(eval TARGET_OBJECTS.$(TARGET) = $(patsubst $(SOURCE_DIR)/%, $(OBJECT_DIR)/%.o, $(TARGET_SOURCES.$(TARGET)))))
+COMPDBS          := $(patsubst $(SOURCE_DIR)/%, $(OBJECT_DIR)/%.compdb, $(ALL_SOURCES))
 ALL_OBJECTS      := $(patsubst $(SOURCE_DIR)/%, $(OBJECT_DIR)/%.o, $(ALL_SOURCES))
 OBJECTS          := $(patsubst $(SOURCE_DIR)/%, $(OBJECT_DIR)/%.o, $(COMMON_SOURCES))
 DEPENDENCIES     := $(ALL_OBJECTS:.o=.d)
@@ -61,7 +62,7 @@ BINARYS          := $(foreach TARGET, $(TARGETS), $(BINARY_DIR)/$(TARGET))
 
 .PHONY: build clean
 
-build: $(TARGETS)
+build: $(TARGETS) | compile_commands.json
 	@$(FINISHED)
 	@$(ECHO) "Build successful."
 
@@ -75,6 +76,21 @@ $(BINARYS): $(BINARY_DIR)/%: $(OBJECTS) $$(TARGET_OBJECTS.$$*) $(LINK_SCRIPT) $(
 $(OBJECT_DIR)/%.o: $(SOURCE_DIR)/% $(MAKEFILE_LIST) | $$(dir $$@)
 	@$(ECHO) "Building $@"
 	$(CC) $(CCFLAGS) -c -o $@ $<
+
+$(OBJECT_DIR)/%.compdb: $(SOURCE_DIR)/% | $$(dir $$@)
+	@echo "    {" > $@
+	@echo "        \"command\": \"cc  $(CCFLAGS) $(CCJFLAGS) -c $<\"," >> $@
+	@echo "        \"directory\": \"$(BASE_DIR)\"," >> $@
+	@echo "        \"file\": \"$<\"" >> $@
+	@echo "    }," >> $@
+
+compile_commands.json: $(COMPDBS)
+	@echo "[" > $@.tmp
+	@cat $^ >> $@.tmp
+	@sed '$$d' < $@.tmp > $@
+	@echo "    }" >> $@
+	@echo "]" >> $@
+	@rm $@.tmp
 
 clean:
 	$(RM) -rf $(BUILD_DIR)

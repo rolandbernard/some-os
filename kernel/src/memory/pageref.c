@@ -43,9 +43,13 @@ bool hasOtherReferences(PageRefTable* table, uintptr_t page) {
     } else if (table->count == 0) {
         return false;
     } else {
-        size_t idx = hashInt64(page) % table->capacity;
+        size_t start = hashInt64(page) % table->capacity;
+        size_t idx = start;
         while (table->keys[idx] != page && table->values[idx] >= 1) {
             idx = (idx + 1) % table->capacity;
+            if (idx == start) {
+                break;
+            }
         }
         if (table->keys[idx] == page) {
             return table->values[idx] > 1;
@@ -58,9 +62,13 @@ bool hasOtherReferences(PageRefTable* table, uintptr_t page) {
 void addReferenceFor(PageRefTable* table, uintptr_t page) {
     // Minimum reference count here must be 2
     testForResize(table);
-    size_t idx = hashInt64(page) % table->capacity;
+    size_t start = hashInt64(page) % table->capacity;
+    size_t idx = start;
     while (table->keys[idx] != page && table->values[idx] >= 1) {
         idx = (idx + 1) % table->capacity;
+        if (idx == start) {
+            break;
+        }
     }
     if (table->keys[idx] == page && table->values[idx] > 1) {
         table->values[idx]++;
@@ -78,9 +86,13 @@ void addReferenceFor(PageRefTable* table, uintptr_t page) {
 
 void removeReferenceFor(PageRefTable* table, uintptr_t page) {
     if (table->count != 0) {
-        size_t idx = hashInt64(page) % table->capacity;
+        size_t start = hashInt64(page) % table->capacity;
+        size_t idx = start;
         while (table->keys[idx] != page && table->values[idx] >= 1) {
             idx = (idx + 1) % table->capacity;
+            if (idx == start) {
+                break;
+            }
         }
         // If the table entry is 1. Don't remove it, because we see it as a deleted value.
         if (table->keys[idx] == page && table->values[idx] > 1) {

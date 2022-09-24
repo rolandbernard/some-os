@@ -58,9 +58,9 @@ Error vfsSuperFreeNode(VfsNode* node) {
 
 Error vfsSuperCopyNode(VfsNode* node) {
     if (node->superblock == NULL) {
-        lockTaskLock(&node->lock);
+        lockTaskLock(&node->ref_lock);
         node->ref_count++;
-        unlockTaskLock(&node->lock);
+        unlockTaskLock(&node->ref_lock);
         return simpleError(SUCCESS);
     } else {
         size_t refs = vfsCacheCopyNode(&node->superblock->nodes, node);
@@ -73,13 +73,15 @@ Error vfsSuperCopyNode(VfsNode* node) {
 
 Error vfsSuperCloseNode(VfsNode* node) {
     if (node->superblock == NULL) {
-        lockTaskLock(&node->lock);
+        // This is a special file (e.g. pipe, fifo, char, block)
+        // These are different, because they are not cached.
+        lockTaskLock(&node->ref_lock);
         node->ref_count--;
         if (node->ref_count == 0) {
-            unlockTaskLock(&node->lock);
+            unlockTaskLock(&node->ref_lock);
             node->functions->free(node);
         } else {
-            unlockTaskLock(&node->lock);
+            unlockTaskLock(&node->ref_lock);
         }
         return simpleError(SUCCESS);
     } else {
@@ -105,25 +107,25 @@ Error vfsSuperCloseNode(VfsNode* node) {
 }
 
 void vfsSuperCopy(VfsSuperblock* sb) {
-    lockTaskLock(&sb->lock);
+    lockTaskLock(&sb->ref_lock);
     sb->ref_count++;
-    unlockTaskLock(&sb->lock);
+    unlockTaskLock(&sb->ref_lock);
 }
 
 void vfsSuperClose(VfsSuperblock* sb) {
-    lockTaskLock(&sb->lock);
+    lockTaskLock(&sb->ref_lock);
     sb->ref_count--;
     if (sb->ref_count == 0) {
         // If no reference is left, only the root node should remain (and that without references).
         // Also, at this point sb is not mounted anywhere anymore.
         assert(sb->root_node->ref_count == 0);
         assert(sb->nodes.count == 0);
-        unlockTaskLock(&sb->lock);
+        unlockTaskLock(&sb->ref_lock);
         vfsCacheDeinit(&sb->nodes);
         sb->root_node->functions->free(sb->root_node);
         sb->functions->free(sb);
     } else {
-        unlockTaskLock(&sb->lock);
+        unlockTaskLock(&sb->ref_lock);
     }
 }
 

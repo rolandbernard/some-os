@@ -188,18 +188,18 @@ static Error minixReadWrite(MinixVfsNode* node, VirtPtr buffer, size_t offset, s
     }
 }
 
-static Error minixReadAt(MinixVfsNode* node, VirtPtr buff, size_t offset, size_t length, size_t* read) {
+static Error minixReadAt(MinixVfsNode* node, VirtPtr buff, size_t offset, size_t length, size_t* read, bool block) {
     return minixReadWrite(node, buff, offset, length, false, read);
 }
 
-static Error minixWriteAt(MinixVfsNode* node, VirtPtr buff, size_t offset, size_t length, size_t* written) {
+static Error minixWriteAt(MinixVfsNode* node, VirtPtr buff, size_t offset, size_t length, size_t* written, bool block) {
     return minixReadWrite(node, buff, offset, length, true, written);
 }
 
 static Error minixReaddirAt(MinixVfsNode* node, VirtPtr buff, size_t offset, size_t length, size_t* read_file, size_t* written_buff) {
     size_t tmp_size;
     MinixDirEntry entry;
-    CHECKED(minixReadAt(node, virtPtrForKernel(&entry), offset, sizeof(MinixDirEntry), &tmp_size));
+    CHECKED(minixReadAt(node, virtPtrForKernel(&entry), offset, sizeof(MinixDirEntry), &tmp_size, true));
     if (tmp_size != 0 && tmp_size != sizeof(MinixDirEntry)) {
         return simpleError(EIO);
     } else {
@@ -232,22 +232,22 @@ typedef struct {
 static Error minixTruncZoneWalkCallback(uint32_t* zone, bool* changed, size_t position, size_t size, bool pre, bool post, void* udata) {
     MinixTruncRequest* request = (MinixTruncRequest*)udata;
     if (*zone != 0) {
-        if (request->length < position + size) {
-            if (!pre && !post) { // Zero the rest of the zone
-                size_t block_offset = request->length % position;
-                size_t tmp_size = MINIX_BLOCK_SIZE - block_offset;
-                assert(MINIX_BLOCK_SIZE < PAGE_SIZE);
-                CHECKED(vfsFileWriteAt(
-                    SUPER(request->file)->block_device, NULL, virtPtrForKernel(zero_page),
-                    offsetForZone(*zone) + block_offset, tmp_size, &tmp_size
-                ));
-            }
-        } else {
-            if (post) { // Free the zone in the filesystem zone map
+        if (request->length <= position) {
+            if (post) { // In this case, we don't need these blocks at all anymore
+                // Free the zone in the filesystem zone map
                 CHECKED(freeMinixZone(SUPER(request->file), *zone));
                 *zone = 0;
                 *changed = true;
             }
+        } else if (!pre && !post) {
+            // We still need part of this zone. Zero the slice we don't need anymore
+            size_t block_offset = request->length % position;
+            size_t tmp_size = MINIX_BLOCK_SIZE - block_offset;
+            assert(MINIX_BLOCK_SIZE < PAGE_SIZE);
+            CHECKED(vfsFileWriteAt(
+                SUPER(request->file)->block_device, NULL, virtPtrForKernel(zero_page),
+                offsetForZone(*zone) + block_offset, tmp_size, &tmp_size
+            ));
         }
     }
     return simpleError(SUCCESS);
@@ -279,7 +279,7 @@ static Error minixInternalLookup(MinixVfsNode* node, const char* name, uint32_t*
     MinixDirEntry* tmp_buffer = kalloc(umin(MAX_LOOKUP_READ_SIZE, left));
     while (left > 0) {
         size_t tmp_size = umin(MAX_LOOKUP_READ_SIZE, left);
-        CHECKED(minixReadAt(node, virtPtrForKernel(tmp_buffer), offset, tmp_size, &tmp_size), {
+        CHECKED(minixReadAt(node, virtPtrForKernel(tmp_buffer), offset, tmp_size, &tmp_size, true), {
             dealloc(tmp_buffer);
         });
         if (tmp_size == 0) {
@@ -319,14 +319,14 @@ static Error minixUnlink(MinixVfsNode* node, const char* name) {
     MinixDirEntry entry;
     size_t tmp_size;
     CHECKED(
-        minixReadAt(node, virtPtrForKernel(&entry), node->base.stat.size - sizeof(MinixDirEntry), sizeof(MinixDirEntry), &tmp_size),
+        minixReadAt(node, virtPtrForKernel(&entry), node->base.stat.size - sizeof(MinixDirEntry), sizeof(MinixDirEntry), &tmp_size, true),
         unlockTaskLock(&node->lock)
     );
     if (tmp_size != sizeof(MinixDirEntry)) {
         unlockTaskLock(&node->lock);
         return simpleError(EIO);
     }
-    CHECKED(minixWriteAt(node, virtPtrForKernel(&entry), offset, sizeof(MinixDirEntry), &tmp_size), unlockTaskLock(&node->lock));
+    CHECKED(minixWriteAt(node, virtPtrForKernel(&entry), offset, sizeof(MinixDirEntry), &tmp_size, true), unlockTaskLock(&node->lock));
     Error err = minixTrunc(node, node->base.stat.size - sizeof(MinixDirEntry));
     unlockTaskLock(&node->lock);
     return err;
@@ -343,7 +343,7 @@ static Error minixLink(MinixVfsNode* node, const char* name, MinixVfsNode* entry
     size_t tmp_size;
     lockTaskLock(&node->lock);
     CHECKED(
-        minixWriteAt(node, virtPtrForKernel(&entry), node->base.stat.size, sizeof(MinixDirEntry), &tmp_size),
+        minixWriteAt(node, virtPtrForKernel(&entry), node->base.stat.size, sizeof(MinixDirEntry), &tmp_size, true),
         unlockTaskLock(&node->lock)
     );
     unlockTaskLock(&node->lock);
@@ -373,6 +373,7 @@ MinixVfsNode* createMinixVfsNode(MinixVfsSuperblock* fs, uint32_t inode) {
     node->base.stat.rdev = 0;
     node->base.stat.block_size = MINIX_BLOCK_SIZE;
     initTaskLock(&node->base.lock);
+    initTaskLock(&node->base.ref_lock);
     initTaskLock(&node->lock);
     return node;
 }

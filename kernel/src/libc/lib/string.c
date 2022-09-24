@@ -37,7 +37,7 @@ size_t strlen(const char* s) {
     return length;
 }
 
-char* strstr(const char* s1, const char* s2) {
+const char* strstr(const char* s1, const char* s2) {
     while (*s1 != 0) {
         const char* st1 = s1;
         const char* st2 = s2;
@@ -49,7 +49,7 @@ char* strstr(const char* s1, const char* s2) {
             st2++;
         }
         if (*st2 == 0) {
-            return (char*)s1;
+            return s1;
         }
         s1++;
     }

@@ -79,6 +79,7 @@ SyscallFunction user_syscalls[] = {
     [SYSCALL_SETSID] = setSidSyscall,
     [SYSCALL_GETSID] = getSidSyscall,
     [SYSCALL_SET_NANOSECONDS] = setNanosecondsSyscall,
+    [SYSCALL_SELECT] = selectSyscall,
 };
 
 SyscallFunction kernel_syscalls[] = {
@@ -110,7 +111,7 @@ static const char* findSyscallName(Syscalls id) {
     if (func == NULL) {
         return NULL;
     } else {
-        SymbolDebugInfo* symb = searchSymbolDebugInfo((uintptr_t)func);
+        const SymbolDebugInfo* symb = searchSymbolDebugInfo((uintptr_t)func);
         return symb == NULL ? NULL : symb->symbol;
     }
 }
@@ -136,7 +137,7 @@ static void syscallTask(SyscallFunction func, TrapFrame* frame) {
     task->times.system_time += self->times.user_time + self->times.system_time;
     task->times.system_time += self->times.user_child_time + self->times.system_child_time;
     if (ret == CONTINUE) {
-        moveTaskToState(task, ENQUABLE);
+        awakenTask(task);
         enqueueTask(task);
     }
     callInHart((void*)syscallTaskEnd, self);
@@ -168,11 +169,13 @@ void runSyscall(TrapFrame* frame, bool is_kernel) {
         } else {
             assert(frame->hart != NULL); // Only tasks can wait for async syscalls
             Task* task = (Task*)frame;
+            task->sched.wakeup_function = NULL;
             moveTaskToState(task, WAITING);
-            Task* syscall_task = createKernelTask(syscallTask, SYSCALL_STACK_SIZE, task->sched.priority);
-            syscall_task->frame.regs[REG_ARGUMENT_0] = (uintptr_t)func;
-            syscall_task->frame.regs[REG_ARGUMENT_1] = (uintptr_t)frame;
-            enqueueTask(syscall_task);
+            task->sys_task = createKernelTask(syscallTask, SYSCALL_STACK_SIZE, task->sched.priority);
+            task->sys_task->frame.regs[REG_ARGUMENT_0] = (uintptr_t)func;
+            task->sys_task->frame.regs[REG_ARGUMENT_1] = (uintptr_t)frame;
+            task->sys_task->sys_task = task;
+            enqueueTask(task->sys_task);
         }
     } else {
         frame->regs[REG_ARGUMENT_0] = -EINVAL;

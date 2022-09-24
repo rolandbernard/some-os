@@ -21,12 +21,16 @@
 #include "util/util.h"
 
 static size_t stringArrayLength(VirtPtr addr) {
-    size_t length = 0;
-    while (readInt(addr, sizeof(uintptr_t) * 8) != 0) {
-        addr.address += sizeof(uintptr_t);
-        length++;
+    if (addr.address == 0) {
+        return 0;
+    } else {
+        size_t length = 0;
+        while (readInt(addr, sizeof(uintptr_t) * 8) != 0) {
+            addr.address += sizeof(uintptr_t);
+            length++;
+        }
+        return length;
     }
-    return length;
 }
 
 static uintptr_t pushString(VirtPtr stack_pointer, VirtPtr string) {
@@ -43,9 +47,9 @@ static uintptr_t pushStringArray(VirtPtr stack_pointer, VirtPtr array, size_t* s
         i--;
         stack_pointer.address = pushString(
             stack_pointer,
-            virtPtrFor(readIntAt(array, i, sizeof(uintptr_t) * 8), stack_pointer.table)
+            virtPtrFor(readIntAt(array, i, sizeof(uintptr_t) * 8), array.table)
         );
-        strings[length] = stack_pointer.address;
+        strings[i] = stack_pointer.address;
     }
     stack_pointer.address -= sizeof(uintptr_t);
     writeInt(stack_pointer, sizeof(uintptr_t) * 8, 0);
@@ -75,7 +79,7 @@ static uintptr_t findStartBrk(MemorySpace* memspc) {
 
 Error loadProgramInto(Task* task, const char* path, VirtPtr args, VirtPtr envs) {
     VfsFile* file;
-    CHECKED(vfsOpenAt(&global_file_system, task->process, NULL, path, VFS_OPEN_EXECUTE, 0, &file));
+    CHECKED(vfsOpenAt(&global_file_system, task->process, NULL, path, VFS_OPEN_EXECUTE | VFS_OPEN_REGULAR, 0, &file));
     VfsStat stat;
     CHECKED(vfsFileStat(file, task->process, virtPtrForKernel(&stat)), vfsFileClose(file));
     MemorySpace* memory = createMemorySpace();
@@ -131,7 +135,6 @@ SyscallReturn execveSyscall(TrapFrame* frame) {
     Task* task = (Task*)frame;
     char* string = copyStringFromSyscallArgs(task, SYSCALL_ARG(0));
     if (string != NULL) {
-        moveTaskToState(task, WAITING);
         Error e = loadProgramInto(task, string, virtPtrForTask(SYSCALL_ARG(1), task), virtPtrForTask(SYSCALL_ARG(2), task));
         dealloc(string);
         if (isError(e)) {

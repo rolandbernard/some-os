@@ -15,7 +15,7 @@
 // Shared data should be locked before calling this
 static void doOperationOnPipe(PipeSharedData* pipe) {
     for (;;) {
-        if (pipe->waiting_reads != NULL && pipe->count != 0) {
+        if (pipe->waiting_reads != NULL && (pipe->count != 0 || pipe->write_count == 0)) {
             // We can do some reading
             size_t length = umin(pipe->count, pipe->waiting_reads->size);
             if (PIPE_BUFFER_CAPACITY < pipe->read_pos + length) {
@@ -41,7 +41,7 @@ static void doOperationOnPipe(PipeSharedData* pipe) {
                     pipe->waiting_reads_tail = NULL;
                 }
                 if (op->wakeup != NULL) {
-                    moveTaskToState(op->wakeup, ENQUABLE);
+                    awakenTask(op->wakeup);
                     enqueueTask(op->wakeup);
                 }
             }
@@ -71,7 +71,7 @@ static void doOperationOnPipe(PipeSharedData* pipe) {
                     pipe->waiting_writes_tail = NULL;
                 }
                 if (op->wakeup != NULL) {
-                    moveTaskToState(op->wakeup, ENQUABLE);
+                    awakenTask(op->wakeup);
                     enqueueTask(op->wakeup);
                 }
             }
@@ -82,7 +82,34 @@ static void doOperationOnPipe(PipeSharedData* pipe) {
     }
 }
 
+static bool handlePipeWakeup(Task* task, void* udata) {
+    lockSpinLock(&task->sys_task->process->lock); 
+    if (task->sys_task->process->signals.signals != NULL) {
+        PipeSharedData* data = (PipeSharedData*)udata;
+        lockSpinLock(&data->lock);
+        WaitingPipeOperation** current = &data->waiting_reads;
+        while (*current != NULL && (*current)->wakeup != task) {
+            current = &(*current)->next;
+        }
+        if (*current != NULL) {
+            *current = (*current)->next;
+            if (data->waiting_reads == NULL) {
+                data->waiting_reads_tail = NULL;
+            }
+        }
+        unlockSpinLock(&data->lock);
+        unlockSpinLock(&task->sys_task->process->lock); 
+        return true;
+    } else {
+        unlockSpinLock(&task->sys_task->process->lock); 
+        return false;
+    }
+}
+
 static void waitForPipeOperation(void* _, Task* task, PipeSharedData* data) {
+    assert(task->process == NULL);
+    task->sched.wakeup_udata = data;
+    task->sched.wakeup_function = task->sys_task->process != NULL ? handlePipeWakeup : NULL;
     moveTaskToState(task, WAITING);
     enqueueTask(task);
     doOperationOnPipe(data);
@@ -90,88 +117,154 @@ static void waitForPipeOperation(void* _, Task* task, PipeSharedData* data) {
     runNextTask();
 }
 
-Error executePipeOperation(PipeSharedData* data, VirtPtr buffer, size_t size, bool write, size_t* ret) {
-    WaitingPipeOperation op;
-    op.buffer = buffer;
-    op.size = size;
-    op.written = 0;
-    op.next = NULL;
-    Task* task = criticalEnter();
-    assert(task != NULL);
-    op.wakeup = task;
-    lockSpinLock(&data->lock);
-    if (write) {
-        if (data->waiting_writes == NULL) {
-            data->waiting_writes = &op;
-            data->waiting_writes_tail = &op;
-        } else {
-            data->waiting_writes_tail->next = &op;
-        }
-    } else {
-        if (data->waiting_reads == NULL) {
-            data->waiting_reads = &op;
-            data->waiting_reads_tail = &op;
-        } else {
-            data->waiting_reads_tail->next = &op;
-        }
+static size_t currentReadCapacity(PipeSharedData* data) {
+    size_t capacity = data->count;
+    WaitingPipeOperation* current = data->waiting_writes;
+    while (current != NULL) {
+        capacity += current->size;
+        current = current->next;
     }
-    if (saveToFrame(&task->frame)) {
-        callInHart((void*)waitForPipeOperation, task, data);
-    }
-    *ret = op.written;
-    return simpleError(SUCCESS);
+    return capacity;
 }
 
-PipeSharedData* createPipeSharedData() {
+static size_t currentWriteCapacity(PipeSharedData* data) {
+    size_t capacity = PIPE_BUFFER_CAPACITY - data->count;
+    WaitingPipeOperation* current = data->waiting_reads;
+    while (current != NULL) {
+        capacity += current->size;
+        current = current->next;
+    }
+    return capacity;
+}
+
+Error executePipeOperation(PipeSharedData* data, VirtPtr buffer, size_t size, bool write, size_t* ret, bool block) {
+    Task* task = criticalEnter();
+    assert(task != NULL);
+    lockSpinLock(&data->lock);
+    if (currentReadCapacity(data) == 0 && data->write_count == 0) {
+        // EOF if there are no open file descriptors for writing
+        unlockSpinLock(&data->lock);
+        criticalReturn(task);
+        *ret = 0;
+        return simpleError(SUCCESS);
+    } else if (block || (write && currentWriteCapacity(data) >= size) || (!write && currentReadCapacity(data) > 0)) {
+        WaitingPipeOperation op;
+        op.buffer = buffer;
+        op.size = size;
+        op.written = 0;
+        op.next = NULL;
+        op.wakeup = task;
+        if (write) {
+            if (data->waiting_writes == NULL) {
+                data->waiting_writes = &op;
+                data->waiting_writes_tail = &op;
+            } else {
+                data->waiting_writes_tail->next = &op;
+            }
+        } else {
+            if (data->waiting_reads == NULL) {
+                data->waiting_reads = &op;
+                data->waiting_reads_tail = &op;
+            } else {
+                data->waiting_reads_tail->next = &op;
+            }
+        }
+        if (saveToFrame(&task->frame)) {
+            callInHart((void*)waitForPipeOperation, task, data);
+        }
+        *ret = op.written;
+        return simpleError(op.written != 0 ? SUCCESS : EINTR);
+    } else {
+        unlockSpinLock(&data->lock);
+        criticalReturn(task);
+        return simpleError(EAGAIN);
+    }
+}
+
+PipeSharedData* createPipeSharedData(bool for_write) {
     PipeSharedData* data = zalloc(sizeof(PipeSharedData));
     data->ref_count = 1;
+    data->write_count = for_write ? 1 : 0;
     data->buffer = kalloc(PIPE_BUFFER_CAPACITY);
     return data;
 }
 
-void copyPipeSharedData(PipeSharedData* data) {
+void copyPipeSharedData(PipeSharedData* data, bool for_write) {
     lockSpinLock(&data->lock);
     data->ref_count++;
+    if (for_write) {
+        data->write_count++;
+    }
     unlockSpinLock(&data->lock);
 }
 
-void freePipeSharedData(PipeSharedData* data) {
+bool freePipeSharedData(PipeSharedData* data, bool for_write) {
     lockSpinLock(&data->lock);
     data->ref_count--;
+    if (for_write) {
+        assert(data->write_count > 0);
+        data->write_count--;
+        if (data->write_count == 0) {
+            // EOF all of the remaining reads
+            doOperationOnPipe(data);
+        }
+    }
+    assert(data->write_count <= data->ref_count);
     if (data->ref_count == 0) {
         unlockSpinLock(&data->lock);
         dealloc(data->buffer);
         dealloc(data);
+        return true;
     } else {
         unlockSpinLock(&data->lock);
+        return false;
     }
 }
 
 typedef struct {
     VfsNode base;
     PipeSharedData* data;
+    bool for_write;
 } VfsPipeNode;
 
 static void pipeNodeFree(VfsPipeNode* node) {
-    freePipeSharedData(node->data);
+    freePipeSharedData(node->data, node->for_write);
     dealloc(node);
 }
 
-static Error pipeNodeReadAt(VfsPipeNode* node, VirtPtr buff, size_t offset, size_t length, size_t* read) {
-    return executePipeOperation(node->data, buff, length, false, read);
+static Error pipeNodeReadAt(VfsPipeNode* node, VirtPtr buff, size_t offset, size_t length, size_t* read, bool block) {
+    return executePipeOperation(node->data, buff, length, false, read, block);
 }
 
-static Error pipeNodeWriteAt(VfsPipeNode* node, VirtPtr buff, size_t offset, size_t length, size_t* written) {
-    return executePipeOperation(node->data, buff, length, true, written);
+static Error pipeNodeWriteAt(VfsPipeNode* node, VirtPtr buff, size_t offset, size_t length, size_t* written, bool block) {
+    assert(node->for_write);
+    return executePipeOperation(node->data, buff, length, true, written, block);
+}
+
+bool pipeWillBlock(PipeSharedData* data, bool write) {
+    bool result;
+    lockSpinLock(&data->lock);
+    if (write) {
+        result = currentWriteCapacity(data) == 0;
+    } else {
+        result = currentReadCapacity(data) == 0 && data->write_count > 0;
+    }
+    unlockSpinLock(&data->lock);
+    return result;
+}
+
+static bool pipeNodeWillBlock(VfsPipeNode* node, bool write) {
+    return pipeWillBlock(node->data, write);
 }
 
 static const VfsNodeFunctions funcs = {
     .free = (VfsNodeFreeFunction)pipeNodeFree,
     .read_at = (VfsNodeReadAtFunction)pipeNodeReadAt,
     .write_at = (VfsNodeWriteAtFunction)pipeNodeWriteAt,
+    .will_block = (VfsNodeWillBlockFunction)pipeNodeWillBlock,
 };
 
-VfsPipeNode* createPipeNode() {
+VfsPipeNode* createPipeNode(PipeSharedData* data, bool for_write) {
     VfsPipeNode* node = kalloc(sizeof(VfsPipeNode));
     node->base.functions = &funcs;
     node->base.superblock = NULL;
@@ -183,30 +276,34 @@ VfsPipeNode* createPipeNode() {
     node->base.stat.mtime = time;
     node->base.stat.ctime = time;
     node->base.real_node = (VfsNode*)node;
-    node->base.ref_count = 0;
+    node->base.ref_count = 1;
     initTaskLock(&node->base.lock);
+    initTaskLock(&node->base.ref_lock);
     node->base.mounted = NULL;
-    node->data = createPipeSharedData();
+    node->data = data;
+    node->for_write = for_write;
     return node;
 }
 
-static VfsFile* createPipeFileWithNode(VfsNode* node) {
-    vfsNodeCopy(node);
+static VfsFile* createPipeFileWithData(PipeSharedData* data, bool for_write) {
     VfsFile* file = kalloc(sizeof(VfsFile));
-    file->node = node;
+    file->node = (VfsNode*)createPipeNode(data, for_write);
     file->path = NULL;
     file->ref_count = 1;
     file->offset = 0;
     file->flags = 0;
     initTaskLock(&file->lock);
+    initTaskLock(&file->ref_lock);
     return file;
 }
 
-VfsFile* createPipeFile() {
-    return createPipeFileWithNode((VfsNode*)createPipeNode());
+VfsFile* createPipeFile(bool for_write) {
+    return createPipeFileWithData(createPipeSharedData(for_write), for_write);
 }
 
-VfsFile* createPipeFileClone(VfsFile* file) {
-    return createPipeFileWithNode(file->node);
+VfsFile* createPipeFileClone(VfsFile* file, bool for_write) {
+    PipeSharedData* data = ((VfsPipeNode*)file->node)->data;
+    copyPipeSharedData(data, for_write);
+    return createPipeFileWithData(data, for_write);
 }
 

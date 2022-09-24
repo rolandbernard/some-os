@@ -24,19 +24,6 @@ static bool isIndexValid(VfsNodeCache* table, size_t idx) {
     return table->nodes[idx] != EMPTY && table->nodes[idx] != DELETED;
 }
 
-static bool continueSearch(VfsNodeCache* table, size_t idx, size_t sb_id, size_t node_id) {
-    return table->nodes[idx] == DELETED
-           || (isIndexValid(table, idx) && !vfsNodeCompareKey(table->nodes[idx], sb_id, node_id));
-}
-
-static size_t findIndexHashTable(VfsNodeCache* table, size_t sb_id, size_t node_id) {
-    size_t idx = vfsNodeKeyHash(sb_id, node_id) % table->capacity;
-    while (continueSearch(table, idx, sb_id, node_id)) {
-        idx = (idx + 1) % table->capacity;
-    }
-    return idx;
-}
-
 static bool continueInsertSearch(VfsNodeCache* table, size_t idx, VfsNode* node) {
     return isIndexValid(table, idx)
            && !vfsNodeCompareKey(table->nodes[idx], node->superblock->id, node->stat.id);
@@ -75,11 +62,44 @@ static void testForResize(VfsNodeCache* table) {
     }
 }
 
+static bool continueSearch(VfsNodeCache* table, size_t idx, size_t sb_id, size_t node_id) {
+    return table->nodes[idx] == DELETED
+           || (isIndexValid(table, idx) && !vfsNodeCompareKey(table->nodes[idx], sb_id, node_id));
+}
+
+static size_t findIndexHashTable(VfsNodeCache* table, size_t sb_id, size_t node_id) {
+    if (table->count == 0) {
+        return SIZE_MAX;
+    }
+    size_t start = vfsNodeKeyHash(sb_id, node_id) % table->capacity;
+    size_t first_free = SIZE_MAX;
+    size_t idx = start;
+    while (continueSearch(table, idx, sb_id, node_id)) {
+        if (table->nodes[idx] == DELETED) {
+            first_free = idx;
+        }
+        idx = (idx + 1) % table->capacity;
+        if (idx == start) {
+            return SIZE_MAX;
+        }
+    }
+    VfsNode* found = table->nodes[idx];
+    if (found == DELETED || found == EMPTY) {
+        return SIZE_MAX;
+    } else if (first_free != SIZE_MAX) {
+        table->nodes[first_free] = found;
+        table->nodes[idx] = DELETED;
+        return first_free;
+    } else {
+        return idx;
+    }
+}
+
 VfsNode* vfsCacheGetNodeOrLock(VfsNodeCache* cache, size_t sb_id, size_t node_id) {
     lockTaskLock(&cache->lock);
     size_t idx = findIndexHashTable(cache, sb_id, node_id);
-    VfsNode* found = cache->nodes[idx];
-    if (found != DELETED && found != EMPTY) {
+    if (idx != SIZE_MAX) {
+        VfsNode* found = cache->nodes[idx];
         vfsNodeCopy(found);
         unlockTaskLock(&cache->lock);
         return found;
@@ -93,6 +113,7 @@ static void vfsCacheInsertNewNode(VfsNodeCache* cache, VfsNode* node) {
     size_t idx = insertIndexHashTable(cache, node);
     assert(cache->nodes[idx] == EMPTY || cache->nodes[idx] == DELETED);
     cache->nodes[idx] = node;
+    cache->count++;
 }
 
 void vfsCacheUnlock(VfsNodeCache* cache) {
@@ -117,8 +138,9 @@ size_t vfsCacheCloseNode(VfsNodeCache* cache, VfsNode* node) {
     node->ref_count--;
     if (node->ref_count == 0) {
         size_t idx = findIndexHashTable(cache, node->superblock->id, node->stat.id);
-        assert(cache->nodes[idx] == node);
+        assert(idx != SIZE_MAX && cache->nodes[idx] == node);
         cache->nodes[idx] = DELETED;
+        cache->count--;
     }
     size_t refs = node->ref_count;
     unlockTaskLock(&cache->lock);

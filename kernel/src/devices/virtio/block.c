@@ -15,7 +15,7 @@ static void handleInterrupt(ExternalInterrupt id, void* udata) {
 
 Error initVirtIOBlockDevice(volatile VirtIODeviceLayout* base, ExternalInterrupt itr_id) {
 #ifdef DEBUG
-    VirtIOBlockDeviceLayout* mmio = (VirtIOBlockDeviceLayout*)base;
+    volatile VirtIOBlockDeviceLayout* mmio = (volatile VirtIOBlockDeviceLayout*)base;
     assert(mmio->config.blk_size == BLOCK_SECTOR_SIZE); // TODO: actually use the data in mmio->config?
 #endif
     VirtIOBlockDevice* device = zalloc(sizeof(VirtIOBlockDevice));
@@ -47,6 +47,7 @@ Error initVirtIOBlockDevice(volatile VirtIODeviceLayout* base, ExternalInterrupt
 }
 
 static void waitForBlockOperation(void* _, VirtIOBlockDevice* device, VirtIOBlockRequest* request) {
+    request->wakeup->sched.wakeup_function = NULL;
     moveTaskToState(request->wakeup, WAITING);
     enqueueTask(request->wakeup);
     sendRequestAt(&device->virtio, request->head);
@@ -121,7 +122,7 @@ void virtIOBlockFreePendingRequests(VirtIOBlockDevice* device) {
                 request->result = simpleError(EIO);
                 break;
         }
-        moveTaskToState(request->wakeup, ENQUABLE);
+        awakenTask(request->wakeup);
         enqueueTask(request->wakeup);
     }
 }
@@ -146,7 +147,7 @@ static const BlockDeviceFunctions funcs = {
 
 Error registerVirtIOBlockDevice(VirtIOBlockDevice* dev) {
     VirtIORegisteredBlockDevice* reg = kalloc(sizeof(VirtIORegisteredBlockDevice));
-    VirtIOBlockDeviceLayout* mmio = (VirtIOBlockDeviceLayout*)dev->virtio.mmio;
+    volatile VirtIOBlockDeviceLayout* mmio = (volatile VirtIOBlockDeviceLayout*)dev->virtio.mmio;
     reg->base.block_size = BLOCK_SECTOR_SIZE;
     reg->base.size = mmio->config.capacity * BLOCK_SECTOR_SIZE;
     reg->base.base.type = DEVICE_BLOCK;

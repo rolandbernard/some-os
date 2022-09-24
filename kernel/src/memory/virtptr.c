@@ -37,6 +37,10 @@ VirtPtr unsafeVirtPtrFor(uintptr_t addr, MemorySpace* mem) {
     return ret;
 }
 
+void* virtPtrPhys(VirtPtr addr) {
+    return (void*)virtToPhys(addr.table, addr.address, false, addr.allow_all);
+}
+
 // Parts are segments of the buffer in continuos physical pages
 size_t getVirtPtrParts(VirtPtr addr, size_t length, VirtPtrBufferPart* parts, size_t max_parts, bool write) {
     size_t part_index = 0;

@@ -92,7 +92,6 @@ void kernelTrap(uintptr_t cause, uintptr_t pc, uintptr_t val, TrapFrame* frame) 
 #endif
         }
         if (interrupt) {
-            frame->pc = pc;
             switch (code) {
                 case 0: // Software interrupt U-mode
                 case 1: // Software interrupt S-mode
@@ -133,7 +132,7 @@ void kernelTrap(uintptr_t cause, uintptr_t pc, uintptr_t val, TrapFrame* frame) 
                     } else {
                         if (!handlePageFault(task->process->memory.mem, val)) {
                             KERNEL_WARNING("Segmentation fault: %i %p %p %p %s", task->process->pid, pc, val, frame, getCauseString(interrupt, code));
-                            addSignalToProcess(task->process, SIGSEGV);
+                            addSignalToProcess(task->process, SIGSEGV, 0);
                         }
                     }
                     break;
@@ -143,7 +142,7 @@ void kernelTrap(uintptr_t cause, uintptr_t pc, uintptr_t val, TrapFrame* frame) 
                         panic();
                     } else {
                         KERNEL_WARNING("Segmentation fault: %i %p %p %p %s", task->process->pid, pc, val, frame, getCauseString(interrupt, code));
-                        addSignalToProcess(task->process, SIGSEGV);
+                        addSignalToProcess(task->process, SIGSEGV, 0);
                     }
                     break;
             }

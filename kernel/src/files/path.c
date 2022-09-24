@@ -9,7 +9,7 @@
 void inlineReducePath(char* path) {
     int read_pos = 0;
     int insert_pos = 0;
-    int segments = 0; // Holds the number of reducable segments e.g: ../seg1/seg2/ ('..' is not reducable)
+    int segments = 0; // Holds the number of reducible segments e.g: ../seg1/seg2/ ('..' is not reducible)
     bool is_absolute = false;
     if (path[read_pos] == '/') {
         read_pos++;
@@ -43,7 +43,7 @@ void inlineReducePath(char* path) {
                     // '/../' is equal to '/'
                     read_pos += 2;
                 } else {
-                    // Write the segment (but don't increment the number of reducable segments)
+                    // Write the segment (but don't increment the number of reducible segments)
                     while (read_pos <= next_slash && path[read_pos] != 0) {
                         path[insert_pos] = path[read_pos];
                         read_pos++;

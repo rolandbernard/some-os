@@ -17,12 +17,12 @@ static void ttyNodeFree(VfsTtyNode* node) {
     dealloc(node);
 }
 
-static Error ttyNodeWriteAt(VfsTtyNode* node, VirtPtr buff, size_t offset, size_t length, size_t* written) {
+static Error ttyNodeWriteAt(VfsTtyNode* node, VirtPtr buff, size_t offset, size_t length, size_t* written, bool block) {
     return node->device->functions->write(node->device, buff, length, written);
 }
 
-static Error ttyNodeReadAt(VfsTtyNode* node, VirtPtr buff, size_t offset, size_t length, size_t* read) {
-    return node->device->functions->read(node->device, buff, length, read, true);
+static Error ttyNodeReadAt(VfsTtyNode* node, VirtPtr buff, size_t offset, size_t length, size_t* read, bool block) {
+    return node->device->functions->read(node->device, buff, length, read, block);
 }
 
 static Error ttyNodeIoctl(VfsTtyNode* node, size_t request, VirtPtr argp, uintptr_t* res) {
@@ -33,11 +33,20 @@ static Error ttyNodeIoctl(VfsTtyNode* node, size_t request, VirtPtr argp, uintpt
     }
 }
 
+static bool ttyNodeWillBlock(VfsTtyNode* node, bool write) {
+    if (node->device->functions->will_block == NULL) {
+        return false;
+    } else {
+        return node->device->functions->will_block(node->device, write);
+    }
+}
+
 static const VfsNodeFunctions funcs = {
     .free = (VfsNodeFreeFunction)ttyNodeFree,
     .read_at = (VfsNodeReadAtFunction)ttyNodeReadAt,
     .write_at = (VfsNodeWriteAtFunction)ttyNodeWriteAt,
     .ioctl = (VfsNodeIoctlFunction)ttyNodeIoctl,
+    .will_block = (VfsNodeWillBlockFunction)ttyNodeWillBlock,
 };
 
 VfsTtyNode* createTtyNode(CharDevice* device, VfsNode* real_node) {
@@ -52,6 +61,7 @@ VfsTtyNode* createTtyNode(CharDevice* device, VfsNode* real_node) {
     node->base.real_node = real_node;
     node->base.ref_count = 1;
     initTaskLock(&node->base.lock);
+    initTaskLock(&node->base.ref_lock);
     node->base.mounted = NULL;
     node->device = device;
     return node;
@@ -65,6 +75,7 @@ VfsFile* createCharDeviceFile(VfsNode* node, CharDevice* device, char* path) {
     file->offset = 0;
     file->flags = 0;
     initTaskLock(&file->lock);
+    initTaskLock(&file->ref_lock);
     return file;
 }
 

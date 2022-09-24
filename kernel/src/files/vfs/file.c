@@ -49,11 +49,11 @@ Error vfsFileWrite(VfsFile* file, Process* process, VirtPtr buffer, size_t lengt
 }
 
 Error vfsFileReadAt(VfsFile* file, Process* process, VirtPtr buffer, size_t offset, size_t length, size_t* read) {
-    return vfsNodeReadAt(file->node, process, buffer, offset, length, read);
+    return vfsNodeReadAt(file->node, process, buffer, offset, length, read, (file->flags & VFS_FILE_NONBLOCK) == 0);
 }
 
 Error vfsFileWriteAt(VfsFile* file, Process* process, VirtPtr buffer, size_t offset, size_t length, size_t* written) {
-    return vfsNodeWriteAt(file->node, process, buffer, offset, length, written);
+    return vfsNodeWriteAt(file->node, process, buffer, offset, length, written, (file->flags & VFS_FILE_NONBLOCK) == 0);
 }
 
 Error vfsFileStat(VfsFile* file, Process* process, VirtPtr ret) {
@@ -109,21 +109,29 @@ Error vfsFileIoctl(VfsFile* file, Process* process, size_t request, VirtPtr argp
     return vfsNodeIoctl(file->node, process, request, argp, out);
 }
 
+bool vfsFileWillBlock(VfsFile* file, Process* process, bool write) {
+    if ((file->flags & VFS_FILE_NONBLOCK) != 0) {
+        return false;
+    } else {
+        return vfsNodeWillBlock(file->node, process, write);
+    }
+}
+
 void vfsFileCopy(VfsFile* file) {
-    lockTaskLock(&file->lock);
+    lockTaskLock(&file->ref_lock);
     file->ref_count++;
-    unlockTaskLock(&file->lock);
+    unlockTaskLock(&file->ref_lock);
 }
 
 void vfsFileClose(VfsFile* file) {
-    lockTaskLock(&file->lock);
+    lockTaskLock(&file->ref_lock);
     file->ref_count--;
     if (file->ref_count == 0) {
-        unlockTaskLock(&file->lock);
+        unlockTaskLock(&file->ref_lock);
         vfsNodeClose(file->node);
         dealloc(file);
     } else {
-        unlockTaskLock(&file->lock);
+        unlockTaskLock(&file->ref_lock);
     }
 }
 

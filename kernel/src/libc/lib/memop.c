@@ -30,19 +30,19 @@ void* memset(void* mem, int byte, size_t n) {
 void* memmove(void* dest, const void* src, size_t n) {
     if (dest < src) {
         while (n > 0 && ((uintptr_t)dest % 8 != 0 || (uintptr_t)src % 8 != 0)) {
-            (*(uint8_t*)dest) = *(uint8_t*)src;
+            (*(uint8_t*)dest) = *(const uint8_t*)src;
             dest++;
             src++;
             n--;
         }
         while (n > 8) {
-            (*(uint64_t*)dest) = *(uint64_t*)src;
+            (*(uint64_t*)dest) = *(const uint64_t*)src;
             dest += 8;
             src += 8;
             n -= 8;
         }
         while (n > 0) {
-            (*(uint8_t*)dest) = *(uint8_t*)src;
+            (*(uint8_t*)dest) = *(const uint8_t*)src;
             dest++;
             src++;
             n--;
@@ -53,19 +53,19 @@ void* memmove(void* dest, const void* src, size_t n) {
         while (n > 0 && ((uintptr_t)dest % 8 != 0 || (uintptr_t)src % 8 != 0)) {
             dest--;
             src--;
-            (*(uint8_t*)dest) = *(uint8_t*)src;
+            (*(uint8_t*)dest) = *(const uint8_t*)src;
             n--;
         }
         while (n > 8) {
             dest -= 8;
             src -= 8;
-            (*(uint64_t*)dest) = *(uint64_t*)src;
+            (*(uint64_t*)dest) = *(const uint64_t*)src;
             n -= 8;
         }
         while (n > 0) {
             dest--;
             src--;
-            (*(uint8_t*)dest) = *(uint8_t*)src;
+            (*(uint8_t*)dest) = *(const uint8_t*)src;
             n--;
         }
     }

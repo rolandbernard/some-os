@@ -49,8 +49,8 @@ static bool wakeupIfRequired(UartTtyDevice* dev) {
     if (canReturnRead(dev)) {
         while (dev->blocked != NULL) {
             Task* wakeup = dev->blocked;
-            dev->blocked = wakeup->sched.sched_next;
-            moveTaskToState(wakeup, ENQUABLE);
+            dev->blocked = wakeup->sched.locks_next;
+            awakenTask(wakeup);
             enqueueTask(wakeup);
         }
         return true;
@@ -68,10 +68,34 @@ static void checkForWakeup(Time time, void* udata) {
     unlockSpinLock(&dev->lock);
 }
 
+static bool handleTtyWakeup(Task* task, void* udata) {
+    lockSpinLock(&task->sys_task->process->lock); 
+    if (task->sys_task->process->signals.signals != NULL) {
+        UartTtyDevice* dev = (UartTtyDevice*)udata;
+        lockSpinLock(&dev->lock);
+        Task** current = &dev->blocked;
+        while (*current != NULL && *current != task) {
+            current = &(*current)->sched.locks_next;
+        }
+        if (*current == task) {
+            *current = (*current)->sched.locks_next;
+        }
+        unlockSpinLock(&dev->lock);
+        unlockSpinLock(&task->sys_task->process->lock); 
+        return true;
+    } else {
+        unlockSpinLock(&task->sys_task->process->lock); 
+        return false;
+    }
+}
+
 static void waitForReadOperation(void* _, Task* task, UartTtyDevice* dev) {
+    assert(task->process == NULL);
+    task->sched.wakeup_udata = dev;
+    task->sched.wakeup_function = task->sys_task->process != NULL ? handleTtyWakeup : NULL;
     moveTaskToState(task, WAITING);
     enqueueTask(task);
-    task->sched.sched_next = dev->blocked;
+    task->sched.locks_next = dev->blocked;
     dev->blocked = task;
     if ((dev->ctrl.lflag & ICANON) == 0 && dev->ctrl.cc[VTIME] != 0 && dev->blocked == NULL) {
         setTimeout(dev->ctrl.cc[VTIME] * CLOCKS_PER_SEC / 10, checkForWakeup, dev);
@@ -116,16 +140,28 @@ static Error uartTtyReadOrWait(UartTtyDevice* dev, VirtPtr buffer, size_t size, 
         *read = length;
         return simpleError(SUCCESS);
     } else {
+        if (task->sys_task->process != NULL) {
+            lockSpinLock(&task->sys_task->process->lock); 
+            if (task->sys_task->process->signals.signals != NULL) {
+                unlockSpinLock(&task->sys_task->process->lock); 
+                unlockSpinLock(&dev->lock);
+                criticalReturn(task);
+                return simpleError(EINTR);
+            } else {
+                unlockSpinLock(&task->sys_task->process->lock); 
+            }
+        }
         if (block) {
             assert(task != NULL);
             if (saveToFrame(&task->frame)) {
                 callInHart((void*)waitForReadOperation, task, dev);
             }
+            return simpleError(EAGAIN);
         } else {
             unlockSpinLock(&dev->lock);
             criticalReturn(task);
+            return simpleError(EAGAIN);
         }
-        return simpleError(EAGAIN);
     }
 }
 
@@ -314,21 +350,15 @@ static Error uartTtyIoctlFunction(UartTtyDevice* dev, size_t request, VirtPtr ar
     return error;
 }
 
-void uartTtyDataReady(UartTtyDevice* dev) {
-    Error error;
-    lockSpinLock(&dev->lock);
-    do {
-        error = basicTtyRead(dev);
-    } while (!isError(error));
-    dev->last_byte = getTime();
-    wakeupIfRequired(dev);
-    unlockSpinLock(&dev->lock);
+static bool uartTtyWillBlockFunction(UartTtyDevice* dev, bool write) {
+    return !write && !canReturnRead(dev);
 }
 
 static const CharDeviceFunctions funcs = {
     .read = (CharDeviceReadFunction)uartTtyReadFunction,
     .write = (CharDeviceWriteFunction)uartTtyWriteFunction,
     .ioctl = (CharDeviceIoctlFunction)uartTtyIoctlFunction,
+    .will_block = (CharDeviceWillBlockFunction)uartTtyWillBlockFunction,
 };
 
 UartTtyDevice* createUartTtyDevice(void* uart, UartWriteFunction write, UartReadFunction read) {
@@ -354,14 +384,25 @@ UartTtyDevice* createUartTtyDevice(void* uart, UartWriteFunction write, UartRead
     dev->ctrl.cc[VEOL] = '\x00';
     dev->ctrl.cc[VINTR] = '\x05';
     dev->ctrl.cc[VKILL] = '\x15';
-    dev->ctrl.cc[VQUIT] = '\x1c';
-    dev->ctrl.cc[VSUSP] = '\x1a';
+    dev->ctrl.cc[VQUIT] = '\x06';
+    dev->ctrl.cc[VSUSP] = '\x14';
     dev->ctrl.cc[VTIME] = 0;
     dev->ctrl.cc[VMIN] = 1;
     dev->last_byte = 0;
     dev->line_delim_count = 0;
     dev->process_group = 1; // Just give it to the init process
     return dev;
+}
+
+void uartTtyDataReady(UartTtyDevice* dev) {
+    Error error;
+    lockSpinLock(&dev->lock);
+    do {
+        error = basicTtyRead(dev);
+    } while (!isError(error));
+    dev->last_byte = getTime();
+    wakeupIfRequired(dev);
+    unlockSpinLock(&dev->lock);
 }
 
 Error writeStringToTty(CharDevice* dev, const char* str) {

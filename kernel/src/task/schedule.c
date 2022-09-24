@@ -15,15 +15,22 @@
 
 #define PRIORITY_DECREASE (CLOCKS_PER_SEC / 75)
 
-SpinLock sleeping_lock;
-Task* sleeping = NULL;
+SpinLock waiting_lock;
+Task* waiting = NULL;
 
-static void addSleepingTask(Task* task) {
-    lockSpinLock(&sleeping_lock);
-    assert(task != sleeping);
-    task->sched.sched_next = sleeping;
-    sleeping = task;
-    unlockSpinLock(&sleeping_lock);
+static void addWaitingTask(Task* task) {
+    lockSpinLock(&waiting_lock);
+    assert(task != waiting);
+#ifdef DEBUG
+    Task* current = waiting;
+    while (current != NULL) {
+        assert(current != task);
+        current = current->sched.sched_next;
+    }
+#endif
+    task->sched.sched_next = waiting;
+    waiting = task;
+    unlockSpinLock(&waiting_lock);
 }
 
 void enqueueTask(Task* task) {
@@ -37,8 +44,8 @@ void enqueueTask(Task* task) {
     if (hart->idle_task != task) { // Ignore the idle process
         lockSpinLock(&task->sched.lock);
         switch (task->sched.state) {
-            case SLEEPING:
-                addSleepingTask(task);
+            case WAITING:
+                addWaitingTask(task);
                 unlockSpinLock(&task->sched.lock);
                 break;
             case ENQUABLE:
@@ -56,7 +63,6 @@ void enqueueTask(Task* task) {
                 break;
             case READY: // Task has already been enqueued
             case RUNNING: // It is currently running
-            case WAITING: // Task is already handled somewhere else
             case STOPPED: // Enqueue these when we continue
                 unlockSpinLock(&task->sched.lock);
                 break;
@@ -71,22 +77,25 @@ void enqueueTask(Task* task) {
 }
 
 static void awakenTasks() {
-    lockSpinLock(&sleeping_lock);
-    Task** current = &sleeping;
+    lockSpinLock(&waiting_lock);
+    Task** current = &waiting;
     while (*current != NULL) {
         Task* task = *current;
         lockSpinLock(&task->sched.lock);
-        if (task->sched.wakeup_function(task)) {
+        if (
+            task->sched.wakeup_function != NULL
+            && task->sched.wakeup_function(task, task->sched.wakeup_udata)
+        ) {
+            task->sched.state = ENQUABLE;
             unlockSpinLock(&task->sched.lock);
             *current = task->sched.sched_next;
-            moveTaskToState(task, ENQUABLE);
             enqueueTask(task);
         } else {
             unlockSpinLock(&task->sched.lock);
             current = &task->sched.sched_next;
         }
     }
-    unlockSpinLock(&sleeping_lock);
+    unlockSpinLock(&waiting_lock);
 }
 
 noreturn void runNextTask() {
@@ -199,9 +208,31 @@ Task* removeTaskFromQueue(ScheduleQueue* queue, Task* task) {
 void moveTaskToState(Task* task, TaskState state) {
     assert(task != NULL);
     lockSpinLock(&task->sched.lock);
+    if (task->sched.state == WAITING) {
+        assert(state == TERMINATED || state == STOPPED); // Use awaken for other cases.
+        awakenTask(task);
+    }
+    assert(task->sched.state != WAITING);
     if (task->sched.state != TERMINATED && (task->sched.state != STOPPED || state == TERMINATED)) {
         task->sched.state = state;
     }
     unlockSpinLock(&task->sched.lock);
+}
+
+void awakenTask(Task* task) {
+    lockSpinLock(&waiting_lock);
+    Task** current = &waiting;
+    while (*current != NULL && *current != task) {
+        current = &(*current)->sched.sched_next;
+    }
+    assert(*current == task);
+    *current = (*current)->sched.sched_next;
+    lockSpinLock(&task->sched.lock);
+    if (task->sched.state != TERMINATED && task->sched.state != STOPPED) {
+        assert(task->sched.state == WAITING);
+        task->sched.state = ENQUABLE;
+    }
+    unlockSpinLock(&task->sched.lock);
+    unlockSpinLock(&waiting_lock);
 }
 

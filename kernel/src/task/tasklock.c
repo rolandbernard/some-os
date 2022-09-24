@@ -20,9 +20,10 @@ void initTaskLock(TaskLock* lock) {
 }
 
 static void waitForTaskLock(void* _, Task* task, TaskLock* lock) {
+    task->sched.wakeup_function = NULL;
     moveTaskToState(task, WAITING);
     enqueueTask(task);
-    task->sched.sched_next = lock->wait_queue;
+    task->sched.locks_next = lock->wait_queue;
     lock->wait_queue = task;
     unlockUnsafeLock(&lock->unsafelock);
     runNextTask();
@@ -128,8 +129,8 @@ void unlockTaskLock(TaskLock* lock) {
         basicUnlockByTask(lock, task);
         while (lock->wait_queue != NULL) {
             Task* wakeup = lock->wait_queue;
-            lock->wait_queue = wakeup->sched.sched_next;
-            moveTaskToState(wakeup, ENQUABLE);
+            lock->wait_queue = wakeup->sched.locks_next;
+            awakenTask(wakeup);
             enqueueTask(wakeup);
         }
         unlockUnsafeLock(&lock->unsafelock);

@@ -43,6 +43,8 @@ $(TARGET.sysroot): $(TARGET.userspace) $(TARGET.programs) $(MAKEFILE_LIST)
 	mkdir -p $(SYSROOT_DIR)/dev
 	mkdir -p $(SYSROOT_DIR)/bin
 	cp -r $(USERSPACE_DIR)/build/$(BUILD)/bin/* $(SYSROOT_DIR)/bin
+	echo -e "PS1='[\h \w]$$ '" > $(SYSROOT_DIR)/.bashrc
+	echo -e "HOME='/'" >> $(SYSROOT_DIR)/.bashrc
 	touch $@
 
 $(DISK): $(TARGET.sysroot) | $(MOUNT_DIR)/
@@ -50,7 +52,7 @@ $(DISK): $(TARGET.sysroot) | $(MOUNT_DIR)/
 	dd if=/dev/zero of=$@ bs=1M count=128 &> /dev/null
 	mkfs.minix -3 $@
 	sudo mount $@ $(MOUNT_DIR)
-	cp -r $(SYSROOT_DIR)/* $(MOUNT_DIR)/
+	cp -r $(SYSROOT_DIR)/{*,.[^.]*} $(MOUNT_DIR)/
 	sudo umount $(MOUNT_DIR)
 
 qemu: $(TARGET.kernel) $(DISK)
@@ -76,6 +78,7 @@ clean:
 	$(MAKE) -C $(KERNEL_DIR) clean
 	$(MAKE) -C $(USERSPACE_DIR) clean
 	$(MAKE) -C $(TOOLCHAIN_DIR) clean
+	$(MAKE) -C $(PROGRAMS_DIR) clean
 	$(RM) -rf $(BUILD_DIR)
 	@$(ECHO) "Cleaned build directory."
 

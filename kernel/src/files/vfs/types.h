@@ -36,7 +36,7 @@ typedef enum {
     VFS_OPEN_CREAT       =   0x0200,
     VFS_OPEN_TRUNC       =   0x0400,
     VFS_OPEN_EXCL        =   0x0800,
-    // TODO: Add VFS_OPEN_NONBLOCK = 0x4000 (for pipe, fifo, chrfile)
+    VFS_OPEN_NONBLOCK    =   0x4000,
     VFS_OPEN_CLOEXEC     =  0x40000,
     VFS_OPEN_EXECUTE     = 0x100000,
     VFS_OPEN_DIRECTORY   = 0x200000,
@@ -74,6 +74,8 @@ typedef enum {
 typedef enum {
     VFS_FILE_READ = (1 << 0),
     VFS_FILE_WRITE = (1 << 1),
+    VFS_FILE_ACCESS = VFS_FILE_READ | VFS_FILE_WRITE,
+    VFS_FILE_NONBLOCK = (1 << 14),
 } VfsFileFlags;
 
 typedef enum {
@@ -159,18 +161,20 @@ typedef struct VfsSuperblock_s {
     size_t id;
     size_t ref_count;
     TaskLock lock;
+    TaskLock ref_lock;
     VfsNodeCache nodes;
 } VfsSuperblock;
 
 typedef void (*VfsNodeFreeFunction)(struct VfsNode_s* node);
-typedef Error (*VfsNodeReadAtFunction)(struct VfsNode_s* node, VirtPtr buff, size_t offset, size_t length, size_t* read);
-typedef Error (*VfsNodeWriteAtFunction)(struct VfsNode_s* node, VirtPtr buff, size_t offset, size_t length, size_t* written);
+typedef Error (*VfsNodeReadAtFunction)(struct VfsNode_s* node, VirtPtr buff, size_t offset, size_t length, size_t* read, bool block);
+typedef Error (*VfsNodeWriteAtFunction)(struct VfsNode_s* node, VirtPtr buff, size_t offset, size_t length, size_t* written, bool block);
 typedef Error (*VfsNodeReaddirAtFunction)(struct VfsNode_s* node, VirtPtr buff, size_t offset, size_t length, size_t* read_file, size_t* written_buff);
 typedef Error (*VfsNodeTruncFunction)(struct VfsNode_s* node, size_t length);
 typedef Error (*VfsNodeLookupFunction)(struct VfsNode_s* node, const char* name, size_t* node_id);
 typedef Error (*VfsNodeUnlinkFunction)(struct VfsNode_s* node, const char* name);
 typedef Error (*VfsNodeLinkFunction)(struct VfsNode_s* node, const char* name, struct VfsNode_s* entry);
 typedef Error (*VfsNodeIoctlFunction)(struct VfsNode_s* node, size_t request, VirtPtr argp, uintptr_t* out);
+typedef bool (*VfsNodeWillBlockFunction)(struct VfsNode_s* node, bool write);
 
 typedef struct {
     VfsNodeFreeFunction free;               // Free all information for the vfs node.
@@ -182,6 +186,7 @@ typedef struct {
     VfsNodeUnlinkFunction unlink;           // If this is a directory, remove the entry with name.
     VfsNodeLinkFunction link;               // If this is a directory, add entry at name.
     VfsNodeIoctlFunction ioctl;
+    VfsNodeWillBlockFunction will_block;
 } VfsNodeFunctions;
 
 typedef struct VfsNode_s {
@@ -190,6 +195,7 @@ typedef struct VfsNode_s {
     VfsStat stat;
     size_t ref_count;
     TaskLock lock;
+    TaskLock ref_lock;
     VfsSuperblock* mounted; // If a filesystem is mounted at this node, this is not NULL.
     struct VfsNode_s* real_node; // node->real_node != node if node is a special file node (pipe/fifo/block/tty).
 } VfsNode;
@@ -203,6 +209,7 @@ typedef struct VfsFile_s {
     size_t offset;
     VfsFileFlags flags;
     TaskLock lock;
+    TaskLock ref_lock;
 } VfsFile;
 
 typedef struct VfsFileDescriptor_s {

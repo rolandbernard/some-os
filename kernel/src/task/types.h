@@ -86,21 +86,22 @@ typedef enum {
     WAITING,
     STOPPED,
     TERMINATED,
-    SLEEPING,
 } TaskState;
 
 typedef uint8_t Priority;
 
-typedef bool (*SleepTryToWakeUp)(struct Task_s* task);
+typedef bool (*SleepTryToWakeUp)(struct Task_s* task, void* udata);
 
 typedef struct {
     // All data needed for scheduling
     Priority priority;
-    Priority queue_priority; // Is at maximum priority, but will be decreased over time
+    Priority queue_priority;    // Is at maximum priority, but will be decreased over time
     Time run_for;
     TaskState state;
-    struct Task_s* sched_next; // Used for ready and waiting lists
+    struct Task_s* sched_next;  // Used for ready and waiting lists
+    struct Task_s* locks_next;  // Used for lists in locks
     SleepTryToWakeUp wakeup_function;
+    void* wakeup_udata;
     SpinLock lock;
 } TaskSched;
 
@@ -123,6 +124,7 @@ typedef struct Task_s {
     TaskTimes times;
     struct Process_s* process;
     struct Task_s* proc_next;
+    struct Task_s* sys_task;
 } Task;
 
 #endif

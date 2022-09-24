@@ -54,11 +54,11 @@ static Error genericBlockFileFunction(VfsBlockNode* node, bool write, VirtPtr bu
     return simpleError(SUCCESS);
 }
 
-static Error blkNodeReadAt(VfsBlockNode* node, VirtPtr buff, size_t offset, size_t length, size_t* read) {
+static Error blkNodeReadAt(VfsBlockNode* node, VirtPtr buff, size_t offset, size_t length, size_t* read, bool block) {
     return genericBlockFileFunction(node, false, buff, offset, length, read);
 }
 
-static Error blkNodeWriteAt(VfsBlockNode* node, VirtPtr buff, size_t offset, size_t length, size_t* written) {
+static Error blkNodeWriteAt(VfsBlockNode* node, VirtPtr buff, size_t offset, size_t length, size_t* written, bool block) {
     return genericBlockFileFunction(node, true, buff, offset, length, written);
 }
 
@@ -80,6 +80,7 @@ VfsBlockNode* createBlkNode(BlockDevice* device, VfsNode* real_node) {
     node->base.real_node = real_node;
     node->base.ref_count = 1;
     initTaskLock(&node->base.lock);
+    initTaskLock(&node->base.ref_lock);
     node->base.mounted = NULL;
     node->device = device;
     return node;
@@ -93,6 +94,7 @@ VfsFile* createBlockDeviceFile(VfsNode* node, BlockDevice* device, char* path, s
     file->offset = offset;
     file->flags = 0;
     initTaskLock(&file->lock);
+    initTaskLock(&file->ref_lock);
     return file;
 }
 

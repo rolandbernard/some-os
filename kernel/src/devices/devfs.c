@@ -57,6 +57,7 @@ static VfsNode* createDeviceFsDevNode(DeviceFilesystem* sb, Device* device) {
     node->stat.ctime = time;
     node->ref_count = 0;
     initTaskLock(&node->lock);
+    initTaskLock(&node->ref_lock);
     node->mounted = NULL;
     node->real_node = node;
     return node;
@@ -88,7 +89,7 @@ static Error deviceFsDirReaddirAt(VfsNode* node, VirtPtr buff, size_t offset, si
             if (fst) {
                 written = writeDirectoryEntryNamed(dev->id + 1, dev->name, vfsTypeForDevice(dev), offset, buff, length);
             } else {
-                FORMAT_STRINGX(entry_name, "%s%zu", dev->name, dev->name_id);
+                FORMAT_STRINGX(entry_name, "%s%lu", dev->name, dev->name_id);
                 written = writeDirectoryEntryNamed(dev->id + 1, entry_name, vfsTypeForDevice(dev), offset, buff, length);
             }
         }
@@ -158,6 +159,7 @@ static VfsNode* createDeviceFsRootDirNode(DeviceFilesystem* sb) {
     node->stat.ctime = time;
     node->ref_count = 0;
     initTaskLock(&node->lock);
+    initTaskLock(&node->ref_lock);
     node->mounted = NULL;
     node->real_node = node;
     return node;
@@ -205,6 +207,7 @@ Error createDeviceSuperblock(VfsFile* file, VirtPtr data, VfsSuperblock** out) {
     sb->base.functions = &sb_functions;
     sb->base.root_node = createDeviceFsRootDirNode(sb);
     initTaskLock(&sb->base.lock);
+    initTaskLock(&sb->base.ref_lock);
     vfsCacheInit(&sb->base.nodes);
     *out = (VfsSuperblock*)sb;
     return simpleError(SUCCESS);

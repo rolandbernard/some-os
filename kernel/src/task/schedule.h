@@ -22,4 +22,6 @@ Task* removeTaskFromQueue(ScheduleQueue* queue, Task* task);
 
 void moveTaskToState(Task* task, TaskState state);
 
+void awakenTask(Task* task);
+
 #endif

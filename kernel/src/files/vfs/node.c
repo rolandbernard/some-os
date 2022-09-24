@@ -24,12 +24,12 @@
         return node->functions->NAME PARAMS;                            \
     }
 
-Error vfsNodeReadAt(VfsNode* node, Process* process, VirtPtr buff, size_t offset, size_t length, size_t* read) {
-    DELEGATE_NODE_FUNCTION(read_at, (node, buff, offset, length, read), VFS_ACCESS_R);
+Error vfsNodeReadAt(VfsNode* node, Process* process, VirtPtr buff, size_t offset, size_t length, size_t* read, bool block) {
+    DELEGATE_NODE_FUNCTION(read_at, (node, buff, offset, length, read, block), VFS_ACCESS_R);
 }
 
-Error vfsNodeWriteAt(VfsNode* node, Process* process, VirtPtr buff, size_t offset, size_t length, size_t* written) {
-    DELEGATE_NODE_FUNCTION(write_at, (node, buff, offset, length, written), VFS_ACCESS_W);
+Error vfsNodeWriteAt(VfsNode* node, Process* process, VirtPtr buff, size_t offset, size_t length, size_t* written, bool block) {
+    DELEGATE_NODE_FUNCTION(write_at, (node, buff, offset, length, written, block), VFS_ACCESS_W);
 }
 
 Error vfsNodeReaddirAt(VfsNode* node, Process* process, VirtPtr buff, size_t offset, size_t length, size_t* read_file, size_t* written_buff) {
@@ -110,6 +110,14 @@ Error vfsNodeIoctl(VfsNode* node, Process* process, size_t request, VirtPtr argp
         return simpleError(ENOTTY);
     } else {
         return node->functions->ioctl(node, request, argp, out);
+    }
+}
+
+bool vfsNodeWillBlock(VfsNode* node, Process* process, bool write) {
+    if (node->functions->will_block == NULL) {
+        return false; // By default, assume we don't block (e.g. regular/block files)
+    } else {
+        return node->functions->will_block(node, write);
     }
 }
 

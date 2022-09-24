@@ -84,7 +84,7 @@ static Error minixNewNode(MinixVfsSuperblock* sb, size_t* id) {
 
 static Error minixFreeNode(MinixVfsSuperblock* sb, MinixVfsNode* free) {
     for (size_t i = 0; i < 10; i++) {
-        assert(free->zones[i] = 0); // All zones should have been freed already.
+        assert(free->zones[i] == 0); // All zones should have been freed already.
     }
     return freeMinixInode(sb, free->base.stat.id);
 }
@@ -117,6 +117,7 @@ Error createMinixVfsSuperblock(VfsFile* block_device, VirtPtr data, VfsSuperbloc
         sb->base.functions = &funcs;
         sb->block_device = block_device;
         initTaskLock(&sb->base.lock);
+        initTaskLock(&sb->base.ref_lock);
         initTaskLock(&sb->maps_lock);
         CHECKED(minixReadNode(sb, 1, (MinixVfsNode**)&sb->base.root_node), dealloc(sb));
         vfsCacheInit(&sb->base.nodes);

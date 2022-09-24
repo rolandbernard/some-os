@@ -30,8 +30,8 @@ static void flushCachedLogs() {
         while (cached_logs != NULL) {
             CachedLog* log = cached_logs;
             writeStringToTty(tty, log->data);
-            dealloc(log);
             cached_logs = log->next;
+            dealloc(log);
             if (cached_logs == NULL) {
                 cached_logs_tail = NULL;
             }

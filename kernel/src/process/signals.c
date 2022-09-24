@@ -10,15 +10,34 @@
 #include "task/schedule.h"
 #include "task/task.h"
 
-void addSignalToProcess(Process* process, Signal signal) {
-    if (signal > SIGNONE && signal < SIG_COUNT) {
+static bool shouldIgnoreSignal(Process* process, Signal signal) {
+    SignalHandler* action = &process->signals.handlers[signal];
+    return signal != SIGKILL && signal != SIGSTOP
+           && (
+               action->handler == SIG_IGN
+               || (
+                   action->handler == SIG_DFL
+                   && (
+                       signal == SIGCHLD || signal == SIGURG || signal == SIGWINCH
+                       || signal == SIGUSR1 || signal == SIGUSR2 || signal == SIGCONT
+                   )
+               )
+           );
+}
+
+void addSignalToProcess(Process* process, Signal signal, Pid child_pid) {
+    // TODO: a stop and continue will interrupt system calls. It should not.
+    if (signal == SIGCONT) {
+        // This always continues the precess, even if the signal is blocked/ignored.
+        // Is that the correct behaviour?
+        continueProcess(process, signal);
+    }
+    if (signal > SIGNONE && signal < SIG_COUNT && !shouldIgnoreSignal(process, signal)) {
         PendingSignal* entry = kalloc(sizeof(PendingSignal));
-        entry->signal = signal;
         entry->next = NULL;
+        entry->signal = signal;
+        entry->child_pid = child_pid;
         lockSpinLock(&process->lock);
-        if (signal == SIGCONT) {
-            continueProcess(process, signal);
-        }
         if (process->signals.signals_tail == NULL) {
             process->signals.signals_tail = entry;
             process->signals.signals = entry;
@@ -85,7 +104,7 @@ static bool handleActualSignal(Task* task, Signal signal) {
         VirtPtr stack_pointer = virtPtrForTask(task->frame.regs[REG_STACK_POINTER], task);
         // Before these values that will be restored, we can but some other data
         PUSH_TO_VIRTPTR(stack_pointer, info);
-        VirtPtr info_addres = stack_pointer;
+        VirtPtr info_address = stack_pointer;
         PUSH_TO_VIRTPTR(stack_pointer, task->process->signals.mask);
         PUSH_TO_VIRTPTR(stack_pointer, task->process->signals.restore_frame);
         PUSH_TO_VIRTPTR(stack_pointer, task->process->signals.current_signal);
@@ -101,7 +120,7 @@ static bool handleActualSignal(Task* task, Signal signal) {
         task->frame.pc = action->handler;
         // Set argument to signal type
         task->frame.regs[REG_ARGUMENT_0] = signal;
-        task->frame.regs[REG_ARGUMENT_1] = info_addres.address;
+        task->frame.regs[REG_ARGUMENT_1] = info_address.address;
         task->frame.regs[REG_ARGUMENT_2] = stack_pointer.address;
         // Set stack pointer to after the restore frame
         task->frame.regs[REG_STACK_POINTER] = stack_pointer.address;
@@ -179,10 +198,28 @@ void clearSignals(Process* process) {
     process->signals.current_signal = 0;
     process->signals.restore_frame = 0;
     for (size_t i = 0; i < SIG_COUNT; i++) {
-        process->signals.handlers->flags = 0;
-        if (process->signals.handlers->handler != SIG_IGN) {
-            process->signals.handlers->handler = SIG_DFL;
+        process->signals.handlers[i].flags = 0;
+        if (process->signals.handlers[i].handler != SIG_IGN) {
+            process->signals.handlers[i].handler = SIG_DFL;
         }
+    }
+    unlockSpinLock(&process->lock);
+}
+
+void clearPendingChildSignals(Process* process, Pid child_pid) {
+    lockSpinLock(&process->lock);
+    PendingSignal** current = &process->signals.signals;
+    while (*current != NULL) {
+        PendingSignal* signal = *current;
+        if (signal->signal == SIGCHLD && signal->child_pid == child_pid) {
+            *current = signal->next;
+            dealloc(signal);
+        } else {
+            current = &signal->next;
+        }
+    }
+    if (process->signals.signals == NULL) {
+        process->signals.signals_tail = NULL;
     }
     unlockSpinLock(&process->lock);
 }

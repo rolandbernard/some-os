@@ -7,16 +7,17 @@ TARGET  := $(ARCH)-someos
 ECHO    := echo
 
 ifeq ($(BUILD),debug)
-export CFLAGS := -O0 -g
+export CFLAGS := -O0 -g -DNEED_EXTERN_PC
 else
-export CFLAGS := -O2
+export CFLAGS := -O2 -DNEED_EXTERN_PC
 endif
 # ==
 
 # == bash
 PROJ_NAME.bash := bash
-CONF_ARGS.bash := --host=$(TARGET) --prefix=$(SYSROOT_DIR) --enable-minimal-config
-INST_ARGS.bash := install
+CONF_ARGS.bash := --host=$(TARGET) --prefix=/
+MAKE_ARGS.bash := DESTDIR=$(SYSROOT_DIR)
+INST_ARGS.bash := DESTDIR=$(SYSROOT_DIR) install
 # ==
 
 .PHONY: $(TARGETS)

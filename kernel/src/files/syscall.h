@@ -51,4 +51,6 @@ SyscallReturn ioctlSyscall(TrapFrame* frame);
 
 SyscallReturn isattySyscall(TrapFrame* frame);
 
+SyscallReturn selectSyscall(TrapFrame* frame);
+
 #endif
