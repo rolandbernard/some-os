@@ -33,6 +33,7 @@ build: $(TARGET.kernel) $(TARGET.userspace)
 
 $(TARGET.userspace): $(TARGET.toolchain) FORCE
 $(TARGET.kernel): $(TARGET.toolchain) FORCE
+$(TARGET.programs): $(TARGET.toolchain)
 
 $(BUILD_DIR)/%.flag:
 	@$(ECHO) "Building $*"
