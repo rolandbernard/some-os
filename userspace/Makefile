@@ -3,6 +3,7 @@ include ../config.mk
 
 # == Config
 TARGETS := init hello systest
+TARGETS += ls
 # ==
 
 # == Tools

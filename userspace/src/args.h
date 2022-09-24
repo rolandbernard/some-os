@@ -84,8 +84,8 @@
                     DEFAULT                                                                         \
                 }                                                                                   \
             }                                                                                       \
+            __VA_ARGS__                                                                             \
         }                                                                                           \
-        __VA_ARGS__                                                                                 \
         return _args;                                                                               \
     }
 
@@ -101,7 +101,8 @@
             ACTION; continue;                                                   \
         }                                                                       \
     } else if (_names) {                                                        \
-        if (NAME != NULL && strcmp(option + 2, ((const char*)NAME)) == 0) {     \
+        const char* _name = NAME;                                               \
+        if (_name != NULL && strcmp(option + 2, _name) == 0) {                  \
             if (argv[_i][_len + 2] == '=') {                                    \
                 ARG_WARN("option does not expect a value");                     \
             }                                                                   \

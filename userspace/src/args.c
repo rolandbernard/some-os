@@ -12,11 +12,14 @@ void printOptionHelpLine(char single, const char* word, const char* value, const
         fputs("-", stderr);
         fputc(single, stderr);
         col += 2;
+    } else {
+        fputs("    ", stderr);
+        col += 4;
     }
     if (word != NULL) {
         if (single != 0) {
-            fputs(" ", stderr);
-            col += 1;
+            fputs(", ", stderr);
+            col += 2;
         }
         fputs("--", stderr);
         fputs(word, stderr);
