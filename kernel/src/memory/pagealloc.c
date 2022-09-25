@@ -8,6 +8,15 @@
 #include "task/spinlock.h"
 #include "task/syscall.h"
 
+typedef struct FreePage_s {
+    size_t size; // Number of free pages after this one
+    struct FreePage_s* next;
+} FreePage;
+
+typedef struct {
+    FreePage* first;
+} FreePages;
+
 extern char __heap_start[];
 extern char __heap_end[];
 
