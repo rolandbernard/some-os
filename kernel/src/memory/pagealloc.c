@@ -4,6 +4,7 @@
 #include <string.h>
 
 #include "memory/pagealloc.h"
+#include "memory/reclaim.h"
 #include "task/spinlock.h"
 #include "task/syscall.h"
 
@@ -38,7 +39,7 @@ void* allocPage() {
     return allocPages(1).ptr;
 }
 
-PageAllocation allocPages(size_t pages) {
+static PageAllocation basicAllocPages(size_t pages) {
     if (pages != 0) {
         lockSpinLock(&alloc_lock);
         FreePage** current = &free_pages.first;
@@ -70,12 +71,29 @@ PageAllocation allocPages(size_t pages) {
         }
         unlockSpinLock(&alloc_lock);
     }
-    // TODO: handle memory pressure
     PageAllocation ret = {
         .ptr = NULL,
         .size = 0,
     };
     return ret;
+}
+
+PageAllocation allocPages(size_t pages) {
+    PageAllocation alloc = basicAllocPages(pages);
+    if (pages != 0 && alloc.size == 0) {
+        // Try to reclaim memory.
+        Priority priority = LOWEST_PRIORITY;
+        while (tryReclaimingMemory(priority) || priority > HIGHEST_PRIORITY) {
+            if (priority > HIGHEST_PRIORITY) {
+                priority--;
+            }
+            alloc = basicAllocPages(pages);
+            if (alloc.size > 0) {
+                break;
+            }
+        }
+    }
+    return alloc;
 }
 
 void deallocPage(void* ptr) {
