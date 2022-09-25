@@ -8,7 +8,7 @@
 char* joinPaths(const char* base, const char* name) {
     size_t base_len = strlen(base);
     size_t name_len = strlen(name);
-    char* result = (char*)malloc(base_len + 1 + name_len);
+    char* result = (char*)malloc(base_len + name_len + 2);
     size_t insert = 0;
     for (size_t i = 0; i < base_len + 1 + name_len; i++) {
         char next = i < base_len ? base[i] : (i == base_len ? '/' : name[i - base_len - 1]);

@@ -310,6 +310,7 @@ void listPath(const char* path, Arguments* args) {
         free(entry->name);
         free(entry);
     }
+    free(cur_tm);
     deinitList(&entries);
 }
 
