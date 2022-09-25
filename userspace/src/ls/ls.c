@@ -101,7 +101,7 @@ ARG_SPEC_FUNCTION(argumentSpec, Arguments*, "ls [options] [file]...", {
     copyStringToList(&context->files, value);
 }, {
     // Warning
-    fprintf(stderr, "%s: %s: %s\n", argv[0], option, warning);
+    fprintf(stderr, "%s: '%s': %s\n", argv[0], option, warning);
     exit(2);
 }, {
     // Final
@@ -138,11 +138,11 @@ int compareName(const void* a, const void* b) {
 }
 
 int compareSize(const void* a, const void* b) {
-    return (ssize_t)(*(Entry* const*)b)->size - (ssize_t)(*(Entry* const*)a)->size;
+    return (int64_t)(*(Entry* const*)b)->size - (int64_t)(*(Entry* const*)a)->size;
 }
 
 int compareTime(const void* a, const void* b) {
-    return (ssize_t)(*(Entry* const*)b)->time - (ssize_t)(*(Entry* const*)a)->time;
+    return (int64_t)(*(Entry* const*)b)->time - (int64_t)(*(Entry* const*)a)->time;
 }
 
 int compareNameReverse(const void* a, const void* b) {
