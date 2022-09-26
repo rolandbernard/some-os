@@ -3,25 +3,21 @@
 #include <stdint.h>
 #include <string.h>
 
+#include "memory/allocator.h"
 #include "memory/pagealloc.h"
 #include "memory/reclaim.h"
 #include "task/spinlock.h"
 #include "task/syscall.h"
 
-typedef struct FreePage_s {
-    size_t size; // Number of free pages after this one
-    struct FreePage_s* next;
-} FreePage;
-
-typedef struct {
-    FreePage* first;
-} FreePages;
+static SpinLock alloc_lock;
+static Allocator page_allocator = {
+    .backing = NULL,
+    .block_size = PAGE_SIZE,
+    .first_free = NULL,
+};
 
 extern char __heap_start[];
 extern char __heap_end[];
-
-static SpinLock alloc_lock;
-static FreePages free_pages;
 
 void* zero_page;
 
@@ -29,15 +25,7 @@ Error initPageAllocator() {
     uintptr_t start = ((uintptr_t)__heap_start + PAGE_SIZE - 1) & -PAGE_SIZE;
     uintptr_t end = (uintptr_t)__heap_end & -PAGE_SIZE;
     assert(end >= start);
-    size_t count = (end - start) / PAGE_SIZE;
-    if (count > 0) {
-        FreePage* first = (FreePage*)start;
-        first->next = NULL;
-        first->size = count;
-        free_pages.first = first;
-    } else {
-        free_pages.first = NULL;
-    }
+    deallocMemory(&page_allocator, (void*)start, end - start);
     KERNEL_SUBSUCCESS("Initialized page allocator");
     zero_page = zallocPage();
     KERNEL_SUBSUCCESS("Initialized zero page");
@@ -49,41 +37,18 @@ void* allocPage() {
 }
 
 static PageAllocation basicAllocPages(size_t pages) {
-    if (pages != 0) {
-        lockSpinLock(&alloc_lock);
-        FreePage** current = &free_pages.first;
-        while (*current != NULL) {
-            if ((*current)->size > pages) {
-                FreePage* page = *current;
-                FreePage* moved = (FreePage*)((uintptr_t)page + PAGE_SIZE * pages);
-                moved->size = page->size - pages;
-                moved->next = page->next;
-                *current = moved;
-                PageAllocation ret = {
-                    .ptr = page,
-                    .size = pages,
-                };
-                unlockSpinLock(&alloc_lock);
-                return ret;
-            } else if ((*current)->size == pages) {
-                FreePage* page = *current;
-                *current = page->next;
-                PageAllocation ret = {
-                    .ptr = page,
-                    .size = page->size,
-                };
-                unlockSpinLock(&alloc_lock);
-                return ret;
-            } else {
-                current = &(*current)->next;
-            }
-        }
-        unlockSpinLock(&alloc_lock);
-    }
     PageAllocation ret = {
         .ptr = NULL,
         .size = 0,
     };
+    if (pages != 0) {
+        lockSpinLock(&alloc_lock);
+        ret.ptr = allocMemory(&page_allocator, pages * PAGE_SIZE);
+        if (ret.ptr != NULL) {
+            ret.size = pages;
+        }
+        unlockSpinLock(&alloc_lock);
+    }
     return ret;
 }
 
@@ -122,36 +87,7 @@ void deallocPages(PageAllocation alloc) {
             && alloc.ptr + alloc.size * PAGE_SIZE <= (void*)__heap_end
         );
         lockSpinLock(&alloc_lock);
-        FreePage** current = &free_pages.first;
-#ifdef DEBUG
-        // Small test to prevent double frees
-        while (*current != NULL) {
-            assert(
-                alloc.ptr + alloc.size * PAGE_SIZE <= (void*)(*current)
-                || alloc.ptr >= (void*)(*current) + (*current)->size * PAGE_SIZE
-            );
-            current = &(*current)->next;
-        }
-        current = &free_pages.first;
-#endif
-        while ((*current) != NULL && (void*)(*current) < alloc.ptr) {
-            if ((void*)(*current) + (*current)->size * PAGE_SIZE == alloc.ptr) {
-                alloc.ptr = (void*)(*current);
-                alloc.size += (*current)->size;
-                *current = (*current)->next;
-            } else {
-                current = &(*current)->next;
-            }
-        }
-        FreePage* memory = alloc.ptr;
-        memory->size = alloc.size;
-        if ((*current) != NULL && alloc.ptr + alloc.size * PAGE_SIZE == (*current)) {
-            memory->next = (*current)->next;
-            memory->size += (*current)->size;
-        } else {
-            memory->next = (*current);
-        }
-        *current = memory;
+        deallocMemory(&page_allocator, alloc.ptr, alloc.size * PAGE_SIZE);
         unlockSpinLock(&alloc_lock);
     }
 }

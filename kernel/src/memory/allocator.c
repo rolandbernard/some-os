@@ -6,14 +6,6 @@
 
 #include "memory/allocator.h"
 
-typedef struct FreeMemory_s {
-    size_t size; // Number of free bytes after this one
-    struct FreeMemory_s* next;
-} FreeMemory;
-
-#define MINIMUM_FREE sizeof(FreeMemory)
-#define MIN_BLOCKS_TO_FREE 32
-
 void initAllocator(Allocator* alloc, size_t block_size, Allocator* backing) {
     assert(backing->block_size % block_size == 0);
     alloc->block_size = block_size;
@@ -126,43 +118,45 @@ void* allocMemory(Allocator* alloc, size_t size) {
 }
 
 static void tryFreeingOldMemory(Allocator* alloc, FreeMemory** memory) {
-    uintptr_t mem_start = (uintptr_t)*memory;
-    uintptr_t mem_end = mem_start + (*memory)->size;
-    uintptr_t page_start = mem_start;
-    page_start -= mem_start % alloc->backing->block_size;
-    uintptr_t page_end = mem_end;
-    mem_end -= mem_end % alloc->backing->block_size;
-    if (page_start != mem_start) {
-        page_start = mem_start + MINIMUM_FREE + alloc->backing->block_size - 1;
+    if (alloc->backing != NULL) {
+        uintptr_t mem_start = (uintptr_t)*memory;
+        uintptr_t mem_end = mem_start + (*memory)->size;
+        uintptr_t page_start = mem_start;
         page_start -= mem_start % alloc->backing->block_size;
-    }
-    if (page_end != mem_end) {
-        page_end = mem_end - MINIMUM_FREE;
-        page_end -= mem_end % alloc->backing->block_size;
-    }
-    if (
-        ((mem_start == page_start && mem_end == page_end) // If this will not create any additional fragmentation
-        || page_end >= page_start + MIN_BLOCKS_TO_FREE * alloc->backing->block_size) // Or free more than a minimum number of pages
-    ) {
-        void* ptr = (void*)page_start;
-        size_t size = page_end - page_start;
-        if (page_start == mem_start && page_end == mem_end) {
-            *memory = (*memory)->next;
-        } else if (mem_end == page_end) {
-            (*memory)->size = page_start - mem_start;
-        } else if (mem_start == page_start) {
-            FreeMemory* next = (FreeMemory*)page_end;
-            next->next = (*memory)->next;
-            next->size = mem_end - page_end;
-            *memory = next;
-        } else {
-            (*memory)->size = page_start - mem_start;
-            FreeMemory* next = (FreeMemory*)page_end;
-            next->next = (*memory)->next;
-            next->size = mem_end - page_end;
-            (*memory)->next = next;
+        uintptr_t page_end = mem_end;
+        mem_end -= mem_end % alloc->backing->block_size;
+        if (page_start != mem_start) {
+            page_start = mem_start + MINIMUM_FREE + alloc->backing->block_size - 1;
+            page_start -= mem_start % alloc->backing->block_size;
         }
-        deallocMemory(alloc->backing, ptr, size);
+        if (page_end != mem_end) {
+            page_end = mem_end - MINIMUM_FREE;
+            page_end -= mem_end % alloc->backing->block_size;
+        }
+        if (
+            ((mem_start == page_start && mem_end == page_end) // If this will not create any additional fragmentation
+            || page_end >= page_start + MIN_BLOCKS_TO_FREE * alloc->backing->block_size) // Or free more than a minimum number of pages
+        ) {
+            void* ptr = (void*)page_start;
+            size_t size = page_end - page_start;
+            if (page_start == mem_start && page_end == mem_end) {
+                *memory = (*memory)->next;
+            } else if (mem_end == page_end) {
+                (*memory)->size = page_start - mem_start;
+            } else if (mem_start == page_start) {
+                FreeMemory* next = (FreeMemory*)page_end;
+                next->next = (*memory)->next;
+                next->size = mem_end - page_end;
+                *memory = next;
+            } else {
+                (*memory)->size = page_start - mem_start;
+                FreeMemory* next = (FreeMemory*)page_end;
+                next->next = (*memory)->next;
+                next->size = mem_end - page_end;
+                (*memory)->next = next;
+            }
+            deallocMemory(alloc->backing, ptr, size);
+        }
     }
 }
 

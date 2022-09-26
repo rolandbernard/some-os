@@ -3,6 +3,14 @@
 
 #include <stddef.h>
 
+#define MINIMUM_FREE sizeof(FreeMemory)
+#define MIN_BLOCKS_TO_FREE 32
+
+typedef struct FreeMemory_s {
+    size_t size; // Number of free bytes after this one
+    struct FreeMemory_s* next;
+} FreeMemory;
+
 typedef struct Allocator_s {
     size_t block_size;
     struct Allocator_s* backing;
