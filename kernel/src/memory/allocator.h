@@ -3,14 +3,13 @@
 
 #include <stddef.h>
 
-#define MINIMUM_ALLOCATION sizeof(FreeMemory)
-
 typedef struct Allocator_s {
+    size_t block_size;
     struct Allocator_s* backing;
     struct FreeMemory_s* first_free;
 } Allocator;
 
-void initAllocator(Allocator* alloc, Allocator* backing);
+void initAllocator(Allocator* alloc, size_t block_size, Allocator* backing);
 
 void deinitAllocator(Allocator* alloc);
 
