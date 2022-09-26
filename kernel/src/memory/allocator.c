@@ -134,8 +134,10 @@ static void tryFreeingOldMemory(Allocator* alloc, FreeMemory** memory) {
             page_end -= mem_end % alloc->backing->block_size;
         }
         if (
-            ((mem_start == page_start && mem_end == page_end) // If this will not create any additional fragmentation
-            || page_end >= page_start + MIN_BLOCKS_TO_FREE * alloc->backing->block_size) // Or free more than a minimum number of pages
+            (mem_end <= (uintptr_t)alloc->special_range_start
+                || mem_start >= (uintptr_t)alloc->special_range_end) // Do not free the special region
+            && ((mem_start == page_start && mem_end == page_end) // If this will not create any additional fragmentation
+                || page_end >= page_start + alloc->min_backing_free) // Or free more than a minimum number of pages
         ) {
             void* ptr = (void*)page_start;
             size_t size = page_end - page_start;
@@ -173,7 +175,7 @@ void* reallocMemory(Allocator* alloc, void* old_ptr, size_t old_size, size_t new
     assert(old_size % alloc->block_size == 0 && new_size % alloc->block_size == 0);
     if (old_size == 0) {
         return allocMemory(alloc, new_size);
-    } else if (new_size) {
+    } else if (new_size == 0) {
         deallocMemory(alloc, old_ptr, old_size);
         return NULL;
     } else {
@@ -202,10 +204,10 @@ void* reallocMemory(Allocator* alloc, void* old_ptr, size_t old_size, size_t new
             size_t min_size = (new_size + MINIMUM_FREE + alloc->block_size - 1);
             min_size -= min_size % alloc->block_size;
             if (free_size >= min_size) {
-                free_mem = (FreeMemory*)((void*)free_mem + new_size);
-                free_mem->next = *current;
-                free_mem->size = free_size - new_size;
-                *current = free_mem;
+                FreeMemory* still_free = (FreeMemory*)((void*)free_mem + new_size);
+                still_free->next = *current;
+                still_free->size = free_size - new_size;
+                *current = still_free;
                 tryFreeingOldMemory(alloc, current);
             }
             return free_mem;

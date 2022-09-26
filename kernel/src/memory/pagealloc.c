@@ -9,15 +9,15 @@
 #include "task/spinlock.h"
 #include "task/syscall.h"
 
-static SpinLock alloc_lock;
-static Allocator page_allocator = {
-    .backing = NULL,
-    .block_size = PAGE_SIZE,
-    .first_free = NULL,
-};
-
 extern char __heap_start[];
 extern char __heap_end[];
+
+static SpinLock alloc_lock;
+Allocator page_allocator = {
+    .block_size = PAGE_SIZE,
+    .backing = NULL,
+    .first_free = NULL,
+};
 
 void* zero_page;
 

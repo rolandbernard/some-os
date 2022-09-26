@@ -4,7 +4,6 @@
 #include <stddef.h>
 
 #define MINIMUM_FREE sizeof(FreeMemory)
-#define MIN_BLOCKS_TO_FREE 32
 
 typedef struct FreeMemory_s {
     size_t size; // Number of free bytes after this one
@@ -13,8 +12,11 @@ typedef struct FreeMemory_s {
 
 typedef struct Allocator_s {
     size_t block_size;
+    size_t min_backing_free;
     struct Allocator_s* backing;
     struct FreeMemory_s* first_free;
+    void* special_range_start;
+    void* special_range_end;
 } Allocator;
 
 void initAllocator(Allocator* alloc, size_t block_size, Allocator* backing);

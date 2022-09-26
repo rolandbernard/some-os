@@ -8,6 +8,7 @@
 #define PAGE_SIZE (1 << 12)
 
 extern void* zero_page;
+extern struct Allocator_s page_allocator;
 
 typedef struct {
     void* ptr;
