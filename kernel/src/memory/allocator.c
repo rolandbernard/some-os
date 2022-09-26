@@ -11,6 +11,9 @@ void initAllocator(Allocator* alloc, size_t block_size, Allocator* backing) {
     alloc->block_size = block_size;
     alloc->backing = backing;
     alloc->first_free = NULL;
+    alloc->min_backing_free = 0;
+    alloc->special_range_start = NULL;
+    alloc->special_range_end = NULL;
 }
 
 void deinitAllocator(Allocator* alloc) {
