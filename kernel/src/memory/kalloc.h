@@ -3,6 +3,8 @@
 
 #include <stddef.h>
 
+extern struct Allocator_s byte_allocator;
+
 void* kalloc(size_t size);
 
 void* zalloc(size_t size);

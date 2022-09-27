@@ -25,10 +25,11 @@ noreturn void silentPanic();
 // Only here for setting breakpoints on
 void panicBreak();
 
-#define panic() {                                                                   \
+#define panic(...) {                                                                \
     panicBreak();                                                                   \
     if (tryLockingUnsafeLock(&global_panic_lock)) {                                 \
         notifyPanic();                                                              \
+        __VA_ARGS__;                                                                \
         KERNEL_ERROR("Kernel panic!" STYLE_DEBUG " on hart %u", getCurrentHartId()) \
         BACKTRACE();                                                                \
     }                                                                               \

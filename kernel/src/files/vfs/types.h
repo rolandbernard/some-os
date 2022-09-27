@@ -198,6 +198,7 @@ typedef struct VfsNode_s {
     TaskLock ref_lock;
     VfsSuperblock* mounted; // If a filesystem is mounted at this node, this is not NULL.
     struct VfsNode_s* real_node; // node->real_node != node if node is a special file node (pipe/fifo/block/tty).
+    bool dirty; // If this is true, write the node when it is freed.
 } VfsNode;
 
 struct PipeSharedData_s;

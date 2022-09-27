@@ -20,7 +20,7 @@ _start:
     # Disable address translation
     csrw satp, zero
     # Setup PMP (Physical Memory Protection)
-#ifndef DONT_SETUP_PMP
+#ifdef SETUP_PMP_PROTECTION
     # Note: This makes qemu much slower.
     # Allow execution(+read) between __text_start and __text_end
     la t0, __text_start

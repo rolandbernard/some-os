@@ -9,7 +9,7 @@ ECHO    := echo
 ifeq ($(BUILD),debug)
 export CFLAGS := -O0 -g -DNEED_EXTERN_PC
 else
-export CFLAGS := -O2 -DNEED_EXTERN_PC
+export CFLAGS := -O2 -g -DNEED_EXTERN_PC
 endif
 # ==
 
