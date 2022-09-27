@@ -60,6 +60,7 @@ static VfsNode* createDeviceFsDevNode(DeviceFilesystem* sb, Device* device) {
     initTaskLock(&node->ref_lock);
     node->mounted = NULL;
     node->real_node = node;
+    node->dirty = false;
     return node;
 }
 
@@ -162,6 +163,7 @@ static VfsNode* createDeviceFsRootDirNode(DeviceFilesystem* sb) {
     initTaskLock(&node->ref_lock);
     node->mounted = NULL;
     node->real_node = node;
+    node->dirty = false;
     return node;
 }
 
