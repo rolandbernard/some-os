@@ -84,6 +84,7 @@ VfsFifoNode* createFifoNode(char* path, VfsNode* real_node, bool for_write) {
     initTaskLock(&node->base.lock);
     initTaskLock(&node->base.ref_lock);
     node->base.mounted = NULL;
+    node->base.dirty = false;
     node->data = getDataForName(path, &node->name, for_write);
     node->for_write = for_write;
     return node;

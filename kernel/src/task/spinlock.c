@@ -16,6 +16,7 @@ void initSpinLock(SpinLock* lock) {
 }
 
 void lockSpinLock(SpinLock* lock) {
+#ifndef NO_SPIN_LOCKS
     Task* task = criticalEnter();
     HartFrame* hart = getCurrentHartFrame();
     if (hart == NULL || lock->locked_by != hart) {
@@ -34,9 +35,11 @@ void lockSpinLock(SpinLock* lock) {
         hart->spinlocks_locked++;
     }
 #endif
+#endif
 }
 
 bool tryLockingSpinLock(SpinLock* lock) {
+#ifndef NO_SPIN_LOCKS
     Task* task = criticalEnter();
     HartFrame* hart = getCurrentHartFrame();
     if ((hart != NULL && lock->locked_by == hart) || panic_lock_bypass || tryLockingUnsafeLock(&lock->unsafelock)) {
@@ -54,9 +57,13 @@ bool tryLockingSpinLock(SpinLock* lock) {
         criticalReturn(task);
         return false;
     }
+#else
+    return true;
+#endif
 }
 
 void unlockSpinLock(SpinLock* lock) {
+#ifndef NO_SPIN_LOCKS
 #ifdef DEBUG
     HartFrame* hart = getCurrentHartFrame();
     if (hart != NULL) {
@@ -77,6 +84,7 @@ void unlockSpinLock(SpinLock* lock) {
         }
         criticalReturn(crit_return);
     }
+#endif
 }
 
 void panicUnlock() {

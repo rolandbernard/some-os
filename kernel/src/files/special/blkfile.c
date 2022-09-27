@@ -82,6 +82,7 @@ VfsBlockNode* createBlkNode(BlockDevice* device, VfsNode* real_node) {
     initTaskLock(&node->base.lock);
     initTaskLock(&node->base.ref_lock);
     node->base.mounted = NULL;
+    node->base.dirty = false;
     node->device = device;
     return node;
 }

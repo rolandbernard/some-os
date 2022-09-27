@@ -280,6 +280,7 @@ VfsPipeNode* createPipeNode(PipeSharedData* data, bool for_write) {
     initTaskLock(&node->base.lock);
     initTaskLock(&node->base.ref_lock);
     node->base.mounted = NULL;
+    node->base.dirty = false;
     node->data = data;
     node->for_write = for_write;
     return node;

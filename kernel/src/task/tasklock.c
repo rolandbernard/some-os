@@ -7,17 +7,18 @@
 #include "task/syscall.h"
 #include "task/task.h"
 
-#ifdef DEBUG
-static SpinLock locked_lock;
-static TaskLock* locked_locks;
-#endif
-
 void initTaskLock(TaskLock* lock) {
     lock->unsafelock.lock = 0;
     lock->locked_by = NULL;
     lock->num_locks = 0;
     lock->wait_queue = NULL;
 }
+
+#ifndef NO_TASK_LOCKS
+#ifdef DEBUG
+static SpinLock locked_lock;
+static TaskLock* locked_locks;
+#endif
 
 static void waitForTaskLock(void* _, Task* task, TaskLock* lock) {
     task->sched.wakeup_function = NULL;
@@ -77,8 +78,10 @@ static bool lockOrWaitTaskLock(TaskLock* lock) {
     }
     return result;
 }
+#endif
 
 void lockTaskLock(TaskLock* lock) {
+#ifndef NO_TASK_LOCKS
     Task* task = getCurrentTask();
     assert(task != NULL);
     if (lock->locked_by != task) {
@@ -89,9 +92,11 @@ void lockTaskLock(TaskLock* lock) {
 #endif
     }
     lock->num_locks++;
+#endif
 }
 
 bool tryLockingTaskLock(TaskLock* lock) {
+#ifndef NO_TASK_LOCKS
     Task* task = getCurrentTask();
     assert(task != NULL);
     bool result = true;
@@ -114,9 +119,13 @@ bool tryLockingTaskLock(TaskLock* lock) {
         lock->num_locks++;
     }
     return result;
+#else
+    return true;
+#endif
 }
 
 void unlockTaskLock(TaskLock* lock) {
+#ifndef NO_TASK_LOCKS
     assert(getCurrentTask() != NULL);
     assert(getCurrentTask() == lock->locked_by);
     lock->num_locks--;
@@ -136,5 +145,6 @@ void unlockTaskLock(TaskLock* lock) {
         unlockUnsafeLock(&lock->unsafelock);
         criticalReturn(task);
     }
+#endif
 }
 

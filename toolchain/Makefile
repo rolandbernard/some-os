@@ -9,7 +9,7 @@ ECHO    := echo
 ifeq ($(BUILD),debug)
 export CFLAGS_FOR_TARGET := -mcmodel=medany -O0 -g
 else
-export CFLAGS_FOR_TARGET := -mcmodel=medany -O2
+export CFLAGS_FOR_TARGET := -mcmodel=medany -O2 -g
 endif
 # ==
 

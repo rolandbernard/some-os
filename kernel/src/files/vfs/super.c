@@ -37,10 +37,10 @@ Error vfsSuperWriteNode(VfsNode* write) {
     } else {
         lockTaskLock(&write->lock);
         write->stat.ctime = getNanosecondsWithFallback();
-        // This could also just be marked dirty and written only when closing the node.
-        Error err = write->superblock->functions->write_node(write->superblock, write);
+        // The node is marked dirty and written only when closing the node.
+        write->dirty = true;
         unlockTaskLock(&write->lock);
-        return err;
+        return simpleError(SUCCESS);
     }
 }
 
@@ -85,6 +85,7 @@ Error vfsSuperCloseNode(VfsNode* node) {
         }
         return simpleError(SUCCESS);
     } else {
+        Error err = simpleError(SUCCESS);
         size_t refs = vfsCacheCloseNode(&node->superblock->nodes, node);
         if (refs == 0) {
             VfsSuperblock* sb = node->superblock;
@@ -98,11 +99,12 @@ Error vfsSuperCloseNode(VfsNode* node) {
                     // There are no other links to this node, we should free the data.
                     CHECKED(vfsSuperFreeNode(node));
                 }
+                err = node->superblock->functions->write_node(node->superblock, node);
                 node->functions->free(node);
                 vfsSuperClose(sb);
             }
         }
-        return simpleError(SUCCESS);
+        return err;
     }
 }
 
