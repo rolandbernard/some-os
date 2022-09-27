@@ -1,6 +1,7 @@
 
 #include "devices/virtio/block.h"
 
+#include "devices/blockcache.h"
 #include "devices/devices.h"
 #include "error/error.h"
 #include "interrupt/plic.h"
@@ -154,7 +155,7 @@ Error registerVirtIOBlockDevice(VirtIOBlockDevice* dev) {
     reg->base.base.name = "blk";
     reg->base.functions = &funcs;
     reg->virtio_device = dev;
-    registerDevice((Device*)reg);
+    registerDevice((Device*)wrapBlockDeviceWithCache((BlockDevice*)reg));
     return simpleError(SUCCESS);
 }
 

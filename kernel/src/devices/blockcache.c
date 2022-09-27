@@ -34,7 +34,7 @@ typedef struct {
 static CachedBlock* lookupCachedBlock(CachedBlock** blocks, size_t size, size_t offset) {
     size_t pl = 0;
     size_t idx = hashInt64(offset) % size;
-    while (blocks[idx] != NULL) {
+    while (blocks[idx] != NULL && blocks[idx]->offset != offset) {
         size_t oth_pl = (size + idx - (hashInt64(blocks[idx]->offset) % size)) % size;
         if (oth_pl < pl) {
             return NULL;
@@ -48,7 +48,7 @@ static CachedBlock* lookupCachedBlock(CachedBlock** blocks, size_t size, size_t 
 static void insertCachedBlock(CachedBlock** blocks, size_t size, CachedBlock* block) {
     size_t pl = 0;
     size_t idx = hashInt64(block->offset) % size;
-    while (blocks[idx] != NULL) {
+    while (blocks[idx] != NULL && blocks[idx]->offset != block->offset) {
         size_t oth_pl = (size + idx - (hashInt64(blocks[idx]->offset) % size)) % size;
         if (oth_pl < pl) {
             CachedBlock* oth = blocks[idx];
@@ -65,7 +65,7 @@ static void insertCachedBlock(CachedBlock** blocks, size_t size, CachedBlock* bl
 static CachedBlock* removeCachedBlock(CachedBlock** blocks, size_t size, size_t offset) {
     size_t pl = 0;
     size_t idx = hashInt64(offset) % size;
-    while (blocks[idx] != NULL) {
+    while (blocks[idx] != NULL && blocks[idx]->offset != offset) {
         size_t oth_pl = (size + idx - (hashInt64(blocks[idx]->offset) % size)) % size;
         if (oth_pl < pl) {
             return NULL;
@@ -74,16 +74,18 @@ static CachedBlock* removeCachedBlock(CachedBlock** blocks, size_t size, size_t 
         pl++;
     }
     CachedBlock* removed = blocks[idx];
-    while (blocks[(idx + 1) % size] != NULL) {
-        size_t nxt_idx = (idx + 1) % size;
-        size_t oth_pl = (size + nxt_idx - (hashInt64(blocks[nxt_idx]->offset) % size)) % size;
-        if (oth_pl == 0) {
-            break;
+    if (removed != NULL) {
+        while (blocks[(idx + 1) % size] != NULL) {
+            size_t nxt_idx = (idx + 1) % size;
+            size_t oth_pl = (size + nxt_idx - (hashInt64(blocks[nxt_idx]->offset) % size)) % size;
+            if (oth_pl == 0) {
+                break;
+            }
+            blocks[idx] = blocks[nxt_idx];
+            idx = nxt_idx;
         }
-        blocks[idx] = blocks[nxt_idx];
-        idx = nxt_idx;
+        blocks[idx] = NULL;
     }
-    blocks[idx] = NULL;
     return removed;
 }
 
@@ -116,6 +118,7 @@ static void insertIntoTable(CachedBlockTable* table, size_t offset, uint8_t* byt
     block->offset = offset;
     block->bytes = bytes;
     insertCachedBlock(table->blocks, table->capacity, block);
+    table->count++;
 }
 
 static CachedBlock* getFromTable(CachedBlockTable* table, size_t offset) {
@@ -135,17 +138,15 @@ typedef struct {
 } CachedBlockDevice;
 
 static Error readUncached(CachedBlockDevice* dev, VirtPtr buff, size_t offset, size_t size) {
-    lockSpinLock(&dev->cache_lock);
     uint8_t* bytes = allocMemory(&dev->alloc, size);
     unlockSpinLock(&dev->cache_lock);
     CHECKED(dev->uncached->functions->read(dev->uncached, virtPtrForKernel(bytes), offset, size), {
         lockSpinLock(&dev->cache_lock);
         deallocMemory(&dev->alloc, bytes, size);
-        unlockSpinLock(&dev->cache_lock);
     });
     memcpyBetweenVirtPtr(buff, virtPtrForKernel(bytes), size);
+    lockSpinLock(&dev->cache_lock);
     while (size > 0) {
-        lockSpinLock(&dev->cache_lock);
         CachedBlock* cached = getFromTable(&dev->table, offset);
         if (cached == NULL) {
             insertIntoTable(&dev->table, offset, bytes);
@@ -155,7 +156,6 @@ static Error readUncached(CachedBlockDevice* dev, VirtPtr buff, size_t offset, s
                 cached->priority--;
             }
         }
-        unlockSpinLock(&dev->cache_lock);
         bytes += dev->base.block_size;
         offset += dev->base.block_size;
         size -= dev->base.block_size;
@@ -166,8 +166,8 @@ static Error readUncached(CachedBlockDevice* dev, VirtPtr buff, size_t offset, s
 static Error readFunction(CachedBlockDevice* dev, VirtPtr buff, size_t offset, size_t size) {
     assert(size % dev->base.block_size == 0 && offset % dev->base.block_size == 0);
     size_t uncached = 0;
+    lockSpinLock(&dev->cache_lock);
     while (size > 0) {
-        lockSpinLock(&dev->cache_lock);
         CachedBlock* cached = getFromTable(&dev->table, offset + uncached);
         if (cached != NULL) {
             if (cached->priority > 0) {
@@ -176,41 +176,42 @@ static Error readFunction(CachedBlockDevice* dev, VirtPtr buff, size_t offset, s
             VirtPtr cbuff = buff;
             cbuff.address += uncached;
             memcpyBetweenVirtPtr(cbuff, virtPtrForKernel(cached->bytes), dev->base.block_size);
-            unlockSpinLock(&dev->cache_lock);
             if (uncached != 0) {
-                CHECKED(readUncached(dev, buff, offset, uncached));
-                buff.address += uncached + dev->base.block_size;
-                offset += uncached + dev->base.block_size;
-                uncached = 0;
+                CHECKED(readUncached(dev, buff, offset, uncached), unlockSpinLock(&dev->cache_lock));
             }
+            buff.address += uncached + dev->base.block_size;
+            offset += uncached + dev->base.block_size;
+            uncached = 0;
         } else {
-            unlockSpinLock(&dev->cache_lock);
             uncached += dev->base.block_size;
         }
         size -= dev->base.block_size;
     }
     if (uncached != 0) {
-        CHECKED(readUncached(dev, buff, offset, uncached));
+        CHECKED(readUncached(dev, buff, offset, uncached), unlockSpinLock(&dev->cache_lock));
     }
+    unlockSpinLock(&dev->cache_lock);
     return simpleError(SUCCESS);
 }
 
 static Error writeFunction(CachedBlockDevice* dev, VirtPtr buff, size_t offset, size_t size) {
     assert(size % dev->base.block_size == 0 && offset % dev->base.block_size == 0);
     CHECKED(dev->uncached->functions->write(dev->uncached, buff, offset, size));
+    lockSpinLock(&dev->cache_lock);
     while (size > 0) {
-        lockSpinLock(&dev->cache_lock);
         CachedBlock* cached = getFromTable(&dev->table, offset);
         if (cached == NULL) {
             uint8_t* bytes = allocMemory(&dev->alloc, dev->base.block_size);
             memcpyBetweenVirtPtr(virtPtrForKernel(bytes), buff, dev->base.block_size);
             insertIntoTable(&dev->table, offset, bytes);
+        } else {
+            memcpyBetweenVirtPtr(virtPtrForKernel(cached->bytes), buff, dev->base.block_size);
         }
-        unlockSpinLock(&dev->cache_lock);
         buff.address += dev->base.block_size;
         offset += dev->base.block_size;
         size -= dev->base.block_size;
     }
+    unlockSpinLock(&dev->cache_lock);
     return simpleError(SUCCESS);
 }
 
@@ -227,6 +228,7 @@ static bool reclaimFunction(Priority priority, CachedBlockDevice* dev) {
         if (block != NULL) {
             if (block->priority > priority) {
                 removeCachedBlock(dev->table.blocks, dev->table.capacity, block->offset);
+                dev->table.count--;
                 deallocMemory(&dev->alloc, block->bytes, dev->base.block_size);
                 dealloc(block);
             } else {
