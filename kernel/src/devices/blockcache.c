@@ -102,12 +102,18 @@ static void rebuildTable(CachedBlockTable* table, size_t new_size) {
 }
 
 static void testForResize(CachedBlockTable* table) {
-    if (table->capacity < MIN_TABLE_CAPACITY) {
-        rebuildTable(table, MIN_TABLE_CAPACITY);
-    } else if (table->capacity > MIN_TABLE_CAPACITY && table->count * 4 < table->capacity) {
-        rebuildTable(table, table->capacity / 2);
-    } else if (table->count * 3 > table->capacity * 2) {
-        rebuildTable(table, table->capacity * 3 / 2);
+    size_t new_size = table->capacity;
+    while (new_size > MIN_TABLE_CAPACITY && table->count * 4 < new_size) {
+        new_size /= 2;
+    }
+    if (new_size < MIN_TABLE_CAPACITY) {
+        new_size = MIN_TABLE_CAPACITY;
+    }
+    while (table->count * 3 > new_size * 2) {
+        new_size = new_size * 3 / 2;
+    }
+    if (new_size != table->capacity) {
+        rebuildTable(table, new_size);
     }
 }
 
@@ -223,17 +229,21 @@ static const BlockDeviceFunctions funcs = {
 static bool reclaimFunction(Priority priority, CachedBlockDevice* dev) {
     size_t freed = 0;
     lockSpinLock(&dev->cache_lock);
-    for (size_t i = 0; i < dev->table.capacity; i++) {
+    for (size_t i = 0; i < dev->table.capacity;) {
         CachedBlock* block = dev->table.blocks[i];
         if (block != NULL) {
-            if (block->priority > priority) {
+            if (block->priority >= priority) {
                 removeCachedBlock(dev->table.blocks, dev->table.capacity, block->offset);
                 dev->table.count--;
                 deallocMemory(&dev->alloc, block->bytes, dev->base.block_size);
                 dealloc(block);
+                freed++;
             } else {
                 block->priority++;
+                i++;
             }
+        } else {
+            i++;
         }
     }
     testForResize(&dev->table);

@@ -130,11 +130,11 @@ static void tryFreeingOldMemory(Allocator* alloc, FreeMemory** memory) {
         mem_end -= mem_end % alloc->backing->block_size;
         if (page_start != mem_start) {
             page_start = mem_start + MINIMUM_FREE + alloc->backing->block_size - 1;
-            page_start -= mem_start % alloc->backing->block_size;
+            page_start -= page_start % alloc->backing->block_size;
         }
         if (page_end != mem_end) {
             page_end = mem_end - MINIMUM_FREE;
-            page_end -= mem_end % alloc->backing->block_size;
+            page_end -= page_end % alloc->backing->block_size;
         }
         if (
             (mem_end <= (uintptr_t)alloc->special_range_start
