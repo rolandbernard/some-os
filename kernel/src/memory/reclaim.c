@@ -44,7 +44,7 @@ bool tryReclaimingMemory(Priority priority) {
     lockSpinLock(&reclaimable_lock);
     Reclaimable* current = reclaimable;
     while (current != NULL) {
-        if (current->priority <= priority) {
+        if (current->priority >= priority) {
             if (current->reclaim(priority, current->udata)) {
                 unlockSpinLock(&reclaimable_lock);
                 return true;

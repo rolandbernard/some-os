@@ -8,12 +8,16 @@
 #include "memory/allocator.h"
 #include "memory/kalloc.h"
 #include "memory/pagealloc.h"
+#include "memory/reclaim.h"
 #include "task/spinlock.h"
 #include "task/types.h"
+#include "util/util.h"
 
 #include "devices/blockcache.h"
 
 // For now, this is only a read cache. This avoids having to write when reclaiming pages.
+
+#define MIN_TABLE_CAPACITY 32
 
 typedef struct {
     size_t offset;
@@ -27,21 +31,100 @@ typedef struct {
     size_t capacity;
 } CachedBlockTable;
 
-// TODO
-// static void resizeTable(CachedBlockTable* table, size_t offset, uint8_t* bytes) {
-// }
+static CachedBlock* lookupCachedBlock(CachedBlock** blocks, size_t size, size_t offset) {
+    size_t pl = 0;
+    size_t idx = hashInt64(offset) % size;
+    while (blocks[idx] != NULL) {
+        size_t oth_pl = (size + idx - (hashInt64(blocks[idx]->offset) % size)) % size;
+        if (oth_pl < pl) {
+            return NULL;
+        }
+        idx = (idx + 1) % size;
+        pl++;
+    }
+    return blocks[idx];
+}
+
+static void insertCachedBlock(CachedBlock** blocks, size_t size, CachedBlock* block) {
+    size_t pl = 0;
+    size_t idx = hashInt64(block->offset) % size;
+    while (blocks[idx] != NULL) {
+        size_t oth_pl = (size + idx - (hashInt64(blocks[idx]->offset) % size)) % size;
+        if (oth_pl < pl) {
+            CachedBlock* oth = blocks[idx];
+            blocks[idx] = block;
+            block = oth;
+            pl = oth_pl;
+        }
+        idx = (idx + 1) % size;
+        pl++;
+    }
+    blocks[idx] = block;
+}
+
+static CachedBlock* removeCachedBlock(CachedBlock** blocks, size_t size, size_t offset) {
+    size_t pl = 0;
+    size_t idx = hashInt64(offset) % size;
+    while (blocks[idx] != NULL) {
+        size_t oth_pl = (size + idx - (hashInt64(blocks[idx]->offset) % size)) % size;
+        if (oth_pl < pl) {
+            return NULL;
+        }
+        idx = (idx + 1) % size;
+        pl++;
+    }
+    CachedBlock* removed = blocks[idx];
+    while (blocks[(idx + 1) % size] != NULL) {
+        size_t nxt_idx = (idx + 1) % size;
+        size_t oth_pl = (size + nxt_idx - (hashInt64(blocks[nxt_idx]->offset) % size)) % size;
+        if (oth_pl == 0) {
+            break;
+        }
+        blocks[idx] = blocks[nxt_idx];
+        idx = nxt_idx;
+    }
+    blocks[idx] = NULL;
+    return removed;
+}
+
+static void rebuildTable(CachedBlockTable* table, size_t new_size) {
+    CachedBlock** new_blocks = zalloc(new_size * sizeof(CachedBlock*));
+    for (size_t i = 0; i < table->capacity; i++) {
+        if (table->blocks[i] != NULL) {
+            insertCachedBlock(new_blocks, new_size, table->blocks[i]);
+        }
+    }
+    dealloc(table->blocks);
+    table->blocks = new_blocks;
+    table->capacity = new_size;
+}
+
+static void testForResize(CachedBlockTable* table) {
+    if (table->capacity < MIN_TABLE_CAPACITY) {
+        rebuildTable(table, MIN_TABLE_CAPACITY);
+    } else if (table->capacity > MIN_TABLE_CAPACITY && table->count * 4 < table->capacity) {
+        rebuildTable(table, table->capacity / 2);
+    } else if (table->count * 3 > table->capacity * 2) {
+        rebuildTable(table, table->capacity * 3 / 2);
+    }
+}
 
 static void insertIntoTable(CachedBlockTable* table, size_t offset, uint8_t* bytes) {
-
+    testForResize(table);
+    CachedBlock* block = kalloc(sizeof(CachedBlock));
+    block->priority = DEFAULT_PRIORITY;
+    block->offset = offset;
+    block->bytes = bytes;
+    insertCachedBlock(table->blocks, table->capacity, block);
 }
 
 static CachedBlock* getFromTable(CachedBlockTable* table, size_t offset) {
-    return NULL;
+    if (table->count == 0) {
+        return NULL;
+    } else {
+        return lookupCachedBlock(table->blocks, table->capacity, offset);
+    }
 }
-
-// TODO
-// static void removeFromTable(CachedBlockTable* table, size_t offset) {
-// }
 
 typedef struct {
     BlockDevice base;
@@ -128,13 +211,33 @@ static Error writeFunction(CachedBlockDevice* dev, VirtPtr buff, size_t offset, 
         offset += dev->base.block_size;
         size -= dev->base.block_size;
     }
-    return simpleError(ENOSYS);
+    return simpleError(SUCCESS);
 }
 
 static const BlockDeviceFunctions funcs = {
     .read = (BlockDeviceReadFunction)readFunction,
     .write = (BlockDeviceWriteFunction)writeFunction,
 };
+
+static bool reclaimFunction(Priority priority, CachedBlockDevice* dev) {
+    size_t freed = 0;
+    lockSpinLock(&dev->cache_lock);
+    for (size_t i = 0; i < dev->table.capacity; i++) {
+        CachedBlock* block = dev->table.blocks[i];
+        if (block != NULL) {
+            if (block->priority > priority) {
+                removeCachedBlock(dev->table.blocks, dev->table.capacity, block->offset);
+                deallocMemory(&dev->alloc, block->bytes, dev->base.block_size);
+                dealloc(block);
+            } else {
+                block->priority++;
+            }
+        }
+    }
+    testForResize(&dev->table);
+    unlockSpinLock(&dev->cache_lock);
+    return freed != 0;
+}
 
 BlockDevice* wrapBlockDeviceWithCache(BlockDevice* uncached) {
     CachedBlockDevice* dev = kalloc(sizeof(CachedBlockDevice));
@@ -146,6 +249,7 @@ BlockDevice* wrapBlockDeviceWithCache(BlockDevice* uncached) {
     dev->table.count = 0;
     dev->table.capacity = 0;
     initAllocator(&dev->alloc, dev->base.block_size, &page_allocator);
+    registerReclaimable(LOWEST_PRIORITY, (ReclaimFunction)reclaimFunction, dev);
     return (BlockDevice*)dev;
 }
 
