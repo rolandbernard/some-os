@@ -36,6 +36,7 @@
         int _args = 0;                                                                              \
         int _len = 0;                                                                               \
         int _i = 0, _j = 0;                                                                         \
+        bool only_default = false;                                                                  \
         if (_help) {                                                                                \
             fputs("Usage: " USAGE "\n", stderr);                                                    \
             fputs("Options:\n", stderr);                                                            \
@@ -46,7 +47,6 @@
                 BODY                                                                                \
             } while (false);                                                                        \
         } else {                                                                                    \
-            bool only_default = false;                                                              \
             for (_i = 1; _i < argc; _i++) {                                                         \
                 if (!only_default && argv[_i][0] == '-') {                                          \
                     if (argv[_i][1] == '-') {                                                       \
