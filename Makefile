@@ -29,7 +29,7 @@ QEMU_ARGS += -device virtio-blk-device,scsi=off,drive=disk0
 
 .PHONY: build clean qemu $(SUBS)
 
-build: $(TARGET.kernel) $(TARGET.userspace)
+build: $(TARGET.kernel) $(TARGET.userspace) $(TARGET.programs)
 
 $(TARGET.userspace): $(TARGET.toolchain) FORCE
 $(TARGET.kernel): $(TARGET.toolchain) FORCE

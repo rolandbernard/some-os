@@ -33,14 +33,16 @@ git submodule update --init --recursive
 ### Building
 
 Compile the project using the `make` command. This will build the toolchain, the kernel and all
-userspace components.
+userspace components. This command can take quite some time.
+You might also want to build in release mode using `make BUILD=release`.
 
 ### Running
 
 To start the operating system in QEMU run `make qemu`. This will also build a minix3 formatted disk
-in `build/hdd.dsk` from the `sysroot` directory.
+in `build/hdd.dsk` from the `sysroot` directory. To do this your system needs the ability to format
+a file using `mkfs.minix` and mount the created file using `mount` and unmount using `umount`.
 
-### File structure
+### Repository structure
 
 This repository has four important subdirectories:
 
