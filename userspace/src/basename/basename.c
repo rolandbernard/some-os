@@ -23,15 +23,15 @@ ARG_SPEC_FUNCTION(argumentSpec, Arguments*, "basename [options] [path]...", {
     // Options
     ARG_FLAG('a', "multiple", {
         context->multiple = true;
-    }, "do not ignore entries starting with .");
+    }, "support multiple arguments");
     ARG_VALUED('s', "suffix", {
         free(context->suffix);
         context->suffix = strdup(value);
         context->multiple = true;
-    }, false, "={none|size|time}", "select sorting mode (-U, -S, -t)");
+    }, false, "=<suffix>", "remove a trailing suffix; implies -a");
     ARG_FLAG('z', "zero", {
         context->zero = true;
-    }, "sort by time, newest first");
+    }, "end each output with NUL, not newline");
     ARG_FLAG(0, "help", {
         ARG_PRINT_HELP(argumentSpec, NULL);
         exit(0);

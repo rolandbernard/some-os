@@ -25,11 +25,14 @@ char* joinPaths(const char* base, const char* name) {
 }
 
 const char* basename(const char* path) {
-    size_t path_len = strlen(path);
-    while (path_len != 0 && path[path_len - 1] != '/') {
-        path_len--;
+    size_t dir_len = strlen(path);
+    while (dir_len > 0 && path[dir_len - 1] == '/') {
+        dir_len--;
     }
-    return path + path_len;
+    while (dir_len > 0 && path[dir_len - 1] != '/') {
+        dir_len--;
+    }
+    return path + dir_len;
 }
 
 int decimalWidth(long i) {

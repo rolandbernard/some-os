@@ -39,6 +39,7 @@ typedef struct {
     bool directory;
     bool long_fmt;
     bool reverse;
+    bool error;
     List files;
 } Arguments;
 
@@ -175,11 +176,17 @@ void listPath(const char* path, Arguments* args) {
     initList(&entries);
     struct stat stats;
     if (stat(path, &stats) != 0) {
+        args->error = true;
         fprintf(stderr, "%s: cannot access '%s': %s\n", args->prog, path, strerror(errno));
         return;
     }
     if (!args->directory && (stats.st_mode & S_IFMT) == S_IFDIR) {
         DIR* dir = opendir(path);
+        if (dir == NULL) {
+            args->error = true;
+            fprintf(stderr, "%s: cannot access '%s': %s\n", args->prog, path, strerror(errno));
+            return;
+        }
         struct dirent* entr = readdir(dir);
         while (entr != NULL) {
             if (
@@ -324,6 +331,7 @@ int main(int argc, const char* const* argv) {
     args.directory = false;
     args.long_fmt = false;
     args.reverse = false;
+    args.error = false;
     initList(&args.files);
     ARG_PARSE_ARGS(argumentSpec, argc, argv, &args);
     for (size_t i = 0; i < args.files.count; i++) {
@@ -335,6 +343,6 @@ int main(int argc, const char* const* argv) {
         free(path);
     }
     deinitList(&args.files);
-    return 0;
+    return args.error ? 1 : 0;
 }
 

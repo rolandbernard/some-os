@@ -280,17 +280,19 @@ static Error vfsCreateNewNode(
     new->stat.ctime = time;
     // dev, id, block_size, and blocks must be initialized by the concrete implementation.
     // We don't have to write the node data, it will be written when linking.
-    const char* filename = getBaseFilename(path);
+    char* filename = getBaseFilename(path);
     CHECKED(vfsNodeLink(parent, process, filename, new), {
         vfsNodeClose(parent);
         vfsNodeClose(new);
         dealloc(real_parent_path);
+        dealloc(filename);
     });
     if (MODE_TYPE(mode) == VFS_TYPE_DIR) {
         CHECKED(vfsCreateDirectoryDotAndDotDot(new, parent), {
             vfsNodeClose(parent);
             vfsNodeClose(new);
             dealloc(real_parent_path);
+            dealloc(filename);
         });
     }
     vfsNodeClose(parent);
@@ -308,6 +310,7 @@ static Error vfsCreateNewNode(
         }
     }
     dealloc(real_parent_path);
+    dealloc(filename);
     return simpleError(SUCCESS);
 }
 
@@ -416,7 +419,7 @@ static Error vfsCheckDirectoryIsEmpty(Process* process, VfsNode* dir) {
         CHECKED(vfsNodeReaddirAt(dir, process, virtPtrForKernel(entry), offset, max_size, &tmp_size, &vfs_size), dealloc(entry));
         if (entry->len > max_size || (strcmp(entry->name, ".") != 0 && strcmp(entry->name, "..") != 0)) {
             dealloc(entry);
-            return simpleError(EEXIST);
+            return simpleError(ENOTEMPTY);
         }
         offset += tmp_size;
     } while (tmp_size != 0);
@@ -452,10 +455,14 @@ Error vfsUnlinkFrom(Process* process, VfsNode* parent, const char* filename, Vfs
 Error vfsUnlinkAt(VirtualFilesystem* fs, Process* process, VfsFile* file, const char* path) {
     VfsNode* parent;
     CHECKED(vfsLookupNodeAt(fs, process, file, path, VFS_LOOKUP_PARENT, &parent, NULL));
-    const char* filename = getBaseFilename(path);
+    char* filename = getBaseFilename(path);
     VfsNode* node;
-    CHECKED(vfsNodeLookup(parent, process, filename, &node), vfsNodeClose(parent));
+    CHECKED(vfsNodeLookup(parent, process, filename, &node), {
+        dealloc(filename);
+        vfsNodeClose(parent);
+    });
     Error err = vfsUnlinkFrom(process, parent, filename, node);
+    dealloc(filename);
     vfsNodeClose(node);
     vfsNodeClose(parent);
     return err;
@@ -464,7 +471,7 @@ Error vfsUnlinkAt(VirtualFilesystem* fs, Process* process, VfsFile* file, const 
 Error vfsLinkAt(VirtualFilesystem* fs, Process* process, VfsFile* old_file, const char* old, VfsFile* new_file, const char* new) {
     VfsNode* parent;
     CHECKED(vfsLookupNodeAt(fs, process, new_file, new, VFS_LOOKUP_PARENT, &parent, NULL));
-    const char* filename = getBaseFilename(new);
+    char* filename = getBaseFilename(new);
     VfsNode* new_node;
     Error err = vfsNodeLookup(parent, process, filename, &new_node);
     if (err.kind == ENOENT) {
@@ -474,13 +481,16 @@ Error vfsLinkAt(VirtualFilesystem* fs, Process* process, VfsFile* old_file, cons
             vfsNodeClose(parent)
         );
         Error err = vfsNodeLink(parent, process, filename, old_node);
+        dealloc(filename);
         vfsNodeClose(old_node);
         vfsNodeClose(parent);
         return err;
     } else if (isError(err)) {
+        dealloc(filename);
         vfsNodeClose(parent);
         return err;
     } else {
+        dealloc(filename);
         vfsNodeClose(parent);
         vfsNodeClose(new_node);
         return simpleError(EEXIST);

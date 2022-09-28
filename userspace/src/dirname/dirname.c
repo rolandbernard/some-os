@@ -21,7 +21,7 @@ ARG_SPEC_FUNCTION(argumentSpec, Arguments*, "dirname [options] [path]...", {
     // Options
     ARG_FLAG('z', "zero", {
         context->zero = true;
-    }, "sort by time, newest first");
+    }, "end each output with NUL, not newline");
     ARG_FLAG(0, "help", {
         ARG_PRINT_HELP(argumentSpec, NULL);
         exit(0);

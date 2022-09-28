@@ -3,7 +3,7 @@ include ../config.mk
 
 # == Config
 TARGETS := init hello systest
-TARGETS += ls basename dirname
+TARGETS += ls basename dirname rm
 # ==
 
 # == Tools
