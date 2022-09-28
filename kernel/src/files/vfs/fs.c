@@ -443,7 +443,7 @@ static Error vfsRemoveDirectoryDotAndDotDot(Process* process, VfsNode* parent, V
 }
 
 Error vfsUnlinkFrom(Process* process, VfsNode* parent, const char* filename, VfsNode* node) {
-    if (MODE_TYPE(node->stat.mode) == VFS_TYPE_DIR) {
+    if (MODE_TYPE(node->stat.mode) == VFS_TYPE_DIR && node->stat.nlinks == 2) {
         CHECKED(vfsCheckDirectoryIsEmpty(process, node));
         CHECKED(vfsNodeUnlink(parent, process, filename, node));
         return vfsRemoveDirectoryDotAndDotDot(process, parent, node);
@@ -480,6 +480,7 @@ Error vfsLinkAt(VirtualFilesystem* fs, Process* process, VfsFile* old_file, cons
             vfsLookupNodeAt(fs, process, old_file, old, VFS_LOOKUP_NORMAL, &old_node, NULL),
             vfsNodeClose(parent)
         );
+        // TODO: If this is a directory update .. link
         Error err = vfsNodeLink(parent, process, filename, old_node);
         dealloc(filename);
         vfsNodeClose(old_node);

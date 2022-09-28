@@ -17,7 +17,7 @@ typedef struct {
     List paths;
 } Arguments;
 
-ARG_SPEC_FUNCTION(argumentSpec, Arguments*, "dirname [options] [path]...", {
+ARG_SPEC_FUNCTION(argumentSpec, Arguments*, "dirname [options] <name>...", {
     // Options
     ARG_FLAG('z', "zero", {
         context->zero = true;

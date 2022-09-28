@@ -19,7 +19,10 @@ typedef struct {
     List paths;
 } Arguments;
 
-ARG_SPEC_FUNCTION(argumentSpec, Arguments*, "basename [options] [path]...", {
+ARG_SPEC_FUNCTION(argumentSpec, Arguments*,
+    "basename [options] <name> [suffix]\n"
+    "  or:  basename [options] <name>...\n"
+, {
     // Options
     ARG_FLAG('a', "multiple", {
         context->multiple = true;
@@ -93,6 +96,7 @@ int main(int argc, const char* const* argv) {
         free(path);
     }
     deinitList(&args.paths);
+    free(args.suffix);
     return 0;
 }
 

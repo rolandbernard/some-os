@@ -22,7 +22,7 @@ typedef struct {
     List files;
 } Arguments;
 
-ARG_SPEC_FUNCTION(argumentSpec, Arguments*, "rm [options] [file]...", {
+ARG_SPEC_FUNCTION(argumentSpec, Arguments*, "rm [options] <file>...", {
     // Options
     ARG_FLAG('f', "force", {
         context->force = true;
@@ -141,7 +141,7 @@ static void removePath(const char* path, Arguments* args) {
 int main(int argc, const char* const* argv) {
     Arguments args;
     args.prog = argv[0];
-    args.force = false;;
+    args.force = false;
     args.recursive = false;
     args.directory = false;
     args.verbose = false;
