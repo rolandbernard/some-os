@@ -13,22 +13,12 @@
 
 typedef struct {
     const char* prog;
-    char* suffix;
-    bool multiple;
     bool zero;
     List paths;
 } Arguments;
 
-ARG_SPEC_FUNCTION(argumentSpec, Arguments*, "basename [options] [path]...", {
+ARG_SPEC_FUNCTION(argumentSpec, Arguments*, "dirname [options] [path]...", {
     // Options
-    ARG_FLAG('a', "multiple", {
-        context->multiple = true;
-    }, "do not ignore entries starting with .");
-    ARG_VALUED('s', "suffix", {
-        free(context->suffix);
-        context->suffix = strdup(value);
-        context->multiple = true;
-    }, false, "={none|size|time}", "select sorting mode (-U, -S, -t)");
     ARG_FLAG('z', "zero", {
         context->zero = true;
     }, "sort by time, newest first");
@@ -38,16 +28,7 @@ ARG_SPEC_FUNCTION(argumentSpec, Arguments*, "basename [options] [path]...", {
     }, "display this help and exit");
 }, {
     // Default
-    only_default = true;
-    if (context->multiple || context->paths.count == 0) {
-        copyStringToList(&context->paths, value);
-    } else if (context->paths.count == 1) {
-        free(context->suffix);
-        context->suffix = strdup(value);
-    } else {
-        const char* option = value;
-        ARG_WARN("extra operand");
-    }
+    copyStringToList(&context->paths, value);
 }, {
     // Warning
     if (option != NULL) {
@@ -67,8 +48,6 @@ ARG_SPEC_FUNCTION(argumentSpec, Arguments*, "basename [options] [path]...", {
 int main(int argc, const char* const* argv) {
     Arguments args;
     args.prog = argv[0];
-    args.suffix = NULL;
-    args.multiple = false;
     args.zero = false;
     initList(&args.paths);
     ARG_PARSE_ARGS(argumentSpec, argc, argv, &args);
@@ -76,19 +55,22 @@ int main(int argc, const char* const* argv) {
         char* path = LIST_GET(char*, args.paths, i);
         size_t path_len = strlen(path);
         size_t dir_len = path_len;
-        while (dir_len != 0 && path[dir_len - 1] != '/') {
+        while (dir_len > 0 && path[dir_len - 1] == '/') {
             dir_len--;
         }
-        if (args.suffix != NULL) {
-            size_t suffix_len = strlen(args.suffix);
-            if (
-                path_len - suffix_len != dir_len
-                && strcmp(path + path_len - suffix_len, args.suffix) == 0
-            ) {
-                path[path_len - suffix_len] = 0;
-            }
+        while (dir_len > 0 && path[dir_len - 1] != '/') {
+            dir_len--;
         }
-        fputs(path + dir_len, stdout);
+        while (dir_len > 1 && path[dir_len - 1] == '/') {
+            dir_len--;
+        }
+        if (dir_len == 0) {
+            path[0] = '.';
+            path[1] = 0;
+        } else {
+            path[dir_len] = 0;
+        }
+        fputs(path, stdout);
         fputc(args.zero ? 0 : '\n', stdout);
         free(path);
     }
