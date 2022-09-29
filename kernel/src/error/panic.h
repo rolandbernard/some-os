@@ -29,7 +29,7 @@ void panicBreak();
     panicBreak();                                                                   \
     if (tryLockingUnsafeLock(&global_panic_lock)) {                                 \
         notifyPanic();                                                              \
-        __VA_ARGS__;                                                                \
+        __VA_OPT__(KERNEL_ERROR(__VA_ARGS__));                                      \
         KERNEL_ERROR("Kernel panic!" STYLE_DEBUG " on hart %u", getCurrentHartId()) \
         BACKTRACE();                                                                \
     }                                                                               \
