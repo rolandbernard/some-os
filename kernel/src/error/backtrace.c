@@ -47,12 +47,12 @@ typedef struct {
     uintptr_t last_addr;
 } UnwindTraceData;
 
-_Unwind_Reason_Code unwindTracingFunction(struct _Unwind_Context *ctx, void *udata) {
+static _Unwind_Reason_Code logTracingFunction(struct _Unwind_Context *ctx, void *udata) {
     UnwindTraceData* data = (UnwindTraceData*)udata;
     data->last_cfa = _Unwind_GetCFA(ctx);
-    if (data->depth >= 2) {
+    if (data->depth >= 0) {
         if (data->last_addr != 0) {
-            logFrameReturnAddress(data->depth - 1, data->last_addr, data->last_cfa, true);
+            logFrameReturnAddress(data->depth + 1, data->last_addr, data->last_cfa, true);
         }
     }
     data->last_addr = _Unwind_GetIP(ctx);
@@ -60,28 +60,55 @@ _Unwind_Reason_Code unwindTracingFunction(struct _Unwind_Context *ctx, void *uda
     return _URC_NO_REASON;
 }
 
-void logBacktraceSkipping(int depth) {
+static void backtraceSkipping(_Unwind_Trace_Fn func, int depth) {
     if (!initialized) {
         initBacktrace();
     }
     UnwindTraceData data = {
         .depth = -depth,
     };
-    _Unwind_Backtrace(unwindTracingFunction, &data);
+    _Unwind_Backtrace(func, &data);
 }
 
 void logBacktrace() {
-    logBacktraceSkipping(1);
+    backtraceSkipping(logTracingFunction, 3);
 }
 
 static void magicLogBacktrace() {
-    logBacktraceSkipping(2);
+    backtraceSkipping(logTracingFunction, 4);
 }
 
+// Magic that will allow to unwind the backtrace for the given frame.
 void magicCfiIndirect(TrapFrame* frame, void* calling);
 
-// Magic that will log the backtrace for the given frame.
 void logBacktraceFor(TrapFrame* frame) {
     magicCfiIndirect(frame, magicLogBacktrace);
 }
+
+#ifdef PROFILE
+static _Unwind_Reason_Code profileTracingFunction(struct _Unwind_Context *ctx, void *udata) {
+    UnwindTraceData* data = (UnwindTraceData*)udata;
+    if (data->depth >= 0) {
+        uintptr_t addr = _Unwind_GetIP(ctx);
+        SymbolDebugInfo* symb_info = searchSymbolDebugInfo(addr - 1);
+        if (symb_info != NULL) {
+            symb_info->profile++;
+        }
+        LineDebugInfo* line_info = searchLineDebugInfo(addr - 1);
+        if (line_info != NULL) {
+            line_info->profile++;
+        }
+    }
+    data->depth++;
+    return _URC_NO_REASON;
+}
+
+static void magicProfileBacktrace() {
+    backtraceSkipping(profileTracingFunction, 3);
+}
+
+void profileBacktraceFor(TrapFrame* frame) {
+    magicCfiIndirect(frame, magicProfileBacktrace);
+}
+#endif
 

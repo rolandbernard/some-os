@@ -7,16 +7,22 @@
 typedef struct {
     uintptr_t addr;
     const char* symbol;
+#ifdef PROFILE
+    size_t profile;
+#endif
 } SymbolDebugInfo;
 
 typedef struct {
     uintptr_t addr;
     const char* file;
     size_t line;
+#ifdef PROFILE
+    size_t profile;
+#endif
 } LineDebugInfo;
 
-const SymbolDebugInfo* searchSymbolDebugInfo(uintptr_t addr);
+SymbolDebugInfo* searchSymbolDebugInfo(uintptr_t addr);
 
-const LineDebugInfo* searchLineDebugInfo(uintptr_t addr);
+LineDebugInfo* searchLineDebugInfo(uintptr_t addr);
 
 #endif

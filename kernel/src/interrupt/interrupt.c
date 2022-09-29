@@ -69,6 +69,11 @@ void kernelTrap(uintptr_t cause, uintptr_t pc, uintptr_t val, TrapFrame* frame) 
         panic();
     } else {
         Task* task = (Task*)frame;
+#ifdef PROFILE
+        if (frame->hart == NULL || task->process == NULL) {
+            profileBacktraceFor(frame);
+        }
+#endif
         if (frame->hart != NULL) {
             Time elapsed = getTime() - task->times.entered;
             task->times.user_time += elapsed;

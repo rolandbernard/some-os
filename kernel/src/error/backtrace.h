@@ -10,4 +10,8 @@ void logBacktrace();
 
 void logBacktraceFor(TrapFrame* frame);
 
+#ifdef PROFILE
+void profileBacktraceFor(TrapFrame* frame);
+#endif
+
 #endif

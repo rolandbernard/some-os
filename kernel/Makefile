@@ -3,8 +3,8 @@ include ../config.mk
 
 # == Config
 TARGETS      := kernel
-SWITCHES     := $(ARCH) $(BOARD)
-ALL_SWITCHES := riscv64 virt
+SWITCHES     := $(ARCH) $(BOARD) profile
+ALL_SWITCHES := riscv64 virt profile
 # ==
 
 # == Tools
