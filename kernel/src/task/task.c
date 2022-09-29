@@ -24,7 +24,6 @@ void initTrapFrame(TrapFrame* frame, uintptr_t sp, uintptr_t gp, uintptr_t pc, u
 
 void initKernelTrapFrame(TrapFrame* frame, uintptr_t sp, uintptr_t pc) {
     initTrapFrame(frame, sp, (uintptr_t)getKernelGlobalPointer(), pc, 0, kernel_page_table);
-    frame->regs[REG_RETURN_ADDRESS] = (uintptr_t)__builtin_return_address(0);
 }
 
 Task* createTask() {

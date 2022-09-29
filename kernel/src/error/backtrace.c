@@ -74,26 +74,14 @@ void logBacktrace() {
     logBacktraceSkipping(1);
 }
 
-// This is utterly unsafe anyways, just use a global.
-static TrapFrame* backtrace_return;
-
 static void magicLogBacktrace() {
-    logBacktraceSkipping(1);
-    loadFromFrame(backtrace_return);
-    panic();
+    logBacktraceSkipping(2);
 }
 
+void magicCfiIndirect(TrapFrame* frame, void* calling);
+
 // Magic that will log the backtrace for the given frame.
-// Note: This will most likely cause a page fault and kernel panic, beware.
 void logBacktraceFor(TrapFrame* frame) {
-    // Registers will be clobbered during the backtrace. Save them here.
-    TrapFrame old_frame;
-    memcpy(&old_frame, frame, sizeof(old_frame));
-    frame->pc = (uintptr_t)magicLogBacktrace;
-    TrapFrame return_frame;
-    backtrace_return = &return_frame;
-    swapTrapFrame(frame, backtrace_return, true);
-    // Restore the state we saved beforehand
-    memcpy(frame, &old_frame, sizeof(old_frame));
+    magicCfiIndirect(frame, magicLogBacktrace);
 }
 

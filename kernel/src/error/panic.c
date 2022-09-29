@@ -25,3 +25,7 @@ void panicBreak() {
     noop();
 }
 
+void doPanic() {
+    panic();
+}
+
