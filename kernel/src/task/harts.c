@@ -83,9 +83,13 @@ int getCurrentHartId() {
     }
 }
 
-void swapTrapFrame(TrapFrame* load_from, TrapFrame* save_to) {
+void swapTrapFrame(TrapFrame* restrict load_from, TrapFrame* restrict save_to, bool all_registers) {
     if (saveToFrame(save_to)) {
-        loadFromFrame(load_from);
+        if (all_registers) {
+            loadAllFromFrame(load_from);
+        } else {
+            loadFromFrame(load_from);
+        }
     }
 }
 

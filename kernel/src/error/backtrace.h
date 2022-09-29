@@ -2,9 +2,12 @@
 #define _BACKTRACE_H_
 
 #include "error/error.h"
+#include "task/types.h"
 
 Error initBacktrace();
 
 void logBacktrace();
+
+void logBacktraceFor(TrapFrame* frame);
 
 #endif

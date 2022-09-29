@@ -60,7 +60,7 @@ SyscallReturn criticalSyscall(TrapFrame* frame) {
 #else
     if (frame->hart != NULL) {
         frame->regs[REG_ARGUMENT_0] = (uintptr_t)frame;
-        swapTrapFrame(frame, getCurrentTrapFrame());
+        swapTrapFrame(frame, getCurrentTrapFrame(), false);
     } else {
         frame->regs[REG_ARGUMENT_0] = 0;
     }
@@ -85,7 +85,7 @@ void criticalReturn(Task* to) {
         assert(getCurrentHartFrame()->spinlocks_locked == 0);
         criticalReturnFastPath(to);
 #else
-        swapTrapFrame(getCurrentTrapFrame(), &to->frame);
+        swapTrapFrame(getCurrentTrapFrame(), &to->frame, false);
 #endif
     }
 }

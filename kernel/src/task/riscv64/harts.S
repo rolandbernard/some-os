@@ -30,6 +30,12 @@ writeSscratch:
 .macro load_gp i, basereg
     ld x\i, ((\i)*8)(\basereg)
 .endm
+.macro save_fp i, basereg=x31
+    fsd f\i, ((32+(\i))*8)(\basereg)
+.endm
+.macro load_fp i, basereg=x31
+    fld f\i, ((32+(\i))*8)(\basereg)
+.endm
 
 .global saveToFrame
 saveToFrame:
@@ -70,6 +76,24 @@ loadFromFrame:
 .endr
     ld t0, 512(t0)
     jr t0
+.cfi_endproc
+
+.global loadAllFromFrame
+loadAllFromFrame:
+.cfi_startproc
+    mv x31, a0
+.set i, 0
+.rept 32
+    load_fp %i, x31
+    .set i, i+1
+.endr
+.set i, 1
+.rept 30
+    load_gp %i, x31
+    .set i, i+1
+.endr
+    ld x31, 512(x31)
+    jr x31
 .cfi_endproc
 
 .global callInHart
