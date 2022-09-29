@@ -184,7 +184,7 @@ typedef struct {
     VfsNodeReaddirAtFunction readdir_at;    // If this is a directory, read the entry starting at offset.
     VfsNodeLookupFunction lookup;           // If this is a directory, find the node id of the entry with name.
     VfsNodeUnlinkFunction unlink;           // If this is a directory, remove the entry with name.
-    VfsNodeLinkFunction link;               // If this is a directory, add entry at name.
+    VfsNodeLinkFunction link;               // If this is a directory, add entry at name (overwrite if same entry exists already).
     VfsNodeIoctlFunction ioctl;
     VfsNodeWillBlockFunction will_block;
 } VfsNodeFunctions;

@@ -238,6 +238,7 @@ static Error vfsLookupNodeAt(
 
 static Error vfsCreateDirectoryDotAndDotDot(VfsNode* dir_node, VfsNode* parent) {
     // These links are created by the system regardless of user permissions.
+    // Note: If they already exist, vfsNodeLink will overwrite them.
     CHECKED(vfsNodeLink(dir_node, NULL, ".", dir_node));
     CHECKED(vfsNodeLink(dir_node, NULL, "..", parent));
     return simpleError(SUCCESS);
@@ -442,7 +443,7 @@ static Error vfsRemoveDirectoryDotAndDotDot(Process* process, VfsNode* parent, V
     }
 }
 
-Error vfsUnlinkFrom(Process* process, VfsNode* parent, const char* filename, VfsNode* node) {
+static Error vfsUnlinkFrom(Process* process, VfsNode* parent, const char* filename, VfsNode* node) {
     if (MODE_TYPE(node->stat.mode) == VFS_TYPE_DIR && node->stat.nlinks == 2) {
         CHECKED(vfsCheckDirectoryIsEmpty(process, node));
         CHECKED(vfsNodeUnlink(parent, process, filename, node));
@@ -468,6 +469,16 @@ Error vfsUnlinkAt(VirtualFilesystem* fs, Process* process, VfsFile* file, const 
     return err;
 }
 
+static Error vfsMoveDirectoryDotDot(
+    VirtualFilesystem* fs, Process* process, VfsFile* old_file, const char* old, VfsNode* parent, VfsNode* child
+) {
+    VfsNode* old_parent;
+    CHECKED(vfsLookupNodeAt(fs, process, old_file, old, VFS_LOOKUP_PARENT, &old_parent, NULL));
+    CHECKED(vfsNodeUnlink(child, process, "..", old_parent));
+    CHECKED(vfsNodeLink(child, process, "..", parent));
+    return simpleError(SUCCESS);
+}
+
 Error vfsLinkAt(VirtualFilesystem* fs, Process* process, VfsFile* old_file, const char* old, VfsFile* new_file, const char* new) {
     VfsNode* parent;
     CHECKED(vfsLookupNodeAt(fs, process, new_file, new, VFS_LOOKUP_PARENT, &parent, NULL));
@@ -480,8 +491,10 @@ Error vfsLinkAt(VirtualFilesystem* fs, Process* process, VfsFile* old_file, cons
             vfsLookupNodeAt(fs, process, old_file, old, VFS_LOOKUP_NORMAL, &old_node, NULL),
             vfsNodeClose(parent)
         );
-        // TODO: If this is a directory update .. link
         Error err = vfsNodeLink(parent, process, filename, old_node);
+        if (!isError(err) && MODE_TYPE(old_node->stat.mode) == VFS_TYPE_DIR) {
+            err = vfsMoveDirectoryDotDot(fs, process, old_file, old, parent, old_node);
+        }
         dealloc(filename);
         vfsNodeClose(old_node);
         vfsNodeClose(parent);
