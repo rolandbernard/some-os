@@ -48,7 +48,7 @@
             } while (false);                                                                        \
         } else {                                                                                    \
             for (_i = 1; _i < argc; _i++) {                                                         \
-                if (!only_default && argv[_i][0] == '-') {                                          \
+                if (!only_default && argv[_i][0] == '-' && argv[_i][1] != 0) {                      \
                     if (argv[_i][1] == '-') {                                                       \
                         if (argv[_i][2] == 0) {                                                     \
                             only_default = true;                                                    \
