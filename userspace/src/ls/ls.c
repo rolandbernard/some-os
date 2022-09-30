@@ -221,7 +221,7 @@ void listPath(const char* path, Arguments* args) {
     } else if (args->sort == SORT_TIME) {
         qsort(entries.values, entries.count, sizeof(Entry*), args->reverse ? compareTimeReverse : compareTime);
     }
-    if (args->files.count > 1 && entries.count > 0) {
+    if (args->files.count > 1) {
         printf("%s:\n", path);
     }
     size_t max_nlink = 0;

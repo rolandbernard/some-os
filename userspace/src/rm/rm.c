@@ -80,7 +80,7 @@ static void removeDirectory(const char* path, Arguments* args) {
         DIR* dir = opendir(path);
         if (dir == NULL) {
             args->error = true;
-            fprintf(stderr, "%s: cannot remove '%s': %s\n", args->prog, path, strerror(errno));
+            fprintf(stderr, "%s: cannot open '%s': %s\n", args->prog, path, strerror(errno));
             return;
         }
         struct dirent* entr = readdir(dir);

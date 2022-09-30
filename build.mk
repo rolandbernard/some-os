@@ -62,7 +62,7 @@ BINARYS          := $(foreach TARGET, $(TARGETS), $(BINARY_DIR)/$(TARGET))
 
 .PHONY: build clean
 
-build: $(TARGETS) | compile_commands.json
+build: compile_commands.json $(TARGETS)
 	@$(FINISHED)
 	@$(ECHO) "Build successful."
 

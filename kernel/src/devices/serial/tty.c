@@ -377,7 +377,7 @@ UartTtyDevice* createUartTtyDevice(void* uart, UartWriteFunction write, UartRead
     initSpinLock(&dev->lock);
     memset(&dev->ctrl, 0, sizeof(Termios));
     dev->ctrl.iflag = ICRNL;
-    dev->ctrl.oflag = ONLCR | ONOCR | OPOST;
+    dev->ctrl.oflag = ONLCR | OPOST;
     dev->ctrl.lflag = ECHO | ECHOK | ECHOE | ECHONL | ECHOCTL | ICANON | ISIG;
     dev->ctrl.cc[VERASE] = '\x7f';
     dev->ctrl.cc[VEOF] = '\x04';

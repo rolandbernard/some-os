@@ -17,13 +17,14 @@ typedef struct {
     bool no_clobber;
     bool no_dir;
     bool update;
+    bool verbose;
     bool error;
     char* target;
     List files;
 } Arguments;
 
 ARG_SPEC_FUNCTION(argumentSpec, Arguments*,
-    "mv [options] [-t] <source> <dest>\n"
+    "mv [options] [-T] <source> <dest>\n"
     "  or:  mv [options] <source>... <directory>\n"
     "  or:  mv [options] -t <directory> <source>..."
 , {
@@ -41,6 +42,9 @@ ARG_SPEC_FUNCTION(argumentSpec, Arguments*,
     ARG_FLAG('u', "update", {
         context->update = true;
     }, "move only if the source is newer that the destination");
+    ARG_FLAG('v', "verbose", {
+        context->verbose = true;
+    }, "explain what is being done");
     ARG_FLAG(0, "help", {
         ARG_PRINT_HELP(argumentSpec, NULL);
         exit(0);
@@ -89,12 +93,16 @@ static void moveFromTo(const char* from, const char* to, Arguments* args) {
                 args->error = true;
                 fprintf(stderr, "%s: cannot remove '%s': %s\n", args->prog, to, strerror(errno));
                 return;
+            } else if (args->verbose) {
+                printf("removed '%s'\n", to);
             }
         }
         if (rename(from, to) != 0) {
             args->error = true;
             fprintf(stderr, "%s: cannot move '%s': %s\n", args->prog, from, strerror(errno));
             return;
+        } else if (args->verbose) {
+            printf("moved '%s' to '%s'\n", from, to);
         }
     }
 }
@@ -121,7 +129,7 @@ int main(int argc, const char* const* argv) {
     }
     if (is_dir) {
         if (args.no_dir) {
-            fprintf(stderr, "%s: target '%s': %s\n", args.prog, args.target, strerror(EEXIST));
+            fprintf(stderr, "%s: target '%s': %s\n", args.prog, args.target, strerror(EISDIR));
             exit(1);
         }
         for (size_t i = 0; i < args.files.count; i++) {
