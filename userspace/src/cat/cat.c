@@ -16,7 +16,7 @@
 typedef struct {
     const char* prog;
     bool error;
-    List files;
+    List times;
 } Arguments;
 
 ARG_SPEC_FUNCTION(argumentSpec, Arguments*, "cat <file>...", {
@@ -27,7 +27,7 @@ ARG_SPEC_FUNCTION(argumentSpec, Arguments*, "cat <file>...", {
     }, "display this help and exit");
 }, {
     // Default
-    copyStringToList(&context->files, value);
+    copyStringToList(&context->times, value);
 }, {
     // Warning
     if (option != NULL) {
@@ -38,8 +38,8 @@ ARG_SPEC_FUNCTION(argumentSpec, Arguments*, "cat <file>...", {
     exit(2);
 }, {
     // Final
-    if (context->files.count == 0) {
-        copyStringToList(&context->files, "-");
+    if (context->times.count == 0) {
+        copyStringToList(&context->times, "-");
     }
 })
 
@@ -72,13 +72,13 @@ static void catFile(const char* path, Arguments* args) {
 int main(int argc, const char* const* argv) {
     Arguments args;
     args.prog = argv[0];
-    initList(&args.files);
+    initList(&args.times);
     ARG_PARSE_ARGS(argumentSpec, argc, argv, &args);
-    for (size_t i = 0; i < args.files.count; i++) {
-        char* path = LIST_GET(char*, args.files, i);
+    for (size_t i = 0; i < args.times.count; i++) {
+        char* path = LIST_GET(char*, args.times, i);
         catFile(path, &args);
     }
-    deinitListAndContents(&args.files);
+    deinitListAndContents(&args.times);
     return args.error ? 1 : 0;
 }
 

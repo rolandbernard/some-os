@@ -17,7 +17,7 @@ typedef struct {
     const char* prog;
     bool append;
     bool error;
-    List files;
+    List times;
 } Arguments;
 
 ARG_SPEC_FUNCTION(argumentSpec, Arguments*, "tee [options] <file>...", {
@@ -31,7 +31,7 @@ ARG_SPEC_FUNCTION(argumentSpec, Arguments*, "tee [options] <file>...", {
     }, "display this help and exit");
 }, {
     // Default
-    copyStringToList(&context->files, value);
+    copyStringToList(&context->times, value);
 }, {
     // Warning
     if (option != NULL) {
@@ -45,23 +45,23 @@ ARG_SPEC_FUNCTION(argumentSpec, Arguments*, "tee [options] <file>...", {
 int main(int argc, const char* const* argv) {
     Arguments args;
     args.prog = argv[0];
-    initList(&args.files);
+    initList(&args.times);
     ARG_PARSE_ARGS(argumentSpec, argc, argv, &args);
-    FILE* files[args.files.count + 1];
-    for (size_t i = 0; i < args.files.count; i++) {
-        char* path = LIST_GET(char*, args.files, i);
+    FILE* files[args.times.count + 1];
+    for (size_t i = 0; i < args.times.count; i++) {
+        char* path = LIST_GET(char*, args.times, i);
         files[i] = fopen(path, args.append ? "a" : "w");
         if (files[i] == NULL) {
             args.error = true;
             fprintf(stderr, "%s: cannot open '%s': %s\n", args.prog, path, strerror(errno));
         }
     }
-    files[args.files.count] = stdout;
+    files[args.times.count] = stdout;
     char buffer[1024];
     size_t tmp_size;
     do {
         tmp_size = fread(buffer, 1, 1024, stdin);
-        for (size_t i = 0; i <= args.files.count; i++) {
+        for (size_t i = 0; i <= args.times.count; i++) {
             if (files[i] != NULL) {
                 size_t left = tmp_size;
                 while (left > 0) {
@@ -70,7 +70,7 @@ int main(int argc, const char* const* argv) {
             }
         }
     } while (tmp_size != 0 && !feof(stdin));
-    deinitListAndContents(&args.files);
+    deinitListAndContents(&args.times);
     return args.error ? 1 : 0;
 }
 

@@ -40,7 +40,7 @@ typedef struct {
     bool long_fmt;
     bool reverse;
     bool error;
-    List files;
+    List times;
 } Arguments;
 
 ARG_SPEC_FUNCTION(argumentSpec, Arguments*, "ls [options] [file]...", {
@@ -99,15 +99,15 @@ ARG_SPEC_FUNCTION(argumentSpec, Arguments*, "ls [options] [file]...", {
     }, "display this help and exit");
 }, {
     // Default
-    copyStringToList(&context->files, value);
+    copyStringToList(&context->times, value);
 }, {
     // Warning
     fprintf(stderr, "%s: '%s': %s\n", argv[0], option, warning);
     exit(2);
 }, {
     // Final
-    if (context->files.count == 0) {
-        copyStringToList(&context->files, ".");
+    if (context->times.count == 0) {
+        copyStringToList(&context->times, ".");
     }
 })
 
@@ -203,7 +203,7 @@ void listPath(const char* path, Arguments* args) {
                     args->recursive && (entry->mode & S_IFMT) == S_IFDIR
                     && strcmp(entr->d_name, ".") != 0 && strcmp(entr->d_name, "..") != 0
                 ) {
-                    addToList(&args->files, entr_path);
+                    addToList(&args->times, entr_path);
                 } else {
                     free(entr_path);
                 }
@@ -221,7 +221,7 @@ void listPath(const char* path, Arguments* args) {
     } else if (args->sort == SORT_TIME) {
         qsort(entries.values, entries.count, sizeof(Entry*), args->reverse ? compareTimeReverse : compareTime);
     }
-    if (args->files.count > 1) {
+    if (args->times.count > 1) {
         printf("%s:\n", path);
     }
     size_t max_nlink = 0;
@@ -341,17 +341,17 @@ int main(int argc, const char* const* argv) {
     args.long_fmt = false;
     args.reverse = false;
     args.error = false;
-    initList(&args.files);
+    initList(&args.times);
     ARG_PARSE_ARGS(argumentSpec, argc, argv, &args);
-    for (size_t i = 0; i < args.files.count; i++) {
-        char* path = LIST_GET(char*, args.files, i);
+    for (size_t i = 0; i < args.times.count; i++) {
+        char* path = LIST_GET(char*, args.times, i);
         if (i != 0) {
             printf("\n");
         }
         listPath(path, &args);
         free(path);
     }
-    deinitList(&args.files);
+    deinitList(&args.times);
     return args.error ? 1 : 0;
 }
 

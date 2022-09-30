@@ -3,7 +3,7 @@ include ../config.mk
 
 # == Config
 TARGETS := init hello systest
-TARGETS += ls basename dirname rm mv cp cat tee chmod
+TARGETS += ls basename dirname rm mv cp cat tee chmod sleep
 # ==
 
 # == Tools
