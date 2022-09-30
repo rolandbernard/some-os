@@ -279,6 +279,15 @@ void listPath(const char* path, Arguments* args) {
                 mode[8 - 3 * i] = (grp & 0b010) != 0 ? 'w' : '-';
                 mode[7 - 3 * i] = (grp & 0b100) != 0 ? 'r' : '-';
             }
+            if ((entry->mode & S_ISUID) != 0) {
+                mode[3] = mode[3] == 'x' ? 's' : 'S';
+            }
+            if ((entry->mode & S_ISGID) != 0) {
+                mode[6] = mode[6] == 'x' ? 's' : 'S';
+            }
+            if ((entry->mode & S_ISVTX) != 0) {
+                mode[9] = mode[9] == 'x' ? 't' : 'T';
+            }
             const struct tm* tm = localtime(&entry->time);
             char time[256];
             if (cur_tm->tm_year != tm->tm_year) {
