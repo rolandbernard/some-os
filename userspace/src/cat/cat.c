@@ -72,6 +72,7 @@ static void catFile(const char* path, Arguments* args) {
 int main(int argc, const char* const* argv) {
     Arguments args;
     args.prog = argv[0];
+    args.error = false;
     initList(&args.files);
     ARG_PARSE_ARGS(argumentSpec, argc, argv, &args);
     for (size_t i = 0; i < args.files.count; i++) {
