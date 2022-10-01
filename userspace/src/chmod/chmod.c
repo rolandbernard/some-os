@@ -18,7 +18,7 @@ typedef struct {
     bool recursive;
     bool error;
     char* reference;
-    List times;
+    List files;
 } Arguments;
 
 ARG_SPEC_FUNCTION(argumentSpec, Arguments*,
@@ -39,7 +39,7 @@ ARG_SPEC_FUNCTION(argumentSpec, Arguments*,
     }, "display this help and exit");
 }, {
     // Default
-    copyStringToList(&context->times, value);
+    copyStringToList(&context->files, value);
 }, {
     // Warning
     if (option != NULL) {
@@ -51,8 +51,8 @@ ARG_SPEC_FUNCTION(argumentSpec, Arguments*,
 }, {
     // Final
     if (
-        context->times.count == 0
-        || (context->times.count == 1 && context->reference == NULL)
+        context->files.count == 0
+        || (context->files.count == 1 && context->reference == NULL)
     ) {
         const char* option = NULL;
         ARG_WARN("missing file operand");
@@ -243,12 +243,12 @@ int main(int argc, const char* const* argv) {
     args.recursive = false;
     args.error = false;
     args.reference = NULL;
-    initList(&args.times);
+    initList(&args.files);
     ARG_PARSE_ARGS(argumentSpec, argc, argv, &args);
     mode_t clear = 0;
     mode_t set = 0;
     if (args.reference == NULL) {
-        parseMode(args.times.values[0], &clear, &set, &args);
+        parseMode(args.files.values[0], &clear, &set, &args);
     } else {
         struct stat stats;
         if (stat(args.reference, &stats) != 0) {
@@ -258,12 +258,12 @@ int main(int argc, const char* const* argv) {
         clear = ~0;
         set = stats.st_mode;
     }
-    for (size_t i = args.reference == NULL ? 1 : 0; i < args.times.count; i++) {
-        char* path = LIST_GET(char*, args.times, i);
+    for (size_t i = args.reference == NULL ? 1 : 0; i < args.files.count; i++) {
+        char* path = LIST_GET(char*, args.files, i);
         chmodPath(path, clear, set, &args);
         free(path);
     }
-    deinitList(&args.times);
+    deinitList(&args.files);
     free(args.reference);
     return args.error ? 1 : 0;
 }

@@ -23,7 +23,7 @@ typedef struct {
     bool verbose;
     bool error;
     char* target;
-    List times;
+    List files;
 } Arguments;
 
 ARG_SPEC_FUNCTION(argumentSpec, Arguments*,
@@ -63,7 +63,7 @@ ARG_SPEC_FUNCTION(argumentSpec, Arguments*,
     }, "display this help and exit");
 }, {
     // Default
-    copyStringToList(&context->times, value);
+    copyStringToList(&context->files, value);
 }, {
     // Warning
     if (option != NULL) {
@@ -74,15 +74,15 @@ ARG_SPEC_FUNCTION(argumentSpec, Arguments*,
     exit(2);
 }, {
     // Final
-    if (context->target == NULL && context->times.count > 0) {
-        context->times.count--;
-        context->target = context->times.values[context->times.count];
+    if (context->target == NULL && context->files.count > 0) {
+        context->files.count--;
+        context->target = context->files.values[context->files.count];
     }
-    if (context->times.count == 0) {
+    if (context->files.count == 0) {
         const char* option = NULL;
         ARG_WARN("missing file operand");
-    } else if (context->no_dir && context->times.count > 1) {
-        const char* option = context->times.values[1];
+    } else if (context->no_dir && context->files.count > 1) {
+        const char* option = context->files.values[1];
         ARG_WARN("extra operand");
     }
 })
@@ -242,7 +242,7 @@ int main(int argc, const char* const* argv) {
     args.verbose = false;
     args.error = false;
     args.target = NULL;
-    initList(&args.times);
+    initList(&args.files);
     ARG_PARSE_ARGS(argumentSpec, argc, argv, &args);
     bool is_dir = false;
     struct stat dst;
@@ -255,21 +255,21 @@ int main(int argc, const char* const* argv) {
         is_dir = (dst.st_mode & S_IFMT) == S_IFDIR;
     }
     if (is_dir && !args.no_dir) {
-        for (size_t i = 0; i < args.times.count; i++) {
-            char* path = LIST_GET(char*, args.times, i);
+        for (size_t i = 0; i < args.files.count; i++) {
+            char* path = LIST_GET(char*, args.files, i);
             char* new_path = joinPaths(args.target, basename(path));
             copyPath(path, new_path, &args);
             free(new_path);
         }
     } else {
-        if (args.times.count > 1) {
+        if (args.files.count > 1) {
             fprintf(stderr, "%s: target '%s': %s\n", args.prog, args.target, strerror(ENOTDIR));
             exit(1);
         }
-        char* path = LIST_GET(char*, args.times, 0);
+        char* path = LIST_GET(char*, args.files, 0);
         copyPath(path, args.target, &args);
     }
-    deinitListAndContents(&args.times);
+    deinitListAndContents(&args.files);
     free(args.target);
     return args.error ? 1 : 0;
 }

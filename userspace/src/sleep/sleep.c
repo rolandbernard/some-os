@@ -13,7 +13,7 @@
 
 typedef struct {
     const char* prog;
-    List times;
+    List files;
 } Arguments;
 
 ARG_SPEC_FUNCTION(argumentSpec, Arguments*, "sleep <number>[s|m|h|d]...", {
@@ -24,14 +24,18 @@ ARG_SPEC_FUNCTION(argumentSpec, Arguments*, "sleep <number>[s|m|h|d]...", {
     }, "display this help and exit");
 }, {
     // Default
-    copyStringToList(&context->times, value);
+    copyStringToList(&context->files, value);
 }, {
     // Warning
-    fprintf(stderr, "%s: '%s': %s\n", argv[0], option, warning);
+    if (option != NULL) {
+        fprintf(stderr, "%s: '%s': %s\n", argv[0], option, warning);
+    } else {
+        fprintf(stderr, "%s: %s\n", argv[0], warning);
+    }
     exit(2);
 }, {
     // Final
-    if (context->times.count == 0) {
+    if (context->files.count == 0) {
         const char* option = NULL;
         ARG_WARN("missing file operand");
     }
@@ -84,16 +88,16 @@ static uint64_t parseTime(const char* time, Arguments* args) {
 int main(int argc, const char* const* argv) {
     Arguments args;
     args.prog = argv[0];
-    initList(&args.times);
+    initList(&args.files);
     ARG_PARSE_ARGS(argumentSpec, argc, argv, &args);
     uint64_t sleep = 0;
-    for (size_t i = 0; i < args.times.count; i++) {
-        char* time = LIST_GET(char*, args.times, i);
+    for (size_t i = 0; i < args.files.count; i++) {
+        char* time = LIST_GET(char*, args.files, i);
         sleep += parseTime(time, &args);
         free(time);
     }
     sleepFor(sleep);
-    deinitList(&args.times);
+    deinitList(&args.files);
     return 0;
 }
 
