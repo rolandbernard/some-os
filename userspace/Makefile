@@ -4,7 +4,7 @@ include ../config.mk
 # == Config
 TARGETS := init hello systest
 TARGETS += ls basename dirname rm mv cp cat tee
-TARGETS += chmod sleep stat chown head tail
+TARGETS += chmod sleep stat chown head tail touch
 # ==
 
 # == Tools
