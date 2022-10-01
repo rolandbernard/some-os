@@ -117,6 +117,8 @@ typedef struct {
     off_t size;
     time_t time;
     dev_t rdev;
+    uid_t uid;
+    gid_t gid;
     char* name;
 } Entry;
 
@@ -129,6 +131,8 @@ Entry* entryForPath(const char* path, Arguments* args) {
         result->size = stats.st_size;
         result->rdev = stats.st_rdev;
         result->time = stats.st_mtime;
+        result->uid = stats.st_uid;
+        result->gid = stats.st_gid;
     }
     result->name = strdup(basename(path));
     return result;
@@ -226,6 +230,8 @@ void listPath(const char* path, Arguments* args) {
     }
     size_t max_nlink = 0;
     size_t max_size = 0;
+    size_t max_uid = 0;
+    size_t max_gid = 0;
     struct tm* cur_tm = NULL;
     if (args->long_fmt) {
         time_t cur_time = time(NULL);
@@ -236,6 +242,12 @@ void listPath(const char* path, Arguments* args) {
             Entry* entry = LIST_GET(Entry*, entries, i);
             if (entry->nlink > max_nlink) {
                 max_nlink = entry->nlink;
+            }
+            if (entry->uid > max_uid) {
+                max_uid = entry->uid;
+            }
+            if (entry->gid > max_gid) {
+                max_gid = entry->gid;
             }
             if ((size_t)entry->rdev > max_size) {
                 max_size = entry->rdev;
@@ -297,21 +309,25 @@ void listPath(const char* path, Arguments* args) {
             }
             if (entry->rdev != 0) {
                 printf(
-                    "%s %*hu %*u %s %s\n", mode, decimalWidth(max_nlink), entry->nlink,
+                    "%s %*hu %*i %*i %*u %s %s\n", mode, decimalWidth(max_nlink), entry->nlink,
+                    decimalWidth(max_uid), entry->uid, decimalWidth(max_gid), entry->gid,
                     decimalWidth(max_size), entry->rdev, time, entry->name
                 );
             } else {
                 if (args->format == FORMAT_NONE) {
                     printf(
-                        "%s %*hu %*lu %s %s\n", mode, decimalWidth(max_nlink), entry->nlink,
+                        "%s %*hu %*i %*i %*lu %s %s\n", mode, decimalWidth(max_nlink), entry->nlink,
+                        decimalWidth(max_uid), entry->uid, decimalWidth(max_gid), entry->gid,
                         decimalWidth(max_size), entry->size, time, entry->name
                     );
                 } else {
                     const char* unit;
                     size_t fmt_size = formatSize(entry->size, args->format == FORMAT_SI, &unit);
                     printf(
-                        "%s %*hu %*lu%s %s %s\n", mode, decimalWidth(max_nlink), entry->nlink,
-                        decimalWidth(max_size) - (int)strlen(unit), fmt_size, unit, time, entry->name
+                        "%s %*hu %*i %*i %*lu%s %s %s\n", mode, decimalWidth(max_nlink),
+                        entry->nlink, decimalWidth(max_uid), entry->uid, decimalWidth(max_gid),
+                        entry->gid, decimalWidth(max_size) - (int)strlen(unit), fmt_size, unit,
+                        time, entry->name
                     );
                 }
             }

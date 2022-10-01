@@ -87,8 +87,12 @@ Error vfsFileChown(VfsFile* file, Process* process, Uid uid, Gid gid) {
     CHECKED(canAccess(node, process, VFS_ACCESS_CHOWN), {
         unlockTaskLock(&node->lock);
     });
-    node->stat.uid = uid;
-    node->stat.gid = gid;
+    if (uid >= 0) {
+        node->stat.uid = uid;
+    }
+    if (gid >= 0) {
+        node->stat.gid = gid;
+    }
     Error err = vfsSuperWriteNode(node);
     unlockTaskLock(&node->lock);
     return err;
