@@ -61,7 +61,7 @@ static void catFile(const char* path, Arguments* args) {
         tmp_size = fread(buffer, 1, 1024, file);
         size_t left = tmp_size;
         while (left > 0) {
-            left -= fwrite(buffer, 1, tmp_size, stdout);
+            left -= fwrite(buffer + tmp_size - left, 1, left, stdout);
         }
     } while (tmp_size != 0 && !feof(file));
     if (file != stdin) {

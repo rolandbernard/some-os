@@ -27,7 +27,7 @@ typedef struct {
 
 static bool parseCount(const char* count, bool* rev, size_t* out) {
     size_t value = 0;
-    bool neg = *count == '-';
+    bool neg = *count == '+';
     if (neg) {
         count++;
     }
@@ -106,20 +106,20 @@ static bool parseCount(const char* count, bool* rev, size_t* out) {
     return *count == 0;
 }
 
-ARG_SPEC_FUNCTION(argumentSpec, Arguments*, "head [options] <file>...", {
+ARG_SPEC_FUNCTION(argumentSpec, Arguments*, "tail [options] <file>...", {
     // Options
     ARG_VALUED('c', "bytes", {
         context->bytes = true;
         if (!parseCount(value, &context->rev, &context->count)) {
             ARG_WARN("invalid byte count");
         }
-    }, false, "=[-]<number>", "");
+    }, false, "=[+]<number>", "");
     ARG_VALUED('n', "lines", {
         context->bytes = false;
         if (!parseCount(value, &context->rev, &context->count)) {
             ARG_WARN("invalid line count");
         }
-    }, false, "=[-]<number>", "");
+    }, false, "=[+]<number>", "");
     ARG_FLAG('q', "quiet", {
         context->silent = true;
         context->verbose = false;
@@ -172,35 +172,42 @@ static void catFile(const char* path, Arguments* args) {
     if (!args->silent && (args->files.count > 1 || args->verbose)) {
         printf("%s:\n", path);
     }
-    if (!args->rev) {
+    if (args->rev) {
         char buffer[1024];
         size_t tmp_size;
         size_t left = args->count;
-        while (left > 0) {
+        do {
+            char* start = buffer;
             tmp_size = fread(buffer, 1, 1024, file);
-            if (args->bytes) {
-                if (tmp_size > left) {
-                    tmp_size = left;
-                }
-                left -= tmp_size;
-            } else {
-                for (size_t i = 0; i < tmp_size; i++) {
-                    if (buffer[i] == (args->zero ? 0 : '\n')) {
-                        left--;
-                        if (left == 0) {
-                            tmp_size = i + 1;
+            if (left > 0) {
+                if (args->bytes) {
+                    if (tmp_size > left) {
+                        start += left;
+                        tmp_size -= left;
+                        left = 0;
+                    } else {
+                        left -= tmp_size;
+                    }
+                } else {
+                    for (size_t i = 0; i < tmp_size; i++) {
+                        if (buffer[i] == (args->zero ? 0 : '\n')) {
+                            left--;
+                            if (left == 0) {
+                                start += i + 1;
+                                tmp_size -= i + 1;
+                                break;
+                            }
                         }
                     }
                 }
             }
-            size_t tmp_left = tmp_size;
-            while (tmp_left > 0) {
-                tmp_left -= fwrite(buffer + tmp_size - tmp_left, 1, tmp_left, stdout);
+            if (left == 0) {
+                size_t tmp_left = tmp_size;
+                while (tmp_left > 0) {
+                    tmp_left -= fwrite(start + tmp_size - tmp_left, 1, tmp_left, stdout);
+                }
             }
-            if (tmp_size == 0 || feof(file)) {
-                break;
-            }
-        }
+        } while (tmp_size != 0 && !feof(file));
         if (file != stdin) {
             fclose(file);
         }
@@ -223,18 +230,22 @@ static void catFile(const char* path, Arguments* args) {
             }
             buffer_size += tmp_size;
         } while (tmp_size != 0 && !feof(file));
-        size_t left = total - args->count;
+        size_t left = total - (total > args->count ? args->count : total);
         char* next_out = buffer;
-        while (left > 0) {
-            if (args->bytes) {
-                left--;
-            } else {
-                if (*next_out == (args->zero ? 0 : '\n')) {
+        while (buffer_size > 0) {
+            if (left > 0) {
+                if (args->bytes) {
                     left--;
+                } else {
+                    if (*next_out == (args->zero ? 0 : '\n')) {
+                        left--;
+                    }
                 }
+            } else {
+                fputc(*next_out, stdout);
             }
-            fputc(*next_out, stdout);
             next_out++;
+            buffer_size--;
         }
         free(buffer);
     }

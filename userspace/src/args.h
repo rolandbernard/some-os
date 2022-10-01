@@ -121,15 +121,13 @@
                 ACTION; continue;                                                   \
             } else {                                                                \
                 const char* value = NULL;                                           \
-                if (_j == 1) {                                                      \
-                    if (argv[_i][_j + 1] != 0) {                                    \
-                        value = argv[_i] + _j + 1;                                  \
-                        _j = strlen(argv[_i]) - 1;                                  \
-                    } else if (_i + 1 < argc && argv[_i + 1][0] != '-') {           \
-                        value = argv[_i + 1];                                       \
-                        _i++;                                                       \
-                        _j = strlen(argv[_i]) - 1;                                  \
-                    }                                                               \
+                if (argv[_i][_j + 1] != 0) {                                        \
+                    value = argv[_i] + _j + 1;                                      \
+                    _j = strlen(argv[_i]) - 1;                                      \
+                } else if (FOLLOWED && _i + 1 < argc) {                             \
+                    value = argv[_i + 1];                                           \
+                    _i++;                                                           \
+                    _j = strlen(argv[_i]) - 1;                                      \
                 }                                                                   \
                 ACTION; continue;                                                   \
             }                                                                       \
@@ -143,7 +141,7 @@
                     ACTION; continue;                                               \
                 } else {                                                            \
                     const char* value = NULL;                                       \
-                    if (FOLLOWED && _i + 1 < argc && argv[_i + 1][0] != '-') {      \
+                    if (FOLLOWED && _i + 1 < argc) {                                \
                         value = argv[_i + 1];                                       \
                         _i++;                                                       \
                     }                                                               \
