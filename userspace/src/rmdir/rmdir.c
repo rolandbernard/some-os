@@ -21,7 +21,7 @@ typedef struct {
     List files;
 } Arguments;
 
-ARG_SPEC_FUNCTION(argumentSpec, Arguments*, "mkdir [options] <directory>...", {
+ARG_SPEC_FUNCTION(argumentSpec, Arguments*, "rmdir [options] <directory>...", {
     // Options
     ARG_FLAG('p', "parents", {
         context->parents = true;
@@ -52,39 +52,28 @@ ARG_SPEC_FUNCTION(argumentSpec, Arguments*, "mkdir [options] <directory>...", {
     }
 })
 
-static bool mkdirPath(const char* path, Arguments* args) {
+static void rmdirPath(const char* path, Arguments* args) {
     struct stat stats;
-    bool exists = stat(path, &stats) == 0;
-    if (!exists && errno != ENOENT) {
+    if (stat(path, &stats) != 0) {
         args->error = true;
         fprintf(stderr, "%s: target '%s': %s\n", args->prog, path, strerror(errno));
-        return false;
+        return;
     }
-    if (exists && !args->parents) {
+    if (rmdir(path) != 0) {
         args->error = true;
-        fprintf(stderr, "%s: target '%s': %s\n", args->prog, path, strerror(EEXIST));
-        return false;
-    } else if (!exists) {
-        if (args->parents) {
-            char* parent = dirname(path);
-            if ((parent[0] != '/' && parent[0] != '.') || parent[1] != 0) {
-                if (!mkdirPath(parent, args)) {
-                    free(parent);
-                    return false;
-                }
-            }
-            free(parent);
-        }
-        if (mkdir(path, 0777) != 0) {
-            args->error = true;
-            fprintf(stderr, "%s: cannot create '%s': %s\n", args->prog, path, strerror(errno));
-            return false;
-        }
-        if (args->verbose) {
-            printf("created directory '%s'\n", path);
-        }
+        fprintf(stderr, "%s: cannot remove '%s': %s\n", args->prog, path, strerror(errno));
+        return;
     }
-    return true;
+    if (args->verbose) {
+        printf("removed directory '%s'\n", path);
+    }
+    if (args->parents) {
+        char* parent = dirname(path);
+        if ((parent[0] != '/' && parent[0] != '.') || parent[1] != 0) {
+            rmdirPath(parent, args);
+        }
+        free(parent);
+    }
 }
 
 int main(int argc, const char* const* argv) {
@@ -97,7 +86,7 @@ int main(int argc, const char* const* argv) {
     ARG_PARSE_ARGS(argumentSpec, argc, argv, &args);
     for (size_t i = 0; i < args.files.count; i++) {
         char* path = LIST_GET(char*, args.files, i);
-        mkdirPath(path, &args);
+        rmdirPath(path, &args);
         free(path);
     }
     deinitList(&args.files);
