@@ -24,6 +24,28 @@ char* joinPaths(const char* base, const char* name) {
     return result;
 }
 
+char* dirname(const char* full) {
+    char* path = strdup(full);
+    size_t path_len = strlen(path);
+    size_t dir_len = path_len;
+    while (dir_len > 0 && path[dir_len - 1] == '/') {
+        dir_len--;
+    }
+    while (dir_len > 0 && path[dir_len - 1] != '/') {
+        dir_len--;
+    }
+    while (dir_len > 1 && path[dir_len - 1] == '/') {
+        dir_len--;
+    }
+    if (dir_len == 0) {
+        path[0] = '.';
+        path[1] = 0;
+    } else {
+        path[dir_len] = 0;
+    }
+    return path;
+}
+
 const char* basename(const char* path) {
     size_t dir_len = strlen(path);
     while (dir_len > 0 && path[dir_len - 1] == '/') {
