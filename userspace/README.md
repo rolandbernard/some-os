@@ -18,6 +18,7 @@ All ported programs are not in here but either in the toolchain or the programs 
 * env
 * expr
 * find
+* grep
 * head
 * hello
 * init
