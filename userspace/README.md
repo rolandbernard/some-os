@@ -12,7 +12,6 @@ All ported programs are not in here but either in the toolchain or the programs 
 * cmp
 * cp
 * date
-* diff
 * dirname
 * edit
 * env
