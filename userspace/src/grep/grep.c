@@ -64,7 +64,12 @@ static char* readLineFromFile(FILE* file) {
             break;
         }
     }
-    return buffer;
+    if (feof(file) && length == 0) {
+        free(buffer);
+        return NULL;
+    } else {
+        return buffer;
+    }
 }
 
 ARG_SPEC_FUNCTION(argumentSpec, Arguments*, "grep [options] <patterns> [file]...", {
