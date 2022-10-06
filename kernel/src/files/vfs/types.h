@@ -186,7 +186,7 @@ typedef struct {
     VfsNodeUnlinkFunction unlink;           // If this is a directory, remove the entry with name.
     VfsNodeLinkFunction link;               // If this is a directory, add entry at name (overwrite if same entry exists already).
     VfsNodeIoctlFunction ioctl;
-    VfsNodeWillBlockFunction will_block;
+    VfsNodeWillBlockFunction is_ready;
 } VfsNodeFunctions;
 
 typedef struct VfsNode_s {

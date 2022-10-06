@@ -60,15 +60,15 @@ static Error fifoNodeWriteAt(VfsFifoNode* node, VirtPtr buff, size_t offset, siz
     return executePipeOperation(node->data, buff, length, true, written, block);
 }
 
-static bool fifoNodeWillBlock(VfsFifoNode* node, bool write) {
-    return pipeWillBlock(node->data, write);
+static bool fifoNodeIsReady(VfsFifoNode* node, bool write) {
+    return pipeIsReady(node->data, write);
 }
 
 static const VfsNodeFunctions funcs = {
     .free = (VfsNodeFreeFunction)fifoNodeFree,
     .read_at = (VfsNodeReadAtFunction)fifoNodeReadAt,
     .write_at = (VfsNodeWriteAtFunction)fifoNodeWriteAt,
-    .will_block = (VfsNodeWillBlockFunction)fifoNodeWillBlock,
+    .is_ready = (VfsNodeWillBlockFunction)fifoNodeIsReady,
 };
 
 VfsFifoNode* createFifoNode(char* path, VfsNode* real_node, bool for_write) {

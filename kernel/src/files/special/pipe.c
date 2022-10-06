@@ -241,27 +241,27 @@ static Error pipeNodeWriteAt(VfsPipeNode* node, VirtPtr buff, size_t offset, siz
     return executePipeOperation(node->data, buff, length, true, written, block);
 }
 
-bool pipeWillBlock(PipeSharedData* data, bool write) {
+bool pipeIsReady(PipeSharedData* data, bool write) {
     bool result;
     lockSpinLock(&data->lock);
     if (write) {
-        result = currentWriteCapacity(data) == 0;
+        result = currentWriteCapacity(data) != 0;
     } else {
-        result = currentReadCapacity(data) == 0 && data->write_count > 0;
+        result = currentReadCapacity(data) != 0 || data->write_count == 0;
     }
     unlockSpinLock(&data->lock);
     return result;
 }
 
-static bool pipeNodeWillBlock(VfsPipeNode* node, bool write) {
-    return pipeWillBlock(node->data, write);
+static bool pipeNodeIsReady(VfsPipeNode* node, bool write) {
+    return pipeIsReady(node->data, write);
 }
 
 static const VfsNodeFunctions funcs = {
     .free = (VfsNodeFreeFunction)pipeNodeFree,
     .read_at = (VfsNodeReadAtFunction)pipeNodeReadAt,
     .write_at = (VfsNodeWriteAtFunction)pipeNodeWriteAt,
-    .will_block = (VfsNodeWillBlockFunction)pipeNodeWillBlock,
+    .is_ready = (VfsNodeWillBlockFunction)pipeNodeIsReady,
 };
 
 VfsPipeNode* createPipeNode(PipeSharedData* data, bool for_write) {

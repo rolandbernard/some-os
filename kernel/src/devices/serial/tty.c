@@ -350,15 +350,15 @@ static Error uartTtyIoctlFunction(UartTtyDevice* dev, size_t request, VirtPtr ar
     return error;
 }
 
-static bool uartTtyWillBlockFunction(UartTtyDevice* dev, bool write) {
-    return !write && !canReturnRead(dev);
+static bool uartTtyIsReadyFunction(UartTtyDevice* dev, bool write) {
+    return write || (canReturnRead(dev) && dev->buffer_count > 0);
 }
 
 static const CharDeviceFunctions funcs = {
     .read = (CharDeviceReadFunction)uartTtyReadFunction,
     .write = (CharDeviceWriteFunction)uartTtyWriteFunction,
     .ioctl = (CharDeviceIoctlFunction)uartTtyIoctlFunction,
-    .will_block = (CharDeviceWillBlockFunction)uartTtyWillBlockFunction,
+    .is_ready = (CharDeviceWillBlockFunction)uartTtyIsReadyFunction,
 };
 
 UartTtyDevice* createUartTtyDevice(void* uart, UartWriteFunction write, UartReadFunction read) {

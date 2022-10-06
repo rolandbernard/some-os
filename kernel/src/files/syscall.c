@@ -465,7 +465,7 @@ static bool handleSelectWakeup(Task* task, void* _) {
                 task->frame.regs[REG_ARGUMENT_0] = -EBADF;
                 return true;
             } else {
-                if (!vfsFileWillBlock(desc->file, task->process, false)) {
+                if (vfsFileIsReady(desc->file, task->process, false)) {
                     num_ready++;
                 } else {
                     reads &= ~(1UL << i);
@@ -478,7 +478,7 @@ static bool handleSelectWakeup(Task* task, void* _) {
                 task->frame.regs[REG_ARGUMENT_0] = -EBADF;
                 return true;
             } else {
-                if (!vfsFileWillBlock(desc->file, task->process, true)) {
+                if (vfsFileIsReady(desc->file, task->process, true)) {
                     num_ready++;
                 } else {
                     writes &= ~(1UL << i);
