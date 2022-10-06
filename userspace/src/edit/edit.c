@@ -1,9 +1,11 @@
 
+#include <ctype.h>
 #include <dirent.h>
 #include <errno.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <sys/fcntl.h>
+#include <sys/ioctl.h>
 #include <sys/stat.h>
 #include <sys/types.h>
 #include <termios.h>
@@ -57,10 +59,17 @@ typedef struct {
 } TextLine;
 
 typedef struct {
+    const char* path;
+    const char* status;
     TextLine* lines;
     size_t line_count;
     size_t cursor_row;
     size_t cursor_column;
+    size_t view_row;
+    size_t view_column;
+    size_t width;
+    size_t height;
+    bool changed;
 } EditorState;
 
 static void insertNewLine(EditorState* state, size_t pos, char* line) {
@@ -78,19 +87,76 @@ static void setupDisplay() {
     tcgetattr(STDIN_FILENO, &oldterm);
     newterm = oldterm;
     newterm.c_lflag &= ~(ICANON | ECHO | ISIG);
-    newterm.c_cc[VMIN] = 0;
+    newterm.c_cc[VMIN] = 1;
     newterm.c_cc[VTIME] = 0;
     tcsetattr(STDIN_FILENO, 0, &newterm);
+    setvbuf(stdout, malloc(1 << 16), _IOFBF, 1 << 16);
     printf("\e7\e[6 q\e[?47h\e[2J\e[H");
+    fflush(stdout);
 }
 
 static void restoreDisplay() {
-    printf("\e[?47l\e[ q\e8");
+    printf("\e[?25h\e[?47l\e[ q\e8");
+    fflush(stdout);
     tcsetattr(STDIN_FILENO, 0, &oldterm);
 }
 
-static void displayEditor(EditorState* state) {
+static void getTerminalSize(EditorState* state) {
+    printf("\e[999;999H\e[6n\e[%lu;%luH", state->cursor_row + 1, state->cursor_column + 1);
+    fflush(stdout);
+    scanf("\e[%lu;%luR", &state->height, &state->width);
+}
 
+static void moveView(EditorState* state) {
+    if (state->cursor_column < state->view_column) {
+        state->view_column = state->cursor_column;
+    }
+    if (state->cursor_column - state->view_column >= state->width - 1) {
+        state->view_column = state->cursor_column - state->width + 1;
+    }
+    if (state->cursor_row < state->view_row) {
+        state->view_row = state->cursor_row;
+    }
+    if (state->cursor_row - state->view_row >= state->height - 2) {
+        state->view_row = state->cursor_row - state->height + 2;
+    }
+}
+
+static void displayEditor(EditorState* state) {
+    printf("\e[?25l");
+    getTerminalSize(state);
+    moveView(state);
+    printf("\e[H\e[J");
+    for (size_t i = 0; i < state->height - 1; i++) {
+        for (size_t j = 0; j < state->width; j++) {
+            size_t row = state->view_row + i;
+            size_t col = state->view_column + j;
+            if (row < state->line_count && j == 0 && col != 0) {
+                fputc('<', stdout);
+            } else if (row < state->line_count && col < state->lines[row].length) {
+                if (j == state->width - 1) {
+                    fputc('>', stdout);
+                } else {
+                    fputc(state->lines[row].text[col], stdout);
+                }
+            } else {
+                break;
+            }
+        }
+        fputc('\n', stdout);
+    }
+    printf(
+        " %*lu:%lu  %s  %s", decimalWidth(state->line_count), state->cursor_row + 1,
+        state->cursor_column + 1, state->path, strerror(errno)
+    );
+    if (strlen(state->status) != 0) {
+        printf(" (%s)", state->status);
+    }
+    printf(
+        "\e[%lu;%luH\e[?25h", state->cursor_row - state->view_row + 1,
+        state->cursor_column - state->view_column + 1
+    );
+    fflush(stdout);
 }
 
 static char* readLineFromFile(FILE* file) {
@@ -112,41 +178,162 @@ static char* readLineFromFile(FILE* file) {
     }
 }
 
-static void loadFile(EditorState* state, const char* path) {
-    FILE* file = fopen(path, "r");
-    if (file == NULL) {
-        if (errno != ENOENT) {
-            fprintf(stderr, "%s: cannot open '%s': %s\n", args.prog, path, strerror(errno));
-            exit(1);
-        }
-    } else {
-        while (!feof(file)) {
-            char* line = readLineFromFile(file);
-            if (line != NULL) {
-                insertNewLine(state, state->line_count, line);
-            }
-        }
-        fclose(file);
+static void loadFile(EditorState* state) {
+    FILE* file = fopen(state->path, "r");
+    if (file == NULL && errno == ENOENT) {
+        file = fopen(state->path, "w+");
+        state->status = "created a new file";
     }
+    if (file == NULL) {
+        fprintf(stderr, "%s: cannot open '%s': %s\n", args.prog, state->path, strerror(errno));
+        exit(1);
+    }
+    while (!feof(file)) {
+        char* line = readLineFromFile(file);
+        if (line != NULL) {
+            insertNewLine(state, state->line_count, line);
+        }
+    }
+    fclose(file);
 }
 
-static void writeFile(EditorState* state, const char* path) {
-
+static void writeFile(EditorState* state) {
+    FILE* file = fopen(state->path, "w");
+    if (file == NULL) {
+        state->status = "failed to save";
+        return;
+    }
+    for (size_t i = 0; i < state->line_count; i++) {
+        fwrite(state->lines[i].text, 1, state->lines[i].length, file);
+        fputc('\n', file);
+    }
+    fclose(file);
+    state->status = "saved";
 }
 
-static bool handleChar(EditorState* state, char c) {
-    return c == 4;
+#define CTRL(CHAR) (CHAR + 1 - 'A')
+#define DEL 0x7f
+#define UP 'A'
+#define DOWN 'B'
+#define RIGHT 'C'
+#define LEFT 'D'
+
+static void insertText(EditorState* state, size_t len, const char* text) {
+    TextLine* line = &state->lines[state->cursor_row];
+    line->text = realloc(line->text, line->length + len);
+    memmove(
+        line->text + state->cursor_column + len, line->text + state->cursor_column,
+        line->length - state->cursor_column
+    );
+    memcpy(line->text + state->cursor_column, text, len);
+    state->cursor_column += len;
+    line->length += len;
 }
 
-static void waitForInput() {
-    fd_set read;
-    FD_ZERO(&read);
-    FD_SET(STDIN_FILENO, &read);
-    fd_set write;
-    FD_ZERO(&write);
-    fd_set error;
-    FD_ZERO(&error);
-    select(STDIN_FILENO + 1, &read, &write, &error, NULL);
+static bool isInputAvail() {
+    int num;
+    ioctl(STDIN_FILENO, FIONREAD, &num);
+    return num != 0;
+}
+
+static int readChar() {
+    char c;
+    while (read(STDIN_FILENO, &c, 1) != 1);
+    return c;
+}
+
+static void changedState(EditorState* state) {
+    state->changed = true;
+}
+
+static bool handleInput(EditorState* state) {
+    do {
+        int c = readChar();
+        if (c == CTRL('S')) {
+            writeFile(state);
+            changedState(state);
+        } else if (c == '\b' || c == DEL) {
+            if (state->cursor_column == 0) {
+                if (state->cursor_row != 0) {
+                    state->cursor_row--;
+                    TextLine* prev = &state->lines[state->cursor_row];
+                    TextLine* next = &state->lines[state->cursor_row + 1];
+                    prev->text = realloc(prev->text, prev->length + next->length);
+                    memcpy(prev->text + prev->length, next->text, next->length);
+                    state->cursor_column = prev->length;
+                    prev->length += next->length;
+                    free(next->text);
+                    memmove(next, next + 1, (state->line_count - state->cursor_row - 2) * sizeof(TextLine));
+                    state->line_count--;
+                    changedState(state);
+                }
+            } else {
+                state->cursor_column--;
+                TextLine* line = &state->lines[state->cursor_row];
+                memmove(
+                    line->text + state->cursor_column, line->text + state->cursor_column + 1,
+                    line->length - state->cursor_column - 1
+                );
+                line->length--;
+                changedState(state);
+            }
+        } else if (c == '\n') {
+            state->cursor_row++;
+            state->lines = realloc(state->lines, (state->line_count + 1) * sizeof(TextLine));
+            TextLine* prev = &state->lines[state->cursor_row - 1];
+            TextLine* next = &state->lines[state->cursor_row];
+            memmove(next + 1, next, (state->line_count - state->cursor_row) * sizeof(TextLine));
+            next->length = prev->length - state->cursor_column;
+            next->text = malloc(next->length);
+            prev->length -= next->length;
+            memcpy(next->text, prev->text + prev->length, next->length);
+            state->cursor_column = 0;
+            state->line_count++;
+            changedState(state);
+        } else if (c == '\t') {
+            insertText(state, 4, "    ");
+            changedState(state);
+        } else if (isprint(c)) {
+            char str[1] = { c };
+            insertText(state, 1, str);
+            changedState(state);
+        } else if (c == '\e' && readChar() == '[') {
+            c = readChar();
+            if (c == RIGHT) {
+                if (state->cursor_column < state->lines[state->cursor_row].length) {
+                    state->cursor_column++;
+                    changedState(state);
+                }
+            } else if (c == LEFT) {
+                if (state->cursor_column > 0) {
+                    state->cursor_column--;
+                    changedState(state);
+                }
+            } else if (c == UP) {
+                if (state->cursor_row > 0) {
+                    state->cursor_row--;
+                    if (state->lines[state->cursor_row].length < state->cursor_column) {
+                        state->cursor_column = state->lines[state->cursor_row].length;
+                    }
+                    changedState(state);
+                }
+            } else if (c == DOWN) {
+                if (state->cursor_row < state->line_count - 1) {
+                    state->cursor_row++;
+                    if (state->lines[state->cursor_row].length < state->cursor_column) {
+                        state->cursor_column = state->lines[state->cursor_row].length;
+                    }
+                    changedState(state);
+                }
+            }
+            while (!isalpha(c)) {
+                c = readChar();
+            }
+        } else if (c == CTRL('C') || c == CTRL('D') || c == CTRL('X')) {
+            return true;
+        }
+    } while (isInputAvail());
+    return false;
 }
 
 int main(int argc, const char* const* argv) {
@@ -154,27 +341,30 @@ int main(int argc, const char* const* argv) {
     args.file = NULL;
     ARG_PARSE_ARGS(argumentSpec, argc, argv, &args);
     EditorState state = {
+        .path = args.file,
+        .status = "",
         .lines = NULL,
         .line_count = 0,
         .cursor_column = 0,
         .cursor_row = 0,
+        .view_column = 0,
+        .view_row = 0,
+        .width = 999,
+        .height = 999,
+        .changed = true,
     };
-    loadFile(&state, args.file);
+    loadFile(&state);
     atexit(restoreDisplay);
     setupDisplay();
     for (;;) {
-        waitForInput();
-        char buffer[512];
-        size_t len = read(STDIN_FILENO, buffer, 512);
-        for (size_t i = 0; i < len; i++) {
-            if (handleChar(&state, buffer[i])) {
-                break;
-            }
+        if (state.changed) {
+            displayEditor(&state);
+            state.changed = false;
         }
-        displayEditor(&state);
+        if (handleInput(&state)) {
+            exit(1);
+        }
     }
-    restoreDisplay();
-    writeFile(&state, args.file);
     return 0;
 }
 
