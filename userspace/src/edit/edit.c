@@ -108,11 +108,15 @@ static void getTerminalSize(EditorState* state) {
 }
 
 static void moveView(EditorState* state) {
+    int line_nums = decimalWidth(state->line_count) + 2;
+    if (line_nums < 4) {
+        line_nums = 4;
+    }
     if (state->cursor_column < state->view_column) {
         state->view_column = state->cursor_column;
     }
-    if (state->cursor_column - state->view_column >= state->width - 1) {
-        state->view_column = state->cursor_column - state->width + 1;
+    if (state->cursor_column - state->view_column >= state->width - line_nums - 1) {
+        state->view_column = state->cursor_column - state->width + line_nums + 1;
     }
     if (state->cursor_row < state->view_row) {
         state->view_row = state->cursor_row;
@@ -126,24 +130,29 @@ static void displayEditor(EditorState* state) {
     printf("\e[?25l");
     getTerminalSize(state);
     moveView(state);
-    printf("\e[H\e[J");
+    printf("\e[H");
+    int line_nums = decimalWidth(state->line_count) + 2;
+    if (line_nums < 4) {
+        line_nums = 4;
+    }
     for (size_t i = 0; i < state->height - 1; i++) {
-        for (size_t j = 0; j < state->width; j++) {
-            size_t row = state->view_row + i;
-            size_t col = state->view_column + j;
-            if (row < state->line_count && j == 0 && col != 0) {
-                fputc('<', stdout);
-            } else if (row < state->line_count && col < state->lines[row].length) {
-                if (j == state->width - 1) {
-                    fputc('>', stdout);
+        size_t row = state->view_row + i;
+        if (row < state->line_count) {
+            printf("\e[90m%*lu\e[m %c", line_nums - 2, row + 1, state->view_column != 0 ? '<' : ' ');
+            for (size_t j = 0; j < state->width - line_nums; j++) {
+                size_t col = state->view_column + j;
+                if (col < state->lines[row].length) {
+                    if (j == state->width - line_nums - 1) {
+                        fputc('>', stdout);
+                    } else {
+                        fputc(state->lines[row].text[col], stdout);
+                    }
                 } else {
-                    fputc(state->lines[row].text[col], stdout);
+                    break;
                 }
-            } else {
-                break;
             }
         }
-        fputc('\n', stdout);
+        printf("\e[K\n");
     }
     printf(
         " %*lu:%lu  %s  %s", decimalWidth(state->line_count), state->cursor_row + 1,
@@ -154,7 +163,7 @@ static void displayEditor(EditorState* state) {
     }
     printf(
         "\e[%lu;%luH\e[?25h", state->cursor_row - state->view_row + 1,
-        state->cursor_column - state->view_column + 1
+        state->cursor_column - state->view_column + 1 + line_nums
     );
     fflush(stdout);
 }
@@ -211,7 +220,7 @@ static void writeFile(EditorState* state) {
     state->status = "saved";
 }
 
-#define CTRL(CHAR) (CHAR + 1 - 'A')
+#define C(CHAR) (CHAR + 1 - 'A')
 #define DEL 0x7f
 #define UP 'A'
 #define DOWN 'B'
@@ -249,7 +258,7 @@ static void changedState(EditorState* state) {
 static bool handleInput(EditorState* state) {
     do {
         int c = readChar();
-        if (c == CTRL('S')) {
+        if (c == C('S')) {
             writeFile(state);
             changedState(state);
         } else if (c == '\b' || c == DEL) {
@@ -329,7 +338,7 @@ static bool handleInput(EditorState* state) {
             while (!isalpha(c)) {
                 c = readChar();
             }
-        } else if (c == CTRL('C') || c == CTRL('D') || c == CTRL('X')) {
+        } else if (c == C('C') || c == C('D') || c == C('X')) {
             return true;
         }
     } while (isInputAvail());
@@ -362,7 +371,7 @@ int main(int argc, const char* const* argv) {
             state.changed = false;
         }
         if (handleInput(&state)) {
-            exit(1);
+            exit(0);
         }
     }
     return 0;
