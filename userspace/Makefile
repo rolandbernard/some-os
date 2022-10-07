@@ -6,7 +6,7 @@ TARGETS := init hello systest
 TARGETS += ls basename dirname rm mv cp cat tee
 TARGETS += chmod sleep stat chown head tail touch
 TARGETS += mkdir rmdir wc date cmp env ln link
-TARGETS += unlink find grep sort edit clear
+TARGETS += unlink find grep sort edit clear expr
 # ==
 
 # == Tools
