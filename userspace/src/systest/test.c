@@ -278,14 +278,25 @@ static bool testSignal() {
 }
 
 static bool testGetpid() {
-    // Note: This is run as the first child of init.
-    ASSERT(getpid() == 2);
+    ASSERT(getpid() > 1);
     return true;
 }
 
 static bool testGetppid() {
-    // Note: This is run as a child of init.
-    ASSERT(getppid() == 1);
+    int parent = getpid();
+    int child = fork();
+    ASSERT(child != -1);
+    if (child == 0) {
+        ASSERT_CHILD(getppid() == parent);
+        exit(getpid());
+    } else {
+        int status;
+        int wait_pid = wait(&status);
+        ASSERT(wait_pid == child);
+        ASSERT(WIFEXITED(status));
+        ASSERT(!WIFSIGNALED(status));
+        ASSERT(WEXITSTATUS(status) == child);
+    }
     return true;
 }
 

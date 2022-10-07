@@ -7,7 +7,7 @@
 
 #ifdef DEBUG
 #define ASSERT(COND, ...) \
-    { if (!(COND)) { panic(KERNEL_ERROR("Assertion failed: %s", IFE(__VA_ARGS__)(#COND) __VA_ARGS__)); } }
+    { if (!(COND)) { panic("Assertion failed: %s", IFE(__VA_ARGS__)(#COND) __VA_ARGS__); } }
 #else
 #define ASSERT(COND, ...) { /* NOOP */ }
 #endif

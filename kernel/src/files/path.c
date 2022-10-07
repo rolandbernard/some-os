@@ -92,6 +92,9 @@ char* stringClone(const char* path) {
 char* getParentPath(const char* path) {
     char* path_copy = stringClone(path);
     size_t len = strlen(path_copy) - 1;
+    while (len > 0 && path_copy[len] == '/') {
+        len--;
+    }
     while (len > 0 && path_copy[len] != '/') {
         len--;
     }
@@ -105,15 +108,24 @@ char* getParentPath(const char* path) {
     return path_copy;
 }
 
-const char* getBaseFilename(const char* path) {
-    size_t len = strlen(path) - 1;
+char* getBaseFilename(const char* path) {
+    char* path_copy = stringClone(path);
+    size_t path_len = strlen(path);
+    size_t len = path_len - 1;
+    while (len > 0 && path_copy[len] == '/') {
+        len--;
+    }
     while (len > 0 && path[len] != '/') {
         len--;
     }
     if (path[len] == '/') {
-        return path + len + 1;
-    } else {
-        return path + len;
+        len++;
     }
+    memcpy(path_copy, path + len, path_len - len);
+    while (path_copy[path_len - len - 1] == '/') {
+        len++;
+    }
+    path_copy[path_len - len] = 0;
+    return path_copy;
 }
 

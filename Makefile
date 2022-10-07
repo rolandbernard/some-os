@@ -29,10 +29,11 @@ QEMU_ARGS += -device virtio-blk-device,scsi=off,drive=disk0
 
 .PHONY: build clean qemu $(SUBS)
 
-build: $(TARGET.kernel) $(TARGET.userspace)
+build: $(TARGET.kernel) $(TARGET.userspace) $(TARGET.programs)
 
 $(TARGET.userspace): $(TARGET.toolchain) FORCE
 $(TARGET.kernel): $(TARGET.toolchain) FORCE
+$(TARGET.programs): $(TARGET.toolchain)
 
 $(BUILD_DIR)/%.flag:
 	@$(ECHO) "Building $*"
@@ -43,8 +44,9 @@ $(TARGET.sysroot): $(TARGET.userspace) $(TARGET.programs) $(MAKEFILE_LIST)
 	mkdir -p $(SYSROOT_DIR)/dev
 	mkdir -p $(SYSROOT_DIR)/bin
 	cp -r $(USERSPACE_DIR)/build/$(BUILD)/bin/* $(SYSROOT_DIR)/bin
-	echo -e "PS1='[\h \w]$$ '" > $(SYSROOT_DIR)/.bashrc
-	echo -e "HOME='/'" >> $(SYSROOT_DIR)/.bashrc
+	echo -e "export PS1='[\h \w]$$ '" > $(SYSROOT_DIR)/.bashrc
+	echo -e "export HOME='/'" >> $(SYSROOT_DIR)/.bashrc
+	echo -e "export PATH" >> $(SYSROOT_DIR)/.bashrc
 	touch $@
 
 $(DISK): $(TARGET.sysroot) | $(MOUNT_DIR)/

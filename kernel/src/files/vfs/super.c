@@ -99,7 +99,9 @@ Error vfsSuperCloseNode(VfsNode* node) {
                     // There are no other links to this node, we should free the data.
                     CHECKED(vfsSuperFreeNode(node));
                 }
-                err = node->superblock->functions->write_node(node->superblock, node);
+                if (node->dirty) {
+                    err = node->superblock->functions->write_node(node->superblock, node);
+                }
                 node->functions->free(node);
                 vfsSuperClose(sb);
             }

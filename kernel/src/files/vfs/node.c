@@ -113,11 +113,11 @@ Error vfsNodeIoctl(VfsNode* node, Process* process, size_t request, VirtPtr argp
     }
 }
 
-bool vfsNodeWillBlock(VfsNode* node, Process* process, bool write) {
-    if (node->functions->will_block == NULL) {
-        return false; // By default, assume we don't block (e.g. regular/block files)
+bool vfsNodeIsReady(VfsNode* node, Process* process, bool write) {
+    if (node->functions->is_ready == NULL) {
+        return true; // By default, assume we don't block (e.g. regular/block files)
     } else {
-        return node->functions->will_block(node, write);
+        return node->functions->is_ready(node, write);
     }
 }
 

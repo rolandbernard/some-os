@@ -59,9 +59,9 @@ Error minixWriteNode(MinixVfsSuperblock* sb, MinixVfsNode* write) {
         .uid = write->base.stat.uid,
         .gid = write->base.stat.gid,
         .size = write->base.stat.size,
-        .atime = write->base.stat.atime,
-        .mtime = write->base.stat.mtime,
-        .ctime = write->base.stat.ctime,
+        .atime = write->base.stat.atime / 1000000000UL,
+        .mtime = write->base.stat.mtime / 1000000000UL,
+        .ctime = write->base.stat.ctime / 1000000000UL,
     };
     unlockTaskLock(&write->base.lock);
     lockTaskLock(&write->lock);

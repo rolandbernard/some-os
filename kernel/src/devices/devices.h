@@ -48,7 +48,7 @@ typedef struct {
     CharDeviceReadFunction read;
     CharDeviceWriteFunction write;
     CharDeviceIoctlFunction ioctl;
-    CharDeviceWillBlockFunction will_block;
+    CharDeviceWillBlockFunction is_ready;
 } CharDeviceFunctions;
 
 typedef struct CharDevice_s {

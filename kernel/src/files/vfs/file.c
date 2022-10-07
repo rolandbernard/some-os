@@ -87,8 +87,12 @@ Error vfsFileChown(VfsFile* file, Process* process, Uid uid, Gid gid) {
     CHECKED(canAccess(node, process, VFS_ACCESS_CHOWN), {
         unlockTaskLock(&node->lock);
     });
-    node->stat.uid = uid;
-    node->stat.gid = gid;
+    if (uid >= 0) {
+        node->stat.uid = uid;
+    }
+    if (gid >= 0) {
+        node->stat.gid = gid;
+    }
     Error err = vfsSuperWriteNode(node);
     unlockTaskLock(&node->lock);
     return err;
@@ -109,12 +113,8 @@ Error vfsFileIoctl(VfsFile* file, Process* process, size_t request, VirtPtr argp
     return vfsNodeIoctl(file->node, process, request, argp, out);
 }
 
-bool vfsFileWillBlock(VfsFile* file, Process* process, bool write) {
-    if ((file->flags & VFS_FILE_NONBLOCK) != 0) {
-        return false;
-    } else {
-        return vfsNodeWillBlock(file->node, process, write);
-    }
+bool vfsFileIsReady(VfsFile* file, Process* process, bool write) {
+    return vfsNodeIsReady(file->node, process, write);
 }
 
 void vfsFileCopy(VfsFile* file) {

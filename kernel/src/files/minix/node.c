@@ -342,8 +342,17 @@ static Error minixLink(MinixVfsNode* node, const char* name, MinixVfsNode* entry
     entry.name[name_len] = 0;
     size_t tmp_size;
     lockTaskLock(&node->lock);
+    uint32_t inodenum;
+    size_t offset;
+    Error err = minixInternalLookup(node, name, &inodenum, &offset);
+    if (err.kind == ENOENT) {
+        offset = node->base.stat.size;
+    } else if (isError(err)) {
+        unlockTaskLock(&node->lock);
+        return err;
+    }
     CHECKED(
-        minixWriteAt(node, virtPtrForKernel(&entry), node->base.stat.size, sizeof(MinixDirEntry), &tmp_size, true),
+        minixWriteAt(node, virtPtrForKernel(&entry), offset, sizeof(MinixDirEntry), &tmp_size, true),
         unlockTaskLock(&node->lock)
     );
     unlockTaskLock(&node->lock);

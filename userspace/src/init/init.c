@@ -59,11 +59,13 @@ noreturn void idleLoop() {
 int main(int argc, char* argv[], char* env[]) {
     setupTty();
     USPACE_SUCCESS("Started init process");
+#ifdef INIT_RUN_SYSTEST
     if (runProgram("/bin/systest") == 0) {
         USPACE_SUCCESS("Finished basic syscall tests");
     } else {
         USPACE_WARNING("Failed basic syscall tests");
     }
+#endif
     setupSystem();
     USPACE_SUCCESS("Finished system setup");
     idleLoop();

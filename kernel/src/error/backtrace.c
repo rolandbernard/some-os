@@ -1,10 +1,13 @@
 
+#include <string.h>
 #include <unwind.h>
 
-#include "error/backtrace.h"
-
-#include "error/log.h"
 #include "error/debuginfo.h"
+#include "error/log.h"
+#include "error/panic.h"
+#include "task/syscall.h"
+
+#include "error/backtrace.h"
 
 void __register_frame(const void* begin);
 
@@ -57,13 +60,28 @@ _Unwind_Reason_Code unwindTracingFunction(struct _Unwind_Context *ctx, void *uda
     return _URC_NO_REASON;
 }
 
-void logBacktrace() {
+void logBacktraceSkipping(int depth) {
     if (!initialized) {
         initBacktrace();
     }
     UnwindTraceData data = {
-        .depth = 0,
+        .depth = -depth,
     };
     _Unwind_Backtrace(unwindTracingFunction, &data);
+}
+
+void logBacktrace() {
+    logBacktraceSkipping(1);
+}
+
+static void magicLogBacktrace() {
+    logBacktraceSkipping(2);
+}
+
+void magicCfiIndirect(TrapFrame* frame, void* calling);
+
+// Magic that will log the backtrace for the given frame.
+void logBacktraceFor(TrapFrame* frame) {
+    magicCfiIndirect(frame, magicLogBacktrace);
 }
 
