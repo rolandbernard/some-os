@@ -9,6 +9,7 @@ All ported programs are not in here but either in the toolchain or the programs 
 * cat
 * chmod
 * chown
+* clear
 * cmp
 * cp
 * date
