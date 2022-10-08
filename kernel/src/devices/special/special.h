@@ -7,4 +7,6 @@ Error registerNullDevice();
 
 Error registerZeroDevice();
 
+Error registerRandomDevice();
+
 #endif
