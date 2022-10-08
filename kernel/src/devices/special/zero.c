@@ -4,8 +4,9 @@
 
 #include "devices/special/special.h"
 
-static Error nullReadFunction(CharDevice* dev, VirtPtr buffer, size_t size, size_t* read, bool block) {
-    *read = 0;
+static Error zeroReadFunction(CharDevice* dev, VirtPtr buffer, size_t size, size_t* read, bool block) {
+    memsetVirtPtr(buffer, 0, size);
+    *read = size;
     return simpleError(SUCCESS);
 }
 
@@ -14,14 +15,14 @@ static Error nullWriteFunction(CharDevice* dev, VirtPtr buffer, size_t size, siz
 }
 
 static const CharDeviceFunctions funcs = {
-    .read = nullReadFunction,
+    .read = zeroReadFunction,
     .write = nullWriteFunction,
 };
 
-Error registerNullDevice() {
+Error registerZeroDevice() {
     CharDevice* dev = kalloc(sizeof(CharDevice));
     dev->base.type = DEVICE_CHAR;
-    dev->base.name = "null";
+    dev->base.name = "zero";
     dev->functions = &funcs;
     registerDevice((Device*)dev);
     return simpleError(SUCCESS);

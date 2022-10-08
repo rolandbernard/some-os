@@ -5,7 +5,7 @@
 
 #include "devices/driver.h"
 #include "devices/serial/uart16550.h"
-#include "devices/special/null.h"
+#include "devices/special/special.h"
 #include "devices/virtio/block.h"
 #include "devices/virtio/virtio.h"
 #include "memory/kalloc.h"
@@ -108,6 +108,7 @@ Error initInterruptDevice() {
 
 Error initDevices() {
     CHECKED(registerNullDevice());
+    CHECKED(registerZeroDevice());
     return initDriversForDeviceTreeNodes();
 }
 
