@@ -162,7 +162,7 @@ static void displayEditor(EditorState* state) {
         printf(" (%s)", state->status);
     }
     printf(
-        "\e[%lu;%luH\e[?25h", state->cursor_row - state->view_row + 1,
+        "\e[K\e[%lu;%luH\e[?25h", state->cursor_row - state->view_row + 1,
         state->cursor_column - state->view_column + 1 + line_nums
     );
     fflush(stdout);
@@ -223,6 +223,7 @@ static void writeFile(EditorState* state) {
     }
     fclose(file);
     state->status = "saved";
+    errno = 0;
 }
 
 #define C(CHAR) (CHAR + 1 - 'A')
@@ -263,7 +264,7 @@ static void changedState(EditorState* state) {
 static bool handleInput(EditorState* state) {
     do {
         int c = readChar();
-        if (c == C('S')) {
+        if (c == C('S') || c == C('Y')) {
             writeFile(state);
             changedState(state);
         } else if (c == '\b' || c == DEL) {
