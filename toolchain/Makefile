@@ -31,9 +31,7 @@ PROJ_NAME.newlib-no-headers  := newlib
 BUILD_REQ.newlib-no-headers  := gcc-no-headers binutils-no-headers
 CONF_ARGS.newlib-no-headers  := --prefix=/
 INST_ARGS.newlib-no-headers  := DESTDIR=$(SYSROOT_DIR) install
-POST_BUILD.newlib-no-headers := cp -ar $(SYSROOT_DIR)/$(TARGET)/* $(SYSROOT_DIR)/ \
-	&& rm -rf $(SYSROOT_DIR)/$(TARGET) \
-	&& cp $(BUILD_DIR)/newlib/crt0.o $(SYSROOT_DIR)/$(TARGET)/lib
+POST_BUILD.newlib-no-headers := cp -ar $(SYSROOT_DIR)/$(TARGET)/* $(SYSROOT_DIR)/ && rm -rf $(SYSROOT_DIR)/$(TARGET)
 # ==
 
 # == gcc
