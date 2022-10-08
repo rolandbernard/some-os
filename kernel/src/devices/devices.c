@@ -109,6 +109,7 @@ Error initInterruptDevice() {
 Error initDevices() {
     CHECKED(registerNullDevice());
     CHECKED(registerZeroDevice());
+    CHECKED(registerRandomDevice());
     return initDriversForDeviceTreeNodes();
 }
 
