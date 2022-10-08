@@ -29,6 +29,7 @@ All ported programs are not in here but either in the toolchain or the programs 
 * mv
 * rm
 * rmdir
+* seq
 * sleep
 * sort
 * stat
