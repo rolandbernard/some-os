@@ -13,25 +13,30 @@
 Error initVirtIODevice(uintptr_t base_address, ExternalInterrupt itr_id) {
     volatile VirtIODeviceLayout* address = (VirtIODeviceLayout*)base_address;
     VirtIODeviceType type = address->device_id;
-    if (address->magic_value == VIRTIO_MAGIC_NUMBER && type != 0) {
-        if (type == VIRTIO_BLOCK) {
-            Error error = initVirtIOBlockDevice(address, itr_id);
-            if (isError(error)) {
-                KERNEL_ERROR(
-                    "Failed to initialize VirtIO block device at %p: %s",
-                    base_address, getErrorMessage(error)
-                );
-                return error;
+    if (address->magic_value == VIRTIO_MAGIC_NUMBER) {
+        if (type != 0) {
+            if (type == VIRTIO_BLOCK) {
+                Error error = initVirtIOBlockDevice(address, itr_id);
+                if (isError(error)) {
+                    KERNEL_ERROR(
+                        "Failed to initialize VirtIO block device at %p: %s", base_address,
+                        getErrorMessage(error)
+                    );
+                    return error;
+                } else {
+                    KERNEL_SUBSUCCESS("Initialized VirtIO block device %p", base_address);
+                    return simpleError(SUCCESS);
+                }
             } else {
-                KERNEL_SUBSUCCESS("Initialized VirtIO block device %p", base_address);
-                return simpleError(SUCCESS);
+                KERNEL_WARNING("Unsupported VirtIO device type %i at %p", type, base_address);
+                return simpleError(ENOTSUP);
             }
         } else {
-            KERNEL_WARNING("Unsupported VirtIO device type %i at %p", type, base_address);
-            return simpleError(ENOTSUP);
+            return someError(SUCCESS, "No device connected");
         }
     } else {
-        return someError(SUCCESS, "No device connected");
+        KERNEL_WARNING("Wrong virtio magic at %p", base_address);
+        return simpleError(ENOTSUP);
     }
 }
 
