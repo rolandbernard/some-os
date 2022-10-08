@@ -1,8 +1,10 @@
 
+#include <assert.h>
 #include <string.h>
 
 #include "error/panic.h"
 #include "interrupt/timer.h"
+#include "task/spinlock.h"
 #include "util/util.h"
 
 #include "util/random.h"
@@ -238,26 +240,36 @@ static void aesBlock(Bits256 key, Bits128 block) {
 #define MIN_RESEED_SIZE 32
 #define ENTROPY_POOLS 32
 
-Bits256 pools[ENTROPY_POOLS];
-size_t pools_size;
-size_t acc_count;
-size_t req_count;
+static Bits256 pools[ENTROPY_POOLS];
+static size_t pools_size;
+static size_t acc_count;
+static size_t req_count;
 
-Bits256 key;
-Bits128 counter;
-Time last_reseed;
+static Bits256 key;
+static Bits128 counter;
+static Time last_reseed;
+
+static SpinLock lock;
 
 void addRandomEvent(uint8_t* data, size_t size) {
+    assert(size < sizeof(Bits256) - 2 * sizeof(uint32_t));
+    lockSpinLock(&lock);
+    if (acc_count == 0) {
+        for (size_t i = 0; i < ENTROPY_POOLS; i++) {
+            sha256Init(pools[i]);
+        }
+        pools_size = 0;
+    }
     Bits256 block;
-    block[0] = getTime() >> 32;
-    block[1] = getTime();
-    block[2] = size;
-    memcpy(block + 3, data, size);
+    block[0] = getTime();
+    block[1] = size;
+    memcpy(block + 2, data, size);
     sha256Block(pools[acc_count % ENTROPY_POOLS], block);
     acc_count++;
     if (acc_count % ENTROPY_POOLS == 0) {
         pools_size++;
     }
+    unlockSpinLock(&lock);
 }
 
 static void reseedRandom() {
@@ -288,6 +300,7 @@ static void randomBlock(Bits128 block) {
 }
 
 void getRandom(VirtPtr bytes, size_t size) {
+    lockSpinLock(&lock);
     Time now = getTime();
     if (last_reseed == 0 || (last_reseed + CLOCKS_PER_SEC / 10 < now && pools_size >= MIN_RESEED_SIZE)) {
         reseedRandom();
@@ -305,8 +318,9 @@ void getRandom(VirtPtr bytes, size_t size) {
         }
         Bits256 new_key;
         randomBlock(new_key);
-        randomBlock(new_key + 1);
+        randomBlock(new_key + 4);
         memcpy(key, new_key, sizeof(Bits256));
     }
+    unlockSpinLock(&lock);
 }
 

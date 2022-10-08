@@ -9,6 +9,7 @@
 #include "memory/kalloc.h"
 #include "task/schedule.h"
 #include "task/syscall.h"
+#include "util/random.h"
 #include "util/text.h"
 #include "util/util.h"
 
@@ -397,6 +398,7 @@ UartTtyDevice* createUartTtyDevice(void* uart, UartWriteFunction write, UartRead
 void uartTtyDataReady(UartTtyDevice* dev) {
     Error error;
     lockSpinLock(&dev->lock);
+    addRandomEvent(NULL, 0);
     do {
         error = basicTtyRead(dev);
     } while (!isError(error));
