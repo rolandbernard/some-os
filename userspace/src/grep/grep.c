@@ -58,8 +58,10 @@ static char* readLineFromFile(FILE* file) {
     char* buffer = NULL;
     while (!feof(file)) {
         buffer = realloc(buffer, length + 1024);
-        fgets(buffer + length, 1024, file);
-        if (buffer[strlen(buffer) - 1] == '\n') {
+        if (fgets(buffer + length, 1024, file) == NULL) {
+            buffer[0] = 0;
+        }
+        if (buffer[0] != 0 && buffer[strlen(buffer) - 1] == '\n') {
             buffer[strlen(buffer) - 1] = 0;
             break;
         }
