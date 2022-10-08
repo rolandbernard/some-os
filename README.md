@@ -51,3 +51,9 @@ This repository has four important subdirectories:
 * `toolchain` This directory includes ported software that belongs to the toolchain
 * `programs` This directory includes all ported programs that don't belong to the toolchain
 
+## Hello world
+
+The os is just about capable enough to run bash:
+
+![Small example](demo.gif)
+
