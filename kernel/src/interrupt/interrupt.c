@@ -13,6 +13,7 @@
 #include "process/signals.h"
 #include "task/schedule.h"
 #include "task/types.h"
+#include "util/random.h"
 
 const char* getCauseString(bool interrupt, int code) {
     if (interrupt) {
@@ -70,6 +71,7 @@ void kernelTrap(uintptr_t cause, uintptr_t pc, uintptr_t val, TrapFrame* frame) 
     } else {
         Task* task = (Task*)frame;
         if (frame->hart != NULL) {
+            addRandomEvent(NULL, 0);
             Time elapsed = getTime() - task->times.entered;
             task->times.user_time += elapsed;
             task->times.entered = getTime();

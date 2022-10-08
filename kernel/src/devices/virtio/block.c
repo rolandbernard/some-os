@@ -9,6 +9,7 @@
 #include "task/schedule.h"
 #include "task/spinlock.h"
 #include "task/syscall.h"
+#include "util/random.h"
 
 static void handleInterrupt(ExternalInterrupt id, void* udata) {
     virtIOBlockFreePendingRequests((VirtIOBlockDevice*)udata);
@@ -90,6 +91,7 @@ Error virtIOBlockDeviceOperation(VirtIOBlockDevice* device, VirtPtr buffer, size
 void virtIOBlockFreePendingRequests(VirtIOBlockDevice* device) {
     VirtIOBlockRequest* requests = NULL;
     lockSpinLock(&device->lock);
+    addRandomEvent(NULL, 0);
     for (; device->virtio.ack_index != device->virtio.queue->used.index; device->virtio.ack_index++) {
         VirtIOUsedElement elem = device->virtio.queue->used.ring[device->virtio.ack_index % VIRTIO_RING_SIZE];
         VirtIOBlockRequest** current = &device->requests;
